@@ -93,6 +93,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         WHERE id = ?
       `
     );
+  const deleteHost = db.prepare(`DELETE FROM hosts WHERE id = ?`);
 
   return {
     create(input: HostInput): HostRecord {
@@ -120,6 +121,10 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
     },
     list(): HostRecord[] {
       return (listHosts.all() as HostRow[]).map(mapRow);
+    },
+    remove(id: string): boolean {
+      const result = deleteHost.run(id);
+      return result.changes > 0;
     }
   };
 }
@@ -150,6 +155,9 @@ function createInMemoryHostsRepository() {
       return Array.from(hosts.values()).sort((left, right) =>
         left.name.localeCompare(right.name)
       );
+    },
+    remove(id: string): boolean {
+      return hosts.delete(id);
     }
   };
 }

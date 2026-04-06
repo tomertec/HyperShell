@@ -24,6 +24,7 @@ import type { IpcMainLike } from "./registerIpc";
 type HostsRepoLike = {
   create(input: HostInput): HostRecord;
   list(): HostRecord[];
+  remove(id: string): boolean;
 };
 
 let hostsRepo: HostsRepoLike | null = null;
@@ -120,6 +121,14 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
       return readHosts().sort((left, right) =>
         left.name.localeCompare(right.name)
       );
+    },
+    remove(id: string): boolean {
+      const hosts = readHosts();
+      const index = hosts.findIndex((host) => host.id === id);
+      if (index === -1) return false;
+      hosts.splice(index, 1);
+      writeHosts(hosts);
+      return true;
     }
   };
 }
@@ -170,6 +179,6 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
 
   ipcMain.handle(ipcChannels.hosts.remove, (_event: IpcMainInvokeEvent, request: RemoveHostRequest) => {
     const parsed = removeHostRequestSchema.parse(request);
-    void parsed;
+    getOrCreateHostsRepo().remove(parsed.id);
   });
 }
