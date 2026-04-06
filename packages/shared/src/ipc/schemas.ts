@@ -99,3 +99,23 @@ export const removeHostRequestSchema = z.object({
 export type HostRecord = z.infer<typeof hostRecordSchema>;
 export type UpsertHostRequest = z.infer<typeof upsertHostRequestSchema>;
 export type RemoveHostRequest = z.infer<typeof removeHostRequestSchema>;
+
+// --- Settings schemas ---
+
+export const getSettingRequestSchema = z.object({
+  key: z.string().min(1)
+});
+
+export const updateSettingRequestSchema = z.object({
+  key: z.string().min(1),
+  value: z.string()
+});
+
+export const settingRecordSchema = z.object({
+  key: z.string().min(1),
+  value: z.string()
+});
+
+export type GetSettingRequest = z.infer<typeof getSettingRequestSchema>;
+export type UpdateSettingRequest = z.infer<typeof updateSettingRequestSchema>;
+export type SettingRecord = z.infer<typeof settingRecordSchema>;

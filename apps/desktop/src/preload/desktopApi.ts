@@ -8,6 +8,8 @@ import {
   upsertHostRequestSchema,
   removeHostRequestSchema,
   writeSessionRequestSchema,
+  getSettingRequestSchema,
+  updateSettingRequestSchema,
   type CloseSessionRequest,
   type HostRecord,
   type OpenSessionRequest,
@@ -16,7 +18,10 @@ import {
   type ResizeSessionRequest,
   type SessionEvent,
   type UpsertHostRequest,
-  type WriteSessionRequest
+  type WriteSessionRequest,
+  type GetSettingRequest,
+  type UpdateSettingRequest,
+  type SettingRecord
 } from "@sshterm/shared";
 
 export interface PreloadIpcRenderer {
@@ -46,6 +51,8 @@ export interface DesktopApi {
   listHosts(): Promise<HostRecord[]>;
   upsertHost(request: UpsertHostRequest): Promise<HostRecord>;
   removeHost(request: RemoveHostRequest): Promise<void>;
+  getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
+  updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -136,6 +143,16 @@ export function createDesktopApi(
     async removeHost(request: RemoveHostRequest): Promise<void> {
       const parsed = removeHostRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.hosts.remove, parsed);
+    },
+    async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
+      const parsed = getSettingRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
+      return result as SettingRecord | null;
+    },
+    async updateSetting(request: UpdateSettingRequest): Promise<SettingRecord> {
+      const parsed = updateSettingRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
+      return result as SettingRecord;
     }
   };
 }

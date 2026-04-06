@@ -14,6 +14,7 @@ import type {
 } from "@sshterm/shared";
 import { createSessionManager } from "@sshterm/session-core";
 import { registerHostIpc } from "./hostsIpc";
+import { registerSettingsIpc } from "./settingsIpc";
 import type {
   SessionManager,
   SessionTransportEvent,
@@ -28,7 +29,9 @@ const registeredChannels = [
   ipcChannels.session.close,
   ipcChannels.hosts.list,
   ipcChannels.hosts.upsert,
-  ipcChannels.hosts.remove
+  ipcChannels.hosts.remove,
+  ipcChannels.settings.get,
+  ipcChannels.settings.update
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -38,6 +41,7 @@ let cleanupRegisteredIpc: (() => void) | null = null;
 export interface RegisterIpcOptions {
   emitSessionEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
+  resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string } | null>;
 }
 
 export type IpcMainLike = Pick<IpcMain, "handle"> &
@@ -46,10 +50,24 @@ export type IpcMainLike = Pick<IpcMain, "handle"> &
 async function openSessionHandler(
   _event: IpcMainInvokeEvent,
   request: OpenSessionRequest,
-  manager: SessionManager = sessionManager
+  manager: SessionManager = sessionManager,
+  resolveHostProfile?: RegisterIpcOptions["resolveHostProfile"]
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
-  return manager.open(parsed);
+
+  let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string } | undefined;
+
+  if (parsed.transport === "ssh" && resolveHostProfile) {
+    const profile = await resolveHostProfile(parsed.profileId);
+    if (profile) {
+      sshOptions = profile;
+    }
+  }
+
+  return manager.open({
+    ...parsed,
+    sshOptions: sshOptions ?? { hostname: parsed.profileId }
+  });
 }
 
 async function resizeSessionHandler(
@@ -99,7 +117,7 @@ export function registerIpc(
   }
 
   ipcMain.handle(ipcChannels.session.open, (event, request) =>
-    openSessionHandler(event, request, manager)
+    openSessionHandler(event, request, manager, options.resolveHostProfile)
   );
   ipcMain.handle(ipcChannels.session.resize, (event, request) =>
     resizeSessionHandler(event, request, manager)
@@ -112,6 +130,7 @@ export function registerIpc(
   );
 
   registerHostIpc(ipcMain);
+  registerSettingsIpc(ipcMain, () => null);
 
   const cleanup = () => {
     unsubscribeSessionEvents();
