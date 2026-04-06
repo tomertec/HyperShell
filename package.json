@@ -1,0 +1,37 @@
+{
+  "name": "sshterm",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.8.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "test": "vitest run",
+    "lint": "pnpm -r --if-present lint",
+    "ci:build": "pnpm build",
+    "ci:test": "pnpm test",
+    "ci:test:e2e": "pnpm --filter @sshterm/ui run test:e2e",
+    "release:windows:unsigned": "pnpm --filter @sshterm/desktop run package:win:unsigned",
+    "release:windows:signed": "pnpm --filter @sshterm/desktop run package:win:signed",
+    "release:manifest": "pnpm --filter @sshterm/desktop run release:manifest",
+    "release:prepare": "node .tools/release/prepare-version-and-changelog.mjs"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@serialport/bindings-cpp",
+      "better-sqlite3",
+      "electron",
+      "electron-winstaller",
+      "esbuild",
+      "node-pty"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

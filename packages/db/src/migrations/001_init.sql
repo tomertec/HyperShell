@@ -1,0 +1,120 @@
+CREATE TABLE IF NOT EXISTS host_groups (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tags (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS auth_profiles (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL,
+  username TEXT,
+  secret_ref TEXT,
+  key_path TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS hosts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  hostname TEXT NOT NULL,
+  port INTEGER NOT NULL DEFAULT 22,
+  username TEXT,
+  auth_profile_id TEXT,
+  group_id TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (auth_profile_id) REFERENCES auth_profiles(id) ON DELETE SET NULL,
+  FOREIGN KEY (group_id) REFERENCES host_groups(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS host_tags (
+  host_id TEXT NOT NULL,
+  tag_id TEXT NOT NULL,
+  PRIMARY KEY (host_id, tag_id),
+  FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS serial_profiles (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  path TEXT NOT NULL,
+  baud_rate INTEGER NOT NULL DEFAULT 9600,
+  data_bits INTEGER NOT NULL DEFAULT 8,
+  stop_bits INTEGER NOT NULL DEFAULT 1,
+  parity TEXT NOT NULL DEFAULT 'none',
+  flow_control TEXT NOT NULL DEFAULT 'none',
+  local_echo INTEGER NOT NULL DEFAULT 0,
+  dtr INTEGER NOT NULL DEFAULT 1,
+  rts INTEGER NOT NULL DEFAULT 1,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  transport TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  title TEXT NOT NULL,
+  last_connected_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS session_layouts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  layout_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS snippets (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS port_forward_profiles (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  transport TEXT NOT NULL,
+  config_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  target_path TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_hosts_group_id ON hosts(group_id);
+CREATE INDEX IF NOT EXISTS idx_hosts_auth_profile_id ON hosts(auth_profile_id);
+CREATE INDEX IF NOT EXISTS idx_host_tags_tag_id ON host_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_serial_profiles_path ON serial_profiles(path);
+CREATE INDEX IF NOT EXISTS idx_sessions_transport_profile_id ON sessions(transport, profile_id);

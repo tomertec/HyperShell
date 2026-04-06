@@ -1,0 +1,27 @@
+appId: com.sshterm.desktop
+productName: SSHTerm
+npmRebuild: false
+asar: true
+asarUnpack:
+  - "**/better-sqlite3/**"
+  - "**/node-pty/**"
+  - "**/serialport/**"
+  - "**/@serialport/**"
+files:
+  - dist/**/*
+  - package.json
+directories:
+  output: release
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: sshterm-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: SSHTerm
+publish: null

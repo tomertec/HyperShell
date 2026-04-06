@@ -1,0 +1,39 @@
+{
+  "name": "@sshterm/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SSHTerm Electron desktop shell",
+  "author": "SSHTerm Team",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "pnpm run build && electron .",
+    "dev:native": "pnpm run rebuild:native && pnpm run build && electron .",
+    "build": "tsc -p tsconfig.json --noEmit && node esbuild.config.mjs",
+    "build:bundle": "pnpm --filter @sshterm/ui run build && pnpm run build && pnpm run sync:renderer",
+    "sync:renderer": "node ../../.tools/desktop/sync-renderer-dist.mjs",
+    "rebuild:native": "electron-builder install-app-deps",
+    "prepare:package": "pnpm run build:bundle",
+    "package:win:dir": "pnpm run prepare:package && electron-builder --config electron-builder.yml --win nsis --dir --publish never",
+    "package:win:unsigned": "pnpm run prepare:package && electron-builder --config electron-builder.yml --win nsis --x64 --publish never",
+    "package:win:signed": "node ../../.tools/desktop/verify-signing-env.mjs && pnpm run package:win:unsigned",
+    "release:manifest": "node ../../.tools/release/write-release-manifest.mjs --artifacts-dir release",
+    "start": "electron .",
+    "start:native": "pnpm run rebuild:native && electron .",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@sshterm/db": "workspace:^",
+    "@sshterm/session-core": "workspace:*",
+    "@sshterm/shared": "workspace:*",
+    "better-sqlite3": "^11.8.0",
+    "node-pty": "^1.0.0",
+    "serialport": "^12.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.0"
+  }
+}
