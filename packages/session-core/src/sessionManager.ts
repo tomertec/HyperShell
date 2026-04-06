@@ -3,6 +3,8 @@ import type {
   SessionState,
   SessionTransportEvent,
   SessionTransportKind,
+  SshConnectionOptions,
+  SerialConnectionOptions,
   TransportHandle
 } from "./transports/transportEvents";
 import { createSerialTransport } from "./transports/serialTransport";
@@ -27,6 +29,8 @@ export interface OpenSessionInput {
   profileId: string;
   cols: number;
   rows: number;
+  sshOptions?: SshConnectionOptions;
+  serialOptions?: SerialConnectionOptions;
 }
 
 export interface OpenSessionResult {
@@ -76,14 +80,29 @@ function createNoopTransport(sessionId: string): TransportHandle {
 
 function createDefaultTransport(request: OpenSessionRequest): TransportHandle {
   if (request.transport === "ssh") {
+    const opts = request.sshOptions ?? { hostname: request.profileId };
     return createSshPtyTransport(request, {
-      hostname: request.profileId
+      hostname: opts.hostname,
+      username: opts.username,
+      port: opts.port,
+      identityFile: opts.identityFile,
+      proxyJump: opts.proxyJump,
+      keepAliveSeconds: opts.keepAliveSeconds
     });
   }
 
   if (request.transport === "serial") {
+    const opts = request.serialOptions ?? { path: request.profileId };
     return createSerialTransport(request, {
-      path: request.profileId
+      path: opts.path,
+      baudRate: opts.baudRate,
+      dataBits: opts.dataBits,
+      stopBits: opts.stopBits,
+      parity: opts.parity,
+      flowControl: opts.flowControl,
+      localEcho: opts.localEcho,
+      dtr: opts.dtr,
+      rts: opts.rts
     });
   }
 
@@ -154,7 +173,9 @@ export function createSessionManager(
         transport: input.transport,
         profileId: input.profileId,
         cols: input.cols,
-        rows: input.rows
+        rows: input.rows,
+        sshOptions: input.sshOptions,
+        serialOptions: input.serialOptions
       });
 
       const unsubscribe = transport.onEvent((event) => {

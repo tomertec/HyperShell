@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createSessionManager } from "./sessionManager";
 import type {
+  OpenSessionRequest,
   SessionTransportEvent,
   TransportHandle
 } from "./transports/transportEvents";
@@ -135,5 +136,36 @@ describe("sessionManager", () => {
       exitCode: 0
     });
     expect(manager.getSession("s-exit")).toBeUndefined();
+  });
+
+  it("passes sshOptions to transport when provided", () => {
+    let capturedRequest: OpenSessionRequest | null = null;
+
+    const manager = createSessionManager({
+      createTransport(request) {
+        capturedRequest = request;
+        const listeners = new Set<(event: SessionTransportEvent) => void>();
+        return {
+          write() {},
+          resize() {},
+          close() { for (const l of listeners) l({ type: "exit", sessionId: request.sessionId, exitCode: null }); },
+          onEvent(l) { listeners.add(l); return () => { listeners.delete(l); }; }
+        };
+      }
+    });
+
+    manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "10.0.0.1", username: "admin", port: 2222 }
+    });
+
+    expect(capturedRequest?.sshOptions).toEqual({
+      hostname: "10.0.0.1",
+      username: "admin",
+      port: 2222
+    });
   });
 });
