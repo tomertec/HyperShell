@@ -1,5 +1,6 @@
 import { useStore } from "zustand";
 
+import { BroadcastBar } from "../broadcast/BroadcastBar";
 import { TerminalPane } from "../terminal/TerminalPane";
 import { type Pane, layoutStore } from "./layoutStore";
 import { TabBar } from "./TabBar";
@@ -70,6 +71,7 @@ export function Workspace() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      <BroadcastBar />
       <TabBar
         tabs={tabs}
         activeSessionId={activeSessionId}

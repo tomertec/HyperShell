@@ -19,4 +19,18 @@ describe("broadcastStore", () => {
     expect(store.getState().targetSessionIds).toEqual(["s1", "s2"]);
     expect(store.getState().enabled).toBe(true);
   });
+
+  it("toggles broadcast on and off", () => {
+    const store = createBroadcastStore();
+    store.getState().toggle();
+    expect(store.getState().enabled).toBe(true);
+    store.getState().toggle();
+    expect(store.getState().enabled).toBe(false);
+  });
+
+  it("deduplicates target session ids", () => {
+    const store = createBroadcastStore();
+    store.getState().setTargets(["s1", "s1", "s2"]);
+    expect(store.getState().targetSessionIds).toEqual(["s1", "s2"]);
+  });
 });
