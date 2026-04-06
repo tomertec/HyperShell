@@ -19,38 +19,56 @@ function PaneView({
 }) {
   const tabs = useStore(layoutStore, (s) => s.tabs);
   const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
-  const tab = pane.sessionId ? tabs.find((t) => t.sessionId === pane.sessionId) ?? null : null;
-  const terminalTransport = tab?.transport === "serial" ? "serial" : "ssh";
+
+  const terminalTabs = tabs.filter((t) => !(t.type === "sftp" && t.sftpSessionId));
+  const activeSftpTab =
+    pane.sessionId
+      ? tabs.find((t) => t.sessionId === pane.sessionId && t.type === "sftp" && t.sftpSessionId) ?? null
+      : null;
 
   return (
     <div
-      className={`flex-1 min-h-0 flex flex-col min-w-0 border-l border-border/40 first:border-l-0 ${
+      className={`flex-1 min-h-0 min-w-0 border-l border-border/40 first:border-l-0 relative ${
         isActive ? "ring-1 ring-inset ring-accent/20" : ""
       }`}
       onClick={onActivate}
     >
-      {tab ? (
-        tab.type === "sftp" && tab.sftpSessionId ? (
+      {activeSftpTab && (
+        <div className="absolute inset-0 flex flex-col z-10">
           <SftpTab
-            sftpSessionId={tab.sftpSessionId}
-            hostId={tab.hostId ?? tab.profileId ?? ""}
-            onClose={() => onCloseTab(tab.sessionId)}
+            sftpSessionId={activeSftpTab.sftpSessionId!}
+            hostId={activeSftpTab.hostId ?? activeSftpTab.profileId ?? ""}
+            onClose={() => onCloseTab(activeSftpTab.sessionId)}
           />
-        ) : (
-          <TerminalPane
+        </div>
+      )}
+
+      {terminalTabs.map((tab) => {
+        const isVisible = !activeSftpTab && tab.sessionId === pane.sessionId;
+        const terminalTransport = tab.transport === "serial" ? "serial" : "ssh";
+        return (
+          <div
             key={tab.tabKey ?? tab.sessionId}
-            title={tab.title}
-            transport={terminalTransport}
-            profileId={tab.profileId ?? tab.sessionId}
-            sessionId={tab.preopened ? tab.sessionId : undefined}
-            autoConnect={!tab.preopened}
-            onSessionOpened={(sessionId) => {
-              replaceSessionId(tab.sessionId, sessionId);
-            }}
-          />
-        )
-      ) : (
-        <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+            className={`absolute inset-0 flex flex-col ${
+              isVisible ? "z-10" : "invisible pointer-events-none"
+            }`}
+          >
+            <TerminalPane
+              title={tab.title}
+              transport={terminalTransport}
+              profileId={tab.profileId ?? tab.sessionId}
+              sessionId={tab.preopened ? tab.sessionId : undefined}
+              autoConnect={!tab.preopened}
+              onSessionOpened={(sessionId) => {
+                replaceSessionId(tab.sessionId, sessionId);
+              }}
+            />
+          </div>
+        );
+      })}
+
+      {!pane.sessionId && terminalTabs.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm">
           Empty pane
         </div>
       )}

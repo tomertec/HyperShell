@@ -51,8 +51,11 @@ export function createLayoutStore() {
       }),
 
     activateTab: (sessionId) =>
-      set(() => ({
-        activeSessionId: sessionId
+      set((state) => ({
+        activeSessionId: sessionId,
+        panes: state.panes.map((p) =>
+          p.paneId === state.activePaneId ? { ...p, sessionId } : p
+        )
       })),
 
     replaceSessionId: (oldSessionId, nextSessionId) =>
