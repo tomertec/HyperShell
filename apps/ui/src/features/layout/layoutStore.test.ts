@@ -12,6 +12,30 @@ describe("layoutStore", () => {
     expect(store.getState().tabs[0]?.tabKey).toBe("s1");
   });
 
+  it("splits a pane", () => {
+    const store = createLayoutStore();
+    store.getState().openTab({ sessionId: "s1", title: "server-1" });
+    store.getState().splitPane("s1");
+    expect(store.getState().panes).toHaveLength(2);
+    expect(store.getState().panes[1]?.sessionId).toBe("s1");
+    expect(store.getState().activePaneId).toBe(store.getState().panes[1]?.paneId);
+  });
+
+  it("closes a pane", () => {
+    const store = createLayoutStore();
+    store.getState().splitPane("s1");
+    const secondPaneId = store.getState().panes[1]?.paneId!;
+    store.getState().closePane(secondPaneId);
+    expect(store.getState().panes).toHaveLength(1);
+  });
+
+  it("does not close the last pane", () => {
+    const store = createLayoutStore();
+    const firstPaneId = store.getState().panes[0]?.paneId!;
+    store.getState().closePane(firstPaneId);
+    expect(store.getState().panes).toHaveLength(1);
+  });
+
   it("replaces temporary session ids with backend ids", () => {
     const store = createLayoutStore();
 

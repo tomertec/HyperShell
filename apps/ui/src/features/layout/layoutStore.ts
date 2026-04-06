@@ -9,29 +9,47 @@ export type LayoutTab = {
   preopened?: boolean;
 };
 
+export type Pane = {
+  paneId: string;
+  sessionId: string | null;
+};
+
 export type LayoutState = {
   tabs: LayoutTab[];
   activeSessionId: string | null;
+  panes: Pane[];
+  activePaneId: string;
   openTab: (tab: LayoutTab) => void;
   activateTab: (sessionId: string) => void;
   replaceSessionId: (oldSessionId: string, nextSessionId: string) => void;
+  splitPane: (sessionId: string) => void;
+  closePane: (paneId: string) => void;
+  activatePane: (paneId: string) => void;
 };
 
 export function createLayoutStore() {
   return createStore<LayoutState>()((set) => ({
     tabs: [],
     activeSessionId: null,
+    panes: [{ paneId: "pane-1", sessionId: null }],
+    activePaneId: "pane-1",
+
     openTab: (tab) =>
-      set((state) => ({
-        tabs: state.tabs.some((existingTab) => existingTab.sessionId === tab.sessionId)
+      set((state) => {
+        const tabs = state.tabs.some((t) => t.sessionId === tab.sessionId)
           ? state.tabs
-          : [...state.tabs, { ...tab, tabKey: tab.tabKey ?? tab.sessionId }],
-        activeSessionId: tab.sessionId
-      })),
+          : [...state.tabs, { ...tab, tabKey: tab.tabKey ?? tab.sessionId }];
+        const panes = state.panes.map((p) =>
+          p.paneId === state.activePaneId ? { ...p, sessionId: tab.sessionId } : p
+        );
+        return { tabs, activeSessionId: tab.sessionId, panes };
+      }),
+
     activateTab: (sessionId) =>
       set(() => ({
         activeSessionId: sessionId
       })),
+
     replaceSessionId: (oldSessionId, nextSessionId) =>
       set((state) => {
         if (oldSessionId === nextSessionId) {
@@ -60,14 +78,44 @@ export function createLayoutStore() {
           dedupedTabs.push(tab);
         }
 
+        const panes = state.panes.map((p) =>
+          p.sessionId === oldSessionId ? { ...p, sessionId: nextSessionId } : p
+        );
+
         return {
           tabs: dedupedTabs,
+          panes,
           activeSessionId:
             state.activeSessionId === oldSessionId
               ? nextSessionId
               : state.activeSessionId
         };
-      })
+      }),
+
+    splitPane: (sessionId) =>
+      set((state) => {
+        const newPaneId = `pane-${state.panes.length + 1}`;
+        return {
+          panes: [...state.panes, { paneId: newPaneId, sessionId }],
+          activePaneId: newPaneId
+        };
+      }),
+
+    closePane: (paneId) =>
+      set((state) => {
+        if (state.panes.length <= 1) return state;
+        const nextPanes = state.panes.filter((p) => p.paneId !== paneId);
+        return {
+          panes: nextPanes,
+          activePaneId:
+            state.activePaneId === paneId
+              ? nextPanes[nextPanes.length - 1].paneId
+              : state.activePaneId
+        };
+      }),
+
+    activatePane: (paneId) =>
+      set({ activePaneId: paneId })
   }));
 }
 

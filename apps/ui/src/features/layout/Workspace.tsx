@@ -1,16 +1,57 @@
 import { useStore } from "zustand";
 
 import { TerminalPane } from "../terminal/TerminalPane";
-import { layoutStore } from "./layoutStore";
+import { type Pane, layoutStore } from "./layoutStore";
 import { TabBar } from "./TabBar";
+
+function PaneView({
+  pane,
+  isActive,
+  onActivate
+}: {
+  pane: Pane;
+  isActive: boolean;
+  onActivate: () => void;
+}) {
+  const tabs = useStore(layoutStore, (s) => s.tabs);
+  const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
+  const tab = pane.sessionId ? tabs.find((t) => t.sessionId === pane.sessionId) ?? null : null;
+
+  return (
+    <div
+      className={`flex-1 min-h-0 flex flex-col min-w-0 border-l border-border/40 first:border-l-0 ${
+        isActive ? "ring-1 ring-inset ring-accent/20" : ""
+      }`}
+      onClick={onActivate}
+    >
+      {tab ? (
+        <TerminalPane
+          key={tab.tabKey ?? tab.sessionId}
+          title={tab.title}
+          transport={tab.transport ?? "ssh"}
+          profileId={tab.profileId ?? tab.sessionId}
+          sessionId={tab.preopened ? tab.sessionId : undefined}
+          autoConnect={!tab.preopened}
+          onSessionOpened={(sessionId) => {
+            replaceSessionId(tab.sessionId, sessionId);
+          }}
+        />
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+          Empty pane
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Workspace() {
   const tabs = useStore(layoutStore, (s) => s.tabs);
   const activeSessionId = useStore(layoutStore, (s) => s.activeSessionId);
   const activateTab = useStore(layoutStore, (s) => s.activateTab);
-  const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
-  const activeTab =
-    tabs.find((t) => t.sessionId === activeSessionId) ?? tabs[0] ?? null;
+  const panes = useStore(layoutStore, (s) => s.panes);
+  const activePaneId = useStore(layoutStore, (s) => s.activePaneId);
+  const activatePane = useStore(layoutStore, (s) => s.activatePane);
 
   const closeTab = (sessionId: string) => {
     window.sshterm?.closeSession?.({ sessionId }).catch(() => {});
@@ -20,7 +61,10 @@ export function Workspace() {
         state.activeSessionId === sessionId
           ? nextTabs[nextTabs.length - 1]?.sessionId ?? null
           : state.activeSessionId;
-      return { tabs: nextTabs, activeSessionId: nextActive };
+      const nextPanes = state.panes.map((p) =>
+        p.sessionId === sessionId ? { ...p, sessionId: null } : p
+      );
+      return { tabs: nextTabs, activeSessionId: nextActive, panes: nextPanes };
     });
   };
 
@@ -33,19 +77,16 @@ export function Workspace() {
         onClose={closeTab}
       />
 
-      {activeTab ? (
-        <div className="flex-1 min-h-0 flex flex-col">
-          <TerminalPane
-            key={activeTab.tabKey ?? activeTab.sessionId}
-            title={activeTab.title}
-            transport={activeTab.transport ?? "ssh"}
-            profileId={activeTab.profileId ?? activeTab.sessionId}
-            sessionId={activeTab.preopened ? activeTab.sessionId : undefined}
-            autoConnect={!activeTab.preopened}
-            onSessionOpened={(sessionId) => {
-              replaceSessionId(activeTab.sessionId, sessionId);
-            }}
-          />
+      {tabs.length > 0 ? (
+        <div className="flex-1 min-h-0 flex flex-row">
+          {panes.map((pane) => (
+            <PaneView
+              key={pane.paneId}
+              pane={pane}
+              isActive={pane.paneId === activePaneId}
+              onActivate={() => activatePane(pane.paneId)}
+            />
+          ))}
         </div>
       ) : (
         <div className="relative flex-1 flex flex-col items-center justify-center gap-4 text-text-secondary">
