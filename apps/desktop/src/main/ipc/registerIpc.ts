@@ -41,7 +41,7 @@ let cleanupRegisteredIpc: (() => void) | null = null;
 export interface RegisterIpcOptions {
   emitSessionEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
-  resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string } | null>;
+  resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
 }
 
 export type IpcMainLike = Pick<IpcMain, "handle"> &
@@ -55,7 +55,7 @@ async function openSessionHandler(
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
 
-  let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string } | undefined;
+  let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | undefined;
 
   if (parsed.transport === "ssh" && resolveHostProfile) {
     const profile = await resolveHostProfile(parsed.profileId);
