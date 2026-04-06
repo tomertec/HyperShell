@@ -133,7 +133,7 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
   };
 }
 
-function getOrCreateHostsRepo() {
+export function getOrCreateHostsRepo() {
   if (!hostsRepo) {
     try {
       const Database = require("better-sqlite3");

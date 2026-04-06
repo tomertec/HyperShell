@@ -53,6 +53,7 @@ export interface DesktopApi {
   removeHost(request: RemoveHostRequest): Promise<void>;
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
+  importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -153,6 +154,10 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return result as SettingRecord;
+    },
+    async importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }> {
+      const result = await ipcRenderer.invoke(ipcChannels.hosts.importSshConfig);
+      return result as { imported: number; hosts: HostRecord[] };
     }
   };
 }

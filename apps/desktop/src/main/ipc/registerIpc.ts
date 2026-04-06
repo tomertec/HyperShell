@@ -13,8 +13,9 @@ import type {
   WriteSessionRequest
 } from "@sshterm/shared";
 import { createSessionManager } from "@sshterm/session-core";
-import { registerHostIpc } from "./hostsIpc";
+import { registerHostIpc, getOrCreateHostsRepo } from "./hostsIpc";
 import { registerSettingsIpc } from "./settingsIpc";
+import { registerSshConfigIpc } from "./sshConfigIpc";
 import type {
   SessionManager,
   SessionTransportEvent,
@@ -30,6 +31,7 @@ const registeredChannels = [
   ipcChannels.hosts.list,
   ipcChannels.hosts.upsert,
   ipcChannels.hosts.remove,
+  ipcChannels.hosts.importSshConfig,
   ipcChannels.settings.get,
   ipcChannels.settings.update
 ] as const;
@@ -130,6 +132,7 @@ export function registerIpc(
   );
 
   registerHostIpc(ipcMain);
+  registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
   registerSettingsIpc(ipcMain, () => null);
 
   const cleanup = () => {

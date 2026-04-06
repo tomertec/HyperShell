@@ -96,9 +96,15 @@ export const removeHostRequestSchema = z.object({
   id: z.string().min(1)
 });
 
+export const importSshConfigResponseSchema = z.object({
+  imported: z.number().int().min(0),
+  hosts: z.array(hostRecordSchema)
+});
+
 export type HostRecord = z.infer<typeof hostRecordSchema>;
 export type UpsertHostRequest = z.infer<typeof upsertHostRequestSchema>;
 export type RemoveHostRequest = z.infer<typeof removeHostRequestSchema>;
+export type ImportSshConfigResponse = z.infer<typeof importSshConfigResponseSchema>;
 
 // --- Settings schemas ---
 
