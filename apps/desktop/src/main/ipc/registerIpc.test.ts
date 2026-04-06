@@ -74,7 +74,8 @@ function createFakeSessionManager() {
       return () => {
         listener = null;
       };
-    }
+    },
+    setSignals() {}
   };
 
   return {

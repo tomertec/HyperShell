@@ -34,6 +34,7 @@ export interface TransportHandle {
   resize(cols: number, rows: number): void;
   close(): void;
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
+  setSignals?(signals: { dtr?: boolean; rts?: boolean }): void;
 }
 
 export interface SshConnectionOptions {
@@ -48,10 +49,10 @@ export interface SshConnectionOptions {
 export interface SerialConnectionOptions {
   path: string;
   baudRate?: number;
-  dataBits?: number;
-  stopBits?: number;
-  parity?: string;
-  flowControl?: string;
+  dataBits?: 5 | 6 | 7 | 8;
+  stopBits?: 1 | 2;
+  parity?: "none" | "even" | "odd" | "mark" | "space";
+  flowControl?: "none" | "hardware" | "software";
   localEcho?: boolean;
   dtr?: boolean;
   rts?: boolean;

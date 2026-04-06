@@ -5,8 +5,13 @@ import type {
   OpenSessionResponse,
   RemoveHostRequest,
   ResizeSessionRequest,
+  SerialPortInfo,
+  SerialProfileRecord,
+  RemoveSerialProfileRequest,
   SessionEvent,
+  SetSignalsRequest,
   UpsertHostRequest,
+  UpsertSerialProfileRequest,
   WriteSessionRequest
 } from "@sshterm/shared";
 
@@ -22,6 +27,11 @@ declare global {
       listHosts?: () => Promise<HostRecord[]>;
       upsertHost?: (request: UpsertHostRequest) => Promise<HostRecord>;
       removeHost?: (request: RemoveHostRequest) => Promise<void>;
+      listSerialProfiles?: () => Promise<SerialProfileRecord[]>;
+      upsertSerialProfile?: (request: UpsertSerialProfileRequest) => Promise<SerialProfileRecord>;
+      removeSerialProfile?: (request: RemoveSerialProfileRequest) => Promise<void>;
+      listSerialPorts?: () => Promise<SerialPortInfo[]>;
+      setSessionSignals?: (request: SetSignalsRequest) => Promise<void>;
     };
   }
 }

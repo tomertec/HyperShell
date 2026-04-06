@@ -12,6 +12,9 @@ import {
   updateSettingRequestSchema,
   upsertGroupRequestSchema,
   removeGroupRequestSchema,
+  upsertSerialProfileRequestSchema,
+  removeSerialProfileRequestSchema,
+  setSignalsRequestSchema,
   type CloseSessionRequest,
   type HostRecord,
   type OpenSessionRequest,
@@ -25,7 +28,12 @@ import {
   type UpdateSettingRequest,
   type SettingRecord,
   type UpsertGroupRequest,
-  type RemoveGroupRequest
+  type RemoveGroupRequest,
+  type SerialProfileRecord,
+  type UpsertSerialProfileRequest,
+  type RemoveSerialProfileRequest,
+  type SerialPortInfo,
+  type SetSignalsRequest
 } from "@sshterm/shared";
 
 export interface PreloadIpcRenderer {
@@ -61,6 +69,11 @@ export interface DesktopApi {
   listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>>;
   upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }>;
   removeGroup(request: RemoveGroupRequest): Promise<void>;
+  listSerialProfiles(): Promise<SerialProfileRecord[]>;
+  upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord>;
+  removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void>;
+  listSerialPorts(): Promise<SerialPortInfo[]>;
+  setSessionSignals(request: SetSignalsRequest): Promise<void>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -178,6 +191,27 @@ export function createDesktopApi(
     async removeGroup(request: RemoveGroupRequest): Promise<void> {
       const parsed = removeGroupRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.groups.remove, parsed);
+    },
+    async listSerialProfiles(): Promise<SerialProfileRecord[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.list);
+      return result as SerialProfileRecord[];
+    },
+    async upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord> {
+      const parsed = upsertSerialProfileRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.upsert, parsed);
+      return result as SerialProfileRecord;
+    },
+    async removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void> {
+      const parsed = removeSerialProfileRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.serialProfiles.remove, parsed);
+    },
+    async listSerialPorts(): Promise<SerialPortInfo[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.listPorts);
+      return result as SerialPortInfo[];
+    },
+    async setSessionSignals(request: SetSignalsRequest): Promise<void> {
+      const parsed = setSignalsRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.session.setSignals, parsed);
     }
   };
 }

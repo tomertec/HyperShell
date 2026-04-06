@@ -167,3 +167,61 @@ export const removeGroupRequestSchema = z.object({
 export type GroupRecord = z.infer<typeof groupRecordSchema>;
 export type UpsertGroupRequest = z.infer<typeof upsertGroupRequestSchema>;
 export type RemoveGroupRequest = z.infer<typeof removeGroupRequestSchema>;
+
+// --- Serial profile schemas ---
+
+export const serialProfileRecordSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  path: z.string().min(1),
+  baudRate: z.number().int().positive(),
+  dataBits: z.number().int().min(5).max(8),
+  stopBits: z.number().int().min(1).max(2),
+  parity: z.enum(["none", "even", "odd", "mark", "space"]),
+  flowControl: z.enum(["none", "hardware", "software"]),
+  localEcho: z.boolean(),
+  dtr: z.boolean(),
+  rts: z.boolean(),
+  notes: z.string().nullable()
+});
+
+export const upsertSerialProfileRequestSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  path: z.string().min(1),
+  baudRate: z.number().int().positive().optional(),
+  dataBits: z.number().int().min(5).max(8).optional(),
+  stopBits: z.number().int().min(1).max(2).optional(),
+  parity: z.enum(["none", "even", "odd", "mark", "space"]).optional(),
+  flowControl: z.enum(["none", "hardware", "software"]).optional(),
+  localEcho: z.boolean().optional(),
+  dtr: z.boolean().optional(),
+  rts: z.boolean().optional(),
+  notes: z.string().nullable().optional()
+});
+
+export const removeSerialProfileRequestSchema = z.object({
+  id: z.string().min(1)
+});
+
+export const serialPortInfoSchema = z.object({
+  path: z.string(),
+  manufacturer: z.string().optional(),
+  pnpId: z.string().optional(),
+  vendorId: z.string().optional(),
+  productId: z.string().optional()
+});
+
+export const setSignalsRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  signals: z.object({
+    dtr: z.boolean().optional(),
+    rts: z.boolean().optional()
+  })
+});
+
+export type SerialProfileRecord = z.infer<typeof serialProfileRecordSchema>;
+export type UpsertSerialProfileRequest = z.infer<typeof upsertSerialProfileRequestSchema>;
+export type RemoveSerialProfileRequest = z.infer<typeof removeSerialProfileRequestSchema>;
+export type SerialPortInfo = z.infer<typeof serialPortInfoSchema>;
+export type SetSignalsRequest = z.infer<typeof setSignalsRequestSchema>;

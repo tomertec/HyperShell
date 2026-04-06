@@ -233,7 +233,7 @@ describe("sessionManager", () => {
       sshOptions: { hostname: "10.0.0.1", username: "admin", port: 2222 }
     });
 
-    expect(capturedRequest?.sshOptions).toEqual({
+    expect((capturedRequest as OpenSessionRequest | null)?.sshOptions).toEqual({
       hostname: "10.0.0.1",
       username: "admin",
       port: 2222

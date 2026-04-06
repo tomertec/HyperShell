@@ -118,6 +118,8 @@ export function createSerialProfilesRepositoryFromDatabase(db: SqliteDatabase) {
       `
     );
 
+  const deleteSerialProfile = db.prepare(`DELETE FROM serial_profiles WHERE id = ?`);
+
   return {
     create(input: SerialProfileInput): SerialProfileRecord {
       const normalized = {
@@ -150,6 +152,10 @@ export function createSerialProfilesRepositoryFromDatabase(db: SqliteDatabase) {
     },
     list(): SerialProfileRecord[] {
       return (listSerialProfiles.all() as SerialProfileRow[]).map(mapRow);
+    },
+    remove(id: string): boolean {
+      const result = deleteSerialProfile.run(id);
+      return result.changes > 0;
     }
   };
 }
@@ -184,6 +190,9 @@ function createInMemorySerialProfilesRepository() {
       return Array.from(profiles.values()).sort((left, right) =>
         left.name.localeCompare(right.name)
       );
+    },
+    remove(id: string): boolean {
+      return profiles.delete(id);
     }
   };
 }

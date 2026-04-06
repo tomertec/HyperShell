@@ -4,7 +4,8 @@ export const sessionChannels = {
   write: "session:write",
   close: "session:close",
   list: "session:list",
-  event: "session:event"
+  event: "session:event",
+  setSignals: "session:set-signals"
 } as const;
 
 export const hostChannels = {
@@ -37,11 +38,19 @@ export const groupChannels = {
   remove: "groups:remove"
 } as const;
 
+export const serialProfileChannels = {
+  list: "serial-profiles:list",
+  upsert: "serial-profiles:upsert",
+  remove: "serial-profiles:remove",
+  listPorts: "serial-profiles:list-ports"
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
   settings: settingsChannels,
   tray: trayChannels,
   portForward: portForwardChannels,
-  groups: groupChannels
+  groups: groupChannels,
+  serialProfiles: serialProfileChannels
 } as const;

@@ -1,6 +1,8 @@
+import type { SerialProfileRecord } from "@sshterm/shared";
 import type { HostRecord } from "../hosts/HostsView";
 import { SidebarHostList } from "./SidebarHostList";
 import { SidebarSection } from "./SidebarSection";
+import { SidebarSerialList } from "./SidebarSerialList";
 
 export interface SidebarProps {
   hosts: HostRecord[];
@@ -8,6 +10,10 @@ export interface SidebarProps {
   onEditHost: (host: HostRecord) => void;
   onNewHost: () => void;
   onImportSshConfig: () => void;
+  serialProfiles: SerialProfileRecord[];
+  onConnectSerial: (profile: SerialProfileRecord) => void;
+  onEditSerial: (profile: SerialProfileRecord) => void;
+  onNewSerial: () => void;
 }
 
 export function Sidebar({
@@ -15,7 +21,11 @@ export function Sidebar({
   onConnectHost,
   onEditHost,
   onNewHost,
-  onImportSshConfig
+  onImportSshConfig,
+  serialProfiles,
+  onConnectSerial,
+  onEditSerial,
+  onNewSerial,
 }: SidebarProps) {
 
   return (
@@ -66,6 +76,27 @@ export function Sidebar({
           hosts={hosts}
           onConnect={onConnectHost}
           onEdit={onEditHost}
+        />
+      </SidebarSection>
+
+      <SidebarSection
+        title="Serial"
+        actions={
+          <button
+            onClick={onNewSerial}
+            className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
+            title="New serial profile"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        }
+      >
+        <SidebarSerialList
+          profiles={serialProfiles}
+          onConnect={onConnectSerial}
+          onEdit={onEditSerial}
         />
       </SidebarSection>
 

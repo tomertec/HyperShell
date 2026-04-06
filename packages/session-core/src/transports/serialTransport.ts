@@ -80,6 +80,7 @@ export interface SerialPortLike {
   open(callback: (error?: Error | null) => void): void;
   close(callback?: (error?: Error | null) => void): void;
   write(data: string, callback?: (error?: Error | null) => void): void;
+  set?(options: { dtr?: boolean; rts?: boolean }, callback?: (error?: Error | null) => void): void;
   removeAllListeners?(event?: string): this;
 }
 
@@ -298,6 +299,20 @@ export function createSerialTransport(
       return () => {
         listeners.delete(listener);
       };
+    },
+    setSignals(signals: { dtr?: boolean; rts?: boolean }) {
+      if (!port || hasExited || !port.isOpen || !port.set) {
+        return;
+      }
+      port.set(signals, (error) => {
+        if (error) {
+          emit({
+            type: "error",
+            sessionId: request.sessionId,
+            message: error.message
+          });
+        }
+      });
     }
   };
 }

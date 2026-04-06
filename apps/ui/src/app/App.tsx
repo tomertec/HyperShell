@@ -15,8 +15,10 @@ import { Workspace } from "../features/layout/Workspace";
 import { layoutStore } from "../features/layout/layoutStore";
 import { QuickConnectDialog } from "../features/quick-connect/QuickConnectDialog";
 import type { QuickConnectProfile } from "../features/quick-connect/searchIndex";
+import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
 import { sessionRecoveryStore } from "../features/sessions/sessionRecoveryStore";
 import { Sidebar } from "../features/sidebar/Sidebar";
+import type { SerialProfileRecord } from "@sshterm/shared";
 
 async function loadHosts(): Promise<HostRecord[]> {
   if (!window.sshterm?.listHosts) {
@@ -39,6 +41,27 @@ async function loadHosts(): Promise<HostRecord[]> {
   } catch (err) {
     console.error("[sshterm] failed to load hosts:", err);
     return [];
+  }
+}
+
+async function loadSerialProfiles(): Promise<SerialProfileRecord[]> {
+  if (!window.sshterm?.listSerialProfiles) {
+    return [];
+  }
+  try {
+    return await window.sshterm.listSerialProfiles();
+  } catch (err) {
+    console.error("[sshterm] failed to load serial profiles:", err);
+    return [];
+  }
+}
+
+async function persistSerialProfile(profile: SerialProfileRecord): Promise<void> {
+  if (!window.sshterm?.upsertSerialProfile) return;
+  try {
+    await window.sshterm.upsertSerialProfile(profile);
+  } catch (err) {
+    console.error("[sshterm] failed to persist serial profile:", err);
   }
 }
 
@@ -70,6 +93,10 @@ export function App() {
   const [hostModalOpen, setHostModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingHost, setEditingHost] = useState<HostRecord | null>(null);
+  const [serialProfiles, setSerialProfiles] = useState<SerialProfileRecord[]>([]);
+  const [serialModalOpen, setSerialModalOpen] = useState(false);
+  const [editingSerial, setEditingSerial] = useState<SerialProfileRecord | null>(null);
+  const [availablePorts, setAvailablePorts] = useState<string[]>([]);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
   const tabs = useStore(layoutStore, (s) => s.tabs);
@@ -79,9 +106,10 @@ export function App() {
   const setBroadcastTargets = useStore(broadcastStore, (s) => s.setTargets);
   const rememberSession = useStore(sessionRecoveryStore, (s) => s.remember);
 
-  // Load hosts from DB on mount
   useEffect(() => {
-    void loadHosts().then(setHosts);
+    void Promise.all([loadHosts(), loadSerialProfiles()]).then(
+      ([h, sp]) => { setHosts(h); setSerialProfiles(sp); }
+    );
   }, []);
 
   const tabSessionIds = useMemo(() => tabs.map((t) => t.sessionId), [tabs]);
@@ -114,6 +142,27 @@ export function App() {
     });
   }, []);
 
+  const refreshPorts = useCallback(() => {
+    window.sshterm?.listSerialPorts?.()
+      .then(ports => setAvailablePorts(ports.map(p => p.path)))
+      .catch(console.error);
+  }, []);
+
+  const connectSerial = useCallback(
+    (profile: SerialProfileRecord) => {
+      const sessionId = `serial-${profile.id}-${Date.now()}`;
+      openTab({
+        tabKey: sessionId,
+        sessionId,
+        title: profile.name,
+        transport: "serial",
+        profileId: profile.id,
+        preopened: false
+      });
+    },
+    [openTab]
+  );
+
   const connectHost = useCallback(
     (host: HostRecord) => {
       const optimisticSessionId = `ssh-${host.id}-${Date.now()}`;
@@ -133,8 +182,8 @@ export function App() {
   );
 
   const profiles = useMemo<QuickConnectProfile[]>(
-    () =>
-      hosts.map((h) => ({
+    () => [
+      ...hosts.map((h) => ({
         id: h.id,
         label: h.name,
         hostname: h.hostname,
@@ -142,7 +191,15 @@ export function App() {
         group: h.group,
         tags: h.tags?.split(",").map((t) => t.trim()) ?? []
       })),
-    [hosts]
+      ...serialProfiles.map((sp) => ({
+        id: sp.id,
+        label: sp.name,
+        hostname: sp.path,
+        transport: "serial" as const,
+        description: `${sp.baudRate} baud`
+      }))
+    ],
+    [hosts, serialProfiles]
   );
 
   return (
@@ -152,15 +209,13 @@ export function App() {
           <Sidebar
             hosts={hosts}
             onConnectHost={connectHost}
-            onEditHost={(host) => {
-              setEditingHost(host);
-              setHostModalOpen(true);
-            }}
-            onNewHost={() => {
-              setEditingHost(null);
-              setHostModalOpen(true);
-            }}
+            onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
+            onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
             onImportSshConfig={() => setImportModalOpen(true)}
+            serialProfiles={serialProfiles}
+            onConnectSerial={connectSerial}
+            onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
+            onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); refreshPorts(); }}
           />
         }
       >
@@ -180,8 +235,13 @@ export function App() {
         onClose={() => setIsQuickConnectOpen(false)}
         profiles={profiles}
         onOpenProfile={(profile) => {
-          const host = hosts.find((h) => h.id === profile.id);
-          if (host) connectHost(host);
+          if (profile.transport === "serial") {
+            const sp = serialProfiles.find((s) => s.id === profile.id);
+            if (sp) connectSerial(sp);
+          } else {
+            const host = hosts.find((h) => h.id === profile.id);
+            if (host) connectHost(host);
+          }
         }}
       />
 
@@ -238,6 +298,37 @@ export function App() {
               void persistHost(host);
             }
             setImportModalOpen(false);
+          }}
+        />
+      </Modal>
+
+      <Modal
+        open={serialModalOpen}
+        onClose={() => setSerialModalOpen(false)}
+        title={editingSerial ? `Edit ${editingSerial.name}` : "New Serial Profile"}
+      >
+        <SerialProfileForm
+          key={editingSerial?.id ?? "new-serial"}
+          initialValue={editingSerial ?? undefined}
+          submitLabel={editingSerial ? "Update profile" : "Add profile"}
+          availablePorts={availablePorts}
+          onRefreshPorts={refreshPorts}
+          onSubmit={(value: SerialProfileFormValue) => {
+            const id = editingSerial?.id ?? `serial-${Date.now()}`;
+            const record: SerialProfileRecord = {
+              id,
+              ...value,
+              notes: null
+            };
+            if (editingSerial) {
+              setSerialProfiles((prev) =>
+                prev.map((p) => (p.id === id ? record : p))
+              );
+            } else {
+              setSerialProfiles((prev) => [...prev, record]);
+            }
+            void persistSerialProfile(record);
+            setSerialModalOpen(false);
           }}
         />
       </Modal>

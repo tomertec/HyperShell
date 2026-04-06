@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { useTerminalSession } from "./useTerminalSession";
 
@@ -31,6 +31,9 @@ export function TerminalPane({
   title = "Terminal",
   onSessionOpened
 }: TerminalPaneProps) {
+  const [dtr, setDtr] = useState(true);
+  const [rts, setRts] = useState(true);
+
   const session = useTerminalSession({
     transport,
     profileId,
@@ -65,7 +68,36 @@ export function TerminalPane({
             </div>
           </div>
         </div>
-        <div className="text-[10px] uppercase tracking-wider text-text-muted/70 font-medium shrink-0">{session.state}</div>
+        <div className="flex items-center gap-2 shrink-0">
+          {transport === "serial" && session.state === "connected" && (
+            <div className="flex items-center gap-1">
+              {([["DTR", dtr, setDtr, "dtr"], ["RTS", rts, setRts, "rts"]] as const).map(
+                ([label, value, setter, signal]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => {
+                      const next = !value;
+                      setter(next);
+                      window.sshterm?.setSessionSignals?.({
+                        sessionId: session.sessionId!,
+                        signals: { [signal]: next }
+                      });
+                    }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider border transition-all duration-150 ${
+                      value
+                        ? "bg-success/15 text-success border-success/30"
+                        : "bg-base-700/60 text-text-muted border-border/40"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+          <div className="text-[10px] uppercase tracking-wider text-text-muted/70 font-medium">{session.state}</div>
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 relative bg-surface">

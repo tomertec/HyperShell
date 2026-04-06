@@ -3,6 +3,7 @@ import {
   ipcChannels,
   openSessionRequestSchema,
   resizeSessionRequestSchema,
+  setSignalsRequestSchema,
   writeSessionRequestSchema
 } from "@sshterm/shared";
 import type {
@@ -18,11 +19,14 @@ import { registerSettingsIpc } from "./settingsIpc";
 import { registerSshConfigIpc } from "./sshConfigIpc";
 import { registerPortForwardIpc } from "./portForwardIpc";
 import { registerGroupsIpc } from "./groupsIpc";
-import { createGroupsRepository } from "@sshterm/db";
+import { registerSerialProfilesIpc } from "./serialProfilesIpc";
+import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
+import type { SerialProfileRecord } from "@sshterm/db";
 import type {
   SessionManager,
   SessionTransportEvent,
-  TransportHandle
+  TransportHandle,
+  SerialConnectionOptions
 } from "@sshterm/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
 
@@ -42,12 +46,18 @@ const registeredChannels = [
   ipcChannels.portForward.list,
   ipcChannels.groups.list,
   ipcChannels.groups.upsert,
-  ipcChannels.groups.remove
+  ipcChannels.groups.remove,
+  ipcChannels.serialProfiles.list,
+  ipcChannels.serialProfiles.upsert,
+  ipcChannels.serialProfiles.remove,
+  ipcChannels.serialProfiles.listPorts,
+  ipcChannels.session.setSignals
 ] as const;
 
 const sessionManager = createSessionManager();
 
 const groupsRepo = createGroupsRepository();
+const serialProfilesRepo = createSerialProfilesRepository();
 
 let cleanupRegisteredIpc: (() => void) | null = null;
 
@@ -55,6 +65,7 @@ export interface RegisterIpcOptions {
   emitSessionEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
   resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
+  resolveSerialProfile?: (profileId: string) => SerialProfileRecord | undefined;
 }
 
 export type IpcMainLike = Pick<IpcMain, "handle"> &
@@ -64,7 +75,8 @@ async function openSessionHandler(
   _event: IpcMainInvokeEvent,
   request: OpenSessionRequest,
   manager: SessionManager = sessionManager,
-  resolveHostProfile?: RegisterIpcOptions["resolveHostProfile"]
+  resolveHostProfile?: RegisterIpcOptions["resolveHostProfile"],
+  resolveSerialProfile?: RegisterIpcOptions["resolveSerialProfile"]
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
 
@@ -77,9 +89,29 @@ async function openSessionHandler(
     }
   }
 
+  let serialOptions: SerialConnectionOptions | undefined;
+
+  if (parsed.transport === "serial") {
+    const profile = resolveSerialProfile?.(parsed.profileId);
+    if (profile) {
+      serialOptions = {
+        path: profile.path,
+        baudRate: profile.baudRate,
+        dataBits: profile.dataBits as 5 | 6 | 7 | 8,
+        stopBits: profile.stopBits as 1 | 2,
+        parity: profile.parity as "none" | "even" | "odd" | "mark" | "space",
+        flowControl: profile.flowControl as "none" | "hardware" | "software",
+        localEcho: profile.localEcho,
+        dtr: profile.dtr,
+        rts: profile.rts
+      };
+    }
+  }
+
   return manager.open({
     ...parsed,
-    sshOptions: sshOptions ?? { hostname: parsed.profileId }
+    sshOptions: sshOptions ?? { hostname: parsed.profileId },
+    serialOptions
   });
 }
 
@@ -130,7 +162,7 @@ export function registerIpc(
   }
 
   ipcMain.handle(ipcChannels.session.open, (event, request) =>
-    openSessionHandler(event, request, manager, options.resolveHostProfile)
+    openSessionHandler(event, request, manager, options.resolveHostProfile, (id) => serialProfilesRepo.get(id))
   );
   ipcMain.handle(ipcChannels.session.resize, (event, request) =>
     resizeSessionHandler(event, request, manager)
@@ -141,12 +173,17 @@ export function registerIpc(
   ipcMain.handle(ipcChannels.session.close, (event, request) =>
     closeSessionHandler(event, request, manager)
   );
+  ipcMain.handle(ipcChannels.session.setSignals, (_event, request) => {
+    const parsed = setSignalsRequestSchema.parse(request);
+    manager.setSignals(parsed.sessionId, parsed.signals);
+  });
 
   registerHostIpc(ipcMain);
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
   registerSettingsIpc(ipcMain, () => null);
   registerPortForwardIpc(ipcMain);
   registerGroupsIpc(ipcMain, () => groupsRepo);
+  registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
 
   const cleanup = () => {
     unsubscribeSessionEvents();
