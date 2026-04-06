@@ -76,6 +76,7 @@ export const hostRecordSchema = z.object({
   hostname: z.string().min(1),
   port: z.number().int().positive(),
   username: z.string().nullable(),
+  identityFile: z.string().nullable(),
   authProfileId: z.string().nullable(),
   groupId: z.string().nullable(),
   notes: z.string().nullable()
@@ -87,6 +88,7 @@ export const upsertHostRequestSchema = z.object({
   hostname: z.string().min(1),
   port: z.number().int().positive().optional(),
   username: z.string().nullable().optional(),
+  identityFile: z.string().nullable().optional(),
   group: z.string().optional(),
   tags: z.string().optional(),
   notes: z.string().nullable().optional()

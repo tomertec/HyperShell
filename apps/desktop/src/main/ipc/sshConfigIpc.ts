@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import type { IpcMainLike } from "./registerIpc";
 
 type HostImporter = {
-  create(input: { id: string; name: string; hostname: string; port?: number; username?: string | null }): unknown;
+  create(input: { id: string; name: string; hostname: string; port?: number; username?: string | null; identityFile?: string | null }): unknown;
 };
 
 export function registerSshConfigIpc(ipcMain: IpcMainLike, getHostsRepo: () => HostImporter): void {
@@ -32,7 +32,8 @@ export function registerSshConfigIpc(ipcMain: IpcMainLike, getHostsRepo: () => H
         name: host.alias,
         hostname: host.hostName ?? host.alias,
         port: host.port,
-        username: host.user ?? null
+        username: host.user ?? null,
+        identityFile: host.identityFile ?? null
       });
       imported.push(record);
     }

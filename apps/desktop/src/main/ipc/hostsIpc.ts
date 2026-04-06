@@ -23,6 +23,7 @@ import type { IpcMainLike } from "./registerIpc";
 
 type HostsRepoLike = {
   create(input: HostInput): HostRecord;
+  get(id: string): HostRecord | undefined;
   list(): HostRecord[];
   remove(id: string): boolean;
 };
@@ -78,6 +79,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           hostname: String(item?.hostname ?? ""),
           port: Number(item?.port ?? 22),
           username: item?.username == null ? null : String(item.username),
+          identityFile:
+            item?.identityFile == null ? null : String(item.identityFile),
           authProfileId:
             item?.authProfileId == null ? null : String(item.authProfileId),
           groupId: item?.groupId == null ? null : String(item.groupId),
@@ -101,6 +104,7 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         hostname: input.hostname,
         port: input.port ?? 22,
         username: input.username ?? null,
+        identityFile: input.identityFile ?? null,
         authProfileId: input.authProfileId ?? null,
         groupId: input.groupId ?? null,
         notes: input.notes ?? null
@@ -116,6 +120,9 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
 
       writeHosts(hosts);
       return normalized;
+    },
+    get(id: string): HostRecord | undefined {
+      return readHosts().find((host) => host.id === id);
     },
     list(): HostRecord[] {
       return readHosts().sort((left, right) =>
@@ -173,6 +180,7 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       hostname: parsed.hostname,
       port: parsed.port,
       username: parsed.username ?? null,
+      identityFile: parsed.identityFile ?? null,
       notes: parsed.notes ?? null
     });
   });

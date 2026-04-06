@@ -151,6 +151,7 @@ export interface DesktopApi {
   fsStat(request: FsListRequest): Promise<FsEntry>;
   fsGetHome(): Promise<{ path: string }>;
   fsGetDrives(): Promise<FsGetDrivesResponse>;
+  fsListSshKeys(): Promise<string[]>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -407,6 +408,10 @@ export function createDesktopApi(
     async fsGetDrives(): Promise<FsGetDrivesResponse> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.getDrives);
       return fsGetDrivesResponseSchema.parse(result);
+    },
+    async fsListSshKeys(): Promise<string[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.fs.listSshKeys);
+      return Array.isArray(result) ? result : [];
     }
   };
 }

@@ -77,6 +77,7 @@ async function persistHost(host: HostRecord): Promise<void> {
       hostname: host.hostname,
       port: host.port,
       username: host.username || null,
+      identityFile: host.identityFile || null,
       group: host.group,
       tags: host.tags,
       notes: host.notes || null
@@ -298,7 +299,11 @@ export function App() {
           lowerMessage.includes("authentication methods failed") ||
           lowerMessage.includes("failed to connect to agent") ||
           lowerMessage.includes("failed to retrieve identities from agent") ||
-          lowerMessage.includes("auth unavailable");
+          lowerMessage.includes("auth unavailable") ||
+          lowerMessage.includes("encrypted") ||
+          lowerMessage.includes("passphrase") ||
+          lowerMessage.includes("cannot parse") ||
+          lowerMessage.includes("no auth methods");
 
         if (!shouldPromptForPassword) {
           console.error("[sshterm] failed to open SFTP tab:", error);

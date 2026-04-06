@@ -5,6 +5,7 @@ export type HostFormValue = {
   hostname: string;
   port: number;
   username: string;
+  identityFile: string;
   group: string;
   tags: string;
 };
@@ -20,6 +21,7 @@ const defaultValue: HostFormValue = {
   hostname: "",
   port: 22,
   username: "",
+  identityFile: "",
   group: "",
   tags: ""
 };
@@ -37,10 +39,21 @@ export function HostForm({
     ...defaultValue,
     ...initialValue
   });
+  const [sshKeys, setSshKeys] = useState<string[]>([]);
 
   useEffect(() => {
     setValue({ ...defaultValue, ...initialValue });
   }, [initialValue]);
+
+  useEffect(() => {
+    async function loadKeys() {
+      try {
+        const keys = await window.sshterm?.fsListSshKeys?.();
+        if (keys?.length) setSshKeys(keys);
+      } catch { /* ignore */ }
+    }
+    void loadKeys();
+  }, []);
 
   return (
     <form
@@ -92,6 +105,28 @@ export function HostForm({
           />
         </label>
       </div>
+
+      <label htmlFor={`${formId}-identityFile`} className="grid gap-1.5">
+        <span className="text-xs font-medium text-text-secondary">SSH Key</span>
+        <select
+          id={`${formId}-identityFile`}
+          value={value.identityFile}
+          onChange={(e) => setValue({ ...value, identityFile: e.target.value })}
+          className={inputClasses}
+        >
+          <option value="">Auto-detect</option>
+          {sshKeys.map((key) => (
+            <option key={key} value={key}>
+              {key.replace(/^.*[\\/]\.ssh[\\/]/, "")}
+            </option>
+          ))}
+          {value.identityFile && !sshKeys.includes(value.identityFile) && (
+            <option value={value.identityFile}>
+              {value.identityFile.replace(/^.*[\\/]\.ssh[\\/]/, "")}
+            </option>
+          )}
+        </select>
+      </label>
 
       <label htmlFor={`${formId}-group`} className="grid gap-1.5">
         <span className="text-xs font-medium text-text-secondary">Group</span>

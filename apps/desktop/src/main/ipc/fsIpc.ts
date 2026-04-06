@@ -73,6 +73,40 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
     return { drives: await listDrives() };
   });
 
+  ipcMain.handle(ipcChannels.fs.listSshKeys, async () => {
+    const sshDir = path.join(os.homedir(), ".ssh");
+    try {
+      const entries = await readdir(sshDir);
+      const keys: string[] = [];
+      for (const name of entries) {
+        // Skip known non-key files, public keys, and config files
+        if (
+          name.endsWith(".pub") ||
+          name === "config" ||
+          name === "known_hosts" ||
+          name === "known_hosts.old" ||
+          name === "authorized_keys" ||
+          name === "environment"
+        ) {
+          continue;
+        }
+
+        const fullPath = path.join(sshDir, name);
+        try {
+          const stats = await stat(fullPath);
+          if (stats.isFile() && stats.size > 0 && stats.size < 100_000) {
+            keys.push(fullPath);
+          }
+        } catch {
+          // Skip inaccessible files
+        }
+      }
+      return keys;
+    } catch {
+      return [];
+    }
+  });
+
   return () => {
     for (const channel of Object.values(ipcChannels.fs)) {
       ipcMain.removeHandler?.(channel);

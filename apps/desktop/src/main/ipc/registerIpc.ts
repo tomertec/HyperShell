@@ -82,7 +82,8 @@ const registeredChannels = [
   ipcChannels.fs.list,
   ipcChannels.fs.stat,
   ipcChannels.fs.getHome,
-  ipcChannels.fs.getDrives
+  ipcChannels.fs.getDrives,
+  ipcChannels.fs.listSshKeys
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -114,10 +115,33 @@ async function openSessionHandler(
 
   let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | undefined;
 
-  if (parsed.transport === "ssh" && resolveHostProfile) {
-    const profile = await resolveHostProfile(parsed.profileId);
-    if (profile) {
-      sshOptions = profile;
+  if (parsed.transport === "ssh") {
+    if (resolveHostProfile) {
+      const profile = await resolveHostProfile(parsed.profileId);
+      if (profile) {
+        sshOptions = profile;
+      }
+    }
+
+    // Fall back to host record from database for identity file.
+    // profileId may be a host ID or a "user@host" destination string.
+    if (!sshOptions) {
+      const repo = getOrCreateHostsRepo();
+      const allHosts = repo.list();
+      const host = repo.get(parsed.profileId)
+        ?? allHosts.find((h) =>
+          parsed.profileId === `${h.username}@${h.hostname}`
+          || parsed.profileId === h.hostname
+          || parsed.profileId === h.name
+        );
+      if (host) {
+        sshOptions = {
+          hostname: host.hostname,
+          username: host.username ?? undefined,
+          port: host.port,
+          identityFile: host.identityFile ?? undefined
+        };
+      }
     }
   }
 
@@ -373,6 +397,7 @@ async function resolveSftpConnectionOptions(
 
   const resolveIdentityFile = () => {
     const explicitCandidates = [
+      resolvedHost?.identityFile,
       profileFromResolver?.identityFile,
       fromConfig?.identityFile,
       ...(effectiveConfig?.identityFiles ?? [])
@@ -413,6 +438,15 @@ async function resolveSftpConnectionOptions(
     if (process.env.SSH_AUTH_SOCK) {
       return process.env.SSH_AUTH_SOCK;
     }
+
+    // Windows OpenSSH agent uses a named pipe, not SSH_AUTH_SOCK
+    if (process.platform === "win32") {
+      const windowsAgentPipe = "\\\\.\\pipe\\openssh-ssh-agent";
+      if (existsSync(windowsAgentPipe)) {
+        return windowsAgentPipe;
+      }
+    }
+
     return undefined;
   };
 
@@ -456,14 +490,32 @@ async function resolveSftpConnectionOptions(
     );
   }
 
+  // If the host has an explicit identity file configured, use it directly.
+  // Only fall back to agent for auto-detected keys (where the agent can
+  // handle passphrase prompting transparently).
+  const hasExplicitKey = Boolean(resolvedHost?.identityFile?.trim());
+
+  if (hasExplicitKey && privateKeyPath) {
+    return {
+      hostname: resolvedHostname,
+      port: resolvedPort,
+      username: resolvedUsername,
+      proxyJump: resolvedProxyJump,
+      keepAliveSeconds,
+      authMethod: "key",
+      privateKeyPath
+    };
+  }
+
+  // For auto-detected keys, prefer agent (handles passphrases transparently).
   return {
     hostname: resolvedHostname,
     port: resolvedPort,
     username: resolvedUsername,
     proxyJump: resolvedProxyJump,
     keepAliveSeconds,
-    authMethod: privateKeyPath ? "key" : "agent",
-    privateKeyPath,
+    authMethod: agentPath ? "agent" : "key",
+    privateKeyPath: agentPath ? undefined : privateKeyPath,
     agentPath
   };
 }

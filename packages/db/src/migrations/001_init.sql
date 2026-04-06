@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS hosts (
   hostname TEXT NOT NULL,
   port INTEGER NOT NULL DEFAULT 22,
   username TEXT,
+  identity_file TEXT,
   auth_profile_id TEXT,
   group_id TEXT,
   notes TEXT,

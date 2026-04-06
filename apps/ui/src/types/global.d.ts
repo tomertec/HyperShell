@@ -82,6 +82,7 @@ declare global {
       fsStat?: (request: FsListRequest) => Promise<FsEntry>;
       fsGetHome?: () => Promise<{ path: string }>;
       fsGetDrives?: () => Promise<FsGetDrivesResponse>;
+      fsListSshKeys?: () => Promise<string[]>;
     };
   }
 }

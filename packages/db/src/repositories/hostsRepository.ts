@@ -7,6 +7,7 @@ export type HostRecord = {
   hostname: string;
   port: number;
   username: string | null;
+  identityFile: string | null;
   authProfileId: string | null;
   groupId: string | null;
   notes: string | null;
@@ -18,6 +19,7 @@ export type HostInput = {
   hostname: string;
   port?: number;
   username?: string | null;
+  identityFile?: string | null;
   authProfileId?: string | null;
   groupId?: string | null;
   notes?: string | null;
@@ -29,6 +31,7 @@ type HostRow = {
   hostname: string;
   port: number;
   username: string | null;
+  identity_file: string | null;
   auth_profile_id: string | null;
   group_id: string | null;
   notes: string | null;
@@ -41,6 +44,7 @@ function mapRow(row: HostRow): HostRecord {
     hostname: row.hostname,
     port: row.port,
     username: row.username,
+    identityFile: row.identity_file,
     authProfileId: row.auth_profile_id,
     groupId: row.group_id,
     notes: row.notes
@@ -62,16 +66,17 @@ export function createHostsRepository(databasePath = ":memory:") {
 export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
   const insertHost = db.prepare(`
     INSERT INTO hosts (
-      id, name, hostname, port, username, auth_profile_id, group_id, notes
+      id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes
     )
     VALUES (
-      @id, @name, @hostname, @port, @username, @authProfileId, @groupId, @notes
+      @id, @name, @hostname, @port, @username, @identityFile, @authProfileId, @groupId, @notes
     )
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       hostname = excluded.hostname,
       port = excluded.port,
       username = excluded.username,
+      identity_file = excluded.identity_file,
       auth_profile_id = excluded.auth_profile_id,
       group_id = excluded.group_id,
       notes = excluded.notes,
@@ -80,7 +85,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
 
   const listHosts = db.prepare(`
     SELECT
-      id, name, hostname, port, username, auth_profile_id, group_id, notes
+      id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes
     FROM hosts
     ORDER BY name COLLATE NOCASE ASC
   `);
@@ -88,7 +93,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
     .prepare(
       `
         SELECT
-          id, name, hostname, port, username, auth_profile_id, group_id, notes
+          id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes
         FROM hosts
         WHERE id = ?
       `
@@ -101,6 +106,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         ...input,
         port: input.port ?? 22,
         username: input.username ?? null,
+        identityFile: input.identityFile ?? null,
         authProfileId: input.authProfileId ?? null,
         groupId: input.groupId ?? null,
         notes: input.notes ?? null
@@ -140,6 +146,7 @@ function createInMemoryHostsRepository() {
         hostname: input.hostname,
         port: input.port ?? 22,
         username: input.username ?? null,
+        identityFile: input.identityFile ?? null,
         authProfileId: input.authProfileId ?? null,
         groupId: input.groupId ?? null,
         notes: input.notes ?? null

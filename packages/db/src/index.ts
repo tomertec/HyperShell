@@ -19,6 +19,13 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
   db.exec(initSchemaSql);
   db.exec(sftpBookmarksSql);
 
+  // Migration 003: add identity_file column to existing hosts tables.
+  try {
+    db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT");
+  } catch {
+    // Column already exists — safe to ignore.
+  }
+
   return db;
 }
 

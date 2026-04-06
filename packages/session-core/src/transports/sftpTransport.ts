@@ -46,15 +46,15 @@ function buildConnectConfig(options: SftpConnectionOptions): ConnectConfig {
 
   if (options.authMethod === "password" && options.password) {
     config.password = options.password;
-  } else if (options.authMethod === "key" && options.privateKeyPath) {
-    config.privateKey = readFileSync(options.privateKeyPath);
-    if (options.passphrase) {
-      config.passphrase = options.passphrase;
-    }
   } else if (options.authMethod === "agent") {
     const agentPath = options.agentPath ?? process.env.SSH_AUTH_SOCK;
     if (agentPath) {
       config.agent = agentPath;
+    }
+  } else if (options.authMethod === "key" && options.privateKeyPath) {
+    config.privateKey = readFileSync(options.privateKeyPath);
+    if (options.passphrase) {
+      config.passphrase = options.passphrase;
     }
   }
 

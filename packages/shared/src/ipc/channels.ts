@@ -70,7 +70,8 @@ export const fsChannels = {
   list: "fs:list",
   stat: "fs:stat",
   getHome: "fs:get-home",
-  getDrives: "fs:get-drives"
+  getDrives: "fs:get-drives",
+  listSshKeys: "fs:list-ssh-keys"
 } as const;
 
 export const ipcChannels = {
