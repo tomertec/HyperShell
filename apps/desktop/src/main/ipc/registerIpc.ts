@@ -18,6 +18,7 @@ import { registerSettingsIpc } from "./settingsIpc";
 import { registerSshConfigIpc } from "./sshConfigIpc";
 import { registerPortForwardIpc } from "./portForwardIpc";
 import { registerGroupsIpc } from "./groupsIpc";
+import { createGroupsRepository } from "@sshterm/db";
 import type {
   SessionManager,
   SessionTransportEvent,
@@ -46,18 +47,7 @@ const registeredChannels = [
 
 const sessionManager = createSessionManager();
 
-const inMemoryGroupsRepo = (() => {
-  const groups = new Map<string, { id: string; name: string; description: string | null }>();
-  return {
-    create(input: { id: string; name: string; description?: string | null }) {
-      const r = { id: input.id, name: input.name, description: input.description ?? null };
-      groups.set(r.id, r);
-      return r;
-    },
-    list() { return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name)); },
-    remove(id: string) { return groups.delete(id); }
-  };
-})();
+const groupsRepo = createGroupsRepository();
 
 let cleanupRegisteredIpc: (() => void) | null = null;
 
@@ -156,7 +146,7 @@ export function registerIpc(
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
   registerSettingsIpc(ipcMain, () => null);
   registerPortForwardIpc(ipcMain);
-  registerGroupsIpc(ipcMain, () => inMemoryGroupsRepo);
+  registerGroupsIpc(ipcMain, () => groupsRepo);
 
   const cleanup = () => {
     unsubscribeSessionEvents();

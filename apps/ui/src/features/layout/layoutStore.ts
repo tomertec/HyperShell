@@ -28,6 +28,8 @@ export type LayoutState = {
 };
 
 export function createLayoutStore() {
+  let paneCounter = 1;
+
   return createStore<LayoutState>()((set) => ({
     tabs: [],
     activeSessionId: null,
@@ -94,7 +96,8 @@ export function createLayoutStore() {
 
     splitPane: (sessionId) =>
       set((state) => {
-        const newPaneId = `pane-${state.panes.length + 1}`;
+        paneCounter++;
+        const newPaneId = `pane-${paneCounter}`;
         return {
           panes: [...state.panes, { paneId: newPaneId, sessionId }],
           activePaneId: newPaneId

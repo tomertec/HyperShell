@@ -5,19 +5,19 @@ import {
   type StartPortForwardRequest,
   type StopPortForwardRequest
 } from "@sshterm/shared";
-import { createPortForward, type PortForwardHandle } from "@sshterm/session-core";
+import { createPortForward, type PortForwardHandle, type SshPtySpawn } from "@sshterm/session-core";
 import type { IpcMainInvokeEvent } from "electron";
 import { randomUUID } from "node:crypto";
 import type { IpcMainLike } from "./registerIpc";
 
-const activeForwards = new Map<string, PortForwardHandle>();
+export function registerPortForwardIpc(ipcMain: IpcMainLike): () => void {
+  const activeForwards = new Map<string, PortForwardHandle>();
 
-export function registerPortForwardIpc(ipcMain: IpcMainLike): void {
   ipcMain.handle(ipcChannels.portForward.start, (_event: IpcMainInvokeEvent, request: StartPortForwardRequest) => {
     const parsed = startPortForwardRequestSchema.parse(request);
     const id = randomUUID();
 
-    const nodePty = require("node-pty") as { spawn: Function };
+    const nodePty = require("node-pty") as { spawn: SshPtySpawn };
 
     const handle = createPortForward(
       {
@@ -53,4 +53,11 @@ export function registerPortForwardIpc(ipcMain: IpcMainLike): void {
   ipcMain.handle(ipcChannels.portForward.list, () => {
     return Array.from(activeForwards.keys()).map((id) => ({ id }));
   });
+
+  return () => {
+    for (const handle of activeForwards.values()) {
+      handle.close();
+    }
+    activeForwards.clear();
+  };
 }
