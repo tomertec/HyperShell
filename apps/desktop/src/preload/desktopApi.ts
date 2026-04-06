@@ -10,6 +10,8 @@ import {
   writeSessionRequestSchema,
   getSettingRequestSchema,
   updateSettingRequestSchema,
+  upsertGroupRequestSchema,
+  removeGroupRequestSchema,
   type CloseSessionRequest,
   type HostRecord,
   type OpenSessionRequest,
@@ -21,7 +23,9 @@ import {
   type WriteSessionRequest,
   type GetSettingRequest,
   type UpdateSettingRequest,
-  type SettingRecord
+  type SettingRecord,
+  type UpsertGroupRequest,
+  type RemoveGroupRequest
 } from "@sshterm/shared";
 
 export interface PreloadIpcRenderer {
@@ -54,6 +58,9 @@ export interface DesktopApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
   importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }>;
+  listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>>;
+  upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }>;
+  removeGroup(request: RemoveGroupRequest): Promise<void>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -158,6 +165,19 @@ export function createDesktopApi(
     async importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }> {
       const result = await ipcRenderer.invoke(ipcChannels.hosts.importSshConfig);
       return result as { imported: number; hosts: HostRecord[] };
+    },
+    async listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>> {
+      const result = await ipcRenderer.invoke(ipcChannels.groups.list);
+      return result as Array<{ id: string; name: string; description: string | null }>;
+    },
+    async upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }> {
+      const parsed = upsertGroupRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.groups.upsert, parsed);
+      return result as { id: string; name: string; description: string | null };
+    },
+    async removeGroup(request: RemoveGroupRequest): Promise<void> {
+      const parsed = removeGroupRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.groups.remove, parsed);
     }
   };
 }
