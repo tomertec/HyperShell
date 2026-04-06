@@ -1,4 +1,4 @@
-export type SessionTransportKind = "ssh" | "serial";
+export type SessionTransportKind = "ssh" | "serial" | "sftp";
 
 export type SessionState =
   | "connecting"
@@ -58,6 +58,19 @@ export interface SerialConnectionOptions {
   rts?: boolean;
 }
 
+export interface SftpConnectionOptions {
+  hostname: string;
+  port?: number;
+  username?: string;
+  authMethod: "password" | "key" | "agent";
+  password?: string;
+  privateKeyPath?: string;
+  agentPath?: string;
+  passphrase?: string;
+  proxyJump?: string;
+  keepAliveSeconds?: number;
+}
+
 export type OpenSessionRequest = {
   sessionId: string;
   transport: SessionTransportKind;
@@ -66,4 +79,5 @@ export type OpenSessionRequest = {
   rows: number;
   sshOptions?: SshConnectionOptions;
   serialOptions?: SerialConnectionOptions;
+  sftpOptions?: SftpConnectionOptions;
 };

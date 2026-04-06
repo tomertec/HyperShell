@@ -1,6 +1,7 @@
 import { useStore } from "zustand";
 
 import { BroadcastBar } from "../broadcast/BroadcastBar";
+import { SftpTab } from "../sftp";
 import { TerminalPane } from "../terminal/TerminalPane";
 import { type Pane, layoutStore } from "./layoutStore";
 import { TabBar } from "./TabBar";
@@ -8,15 +9,18 @@ import { TabBar } from "./TabBar";
 function PaneView({
   pane,
   isActive,
-  onActivate
+  onActivate,
+  onCloseTab
 }: {
   pane: Pane;
   isActive: boolean;
   onActivate: () => void;
+  onCloseTab: (sessionId: string) => void;
 }) {
   const tabs = useStore(layoutStore, (s) => s.tabs);
   const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
   const tab = pane.sessionId ? tabs.find((t) => t.sessionId === pane.sessionId) ?? null : null;
+  const terminalTransport = tab?.transport === "serial" ? "serial" : "ssh";
 
   return (
     <div
@@ -26,17 +30,25 @@ function PaneView({
       onClick={onActivate}
     >
       {tab ? (
-        <TerminalPane
-          key={tab.tabKey ?? tab.sessionId}
-          title={tab.title}
-          transport={tab.transport ?? "ssh"}
-          profileId={tab.profileId ?? tab.sessionId}
-          sessionId={tab.preopened ? tab.sessionId : undefined}
-          autoConnect={!tab.preopened}
-          onSessionOpened={(sessionId) => {
-            replaceSessionId(tab.sessionId, sessionId);
-          }}
-        />
+        tab.type === "sftp" && tab.sftpSessionId ? (
+          <SftpTab
+            sftpSessionId={tab.sftpSessionId}
+            hostId={tab.hostId ?? tab.profileId ?? ""}
+            onClose={() => onCloseTab(tab.sessionId)}
+          />
+        ) : (
+          <TerminalPane
+            key={tab.tabKey ?? tab.sessionId}
+            title={tab.title}
+            transport={terminalTransport}
+            profileId={tab.profileId ?? tab.sessionId}
+            sessionId={tab.preopened ? tab.sessionId : undefined}
+            autoConnect={!tab.preopened}
+            onSessionOpened={(sessionId) => {
+              replaceSessionId(tab.sessionId, sessionId);
+            }}
+          />
+        )
       ) : (
         <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
           Empty pane
@@ -55,7 +67,13 @@ export function Workspace() {
   const activatePane = useStore(layoutStore, (s) => s.activatePane);
 
   const closeTab = (sessionId: string) => {
-    window.sshterm?.closeSession?.({ sessionId }).catch(() => {});
+    const tab = layoutStore.getState().tabs.find((candidate) => candidate.sessionId === sessionId);
+    if (tab?.type === "sftp" && tab.sftpSessionId) {
+      void window.sshterm?.sftpDisconnect?.({ sftpSessionId: tab.sftpSessionId }).catch(() => {});
+    } else {
+      void window.sshterm?.closeSession?.({ sessionId }).catch(() => {});
+    }
+
     layoutStore.setState((state) => {
       const nextTabs = state.tabs.filter((t) => t.sessionId !== sessionId);
       const nextActive =
@@ -87,6 +105,7 @@ export function Workspace() {
               pane={pane}
               isActive={pane.paneId === activePaneId}
               onActivate={() => activatePane(pane.paneId)}
+              onCloseTab={closeTab}
             />
           ))}
         </div>

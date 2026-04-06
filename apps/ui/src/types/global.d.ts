@@ -1,5 +1,9 @@
 import type {
   CloseSessionRequest,
+  FsEntry,
+  FsGetDrivesResponse,
+  FsListRequest,
+  FsListResponse,
   HostRecord,
   OpenSessionRequest,
   OpenSessionResponse,
@@ -10,6 +14,30 @@ import type {
   RemoveSerialProfileRequest,
   SessionEvent,
   SetSignalsRequest,
+  SftpBookmark,
+  SftpBookmarkListRequest,
+  SftpBookmarkRemoveRequest,
+  SftpBookmarkReorderRequest,
+  SftpBookmarkUpsertRequest,
+  SftpConnectRequest,
+  SftpConnectResponse,
+  SftpDeleteRequest,
+  SftpDisconnectRequest,
+  SftpEvent,
+  SftpListRequest,
+  SftpListResponse,
+  SftpMkdirRequest,
+  SftpReadFileRequest,
+  SftpReadFileResponse,
+  SftpRenameRequest,
+  SftpEntry,
+  SftpStatRequest,
+  SftpTransferCancelRequest,
+  SftpTransferListResponse,
+  SftpTransferResolveConflictRequest,
+  SftpTransferStartRequest,
+  SftpWriteFileRequest,
+  TransferJob,
   UpsertHostRequest,
   UpsertSerialProfileRequest,
   WriteSessionRequest
@@ -32,6 +60,28 @@ declare global {
       removeSerialProfile?: (request: RemoveSerialProfileRequest) => Promise<void>;
       listSerialPorts?: () => Promise<SerialPortInfo[]>;
       setSessionSignals?: (request: SetSignalsRequest) => Promise<void>;
+      sftpConnect?: (request: SftpConnectRequest) => Promise<SftpConnectResponse>;
+      sftpDisconnect?: (request: SftpDisconnectRequest) => Promise<void>;
+      sftpList?: (request: SftpListRequest) => Promise<SftpListResponse>;
+      sftpStat?: (request: SftpStatRequest) => Promise<SftpEntry>;
+      sftpMkdir?: (request: SftpMkdirRequest) => Promise<void>;
+      sftpRename?: (request: SftpRenameRequest) => Promise<void>;
+      sftpDelete?: (request: SftpDeleteRequest) => Promise<void>;
+      sftpReadFile?: (request: SftpReadFileRequest) => Promise<SftpReadFileResponse>;
+      sftpWriteFile?: (request: SftpWriteFileRequest) => Promise<void>;
+      sftpTransferStart?: (request: SftpTransferStartRequest) => Promise<TransferJob[]>;
+      sftpTransferCancel?: (request: SftpTransferCancelRequest) => Promise<void>;
+      sftpTransferList?: () => Promise<SftpTransferListResponse>;
+      sftpTransferResolveConflict?: (request: SftpTransferResolveConflictRequest) => Promise<void>;
+      onSftpEvent?: (listener: (event: SftpEvent) => void) => () => void;
+      sftpBookmarksList?: (request: SftpBookmarkListRequest) => Promise<SftpBookmark[]>;
+      sftpBookmarksUpsert?: (request: SftpBookmarkUpsertRequest) => Promise<SftpBookmark>;
+      sftpBookmarksRemove?: (request: SftpBookmarkRemoveRequest) => Promise<void>;
+      sftpBookmarksReorder?: (request: SftpBookmarkReorderRequest) => Promise<void>;
+      fsList?: (request: FsListRequest) => Promise<FsListResponse>;
+      fsStat?: (request: FsListRequest) => Promise<FsEntry>;
+      fsGetHome?: () => Promise<{ path: string }>;
+      fsGetDrives?: () => Promise<FsGetDrivesResponse>;
     };
   }
 }

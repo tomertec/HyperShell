@@ -1,0 +1,81 @@
+import { ipcChannels, fsListRequestSchema } from "@sshterm/shared";
+import type { FsEntry } from "@sshterm/shared";
+import type { IpcMainInvokeEvent } from "electron";
+import { readdir, stat, access } from "node:fs/promises";
+import path from "node:path";
+import os from "node:os";
+
+import type { IpcMainLike } from "./registerIpc";
+
+async function toEntry(basePath: string, name: string): Promise<FsEntry> {
+  const fullPath = path.join(basePath, name);
+  const stats = await stat(fullPath);
+  return {
+    name,
+    path: fullPath,
+    size: stats.size,
+    modifiedAt: stats.mtime.toISOString(),
+    isDirectory: stats.isDirectory()
+  };
+}
+
+async function listDrives(): Promise<string[]> {
+  if (process.platform !== "win32") {
+    return ["/"];
+  }
+
+  const checks = Array.from({ length: 26 }, (_, i) => {
+    const drive = `${String.fromCharCode(65 + i)}:\\`;
+    return access(drive).then(() => drive, () => null);
+  });
+
+  const results = await Promise.all(checks);
+  const drives = results.filter((d): d is string => d !== null);
+  return drives.length > 0 ? drives : ["C:\\"];
+}
+
+export function registerFsIpc(ipcMain: IpcMainLike): () => void {
+  ipcMain.handle(ipcChannels.fs.list, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = fsListRequestSchema.parse(rawRequest);
+    const dirents = await readdir(request.path, { withFileTypes: true });
+
+    const settled = await Promise.allSettled(
+      dirents.map((dirent) => toEntry(request.path, dirent.name))
+    );
+
+    const entries: FsEntry[] = [];
+    for (const result of settled) {
+      if (result.status === "fulfilled") {
+        entries.push(result.value);
+      }
+    }
+
+    return { entries };
+  });
+
+  ipcMain.handle(ipcChannels.fs.stat, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = fsListRequestSchema.parse(rawRequest);
+    const stats = await stat(request.path);
+    return {
+      name: path.basename(request.path) || request.path,
+      path: request.path,
+      size: stats.size,
+      modifiedAt: stats.mtime.toISOString(),
+      isDirectory: stats.isDirectory()
+    } satisfies FsEntry;
+  });
+
+  ipcMain.handle(ipcChannels.fs.getHome, () => {
+    return { path: os.homedir() };
+  });
+
+  ipcMain.handle(ipcChannels.fs.getDrives, async () => {
+    return { drives: await listDrives() };
+  });
+
+  return () => {
+    for (const channel of Object.values(ipcChannels.fs)) {
+      ipcMain.removeHandler?.(channel);
+    }
+  };
+}

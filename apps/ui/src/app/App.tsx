@@ -87,6 +87,27 @@ async function persistHost(host: HostRecord): Promise<void> {
   }
 }
 
+function toSerialFormInitialValue(
+  profile: SerialProfileRecord | null
+): Partial<SerialProfileFormValue> | undefined {
+  if (!profile) {
+    return undefined;
+  }
+
+  return {
+    name: profile.name,
+    path: profile.path,
+    baudRate: profile.baudRate,
+    dataBits: profile.dataBits as 5 | 6 | 7 | 8,
+    stopBits: profile.stopBits as 1 | 2,
+    parity: profile.parity,
+    flowControl: profile.flowControl,
+    localEcho: profile.localEcho,
+    dtr: profile.dtr,
+    rts: profile.rts
+  };
+}
+
 export function App() {
   const [hosts, setHosts] = useState<HostRecord[]>([]);
   const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
@@ -97,6 +118,12 @@ export function App() {
   const [serialModalOpen, setSerialModalOpen] = useState(false);
   const [editingSerial, setEditingSerial] = useState<SerialProfileRecord | null>(null);
   const [availablePorts, setAvailablePorts] = useState<string[]>([]);
+  const [sftpAuthModalOpen, setSftpAuthModalOpen] = useState(false);
+  const [sftpAuthHost, setSftpAuthHost] = useState<HostRecord | null>(null);
+  const [sftpAuthUsername, setSftpAuthUsername] = useState("");
+  const [sftpAuthPassword, setSftpAuthPassword] = useState("");
+  const [sftpAuthError, setSftpAuthError] = useState<string | null>(null);
+  const [sftpAuthSubmitting, setSftpAuthSubmitting] = useState(false);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
   const tabs = useStore(layoutStore, (s) => s.tabs);
@@ -181,6 +208,108 @@ export function App() {
     [openTab]
   );
 
+  const openSftpTab = useCallback(
+    (host: HostRecord, sftpSessionId: string) => {
+      const tabSessionId = `sftp-tab-${sftpSessionId}`;
+      openTab({
+        tabKey: tabSessionId,
+        sessionId: tabSessionId,
+        title: `SFTP: ${host.name}`,
+        transport: "sftp",
+        type: "sftp",
+        sftpSessionId,
+        hostId: host.id,
+        preopened: true
+      });
+    },
+    [openTab]
+  );
+
+  const closeSftpAuthModal = useCallback(() => {
+    setSftpAuthModalOpen(false);
+    setSftpAuthHost(null);
+    setSftpAuthPassword("");
+    setSftpAuthError(null);
+    setSftpAuthSubmitting(false);
+  }, []);
+
+  const openSftpAuthModal = useCallback(
+    (host: HostRecord, errorMessage?: string) => {
+      setSftpAuthHost(host);
+      setSftpAuthUsername(host.username?.trim() ?? "");
+      setSftpAuthPassword("");
+      setSftpAuthError(errorMessage ?? null);
+      setSftpAuthModalOpen(true);
+    },
+    []
+  );
+
+  const connectSftpWithPassword = useCallback(async () => {
+    if (!window.sshterm?.sftpConnect || !sftpAuthHost) {
+      return;
+    }
+
+    const username = sftpAuthUsername.trim();
+    if (!username || !sftpAuthPassword) {
+      setSftpAuthError("Username and password are required.");
+      return;
+    }
+
+    setSftpAuthSubmitting(true);
+    setSftpAuthError(null);
+    try {
+      const { sftpSessionId } = await window.sshterm.sftpConnect({
+        hostId: sftpAuthHost.id,
+        username,
+        password: sftpAuthPassword
+      });
+      openSftpTab(sftpAuthHost, sftpSessionId);
+      closeSftpAuthModal();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSftpAuthError(message);
+    } finally {
+      setSftpAuthSubmitting(false);
+    }
+  }, [
+    closeSftpAuthModal,
+    openSftpTab,
+    sftpAuthHost,
+    sftpAuthPassword,
+    sftpAuthUsername
+  ]);
+
+  const openSftpHost = useCallback(
+    async (host: HostRecord) => {
+      if (!window.sshterm?.sftpConnect) {
+        return;
+      }
+
+      try {
+        const { sftpSessionId } = await window.sshterm.sftpConnect({
+          hostId: host.id
+        });
+        openSftpTab(host, sftpSessionId);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        const lowerMessage = message.toLowerCase();
+        const shouldPromptForPassword =
+          lowerMessage.includes("authentication methods failed") ||
+          lowerMessage.includes("failed to connect to agent") ||
+          lowerMessage.includes("failed to retrieve identities from agent") ||
+          lowerMessage.includes("auth unavailable");
+
+        if (!shouldPromptForPassword) {
+          console.error("[sshterm] failed to open SFTP tab:", error);
+          return;
+        }
+        openSftpAuthModal(host, message);
+      }
+    },
+    [openSftpAuthModal, openSftpTab]
+  );
+
   const profiles = useMemo<QuickConnectProfile[]>(
     () => [
       ...hosts.map((h) => ({
@@ -209,6 +338,7 @@ export function App() {
           <Sidebar
             hosts={hosts}
             onConnectHost={connectHost}
+            onOpenSftpHost={openSftpHost}
             onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
             onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
             onImportSshConfig={() => setImportModalOpen(true)}
@@ -309,7 +439,7 @@ export function App() {
       >
         <SerialProfileForm
           key={editingSerial?.id ?? "new-serial"}
-          initialValue={editingSerial ?? undefined}
+          initialValue={toSerialFormInitialValue(editingSerial)}
           submitLabel={editingSerial ? "Update profile" : "Add profile"}
           availablePorts={availablePorts}
           onRefreshPorts={refreshPorts}
@@ -331,6 +461,71 @@ export function App() {
             setSerialModalOpen(false);
           }}
         />
+      </Modal>
+
+      <Modal
+        open={sftpAuthModalOpen}
+        onClose={closeSftpAuthModal}
+        title={sftpAuthHost ? `SFTP Credentials: ${sftpAuthHost.name}` : "SFTP Credentials"}
+      >
+        <form
+          className="grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void connectSftpWithPassword();
+          }}
+        >
+          {sftpAuthHost ? (
+            <p className="text-xs text-text-muted">
+              Connect to `{sftpAuthHost.hostname}:{sftpAuthHost.port}`
+            </p>
+          ) : null}
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">Username</span>
+            <input
+              value={sftpAuthUsername}
+              onChange={(event) => setSftpAuthUsername(event.target.value)}
+              className="w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright"
+              autoComplete="username"
+              disabled={sftpAuthSubmitting}
+            />
+          </label>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">Password</span>
+            <input
+              type="password"
+              value={sftpAuthPassword}
+              onChange={(event) => setSftpAuthPassword(event.target.value)}
+              className="w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright"
+              autoComplete="current-password"
+              disabled={sftpAuthSubmitting}
+            />
+          </label>
+
+          {sftpAuthError ? (
+            <p className="text-xs text-danger">{sftpAuthError}</p>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-border bg-base-700/60 px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
+              onClick={closeSftpAuthModal}
+              disabled={sftpAuthSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40 disabled:opacity-60"
+              disabled={sftpAuthSubmitting}
+            >
+              {sftpAuthSubmitting ? "Connecting..." : "Connect SFTP"}
+            </button>
+          </div>
+        </form>
       </Modal>
     </>
   );

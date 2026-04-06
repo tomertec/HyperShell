@@ -107,6 +107,9 @@ export function createMainProcessLifecycle(
     unregisterIpc = deps.registerIpc(deps.ipcMain, {
       emitSessionEvent: (event: unknown) => {
         mainWindow?.webContents.send(ipcChannels.session.event, event);
+      },
+      emitSftpEvent: (event: unknown) => {
+        mainWindow?.webContents.send(ipcChannels.sftp.event, event);
       }
     });
     hostMonitor = deps.createHostMonitor();

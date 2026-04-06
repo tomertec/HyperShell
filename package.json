@@ -23,10 +23,12 @@
     "onlyBuiltDependencies": [
       "@serialport/bindings-cpp",
       "better-sqlite3",
+      "cpu-features",
       "electron",
       "electron-winstaller",
       "esbuild",
-      "node-pty"
+      "node-pty",
+      "ssh2"
     ]
   },
   "devDependencies": {

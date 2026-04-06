@@ -11,24 +11,33 @@ import type {
   OpenSessionRequest,
   OpenSessionResponse,
   ResizeSessionRequest,
+  SftpConnectRequest,
   WriteSessionRequest
 } from "@sshterm/shared";
 import { createSessionManager } from "@sshterm/session-core";
+import { parseSshConfig } from "@sshterm/session-core";
 import { registerHostIpc, getOrCreateHostsRepo } from "./hostsIpc";
 import { registerSettingsIpc } from "./settingsIpc";
 import { registerSshConfigIpc } from "./sshConfigIpc";
 import { registerPortForwardIpc } from "./portForwardIpc";
 import { registerGroupsIpc } from "./groupsIpc";
 import { registerSerialProfilesIpc } from "./serialProfilesIpc";
+import { registerSftpIpc } from "./sftpIpc";
+import { registerFsIpc } from "./fsIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord } from "@sshterm/db";
 import type {
   SessionManager,
   SessionTransportEvent,
   TransportHandle,
-  SerialConnectionOptions
+  SerialConnectionOptions,
+  SftpConnectionOptions
 } from "@sshterm/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const registeredChannels = [
   ipcChannels.session.open,
@@ -51,7 +60,29 @@ const registeredChannels = [
   ipcChannels.serialProfiles.upsert,
   ipcChannels.serialProfiles.remove,
   ipcChannels.serialProfiles.listPorts,
-  ipcChannels.session.setSignals
+  ipcChannels.session.setSignals,
+  ipcChannels.sftp.connect,
+  ipcChannels.sftp.disconnect,
+  ipcChannels.sftp.list,
+  ipcChannels.sftp.stat,
+  ipcChannels.sftp.mkdir,
+  ipcChannels.sftp.rename,
+  ipcChannels.sftp.delete,
+  ipcChannels.sftp.readFile,
+  ipcChannels.sftp.writeFile,
+  ipcChannels.sftp.transferStart,
+  ipcChannels.sftp.transferCancel,
+  ipcChannels.sftp.transferList,
+  ipcChannels.sftp.transferResolveConflict,
+  ipcChannels.sftp.event,
+  ipcChannels.sftp.bookmarksList,
+  ipcChannels.sftp.bookmarksUpsert,
+  ipcChannels.sftp.bookmarksRemove,
+  ipcChannels.sftp.bookmarksReorder,
+  ipcChannels.fs.list,
+  ipcChannels.fs.stat,
+  ipcChannels.fs.getHome,
+  ipcChannels.fs.getDrives
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -63,6 +94,7 @@ let cleanupRegisteredIpc: (() => void) | null = null;
 
 export interface RegisterIpcOptions {
   emitSessionEvent?: (event: unknown) => void;
+  emitSftpEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
   resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
   resolveSerialProfile?: (profileId: string) => SerialProfileRecord | undefined;
@@ -142,6 +174,300 @@ async function closeSessionHandler(
   manager.close(parsed.sessionId);
 }
 
+async function resolveSftpConnectionOptions(
+  hostId: string,
+  options: RegisterIpcOptions,
+  request: SftpConnectRequest
+): Promise<SftpConnectionOptions | null> {
+  const allHosts = getOrCreateHostsRepo().list();
+  const resolvedHost = allHosts.find(
+    (candidate) =>
+      candidate.id === hostId ||
+      candidate.name === hostId ||
+      candidate.hostname === hostId
+  );
+
+  const sshConfigPath = path.join(homedir(), ".ssh", "config");
+  let sshConfigHosts: ReturnType<typeof parseSshConfig>["hosts"] = [];
+  try {
+    const sshConfigContent = readFileSync(sshConfigPath, "utf8");
+    sshConfigHosts = parseSshConfig(sshConfigContent).hosts;
+  } catch {
+    sshConfigHosts = [];
+  }
+
+  const profileFromResolver = options.resolveHostProfile
+    ? await options.resolveHostProfile(resolvedHost?.id ?? hostId)
+    : null;
+
+  const fromConfig = resolvedHost
+    ? sshConfigHosts.find(
+        (entry) =>
+          entry.alias === resolvedHost.name ||
+          entry.alias === resolvedHost.hostname ||
+          entry.hostName === resolvedHost.hostname
+      )
+    : sshConfigHosts.find(
+        (entry) => entry.alias === hostId || entry.hostName === hostId
+      );
+
+  const hostname =
+    profileFromResolver?.hostname ??
+    resolvedHost?.hostname ??
+    fromConfig?.hostName ??
+    fromConfig?.alias ??
+    hostId;
+  const username =
+    profileFromResolver?.username ??
+    resolvedHost?.username ??
+    fromConfig?.user ??
+    undefined;
+  const port = profileFromResolver?.port ?? resolvedHost?.port ?? fromConfig?.port ?? 22;
+
+  function resolveSshBinaryPath(): string {
+    if (process.platform !== "win32") {
+      return "ssh";
+    }
+
+    const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
+    if (!systemRoot) {
+      return "ssh";
+    }
+
+    const bundledWindowsSshPath = path.join(
+      systemRoot,
+      "System32",
+      "OpenSSH",
+      "ssh.exe"
+    );
+    return existsSync(bundledWindowsSshPath) ? bundledWindowsSshPath : "ssh";
+  }
+
+  type EffectiveSshConfig = {
+    hostname?: string;
+    user?: string;
+    port?: number;
+    proxyJump?: string;
+    identityAgent?: string;
+    identityFiles: string[];
+  };
+
+  function resolveEffectiveSshConfig(target: string): EffectiveSshConfig | null {
+    const result = spawnSync(resolveSshBinaryPath(), ["-G", target], {
+      encoding: "utf8",
+      windowsHide: true
+    });
+    if (result.status !== 0 || !result.stdout) {
+      return null;
+    }
+
+    const effective: EffectiveSshConfig = {
+      identityFiles: []
+    };
+
+    for (const line of result.stdout.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        continue;
+      }
+
+      const [rawKey, ...rest] = trimmed.split(/\s+/);
+      const key = rawKey.toLowerCase();
+      const value = rest.join(" ").trim();
+      if (!value) {
+        continue;
+      }
+
+      if (key === "hostname") {
+        effective.hostname = value;
+        continue;
+      }
+
+      if (key === "user") {
+        effective.user = value;
+        continue;
+      }
+
+      if (key === "port") {
+        const parsedPort = Number.parseInt(value, 10);
+        if (!Number.isNaN(parsedPort)) {
+          effective.port = parsedPort;
+        }
+        continue;
+      }
+
+      if (key === "proxyjump" && value.toLowerCase() !== "none") {
+        effective.proxyJump = value;
+        continue;
+      }
+
+      if (key === "identityagent" && value.toLowerCase() !== "none") {
+        effective.identityAgent = value;
+        continue;
+      }
+
+      if (key === "identityfile" && value.toLowerCase() !== "none") {
+        effective.identityFiles.push(value);
+      }
+    }
+
+    return effective;
+  }
+
+  const sshTargets = [
+    resolvedHost?.name,
+    fromConfig?.alias,
+    hostId,
+    profileFromResolver?.hostname,
+    resolvedHost?.hostname,
+    fromConfig?.hostName
+  ]
+    .filter((value): value is string => Boolean(value && value.trim().length > 0))
+    .filter((value, index, all) => all.indexOf(value) === index);
+
+  let effectiveConfig: EffectiveSshConfig | null = null;
+  for (const target of sshTargets) {
+    const candidate = resolveEffectiveSshConfig(target);
+    if (!candidate) {
+      continue;
+    }
+
+    // Avoid promoting a friendly host name (e.g. "pr") to hostname when we already
+    // have an explicit concrete hostname stored for the host record.
+    if (
+      resolvedHost?.hostname &&
+      resolvedHost.hostname !== target &&
+      candidate.hostname === target
+    ) {
+      continue;
+    }
+
+    effectiveConfig = candidate;
+    if (effectiveConfig) {
+      break;
+    }
+  }
+
+  const expandIdentityPath = (rawPath: string): string => {
+    const trimmed = rawPath.trim().replace(/^"(.*)"$/, "$1");
+    const withHome = trimmed.replace(/^~(?=$|[\\/])/, homedir());
+    if (process.platform !== "win32") {
+      return withHome;
+    }
+
+    return withHome.replace(/%([^%]+)%/g, (_full, varName) => {
+      const value = process.env[varName];
+      return value ?? _full;
+    });
+  };
+
+  const expandAgentPath = (rawPath: string): string | undefined => {
+    const trimmed = rawPath.trim().replace(/^"(.*)"$/, "$1");
+    const envRefMatch = /^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(trimmed);
+    if (envRefMatch) {
+      return process.env[envRefMatch[1]];
+    }
+
+    return expandIdentityPath(trimmed);
+  };
+
+  const resolveIdentityFile = () => {
+    const explicitCandidates = [
+      profileFromResolver?.identityFile,
+      fromConfig?.identityFile,
+      ...(effectiveConfig?.identityFiles ?? [])
+    ]
+      .filter((value): value is string => Boolean(value && value.trim().length > 0))
+      .map(expandIdentityPath);
+    const explicit = explicitCandidates.find((candidate) => existsSync(candidate));
+    if (explicit) {
+      return explicit;
+    }
+
+    const home = homedir();
+    const sshDir = path.join(home, ".ssh");
+    const defaultKeyCandidates = [
+      path.join(sshDir, "id_ed25519"),
+      path.join(sshDir, "id_ecdsa"),
+      path.join(sshDir, "id_rsa"),
+      path.join(sshDir, "id_dsa"),
+      path.join(sshDir, "id_ed25519_sk"),
+      path.join(sshDir, "id_ecdsa_sk")
+    ];
+    const defaultKey = defaultKeyCandidates.find((candidate) => existsSync(candidate));
+    if (defaultKey) {
+      return defaultKey;
+    }
+
+    return undefined;
+  };
+
+  const resolveAgentPath = (): string | undefined => {
+    const explicitAgent = effectiveConfig?.identityAgent
+      ? expandAgentPath(effectiveConfig.identityAgent)
+      : undefined;
+    if (explicitAgent) {
+      return explicitAgent;
+    }
+
+    if (process.env.SSH_AUTH_SOCK) {
+      return process.env.SSH_AUTH_SOCK;
+    }
+    return undefined;
+  };
+
+  const requestedUsername =
+    "username" in request && request.username?.trim()
+      ? request.username.trim()
+      : undefined;
+  const requestedPassword =
+    "password" in request && request.password ? request.password : undefined;
+
+  const resolvedUsername =
+    requestedUsername ??
+    effectiveConfig?.user ??
+    username;
+  const resolvedHostname = effectiveConfig?.hostname ?? hostname;
+  const resolvedPort = effectiveConfig?.port ?? port;
+  const resolvedProxyJump =
+    profileFromResolver?.proxyJump ??
+    effectiveConfig?.proxyJump ??
+    fromConfig?.proxyJump;
+  const keepAliveSeconds = profileFromResolver?.keepAliveSeconds;
+
+  if (requestedPassword) {
+    return {
+      hostname: resolvedHostname,
+      port: resolvedPort,
+      username: resolvedUsername,
+      proxyJump: resolvedProxyJump,
+      keepAliveSeconds,
+      authMethod: "password",
+      password: requestedPassword
+    };
+  }
+
+  const privateKeyPath = resolveIdentityFile();
+  const agentPath = resolveAgentPath();
+
+  if (!privateKeyPath && !agentPath) {
+    throw new Error(
+      "SFTP auth unavailable: no usable private key or SSH agent was found. Configure IdentityFile in ~/.ssh/config, start an SSH agent, or retry and enter a password."
+    );
+  }
+
+  return {
+    hostname: resolvedHostname,
+    port: resolvedPort,
+    username: resolvedUsername,
+    proxyJump: resolvedProxyJump,
+    keepAliveSeconds,
+    authMethod: privateKeyPath ? "key" : "agent",
+    privateKeyPath,
+    agentPath
+  };
+}
+
 export function getRegisteredChannels(): readonly string[] {
   return registeredChannels;
 }
@@ -184,9 +510,20 @@ export function registerIpc(
   registerPortForwardIpc(ipcMain);
   registerGroupsIpc(ipcMain, () => groupsRepo);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
+  const cleanupSftp = registerSftpIpc(ipcMain, {
+    sessionManager: manager,
+    resolveConnectionOptions: (hostId, request) =>
+      resolveSftpConnectionOptions(hostId, options, request),
+    emitSftpEvent: (event) => {
+      options.emitSftpEvent?.(event);
+    }
+  });
+  const cleanupFs = registerFsIpc(ipcMain);
 
   const cleanup = () => {
     unsubscribeSessionEvents();
+    cleanupSftp();
+    cleanupFs();
     for (const channel of registeredChannels) {
       ipcMain.removeHandler?.(channel);
     }

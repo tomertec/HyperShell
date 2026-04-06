@@ -1,0 +1,199 @@
+import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useStore } from "zustand";
+import type { StoreApi } from "zustand";
+
+import type { FsEntry } from "@sshterm/shared";
+import type { SftpStoreState } from "../sftpStore";
+import { getParentPath } from "../utils/fileUtils";
+import { DriveSelector } from "./DriveSelector";
+import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
+import { FileList } from "./FileList";
+import { PathBreadcrumb } from "./PathBreadcrumb";
+
+export interface LocalPaneProps {
+  store: StoreApi<SftpStoreState>;
+  onTransfer: (localPaths: string[], remotePath: string) => void;
+}
+
+interface LocalContextMenuState {
+  x: number;
+  y: number;
+  entry?: FsEntry;
+}
+
+export function LocalPane({ store, onTransfer }: LocalPaneProps) {
+  const localPath = useStore(store, (state) => state.localPath);
+  const localEntries = useStore(store, (state) => state.localEntries);
+  const localSelection = useStore(store, (state) => state.localSelection);
+  const localSortBy = useStore(store, (state) => state.localSortBy);
+  const isLoading = useStore(store, (state) => state.isLoading.local);
+  const error = useStore(store, (state) => state.error.local);
+
+  const setLocalPath = useStore(store, (state) => state.setLocalPath);
+  const setLocalEntries = useStore(store, (state) => state.setLocalEntries);
+  const setLocalSelection = useStore(store, (state) => state.setLocalSelection);
+  const setLocalSortBy = useStore(store, (state) => state.setLocalSortBy);
+  const setLoading = useStore(store, (state) => state.setLoading);
+  const setError = useStore(store, (state) => state.setError);
+
+  const [contextMenu, setContextMenu] = useState<LocalContextMenuState | null>(null);
+
+  const loadDirectory = useCallback(
+    async (path: string) => {
+      if (!path) {
+        return;
+      }
+
+      setLoading("local", true);
+      setError("local", null);
+
+      try {
+        const response = await window.sshterm?.fsList?.({ path });
+        setLocalEntries(response?.entries ?? []);
+      } catch (loadError) {
+        const message =
+          loadError instanceof Error ? loadError.message : "Failed to list local directory";
+        setError("local", message);
+      } finally {
+        setLoading("local", false);
+      }
+    },
+    [setError, setLoading, setLocalEntries]
+  );
+
+  useEffect(() => {
+    if (localPath) {
+      return;
+    }
+
+    let disposed = false;
+
+    async function loadHome() {
+      try {
+        const home = await window.sshterm?.fsGetHome?.();
+        if (disposed) {
+          return;
+        }
+
+        if (home?.path) {
+          setLocalPath(home.path);
+        }
+      } catch {
+        if (!disposed) {
+          setError("local", "Failed to resolve local home directory");
+        }
+      }
+    }
+
+    void loadHome();
+
+    return () => {
+      disposed = true;
+    };
+  }, [localPath, setError, setLocalPath]);
+
+  useEffect(() => {
+    if (!localPath) {
+      return;
+    }
+
+    void loadDirectory(localPath);
+  }, [loadDirectory, localPath]);
+
+  const handleNavigate = useCallback(
+    (path: string) => {
+      setLocalPath(path);
+      setLocalSelection(new Set<string>());
+    },
+    [setLocalPath, setLocalSelection]
+  );
+
+  const handleContextMenu = useCallback(
+    (event: ReactMouseEvent, entry?: FsEntry) => {
+      event.preventDefault();
+      setContextMenu({ x: event.clientX, y: event.clientY, entry });
+    },
+    []
+  );
+
+  const contextActions = useMemo<FileContextMenuAction[]>(() => {
+    if (!contextMenu) {
+      return [];
+    }
+
+    const selectedPaths =
+      localSelection.size > 0
+        ? Array.from(localSelection)
+        : contextMenu.entry
+          ? [contextMenu.entry.path]
+          : [];
+
+    if (contextMenu.entry) {
+      return [
+        {
+          label: "Open",
+          action: () => handleNavigate(contextMenu.entry!.path),
+          disabled: !contextMenu.entry.isDirectory
+        },
+        {
+          label: "Upload to Remote",
+          action: () => onTransfer(selectedPaths, ""),
+          disabled: selectedPaths.length === 0
+        },
+        { label: "", action: () => {}, separator: true },
+        {
+          label: "Copy Path",
+          action: () => {
+            void navigator.clipboard?.writeText(contextMenu.entry!.path);
+          }
+        }
+      ];
+    }
+
+    return [
+      { label: "Go Up", action: () => handleNavigate(getParentPath(localPath)) },
+      { label: "Refresh", action: () => void loadDirectory(localPath) }
+    ];
+  }, [contextMenu, handleNavigate, loadDirectory, localPath, localSelection, onTransfer]);
+
+  return (
+    <div className="flex h-full flex-col" onContextMenu={(event) => handleContextMenu(event)}>
+      <div className="flex items-center gap-2 border-b border-base-700 bg-base-900 px-2 py-1">
+        <DriveSelector currentPath={localPath} onSelect={handleNavigate} />
+        <button
+          type="button"
+          title="Go up"
+          className="px-1 text-sm text-text-secondary hover:text-text-primary"
+          onClick={() => handleNavigate(getParentPath(localPath))}
+        >
+          ..
+        </button>
+      </div>
+
+      <PathBreadcrumb path={localPath} onNavigate={handleNavigate} separator="\\" />
+
+      <FileList
+        entries={localEntries}
+        selection={localSelection}
+        sortBy={localSortBy}
+        isLoading={isLoading}
+        error={error}
+        onNavigate={handleNavigate}
+        onSelect={setLocalSelection}
+        onSort={(column, direction) => setLocalSortBy({ column, direction })}
+        onDrop={() => {}}
+        onContextMenu={handleContextMenu}
+        paneType="local"
+      />
+
+      {contextMenu && (
+        <FileContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextActions}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+    </div>
+  );
+}

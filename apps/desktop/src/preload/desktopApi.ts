@@ -1,4 +1,8 @@
 import {
+  fsEntrySchema,
+  fsGetDrivesResponseSchema,
+  fsListRequestSchema,
+  fsListResponseSchema,
   closeSessionRequestSchema,
   ipcChannels,
   openSessionRequestSchema,
@@ -14,8 +18,35 @@ import {
   removeGroupRequestSchema,
   upsertSerialProfileRequestSchema,
   removeSerialProfileRequestSchema,
+  sftpBookmarkListRequestSchema,
+  sftpBookmarkRemoveRequestSchema,
+  sftpBookmarkReorderRequestSchema,
+  sftpBookmarkSchema,
+  sftpBookmarkUpsertRequestSchema,
+  sftpConnectRequestSchema,
+  sftpConnectResponseSchema,
+  sftpDeleteRequestSchema,
+  sftpDisconnectRequestSchema,
+  sftpEventSchema,
+  sftpEntrySchema,
+  sftpListRequestSchema,
+  sftpListResponseSchema,
+  sftpMkdirRequestSchema,
+  sftpReadFileRequestSchema,
+  sftpReadFileResponseSchema,
+  sftpRenameRequestSchema,
+  sftpStatRequestSchema,
+  sftpTransferCancelRequestSchema,
+  sftpTransferListResponseSchema,
+  sftpTransferResolveConflictRequestSchema,
+  sftpTransferStartRequestSchema,
+  sftpWriteFileRequestSchema,
   setSignalsRequestSchema,
   type CloseSessionRequest,
+  type FsEntry,
+  type FsGetDrivesResponse,
+  type FsListRequest,
+  type FsListResponse,
   type HostRecord,
   type OpenSessionRequest,
   type OpenSessionResponse,
@@ -33,7 +64,31 @@ import {
   type UpsertSerialProfileRequest,
   type RemoveSerialProfileRequest,
   type SerialPortInfo,
-  type SetSignalsRequest
+  type SetSignalsRequest,
+  type SftpEntry,
+  type SftpBookmark,
+  type SftpBookmarkListRequest,
+  type SftpBookmarkRemoveRequest,
+  type SftpBookmarkReorderRequest,
+  type SftpBookmarkUpsertRequest,
+  type SftpConnectRequest,
+  type SftpConnectResponse,
+  type SftpDeleteRequest,
+  type SftpDisconnectRequest,
+  type SftpEvent,
+  type SftpListRequest,
+  type SftpListResponse,
+  type SftpMkdirRequest,
+  type SftpReadFileRequest,
+  type SftpReadFileResponse,
+  type SftpRenameRequest,
+  type SftpStatRequest,
+  type SftpTransferCancelRequest,
+  type SftpTransferListResponse,
+  type SftpTransferResolveConflictRequest,
+  type SftpTransferStartRequest,
+  type SftpWriteFileRequest,
+  type TransferJob
 } from "@sshterm/shared";
 
 export interface PreloadIpcRenderer {
@@ -74,6 +129,28 @@ export interface DesktopApi {
   removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void>;
   listSerialPorts(): Promise<SerialPortInfo[]>;
   setSessionSignals(request: SetSignalsRequest): Promise<void>;
+  sftpConnect(request: SftpConnectRequest): Promise<SftpConnectResponse>;
+  sftpDisconnect(request: SftpDisconnectRequest): Promise<void>;
+  sftpList(request: SftpListRequest): Promise<SftpListResponse>;
+  sftpStat(request: SftpStatRequest): Promise<SftpEntry>;
+  sftpMkdir(request: SftpMkdirRequest): Promise<void>;
+  sftpRename(request: SftpRenameRequest): Promise<void>;
+  sftpDelete(request: SftpDeleteRequest): Promise<void>;
+  sftpReadFile(request: SftpReadFileRequest): Promise<SftpReadFileResponse>;
+  sftpWriteFile(request: SftpWriteFileRequest): Promise<void>;
+  sftpTransferStart(request: SftpTransferStartRequest): Promise<TransferJob[]>;
+  sftpTransferCancel(request: SftpTransferCancelRequest): Promise<void>;
+  sftpTransferList(): Promise<SftpTransferListResponse>;
+  sftpTransferResolveConflict(request: SftpTransferResolveConflictRequest): Promise<void>;
+  onSftpEvent(listener: (event: SftpEvent) => void): () => void;
+  sftpBookmarksList(request: SftpBookmarkListRequest): Promise<SftpBookmark[]>;
+  sftpBookmarksUpsert(request: SftpBookmarkUpsertRequest): Promise<SftpBookmark>;
+  sftpBookmarksRemove(request: SftpBookmarkRemoveRequest): Promise<void>;
+  sftpBookmarksReorder(request: SftpBookmarkReorderRequest): Promise<void>;
+  fsList(request: FsListRequest): Promise<FsListResponse>;
+  fsStat(request: FsListRequest): Promise<FsEntry>;
+  fsGetHome(): Promise<{ path: string }>;
+  fsGetDrives(): Promise<FsGetDrivesResponse>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -212,6 +289,124 @@ export function createDesktopApi(
     async setSessionSignals(request: SetSignalsRequest): Promise<void> {
       const parsed = setSignalsRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.session.setSignals, parsed);
+    },
+    async sftpConnect(request: SftpConnectRequest): Promise<SftpConnectResponse> {
+      const parsed = sftpConnectRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.connect, parsed);
+      return sftpConnectResponseSchema.parse(result);
+    },
+    async sftpDisconnect(request: SftpDisconnectRequest): Promise<void> {
+      const parsed = sftpDisconnectRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.disconnect, parsed);
+    },
+    async sftpList(request: SftpListRequest): Promise<SftpListResponse> {
+      const parsed = sftpListRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.list, parsed);
+      return sftpListResponseSchema.parse(result);
+    },
+    async sftpStat(request: SftpStatRequest): Promise<SftpEntry> {
+      const parsed = sftpStatRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.stat, parsed);
+      return sftpEntrySchema.parse(result);
+    },
+    async sftpMkdir(request: SftpMkdirRequest): Promise<void> {
+      const parsed = sftpMkdirRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.mkdir, parsed);
+    },
+    async sftpRename(request: SftpRenameRequest): Promise<void> {
+      const parsed = sftpRenameRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.rename, parsed);
+    },
+    async sftpDelete(request: SftpDeleteRequest): Promise<void> {
+      const parsed = sftpDeleteRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.delete, parsed);
+    },
+    async sftpReadFile(request: SftpReadFileRequest): Promise<SftpReadFileResponse> {
+      const parsed = sftpReadFileRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.readFile, parsed);
+      return sftpReadFileResponseSchema.parse(result);
+    },
+    async sftpWriteFile(request: SftpWriteFileRequest): Promise<void> {
+      const parsed = sftpWriteFileRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.writeFile, parsed);
+    },
+    async sftpTransferStart(request: SftpTransferStartRequest): Promise<TransferJob[]> {
+      const parsed = sftpTransferStartRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.transferStart, parsed);
+      return result as TransferJob[];
+    },
+    async sftpTransferCancel(request: SftpTransferCancelRequest): Promise<void> {
+      const parsed = sftpTransferCancelRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.transferCancel, parsed);
+    },
+    async sftpTransferList(): Promise<SftpTransferListResponse> {
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.transferList);
+      return sftpTransferListResponseSchema.parse(result);
+    },
+    async sftpTransferResolveConflict(
+      request: SftpTransferResolveConflictRequest
+    ): Promise<void> {
+      const parsed = sftpTransferResolveConflictRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.transferResolveConflict, parsed);
+    },
+    onSftpEvent(listener: (event: SftpEvent) => void): () => void {
+      assertListener(listener, "onSftpEvent");
+
+      const wrappedListener = (_event: unknown, payload: unknown) => {
+        const parsed = sftpEventSchema.safeParse(payload);
+        if (!parsed.success) {
+          logger.warn?.("Ignored invalid SFTP event payload from IPC", parsed.error);
+          return;
+        }
+
+        try {
+          listener(parsed.data);
+        } catch (error) {
+          logger.error?.("SFTP event listener threw", error);
+        }
+      };
+
+      ipcRenderer.on(ipcChannels.sftp.event, wrappedListener);
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.sftp.event, wrappedListener);
+      };
+    },
+    async sftpBookmarksList(request: SftpBookmarkListRequest): Promise<SftpBookmark[]> {
+      const parsed = sftpBookmarkListRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.bookmarksList, parsed);
+      return result as SftpBookmark[];
+    },
+    async sftpBookmarksUpsert(request: SftpBookmarkUpsertRequest): Promise<SftpBookmark> {
+      const parsed = sftpBookmarkUpsertRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.bookmarksUpsert, parsed);
+      return sftpBookmarkSchema.parse(result);
+    },
+    async sftpBookmarksRemove(request: SftpBookmarkRemoveRequest): Promise<void> {
+      const parsed = sftpBookmarkRemoveRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.bookmarksRemove, parsed);
+    },
+    async sftpBookmarksReorder(request: SftpBookmarkReorderRequest): Promise<void> {
+      const parsed = sftpBookmarkReorderRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.bookmarksReorder, parsed);
+    },
+    async fsList(request: FsListRequest): Promise<FsListResponse> {
+      const parsed = fsListRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.fs.list, parsed);
+      return fsListResponseSchema.parse(result);
+    },
+    async fsStat(request: FsListRequest): Promise<FsEntry> {
+      const parsed = fsListRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.fs.stat, parsed);
+      return fsEntrySchema.parse(result);
+    },
+    async fsGetHome(): Promise<{ path: string }> {
+      const result = await ipcRenderer.invoke(ipcChannels.fs.getHome);
+      return result as { path: string };
+    },
+    async fsGetDrives(): Promise<FsGetDrivesResponse> {
+      const result = await ipcRenderer.invoke(ipcChannels.fs.getDrives);
+      return fsGetDrivesResponseSchema.parse(result);
     }
   };
 }

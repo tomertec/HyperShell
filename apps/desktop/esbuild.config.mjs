@@ -1,3 +1,6 @@
+import { cpSync, existsSync, mkdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 
 const banner = `
@@ -23,6 +26,8 @@ const common = {
     "node-pty",
     "serialport",
     "@serialport/bindings-cpp",
+    "ssh2",
+    "cpu-features",
   ],
 };
 
@@ -48,3 +53,15 @@ await Promise.all([
     outfile: "dist/preload/index.cjs",
   }),
 ]);
+
+const projectDir = fileURLToPath(new URL(".", import.meta.url));
+const migrationsSourceDir = path.resolve(
+  projectDir,
+  "../../packages/db/src/migrations"
+);
+const migrationsTargetDir = path.resolve(projectDir, "dist/main/migrations");
+
+if (existsSync(migrationsSourceDir)) {
+  mkdirSync(migrationsTargetDir, { recursive: true });
+  cpSync(migrationsSourceDir, migrationsTargetDir, { recursive: true });
+}

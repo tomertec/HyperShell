@@ -4,9 +4,12 @@ export type LayoutTab = {
   tabKey?: string;
   sessionId: string;
   title: string;
-  transport?: "ssh" | "serial";
+  transport?: "ssh" | "serial" | "sftp";
   profileId?: string;
   preopened?: boolean;
+  type?: "terminal" | "sftp";
+  sftpSessionId?: string;
+  hostId?: string;
 };
 
 export type Pane = {

@@ -54,4 +54,27 @@ describe("layoutStore", () => {
     expect(store.getState().tabs[0]?.preopened).toBe(true);
     expect(store.getState().activeSessionId).toBe("session-42");
   });
+
+  it("preserves sftp tab metadata", () => {
+    const store = createLayoutStore();
+
+    store.getState().openTab({
+      sessionId: "sftp-1",
+      title: "files",
+      transport: "sftp",
+      type: "sftp",
+      sftpSessionId: "sftp-1",
+      hostId: "host-1"
+    });
+
+    expect(store.getState().tabs[0]).toMatchObject({
+      sessionId: "sftp-1",
+      title: "files",
+      transport: "sftp",
+      type: "sftp",
+      sftpSessionId: "sftp-1",
+      hostId: "host-1",
+      tabKey: "sftp-1"
+    });
+  });
 });

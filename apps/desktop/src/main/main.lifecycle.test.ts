@@ -67,6 +67,7 @@ describe("createMainProcessLifecycle", () => {
     const hostMonitor = createHostMonitor();
     const cleanupIpc = vi.fn();
     let sessionEventHandler: (event: SessionEvent) => void = () => {};
+    let sftpEventHandler: (event: unknown) => void = () => {};
 
     const createMainWindow = vi
       .fn()
@@ -79,9 +80,13 @@ describe("createMainProcessLifecycle", () => {
     const registerIpc = vi.fn(
       (
         _ipcMain: unknown,
-        options: { emitSessionEvent?: (event: SessionEvent) => void }
+        options: {
+          emitSessionEvent?: (event: SessionEvent) => void;
+          emitSftpEvent?: (event: unknown) => void;
+        }
       ) => {
         sessionEventHandler = options.emitSessionEvent ?? (() => {});
+        sftpEventHandler = options.emitSftpEvent ?? (() => {});
         return cleanupIpc;
       }
     );
@@ -122,6 +127,20 @@ describe("createMainProcessLifecycle", () => {
       }
     );
 
+    sftpEventHandler({
+      kind: "status",
+      sftpSessionId: "sftp-1",
+      state: "connected"
+    });
+    expect(firstWindow.webContents.send).toHaveBeenCalledWith(
+      ipcChannels.sftp.event,
+      {
+        kind: "status",
+        sftpSessionId: "sftp-1",
+        state: "connected"
+      }
+    );
+
     firstWindow.destroyed = true;
     app.emit("activate");
 
@@ -142,7 +161,20 @@ describe("createMainProcessLifecycle", () => {
         state: "disconnected"
       }
     );
-    expect(firstWindow.webContents.send).toHaveBeenCalledTimes(1);
+    sftpEventHandler({
+      kind: "status",
+      sftpSessionId: "sftp-2",
+      state: "disconnected"
+    });
+    expect(secondWindow.webContents.send).toHaveBeenCalledWith(
+      ipcChannels.sftp.event,
+      {
+        kind: "status",
+        sftpSessionId: "sftp-2",
+        state: "disconnected"
+      }
+    );
+    expect(firstWindow.webContents.send).toHaveBeenCalledTimes(2);
 
     app.emit("before-quit");
 

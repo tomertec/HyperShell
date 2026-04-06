@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const transportSchema = z.enum(["ssh", "serial"]);
+export const transportSchema = z.enum(["ssh", "serial", "sftp"]);
 
 export const sessionStateSchema = z.enum([
   "connecting",

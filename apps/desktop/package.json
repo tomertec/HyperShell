@@ -29,11 +29,12 @@
     "better-sqlite3": "^11.8.0",
     "node-pty": "^1.0.0",
     "serialport": "^12.0.0",
+    "ssh2": "^1.17.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "electron": "^34.0.0",
     "electron-builder": "^26.0.12",
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.25.12"
   }
 }

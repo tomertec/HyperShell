@@ -45,6 +45,34 @@ export const serialProfileChannels = {
   listPorts: "serial-profiles:list-ports"
 } as const;
 
+export const sftpChannels = {
+  connect: "sftp:connect",
+  disconnect: "sftp:disconnect",
+  list: "sftp:list",
+  stat: "sftp:stat",
+  mkdir: "sftp:mkdir",
+  rename: "sftp:rename",
+  delete: "sftp:delete",
+  readFile: "sftp:read-file",
+  writeFile: "sftp:write-file",
+  transferStart: "sftp:transfer:start",
+  transferCancel: "sftp:transfer:cancel",
+  transferList: "sftp:transfer:list",
+  transferResolveConflict: "sftp:transfer:resolve-conflict",
+  event: "sftp:event",
+  bookmarksList: "sftp:bookmarks:list",
+  bookmarksUpsert: "sftp:bookmarks:upsert",
+  bookmarksRemove: "sftp:bookmarks:remove",
+  bookmarksReorder: "sftp:bookmarks:reorder"
+} as const;
+
+export const fsChannels = {
+  list: "fs:list",
+  stat: "fs:stat",
+  getHome: "fs:get-home",
+  getDrives: "fs:get-drives"
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -52,5 +80,7 @@ export const ipcChannels = {
   tray: trayChannels,
   portForward: portForwardChannels,
   groups: groupChannels,
-  serialProfiles: serialProfileChannels
+  serialProfiles: serialProfileChannels,
+  sftp: sftpChannels,
+  fs: fsChannels
 } as const;

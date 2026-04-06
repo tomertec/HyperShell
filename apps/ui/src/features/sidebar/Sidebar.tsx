@@ -7,6 +7,7 @@ import { SidebarSerialList } from "./SidebarSerialList";
 export interface SidebarProps {
   hosts: HostRecord[];
   onConnectHost: (host: HostRecord) => void;
+  onOpenSftpHost: (host: HostRecord) => void;
   onEditHost: (host: HostRecord) => void;
   onNewHost: () => void;
   onImportSshConfig: () => void;
@@ -19,6 +20,7 @@ export interface SidebarProps {
 export function Sidebar({
   hosts,
   onConnectHost,
+  onOpenSftpHost,
   onEditHost,
   onNewHost,
   onImportSshConfig,
@@ -75,6 +77,7 @@ export function Sidebar({
         <SidebarHostList
           hosts={hosts}
           onConnect={onConnectHost}
+          onOpenSftp={onOpenSftpHost}
           onEdit={onEditHost}
         />
       </SidebarSection>
