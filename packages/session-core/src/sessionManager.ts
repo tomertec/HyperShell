@@ -17,6 +17,8 @@ export interface SessionSnapshot {
   cols: number;
   rows: number;
   state: SessionState;
+  autoReconnect: boolean;
+  reconnectAttempts: number;
 }
 
 export interface SessionManagerDeps {
@@ -31,6 +33,8 @@ export interface OpenSessionInput {
   rows: number;
   sshOptions?: SshConnectionOptions;
   serialOptions?: SerialConnectionOptions;
+  autoReconnect?: boolean;
+  maxReconnectAttempts?: number;
 }
 
 export interface OpenSessionResult {
@@ -52,6 +56,8 @@ interface ManagedSession {
   snapshot: SessionSnapshot;
   transport: TransportHandle;
   unsubscribe: () => void;
+  input: OpenSessionInput;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
 
 function createNoopTransport(sessionId: string): TransportHandle {
@@ -148,11 +154,50 @@ export function createSessionManager(
     }
 
     if (event.type === "exit") {
-      updateSession(sessionId, (session) => {
-        session.snapshot.state = "disconnected";
-        session.unsubscribe();
-      });
-      sessions.delete(sessionId);
+      const session = sessions.get(sessionId);
+      if (session) {
+        const { snapshot, input } = session;
+        const maxAttempts = input.maxReconnectAttempts ?? 5;
+
+        if (snapshot.autoReconnect && snapshot.reconnectAttempts < maxAttempts) {
+          snapshot.reconnectAttempts += 1;
+          snapshot.state = "reconnecting";
+          session.unsubscribe();
+
+          for (const listener of listeners) {
+            listener({ type: "status", sessionId, state: "reconnecting" });
+          }
+
+          const delay = Math.min(1000 * Math.pow(2, snapshot.reconnectAttempts - 1), 30000);
+          session.reconnectTimer = setTimeout(() => {
+            const current = sessions.get(sessionId);
+            if (!current) return;
+
+            const newTransport = createTransport({
+              sessionId,
+              transport: input.transport,
+              profileId: input.profileId,
+              cols: current.snapshot.cols,
+              rows: current.snapshot.rows,
+              sshOptions: input.sshOptions,
+              serialOptions: input.serialOptions
+            });
+
+            const newUnsubscribe = newTransport.onEvent((e) => {
+              handleEvent(sessionId, e);
+            });
+
+            current.transport = newTransport;
+            current.unsubscribe = newUnsubscribe;
+            current.reconnectTimer = null;
+            current.snapshot.state = "connecting";
+          }, delay);
+        } else {
+          session.snapshot.state = "disconnected";
+          session.unsubscribe();
+          sessions.delete(sessionId);
+        }
+      }
     }
   }
 
@@ -165,7 +210,9 @@ export function createSessionManager(
         profileId: input.profileId,
         cols: input.cols,
         rows: input.rows,
-        state: "connecting"
+        state: "connecting",
+        autoReconnect: input.autoReconnect ?? false,
+        reconnectAttempts: 0
       };
 
       const transport = createTransport({
@@ -185,7 +232,9 @@ export function createSessionManager(
       sessions.set(sessionId, {
         snapshot,
         transport,
-        unsubscribe
+        unsubscribe,
+        input,
+        reconnectTimer: null
       });
 
       return {
@@ -214,6 +263,12 @@ export function createSessionManager(
       if (!session) {
         return;
       }
+
+      if (session.reconnectTimer !== null) {
+        clearTimeout(session.reconnectTimer);
+        session.reconnectTimer = null;
+      }
+      session.snapshot.autoReconnect = false;
 
       session.transport.close();
       session.unsubscribe();

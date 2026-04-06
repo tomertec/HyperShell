@@ -138,6 +138,77 @@ describe("sessionManager", () => {
     expect(manager.getSession("s-exit")).toBeUndefined();
   });
 
+  it("reconnects automatically when autoReconnect is true", async () => {
+    let transportCount = 0;
+
+    const manager = createSessionManager({
+      createTransport(request) {
+        transportCount++;
+        const listeners = new Set<(event: SessionTransportEvent) => void>();
+        return {
+          write() {},
+          resize() {},
+          close() {},
+          onEvent(listener) {
+            listeners.add(listener);
+            // Simulate immediate exit on first transport
+            if (transportCount === 1) {
+              queueMicrotask(() => {
+                for (const l of listeners) l({ type: "exit", sessionId: request.sessionId, exitCode: 1 });
+              });
+            }
+            return () => { listeners.delete(listener); };
+          }
+        };
+      }
+    });
+
+    const events: SessionTransportEvent[] = [];
+    manager.onEvent((e) => events.push(e));
+
+    manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true,
+      maxReconnectAttempts: 3
+    });
+
+    // Wait for exit + reconnect timer (1s for first attempt)
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    expect(transportCount).toBeGreaterThanOrEqual(2);
+    expect(events.some((e) => e.type === "status" && e.state === "reconnecting")).toBe(true);
+  });
+
+  it("does not reconnect when user closes session", () => {
+    let transportCount = 0;
+
+    const manager = createSessionManager({
+      createTransport(request) {
+        transportCount++;
+        return {
+          write() {},
+          resize() {},
+          close() {},
+          onEvent() { return () => {}; }
+        };
+      }
+    });
+
+    const result = manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true
+    });
+
+    manager.close(result.sessionId);
+    expect(transportCount).toBe(1);
+  });
+
   it("passes sshOptions to transport when provided", () => {
     let capturedRequest: OpenSessionRequest | null = null;
 
