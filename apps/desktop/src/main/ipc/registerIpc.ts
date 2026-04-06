@@ -16,6 +16,7 @@ import { createSessionManager } from "@sshterm/session-core";
 import { registerHostIpc, getOrCreateHostsRepo } from "./hostsIpc";
 import { registerSettingsIpc } from "./settingsIpc";
 import { registerSshConfigIpc } from "./sshConfigIpc";
+import { registerPortForwardIpc } from "./portForwardIpc";
 import type {
   SessionManager,
   SessionTransportEvent,
@@ -33,7 +34,10 @@ const registeredChannels = [
   ipcChannels.hosts.remove,
   ipcChannels.hosts.importSshConfig,
   ipcChannels.settings.get,
-  ipcChannels.settings.update
+  ipcChannels.settings.update,
+  ipcChannels.portForward.start,
+  ipcChannels.portForward.stop,
+  ipcChannels.portForward.list
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -134,6 +138,7 @@ export function registerIpc(
   registerHostIpc(ipcMain);
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
   registerSettingsIpc(ipcMain, () => null);
+  registerPortForwardIpc(ipcMain);
 
   const cleanup = () => {
     unsubscribeSessionEvents();

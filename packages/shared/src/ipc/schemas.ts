@@ -125,3 +125,45 @@ export const settingRecordSchema = z.object({
 export type GetSettingRequest = z.infer<typeof getSettingRequestSchema>;
 export type UpdateSettingRequest = z.infer<typeof updateSettingRequestSchema>;
 export type SettingRecord = z.infer<typeof settingRecordSchema>;
+
+// --- Port forward schemas ---
+
+export const startPortForwardRequestSchema = z.object({
+  hostname: z.string().min(1),
+  username: z.string().optional(),
+  port: z.number().int().positive().optional(),
+  protocol: z.enum(["local", "remote", "dynamic"]),
+  localAddress: z.string().default("127.0.0.1"),
+  localPort: z.number().int().positive(),
+  remoteHost: z.string().default(""),
+  remotePort: z.number().int().min(0).default(0)
+});
+
+export const stopPortForwardRequestSchema = z.object({
+  id: z.string().min(1)
+});
+
+export type StartPortForwardRequest = z.infer<typeof startPortForwardRequestSchema>;
+export type StopPortForwardRequest = z.infer<typeof stopPortForwardRequestSchema>;
+
+// --- Group schemas ---
+
+export const groupRecordSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().nullable()
+});
+
+export const upsertGroupRequestSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().nullable().optional()
+});
+
+export const removeGroupRequestSchema = z.object({
+  id: z.string().min(1)
+});
+
+export type GroupRecord = z.infer<typeof groupRecordSchema>;
+export type UpsertGroupRequest = z.infer<typeof upsertGroupRequestSchema>;
+export type RemoveGroupRequest = z.infer<typeof removeGroupRequestSchema>;
