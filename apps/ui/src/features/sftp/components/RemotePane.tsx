@@ -197,7 +197,7 @@ export function RemotePane({
           ..
         </button>
         <div className="mx-0.5 h-3 w-px bg-base-700" />
-        <PathBreadcrumb path={remotePath} onNavigate={handleNavigate} />
+        <PathBreadcrumb path={remotePath} onNavigate={handleNavigate} editable onPathSubmit={handleNavigate} />
       </div>
 
       <FileList

@@ -170,7 +170,7 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
           ..
         </button>
         <div className="mx-0.5 h-3 w-px bg-base-700" />
-        <PathBreadcrumb path={localPath} onNavigate={handleNavigate} separator="\\" />
+        <PathBreadcrumb path={localPath} onNavigate={handleNavigate} separator="\\" editable onPathSubmit={handleNavigate} />
       </div>
 
       <FileList

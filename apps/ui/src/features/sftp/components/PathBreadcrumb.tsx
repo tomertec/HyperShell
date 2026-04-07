@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 interface BreadcrumbItem {
   label: string;
   path: string;
@@ -7,6 +9,8 @@ export interface PathBreadcrumbProps {
   path: string;
   onNavigate: (path: string) => void;
   separator?: string;
+  editable?: boolean;
+  onPathSubmit?: (path: string) => void;
 }
 
 function buildPosixCrumbs(path: string): BreadcrumbItem[] {
@@ -49,15 +53,72 @@ function buildWindowsCrumbs(path: string): BreadcrumbItem[] {
 export function PathBreadcrumb({
   path,
   onNavigate,
-  separator = "/"
+  separator = "/",
+  editable,
+  onPathSubmit
 }: PathBreadcrumbProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(path);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setEditValue(path);
+    }
+  }, [path, isEditing]);
+
+  if (editable && isEditing) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center text-[11px]">
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              onPathSubmit?.(editValue);
+              setIsEditing(false);
+            }
+            if (e.key === "Escape") {
+              setIsEditing(false);
+              setEditValue(path);
+            }
+            e.stopPropagation();
+          }}
+          onBlur={() => {
+            setIsEditing(false);
+            setEditValue(path);
+          }}
+          className="w-full rounded bg-base-800 px-1.5 py-0.5 text-text-primary outline-none ring-1 ring-accent/50"
+          autoFocus
+        />
+      </div>
+    );
+  }
+
   const isWindowsPath = /^[a-zA-Z]:/.test(path);
   const crumbs = isWindowsPath
     ? buildWindowsCrumbs(path)
     : buildPosixCrumbs(path || "/");
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-[11px] text-text-secondary">
+    <div
+      className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-[11px] text-text-secondary"
+      onDoubleClick={() => {
+        if (editable) {
+          setEditValue(path);
+          setIsEditing(true);
+        }
+      }}
+    >
       {crumbs.map((crumb, index) => (
         <span key={crumb.path} className="flex shrink-0 items-center">
           {index > 0 && <span className="mx-1 text-text-secondary/50">{separator}</span>}
