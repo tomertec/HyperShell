@@ -167,7 +167,7 @@ export const sftpEventSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("status"),
     sftpSessionId: z.string(),
-    state: z.enum(["connecting", "connected", "reconnecting", "disconnected", "failed"])
+    state: z.enum(["connecting", "connected", "reconnecting", "waiting_for_network", "disconnected", "failed"])
   }),
   z.object({
     kind: z.literal("transfer-complete"),

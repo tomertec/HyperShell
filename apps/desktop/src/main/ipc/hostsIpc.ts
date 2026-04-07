@@ -171,7 +171,13 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           opReference: item?.opReference == null ? null : String(item.opReference),
           isFavorite: Boolean(item?.isFavorite ?? false),
           sortOrder: item?.sortOrder == null ? null : Number(item.sortOrder),
-          color: item?.color == null ? null : String(item.color)
+          color: item?.color == null ? null : String(item.color),
+          proxyJump: item?.proxyJump == null ? null : String(item.proxyJump),
+          proxyJumpHostIds: item?.proxyJumpHostIds == null ? null : String(item.proxyJumpHostIds),
+          keepAliveInterval: item?.keepAliveInterval == null ? null : Number(item.keepAliveInterval),
+          autoReconnect: Boolean(item?.autoReconnect ?? false),
+          reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? 5),
+          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? 1)
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
     } catch {
@@ -200,7 +206,13 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         opReference: input.opReference ?? null,
         isFavorite: input.isFavorite ?? false,
         sortOrder: input.sortOrder ?? null,
-        color: input.color ?? null
+        color: input.color ?? null,
+        proxyJump: input.proxyJump ?? null,
+        proxyJumpHostIds: input.proxyJumpHostIds ?? null,
+        keepAliveInterval: input.keepAliveInterval ?? null,
+        autoReconnect: input.autoReconnect ?? false,
+        reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
+        reconnectBaseInterval: input.reconnectBaseInterval ?? 1
       };
 
       const hosts = readHosts();
