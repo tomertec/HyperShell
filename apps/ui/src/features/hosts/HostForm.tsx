@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { HostPortForwardList } from "./HostPortForwardList";
+import { OpPickerModal } from "./OpPickerModal";
 import { inputClasses } from "../../lib/formStyles";
 
 // --- Validation helpers ---
@@ -117,6 +118,7 @@ export function HostForm({
   const [value, setValue] = useState<HostFormValue>(buildInitialValue(initialValue));
   const [sshKeys, setSshKeys] = useState<string[]>([]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [opPickerOpen, setOpPickerOpen] = useState(false);
 
   const errors = useMemo(() => {
     const e: Record<string, string | null> = {};
@@ -387,19 +389,36 @@ export function HostForm({
         )}
 
         {value.authMethod === "op-reference" && (
-          <label htmlFor={`${formId}-opReference`} className="grid gap-1.5">
+          <div className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">1Password Reference</span>
-            <input
-              id={`${formId}-opReference`}
-              value={value.opReference}
-              onChange={(e) => setValue({ ...value, opReference: e.target.value })}
-              placeholder="op://vault/item/field"
-              className={inputClasses}
-            />
+            <div className="flex gap-1.5">
+              <input
+                id={`${formId}-opReference`}
+                value={value.opReference}
+                onChange={(e) => setValue({ ...value, opReference: e.target.value })}
+                placeholder="op://vault/item/field"
+                className={`${inputClasses} flex-1`}
+              />
+              <button
+                type="button"
+                onClick={() => setOpPickerOpen(true)}
+                title="Browse 1Password vault"
+                className="shrink-0 rounded-md border border-border bg-base-800 px-2.5 hover:bg-base-700 text-text-muted hover:text-text-primary transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M6.5 2a4.5 4.5 0 1 0 2.76 8.05l2.85 2.85a.75.75 0 1 0 1.06-1.06l-2.85-2.85A4.5 4.5 0 0 0 6.5 2ZM3 6.5a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0Z" fill="currentColor" />
+                </svg>
+              </button>
+            </div>
             <span className="text-xs text-text-muted/70">
-              Enter an <code>op://</code> reference to a credential stored in 1Password.
+              Enter an <code>op://</code> reference or browse your vault.
             </span>
-          </label>
+            <OpPickerModal
+              open={opPickerOpen}
+              onClose={() => setOpPickerOpen(false)}
+              onSelect={(ref) => setValue({ ...value, opReference: ref })}
+            />
+          </div>
         )}
       </div>
 
