@@ -17,6 +17,12 @@ export type HostRecord = {
   isFavorite: boolean;
   sortOrder: number | null;
   color: string | null;
+  proxyJump: string | null;
+  proxyJumpHostIds: string | null;
+  keepAliveInterval: number | null;
+  autoReconnect: boolean;
+  reconnectMaxAttempts: number;
+  reconnectBaseInterval: number;
 };
 
 export type HostInput = {
@@ -35,6 +41,12 @@ export type HostInput = {
   isFavorite?: boolean;
   sortOrder?: number | null;
   color?: string | null;
+  proxyJump?: string | null;
+  proxyJumpHostIds?: string | null;
+  keepAliveInterval?: number | null;
+  autoReconnect?: boolean;
+  reconnectMaxAttempts?: number;
+  reconnectBaseInterval?: number;
 };
 
 type HostRow = {
@@ -53,6 +65,12 @@ type HostRow = {
   is_favorite: number;
   sort_order: number | null;
   color: string | null;
+  proxy_jump: string | null;
+  proxy_jump_host_ids: string | null;
+  keep_alive_interval: number | null;
+  auto_reconnect: number;
+  reconnect_max_attempts: number;
+  reconnect_base_interval: number;
 };
 
 function mapRow(row: HostRow): HostRecord {
@@ -71,7 +89,13 @@ function mapRow(row: HostRow): HostRecord {
     opReference: row.op_reference ?? null,
     isFavorite: Boolean(row.is_favorite),
     sortOrder: row.sort_order ?? null,
-    color: row.color ?? null
+    color: row.color ?? null,
+    proxyJump: row.proxy_jump ?? null,
+    proxyJumpHostIds: row.proxy_jump_host_ids ?? null,
+    keepAliveInterval: row.keep_alive_interval ?? null,
+    autoReconnect: Boolean(row.auto_reconnect),
+    reconnectMaxAttempts: row.reconnect_max_attempts ?? 5,
+    reconnectBaseInterval: row.reconnect_base_interval ?? 1,
   };
 }
 
@@ -91,11 +115,15 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
   const insertHost = db.prepare(`
     INSERT INTO hosts (
       id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
-      auth_method, agent_kind, op_reference, is_favorite, sort_order, color
+      auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
+      proxy_jump, proxy_jump_host_ids, keep_alive_interval,
+      auto_reconnect, reconnect_max_attempts, reconnect_base_interval
     )
     VALUES (
       @id, @name, @hostname, @port, @username, @identityFile, @authProfileId, @groupId, @notes,
-      @authMethod, @agentKind, @opReference, @isFavorite, @sortOrder, @color
+      @authMethod, @agentKind, @opReference, @isFavorite, @sortOrder, @color,
+      @proxyJump, @proxyJumpHostIds, @keepAliveInterval,
+      @autoReconnect, @reconnectMaxAttempts, @reconnectBaseInterval
     )
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -112,13 +140,21 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       is_favorite = excluded.is_favorite,
       sort_order = excluded.sort_order,
       color = excluded.color,
+      proxy_jump = excluded.proxy_jump,
+      proxy_jump_host_ids = excluded.proxy_jump_host_ids,
+      keep_alive_interval = excluded.keep_alive_interval,
+      auto_reconnect = excluded.auto_reconnect,
+      reconnect_max_attempts = excluded.reconnect_max_attempts,
+      reconnect_base_interval = excluded.reconnect_base_interval,
       updated_at = CURRENT_TIMESTAMP
   `);
 
   const listHosts = db.prepare(`
     SELECT
       id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
-      auth_method, agent_kind, op_reference, is_favorite, sort_order, color
+      auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
+      proxy_jump, proxy_jump_host_ids, keep_alive_interval,
+      auto_reconnect, reconnect_max_attempts, reconnect_base_interval
     FROM hosts
     ORDER BY COALESCE(sort_order, 999999) ASC, is_favorite DESC, name COLLATE NOCASE ASC
   `);
@@ -126,7 +162,9 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
     `
       SELECT
         id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
-        auth_method, agent_kind, op_reference, is_favorite, sort_order, color
+        auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
+        proxy_jump, proxy_jump_host_ids, keep_alive_interval,
+        auto_reconnect, reconnect_max_attempts, reconnect_base_interval
       FROM hosts
       WHERE id = ?
     `
@@ -153,7 +191,13 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         opReference: input.opReference ?? null,
         isFavorite: input.isFavorite ? 1 : 0,
         sortOrder: input.sortOrder ?? null,
-        color: input.color ?? null
+        color: input.color ?? null,
+        proxyJump: input.proxyJump ?? null,
+        proxyJumpHostIds: input.proxyJumpHostIds ?? null,
+        keepAliveInterval: input.keepAliveInterval ?? null,
+        autoReconnect: input.autoReconnect ? 1 : 0,
+        reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
+        reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
       };
 
       insertHost.run(normalized);
@@ -207,7 +251,13 @@ function createInMemoryHostsRepository() {
         opReference: input.opReference ?? null,
         isFavorite: input.isFavorite ?? false,
         sortOrder: input.sortOrder ?? null,
-        color: input.color ?? null
+        color: input.color ?? null,
+        proxyJump: input.proxyJump ?? null,
+        proxyJumpHostIds: input.proxyJumpHostIds ?? null,
+        keepAliveInterval: input.keepAliveInterval ?? null,
+        autoReconnect: input.autoReconnect ?? false,
+        reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
+        reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
       };
 
       hosts.set(record.id, record);

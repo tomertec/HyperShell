@@ -27,4 +27,42 @@ describe("hostsRepository", () => {
     const repo = createHostsRepository();
     expect(repo.remove("nonexistent")).toBe(false);
   });
+
+  it("stores and retrieves advanced SSH fields", () => {
+    const repo = createHostsRepository();
+    const host = repo.create({
+      id: "h1",
+      name: "bastion",
+      hostname: "bastion.example.com",
+      proxyJump: "jump@gateway:22",
+      proxyJumpHostIds: JSON.stringify(["gw-1"]),
+      keepAliveInterval: 60,
+      autoReconnect: true,
+      reconnectMaxAttempts: 10,
+      reconnectBaseInterval: 2,
+    });
+
+    expect(host.proxyJump).toBe("jump@gateway:22");
+    expect(host.proxyJumpHostIds).toBe(JSON.stringify(["gw-1"]));
+    expect(host.keepAliveInterval).toBe(60);
+    expect(host.autoReconnect).toBe(true);
+    expect(host.reconnectMaxAttempts).toBe(10);
+    expect(host.reconnectBaseInterval).toBe(2);
+  });
+
+  it("defaults advanced SSH fields when not provided", () => {
+    const repo = createHostsRepository();
+    const host = repo.create({
+      id: "h2",
+      name: "simple",
+      hostname: "simple.example.com",
+    });
+
+    expect(host.proxyJump).toBeNull();
+    expect(host.proxyJumpHostIds).toBeNull();
+    expect(host.keepAliveInterval).toBeNull();
+    expect(host.autoReconnect).toBe(false);
+    expect(host.reconnectMaxAttempts).toBe(5);
+    expect(host.reconnectBaseInterval).toBe(1);
+  });
 });
