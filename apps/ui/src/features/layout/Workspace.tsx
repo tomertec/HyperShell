@@ -42,7 +42,7 @@ function PaneView({
 
   return (
     <div
-      className={`flex-1 min-h-0 min-w-0 border-l border-border/40 first:border-l-0 relative ${
+      className={`h-full min-h-0 min-w-0 border-l border-border/40 first:border-l-0 relative ${
         isActive ? "shadow-[inset_0_1px_0_rgba(56,189,248,0.22)]" : ""
       }`}
       onClick={onActivate}
@@ -226,7 +226,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
                 style={{
                   [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
                 }}
-                className="min-h-0 min-w-0 relative"
+                className="h-full min-h-0 min-w-0 relative"
               >
                 <PaneView
                   pane={pane}

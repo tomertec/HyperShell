@@ -466,21 +466,7 @@ export function App() {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : String(error);
-        const lowerMessage = message.toLowerCase();
-        const shouldPromptForPassword =
-          lowerMessage.includes("authentication methods failed") ||
-          lowerMessage.includes("failed to connect to agent") ||
-          lowerMessage.includes("failed to retrieve identities from agent") ||
-          lowerMessage.includes("auth unavailable") ||
-          lowerMessage.includes("encrypted") ||
-          lowerMessage.includes("passphrase") ||
-          lowerMessage.includes("cannot parse") ||
-          lowerMessage.includes("no auth methods");
-
-        if (!shouldPromptForPassword) {
-          console.error("[sshterm] failed to open SFTP tab:", error);
-          return;
-        }
+        console.warn("[sftp] connect failed, prompting for credentials:", message);
         openSftpAuthModal(host, message);
       }
     },

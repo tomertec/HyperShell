@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 
 import {
   formatFileSize,
@@ -69,6 +69,7 @@ export function FileList({
   paneType,
   cursorIndex
 }: FileListProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const cursorRowRef = useCallback((node: HTMLTableRowElement | null) => {
     node?.scrollIntoView({ block: "nearest" });
   }, []);
@@ -110,6 +111,26 @@ export function FileList({
     () => sortEntries(entries, sortBy.column, sortBy.direction),
     [entries, sortBy.column, sortBy.direction]
   );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const domRows = container?.querySelectorAll("tbody tr") ?? [];
+    const firstRow = domRows.item(0) as HTMLTableRowElement | null;
+    const firstRowHeight = firstRow?.getBoundingClientRect().height ?? 0;
+    const containerHeight = container?.getBoundingClientRect().height ?? 0;
+
+    console.log(
+      "[sftp-ui] file list render:",
+      `pane=${paneType}`,
+      `entries=${entries.length}`,
+      `sorted=${sortedEntries.length}`,
+      `loading=${isLoading}`,
+      `error=${error ?? "(none)"}`,
+      `domRows=${domRows.length}`,
+      `firstRowH=${firstRowHeight.toFixed(1)}`,
+      `containerH=${containerHeight.toFixed(1)}`
+    );
+  }, [entries.length, error, isLoading, paneType, sortedEntries.length]);
 
   const handleHeaderClick = (column: SortColumn) => {
     const direction =
@@ -213,6 +234,8 @@ export function FileList({
 
   return (
     <div
+      ref={containerRef}
+      data-sftp-pane={paneType}
       className={`min-h-0 flex-1 overflow-y-auto bg-base-800/70 ${
         dropActive ? "ring-2 ring-inset ring-accent/50" : ""
       }`}
@@ -225,8 +248,8 @@ export function FileList({
         <div className="flex h-32 items-center justify-center px-4 text-sm text-text-muted">
           Loading files...
         </div>
-      ) : (
-        <table className="w-full table-fixed border-collapse text-[12px]" style={{ height: "auto" }}>
+	      ) : (
+	        <table className="w-full table-fixed border-collapse text-[12px]" style={{ height: "auto" }}>
           <colgroup>
             <col />
             <col style={{ width: colWidths.size }} />
@@ -266,56 +289,67 @@ export function FileList({
               )}
             </tr>
           </thead>
-          <tbody>
-            {sortedEntries.map((entry, index) => (
-              <tr
-                key={entry.path}
-                ref={cursorIndex === index ? cursorRowRef : undefined}
-                style={{ height: ROW_HEIGHT }}
-                className={`transition-colors ${
-                  selection.has(entry.path)
-                    ? "bg-accent/15 border-l-2 border-l-accent"
-                    : index % 2 === 0
-                      ? "hover:bg-base-700/30"
-                      : "bg-base-800/20 hover:bg-base-700/30"
-                } ${cursorIndex === index ? "ring-1 ring-inset ring-accent/40" : ""}`}
-                onClick={(event) => handleRowClick(entry, event)}
-                onDoubleClick={() => handleRowDoubleClick(entry)}
-                onContextMenu={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (!selection.has(entry.path)) {
-                    onSelect(new Set([entry.path]));
-                  }
-                  onContextMenu(event, entry);
-                }}
-                draggable
-                onDragStart={(event) => handleDragStart(event, entry)}
-              >
-                <td className="overflow-hidden px-1.5">
-                  <div className="flex min-w-0 items-center gap-1" style={{ height: ROW_HEIGHT }}>
-                    <FileIcon name={entry.name} isDirectory={entry.isDirectory} />
-                    <span className={`truncate text-[12px] ${entry.isDirectory ? "font-medium text-text-primary" : "text-text-primary"}`}>
-                      {entry.name}
-                    </span>
-                  </div>
-                </td>
-                <td className="overflow-hidden whitespace-nowrap px-1.5 text-right text-[11px] text-text-secondary">
-                  {entry.isDirectory ? "—" : formatFileSize(entry.size)}
-                </td>
-                <td className="overflow-hidden whitespace-nowrap px-1.5 text-[11px] text-text-secondary">
-                  {formatCompactDate(entry.modifiedAt)}
-                </td>
-                {paneType === "remote" && (
-                  <td className="overflow-hidden whitespace-nowrap px-1.5 font-mono text-[10px] text-text-secondary">
-                    {(entry.permissions ?? 0).toString(8).padStart(4, "0")}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+	          <tbody>
+	            {sortedEntries.length === 0 ? (
+	              <tr>
+	                <td
+	                  colSpan={paneType === "remote" ? 4 : 3}
+	                  className="px-1.5 py-6 text-center text-[11px] text-text-muted"
+	                >
+	                  No files or folders
+	                </td>
+	              </tr>
+	            ) : (
+	              sortedEntries.map((entry, index) => (
+	                <tr
+	                  key={entry.path}
+	                  ref={cursorIndex === index ? cursorRowRef : undefined}
+	                  style={{ height: ROW_HEIGHT }}
+	                  className={`transition-colors ${
+	                    selection.has(entry.path)
+	                      ? "bg-accent/15 border-l-2 border-l-accent"
+	                      : index % 2 === 0
+	                        ? "hover:bg-base-700/30"
+	                        : "bg-base-800/20 hover:bg-base-700/30"
+	                  } ${cursorIndex === index ? "ring-1 ring-inset ring-accent/40" : ""}`}
+	                  onClick={(event) => handleRowClick(entry, event)}
+	                  onDoubleClick={() => handleRowDoubleClick(entry)}
+	                  onContextMenu={(event) => {
+	                    event.preventDefault();
+	                    event.stopPropagation();
+	                    if (!selection.has(entry.path)) {
+	                      onSelect(new Set([entry.path]));
+	                    }
+	                    onContextMenu(event, entry);
+	                  }}
+	                  draggable
+	                  onDragStart={(event) => handleDragStart(event, entry)}
+	                >
+	                  <td className="overflow-hidden px-1.5">
+	                    <div className="flex min-w-0 items-center gap-1" style={{ height: ROW_HEIGHT }}>
+	                      <FileIcon name={entry.name} isDirectory={entry.isDirectory} />
+	                      <span className={`truncate text-[12px] ${entry.isDirectory ? "font-medium text-text-primary" : "text-text-primary"}`}>
+	                        {entry.name}
+	                      </span>
+	                    </div>
+	                  </td>
+	                  <td className="overflow-hidden whitespace-nowrap px-1.5 text-right text-[11px] text-text-secondary">
+	                    {entry.isDirectory ? "—" : formatFileSize(entry.size)}
+	                  </td>
+	                  <td className="overflow-hidden whitespace-nowrap px-1.5 text-[11px] text-text-secondary">
+	                    {formatCompactDate(entry.modifiedAt)}
+	                  </td>
+	                  {paneType === "remote" && (
+	                    <td className="overflow-hidden whitespace-nowrap px-1.5 font-mono text-[10px] text-text-secondary">
+	                      {(entry.permissions ?? 0).toString(8).padStart(4, "0")}
+	                    </td>
+	                  )}
+	                </tr>
+	              ))
+	            )}
+	          </tbody>
+	        </table>
+	      )}
+	    </div>
   );
 }

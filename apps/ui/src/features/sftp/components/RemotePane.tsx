@@ -8,6 +8,7 @@ import {
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 
+import type { SftpEntry } from "@sshterm/shared";
 import type { SftpStoreState } from "../sftpStore";
 import { getParentPath } from "../utils/fileUtils";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
@@ -30,6 +31,29 @@ interface RemoteContextMenuState {
   x: number;
   y: number;
   entry?: FileListEntry;
+}
+
+function extractRemoteEntries(
+  response: unknown
+): SftpEntry[] {
+  if (Array.isArray(response)) {
+    return response as SftpEntry[];
+  }
+
+  if (!response || typeof response !== "object") {
+    return [];
+  }
+
+  const payload = response as Record<string, unknown>;
+  if (Array.isArray(payload.entries)) {
+    return payload.entries as SftpEntry[];
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items as SftpEntry[];
+  }
+
+  return [];
 }
 
 export function RemotePane({
@@ -67,6 +91,18 @@ export function RemotePane({
   }, [remoteEntries, remoteFilterText]);
 
   useEffect(() => {
+    console.log(
+      "[sftp-ui] remote pane state:",
+      `path=${remotePath}`,
+      `entries=${remoteEntries.length}`,
+      `filtered=${filteredEntries.length}`,
+      `filter="${remoteFilterText || ""}"`,
+      `loading=${isLoading}`,
+      `error=${error ?? "(none)"}`
+    );
+  }, [error, filteredEntries.length, isLoading, remoteEntries.length, remoteFilterText, remotePath]);
+
+  useEffect(() => {
     const maxIndex = Math.max(0, filteredEntries.length - 1);
     if (remoteCursorIndex > maxIndex) {
       store.getState().setCursorIndex("remote", maxIndex);
@@ -85,11 +121,25 @@ export function RemotePane({
       setError("remote", null);
 
       try {
-        const response = await window.sshterm?.sftpList?.({ sftpSessionId, path });
-        setRemoteEntries(response?.entries ?? []);
+        const sftpList = window.sshterm?.sftpList;
+        if (!sftpList) {
+          throw new Error("SFTP list API is unavailable in preload bridge");
+        }
+        const response = await sftpList({ sftpSessionId, path });
+        const entries = extractRemoteEntries(response);
+        console.log(
+          "[sftp-ui] loadDirectory:",
+          path,
+          "→",
+          entries.length,
+          "entries",
+          entries.length > 0 ? `(first: ${entries[0].name})` : ""
+        );
+        setRemoteEntries(entries);
       } catch (loadError) {
         const message =
           loadError instanceof Error ? loadError.message : "Failed to list remote directory";
+        console.error("[sftp-ui] loadDirectory failed:", message);
         setError("remote", message);
       } finally {
         setLoading("remote", false);

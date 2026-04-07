@@ -36,20 +36,38 @@ export interface SftpTransportHandle {
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
 }
 
-function buildConnectConfig(options: SftpConnectionOptions): ConnectConfig {
+/** Collect all candidate key file paths in priority order. */
+function collectKeyPaths(options: SftpConnectionOptions): string[] {
+  const paths: string[] = [];
+  if (options.privateKeyPath) paths.push(options.privateKeyPath);
+  if (options.fallbackKeyPaths) {
+    for (const p of options.fallbackKeyPaths) {
+      if (!paths.includes(p)) paths.push(p);
+    }
+  }
+  return paths;
+}
+
+function buildConnectConfig(options: SftpConnectionOptions, keyPath?: string): ConnectConfig {
+  // Strip Windows domain prefix (e.g. "DOMAIN\user" → "user") — SSH servers
+  // don't understand Windows domain usernames.
+  let sshUsername = options.username;
+  if (sshUsername && sshUsername.includes("\\")) {
+    sshUsername = sshUsername.split("\\").pop();
+  }
+
   const config: ConnectConfig = {
     host: options.hostname,
     port: options.port ?? 22,
-    username: options.username,
+    username: sshUsername,
     keepaliveInterval: (options.keepAliveSeconds ?? 60) * 1000
   };
 
-  // Provide all available credentials — ssh2 tries publickey first, then password.
-  if (options.privateKeyPath) {
+  if (keyPath) {
     try {
-      config.privateKey = readFileSync(options.privateKeyPath);
+      config.privateKey = readFileSync(keyPath);
     } catch {
-      // Key file unreadable — skip key auth, fall through to agent/password.
+      // Key file unreadable — skip.
     }
   }
 
@@ -127,23 +145,15 @@ export function createSftpTransport(
     return sftp;
   };
 
-  async function connect(): Promise<void> {
-    emitStatus("connecting");
-
-    const connectConfig = buildConnectConfig(options);
-
-    await new Promise<void>((resolve, reject) => {
+  function tryConnect(connectConfig: ConnectConfig): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       const conn = new Client();
       let settled = false;
 
       const fail = (error: Error) => {
-        if (settled) {
-          return;
-        }
-
+        if (settled) return;
         settled = true;
-        emitError(error.message);
-        emitStatus("failed");
+        conn.removeAllListeners();
         reject(error);
       };
 
@@ -153,29 +163,56 @@ export function createSftpTransport(
             fail(error);
             return;
           }
-
-          if (settled) {
-            return;
-          }
+          if (settled) return;
 
           settled = true;
           client = conn;
           sftp = sftpSession;
-          emitStatus("connected");
+
+          conn.on("close", () => {
+            sftp = null;
+            client = null;
+            emitStatus("disconnected");
+          });
+
           resolve();
         });
       });
 
       conn.on("error", fail);
-
-      conn.on("close", () => {
-        sftp = null;
-        client = null;
-        emitStatus("disconnected");
-      });
-
       conn.connect(connectConfig);
     });
+  }
+
+  async function connect(): Promise<void> {
+    emitStatus("connecting");
+
+    // Collect all candidate key paths and try each one sequentially,
+    // just like the system ssh binary does.
+    const keyPaths = collectKeyPaths(options);
+    const attempts = keyPaths.length > 0 ? keyPaths : [undefined];
+
+    let lastError: Error | null = null;
+    for (const keyPath of attempts) {
+      const config = buildConnectConfig(options, keyPath);
+      if (keyPath) {
+        console.log("[sftp-auth] trying key:", keyPath);
+      }
+
+      try {
+        await tryConnect(config);
+        console.log("[sftp-auth] CONNECTED successfully as", config.username, "to", config.host);
+        emitStatus("connected");
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.log("[sftp-auth] key failed:", keyPath ?? "(no key)", lastError.message);
+      }
+    }
+
+    emitError(lastError?.message ?? "All authentication methods failed");
+    emitStatus("failed");
+    throw lastError ?? new Error("All authentication methods failed");
   }
 
   function disconnect(): void {
@@ -189,6 +226,7 @@ export function createSftpTransport(
   }
 
   async function list(remotePath: string): Promise<SftpEntry[]> {
+    console.log("[sftp] list called for:", remotePath);
     const sftpSession = requireSftp();
     return await new Promise<SftpEntry[]>((resolve, reject) => {
       sftpSession.readdir(remotePath, (error, entries) => {

@@ -207,6 +207,146 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
+const UNIX_EPOCH_ISO = new Date(0).toISOString();
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "bigint") {
+    return Number(value);
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function toIsoDate(value: unknown): string {
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return new Date(parsed).toISOString();
+    }
+  }
+
+  const numeric = coerceNumber(value);
+  if (numeric !== null) {
+    const millis = numeric > 10_000_000_000 ? numeric : numeric * 1000;
+    const date = new Date(millis);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+
+  return UNIX_EPOCH_ISO;
+}
+
+function isDirectoryFromMode(mode: number | null): boolean {
+  if (mode === null) {
+    return false;
+  }
+
+  return (mode & 0o40000) !== 0;
+}
+
+function normalizePermissions(mode: number | null): number {
+  if (mode === null) {
+    return 0;
+  }
+
+  return mode > 0o7777 ? mode & 0o7777 : mode;
+}
+
+function normalizeSftpEntryShape(value: unknown): SftpEntry | null {
+  const entry = asRecord(value);
+  if (!entry) {
+    return null;
+  }
+
+  const attrs = asRecord(entry.attrs);
+  const name =
+    typeof entry.name === "string"
+      ? entry.name
+      : typeof entry.filename === "string"
+        ? entry.filename
+        : null;
+  if (!name || name.length === 0) {
+    return null;
+  }
+
+  const path =
+    typeof entry.path === "string" && entry.path.length > 0
+      ? entry.path
+      : typeof entry.fullPath === "string" && entry.fullPath.length > 0
+        ? entry.fullPath
+        : name.startsWith("/")
+          ? name
+          : `/${name}`;
+
+  const mode = coerceNumber(entry.mode ?? entry.permissions ?? attrs?.mode);
+  const typeValue = typeof entry.type === "string" ? entry.type.toLowerCase() : null;
+  const isDirectory =
+    typeof entry.isDirectory === "boolean"
+      ? entry.isDirectory
+      : typeValue === "d" || typeValue === "directory"
+        ? true
+        : isDirectoryFromMode(mode);
+
+  return {
+    name,
+    path,
+    size: coerceNumber(entry.size ?? attrs?.size) ?? 0,
+    modifiedAt: toIsoDate(entry.modifiedAt ?? entry.mtime ?? attrs?.mtime),
+    isDirectory,
+    permissions: normalizePermissions(mode),
+    owner: coerceNumber(entry.owner ?? entry.uid ?? attrs?.uid) ?? 0,
+    group: coerceNumber(entry.group ?? entry.gid ?? attrs?.gid) ?? 0
+  };
+}
+
+function normalizeSftpListResponseShape(value: unknown): SftpListResponse | null {
+  let rawEntries: unknown[] | null = null;
+
+  if (Array.isArray(value)) {
+    rawEntries = value;
+  } else {
+    const payload = asRecord(value);
+    if (Array.isArray(payload?.entries)) {
+      rawEntries = payload.entries;
+    } else if (Array.isArray(payload?.items)) {
+      rawEntries = payload.items;
+    }
+  }
+
+  if (!rawEntries) {
+    return null;
+  }
+
+  const entries = rawEntries
+    .map((entry) => normalizeSftpEntryShape(entry))
+    .filter((entry): entry is SftpEntry => entry !== null);
+  if (rawEntries.length > 0 && entries.length === 0) {
+    return null;
+  }
+
+  return { entries };
+}
+
 export function createDesktopApi(
   ipcRenderer: PreloadIpcRenderer,
   logger: PreloadLogger = console
@@ -361,12 +501,55 @@ export function createDesktopApi(
     async sftpList(request: SftpListRequest): Promise<SftpListResponse> {
       const parsed = sftpListRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sftp.list, parsed);
-      return sftpListResponseSchema.parse(result);
+      const strict = sftpListResponseSchema.safeParse(result);
+      if (strict.success) {
+        console.log(
+          "[sftp-preload] sftpList strict parse ok:",
+          strict.data.entries.length,
+          strict.data.entries.length > 0 ? `(first: ${strict.data.entries[0].name})` : ""
+        );
+        return strict.data;
+      }
+
+      const normalized = normalizeSftpListResponseShape(result);
+      if (normalized) {
+        console.log(
+          "[sftp-preload] sftpList normalized fallback ok:",
+          normalized.entries.length,
+          normalized.entries.length > 0 ? `(first: ${normalized.entries[0].name})` : ""
+        );
+        return normalized;
+      }
+
+      const payload = asRecord(result);
+      const payloadEntries = payload?.entries;
+      const previewEntry = Array.isArray(result)
+        ? result[0]
+        : Array.isArray(payloadEntries)
+          ? payloadEntries[0]
+          : undefined;
+
+      console.error("[sftp-preload] Zod parse failed for sftpList response:", strict.error);
+      console.error(
+        "[sftp-preload] Raw result sample:",
+        JSON.stringify(previewEntry).slice(0, 200)
+      );
+      throw strict.error;
     },
     async sftpStat(request: SftpStatRequest): Promise<SftpEntry> {
       const parsed = sftpStatRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sftp.stat, parsed);
-      return sftpEntrySchema.parse(result);
+      const strict = sftpEntrySchema.safeParse(result);
+      if (strict.success) {
+        return strict.data;
+      }
+
+      const normalized = normalizeSftpEntryShape(result);
+      if (normalized) {
+        return normalized;
+      }
+
+      throw strict.error;
     },
     async sftpMkdir(request: SftpMkdirRequest): Promise<void> {
       const parsed = sftpMkdirRequestSchema.parse(request);

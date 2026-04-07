@@ -65,6 +65,8 @@ export interface SftpConnectionOptions {
   authMethod: "password" | "key" | "agent";
   password?: string;
   privateKeyPath?: string;
+  /** Additional key paths to try if the primary key fails */
+  fallbackKeyPaths?: string[];
   agentPath?: string;
   passphrase?: string;
   proxyJump?: string;

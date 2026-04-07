@@ -383,26 +383,26 @@ async function resolveSftpConnectionOptions(
     .filter((value, index, all) => all.indexOf(value) === index);
 
   let effectiveConfig: EffectiveSshConfig | null = null;
+  let useHostRecordHostname = false;
   for (const target of sshTargets) {
     const candidate = resolveEffectiveSshConfig(target);
     if (!candidate) {
       continue;
     }
 
-    // Avoid promoting a friendly host name (e.g. "pr") to hostname when we already
-    // have an explicit concrete hostname stored for the host record.
+    // When ssh -G didn't resolve the hostname to something different from the
+    // target (i.e. no HostName directive), keep the host record's explicit
+    // hostname but still use user/identity/proxy info from the effective config.
     if (
       resolvedHost?.hostname &&
       resolvedHost.hostname !== target &&
       candidate.hostname === target
     ) {
-      continue;
+      useHostRecordHostname = true;
     }
 
     effectiveConfig = candidate;
-    if (effectiveConfig) {
-      break;
-    }
+    break;
   }
 
   const expandIdentityPath = (rawPath: string): string => {
@@ -428,7 +428,8 @@ async function resolveSftpConnectionOptions(
     return expandIdentityPath(trimmed);
   };
 
-  const resolveIdentityFile = () => {
+  /** Returns [primaryKey, ...fallbackKeys] — all existing key paths in priority order. */
+  const resolveAllIdentityFiles = (): string[] => {
     const explicitCandidates = [
       resolvedHost?.identityFile,
       profileFromResolver?.identityFile,
@@ -437,10 +438,6 @@ async function resolveSftpConnectionOptions(
     ]
       .filter((value): value is string => Boolean(value && value.trim().length > 0))
       .map(expandIdentityPath);
-    const explicit = explicitCandidates.find((candidate) => existsSync(candidate));
-    if (explicit) {
-      return explicit;
-    }
 
     const home = homedir();
     const sshDir = path.join(home, ".ssh");
@@ -452,9 +449,24 @@ async function resolveSftpConnectionOptions(
       path.join(sshDir, "id_ed25519_sk"),
       path.join(sshDir, "id_ecdsa_sk")
     ];
-    const defaultKey = defaultKeyCandidates.find((candidate) => existsSync(candidate));
-    if (defaultKey) {
-      return defaultKey;
+
+    const all = [...explicitCandidates, ...defaultKeyCandidates];
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const p of all) {
+      const normalized = path.resolve(p);
+      if (!seen.has(normalized) && existsSync(normalized)) {
+        seen.add(normalized);
+        result.push(normalized);
+      }
+    }
+    return result;
+  };
+
+  const resolveIdentityFile = () => {
+    const all = resolveAllIdentityFiles();
+    if (all.length > 0) {
+      return all[0];
     }
 
     return undefined;
@@ -490,11 +502,22 @@ async function resolveSftpConnectionOptions(
   const requestedPassword =
     "password" in request && request.password ? request.password : undefined;
 
+  // Strip Windows domain prefix (DOMAIN\user → user) — SSH servers don't
+  // understand Windows domain usernames.
+  const stripDomain = (u: string | undefined): string | undefined => {
+    if (!u) return u;
+    return u.includes("\\") ? u.split("\\").pop() : u;
+  };
+
+  // Priority: explicit username from auth modal or host record first,
+  // then fall back to ssh -G effective config.
   const resolvedUsername =
-    requestedUsername ??
-    effectiveConfig?.user ??
-    username;
-  const resolvedHostname = effectiveConfig?.hostname ?? hostname;
+    stripDomain(requestedUsername) ??
+    stripDomain(username) ??
+    stripDomain(effectiveConfig?.user);
+  const resolvedHostname = useHostRecordHostname
+    ? hostname
+    : (effectiveConfig?.hostname ?? hostname);
   const resolvedPort = effectiveConfig?.port ?? port;
   const resolvedProxyJump =
     profileFromResolver?.proxyJump ??
@@ -502,8 +525,20 @@ async function resolveSftpConnectionOptions(
     fromConfig?.proxyJump;
   const keepAliveSeconds = profileFromResolver?.keepAliveSeconds;
 
-  const privateKeyPath = resolveIdentityFile();
+  const allKeyPaths = resolveAllIdentityFiles();
+  const privateKeyPath = allKeyPaths[0] ?? undefined;
+  const fallbackKeyPaths = allKeyPaths.slice(1);
   const agentPath = resolveAgentPath();
+
+  console.log("[sftp-auth] resolved credentials:", {
+    hostname: effectiveConfig?.hostname ?? hostname,
+    username: effectiveConfig?.user ?? username,
+    privateKeyPath: privateKeyPath ?? "(none)",
+    agentPath: agentPath ?? "(none)",
+    hasPassword: Boolean(requestedPassword),
+    effectiveIdentityFiles: effectiveConfig?.identityFiles ?? [],
+    effectiveIdentityAgent: effectiveConfig?.identityAgent ?? "(none)",
+  });
 
   if (!requestedPassword && !privateKeyPath && !agentPath) {
     throw new Error(
@@ -531,6 +566,7 @@ async function resolveSftpConnectionOptions(
     keepAliveSeconds,
     authMethod,
     privateKeyPath: privateKeyPath ?? undefined,
+    fallbackKeyPaths: fallbackKeyPaths.length > 0 ? fallbackKeyPaths : undefined,
     agentPath: agentPath ?? undefined,
     // When user provides a password, use it as both key passphrase and password
     // fallback — ssh2 tries publickey first, then password.

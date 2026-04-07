@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
-import type { TransferJob } from "@sshterm/shared";
+import type { SftpEntry, TransferJob } from "@sshterm/shared";
 import { getSftpStore, disposeSftpStore } from "./sftpStore";
 import { transferStore } from "./transferStore";
 import { getParentPath, joinRemotePath } from "./utils/fileUtils";
@@ -35,6 +35,27 @@ function mergeTransfers(existing: TransferJob[], next: TransferJob[]): TransferJ
     byId.set(transfer.transferId, transfer);
   }
   return [...byId.values()];
+}
+
+function extractSftpEntries(response: unknown): SftpEntry[] {
+  if (Array.isArray(response)) {
+    return response as SftpEntry[];
+  }
+
+  if (!response || typeof response !== "object") {
+    return [];
+  }
+
+  const payload = response as Record<string, unknown>;
+  if (Array.isArray(payload.entries)) {
+    return payload.entries as SftpEntry[];
+  }
+
+  if (Array.isArray(payload.items)) {
+    return payload.items as SftpEntry[];
+  }
+
+  return [];
 }
 
 export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
@@ -71,8 +92,12 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   }, []);
 
   const refreshRemoteDirectory = useCallback(async () => {
-    const response = await window.sshterm?.sftpList?.({ sftpSessionId, path: remotePath });
-    store.getState().setRemoteEntries(response?.entries ?? []);
+    const sftpList = window.sshterm?.sftpList;
+    if (!sftpList) {
+      throw new Error("SFTP list API is unavailable in preload bridge");
+    }
+    const response = await sftpList({ sftpSessionId, path: remotePath });
+    store.getState().setRemoteEntries(extractSftpEntries(response));
   }, [remotePath, sftpSessionId, store]);
 
   useEffect(() => {

@@ -207,4 +207,80 @@ describe("createDesktopApi", () => {
     expect(fake.listenerCount(ipcChannels.session.event)).toBe(0);
     expect(fake.listenerCount(ipcChannels.tray.quickConnect)).toBe(0);
   });
+
+  it("normalizes legacy sftpList array payloads", async () => {
+    const fake = createFakeIpcRenderer();
+    fake.invoke.mockResolvedValueOnce([
+      {
+        filename: "lib",
+        attrs: {
+          mode: 0o040755,
+          size: 4096,
+          mtime: 1712400000,
+          uid: 0,
+          gid: 0
+        }
+      },
+      {
+        filename: "hosts",
+        attrs: {
+          mode: 0o100644,
+          size: 120,
+          mtime: 1712403600,
+          uid: 0,
+          gid: 0
+        }
+      }
+    ]);
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    const result = await api.sftpList({
+      sftpSessionId: "sftp-1",
+      path: "/"
+    });
+
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries[0]).toMatchObject({
+      name: "lib",
+      path: "/lib",
+      isDirectory: true,
+      permissions: 0o755
+    });
+    expect(result.entries[1]).toMatchObject({
+      name: "hosts",
+      path: "/hosts",
+      isDirectory: false,
+      size: 120,
+      permissions: 0o644
+    });
+  });
+
+  it("normalizes non-canonical sftpStat payloads", async () => {
+    const fake = createFakeIpcRenderer();
+    fake.invoke.mockResolvedValueOnce({
+      filename: "passwd",
+      fullPath: "/etc/passwd",
+      attrs: {
+        mode: 0o100644,
+        size: 2048,
+        mtime: 1712407200,
+        uid: 0,
+        gid: 0
+      }
+    });
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    const result = await api.sftpStat({
+      sftpSessionId: "sftp-1",
+      path: "/etc/passwd"
+    });
+
+    expect(result).toMatchObject({
+      name: "passwd",
+      path: "/etc/passwd",
+      isDirectory: false,
+      permissions: 0o644,
+      size: 2048
+    });
+  });
 });
