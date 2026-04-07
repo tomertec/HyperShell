@@ -113,3 +113,40 @@ kbd {
 .xterm .xterm-scrollable-element > .shadow {
   display: none !important;
 }
+
+/* Host connection spinner */
+@keyframes host-connecting-spin {
+  to { transform: rotate(360deg); }
+}
+
+.host-status-connecting {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid transparent;
+  border-top-color: var(--color-accent);
+  border-right-color: var(--color-accent);
+  border-radius: 50%;
+  animation: host-connecting-spin 0.8s linear infinite;
+  background: none;
+}
+
+/* Host color tag left borders */
+.host-color-red    { border-left-color: #f87171 !important; }
+.host-color-orange { border-left-color: #fb923c !important; }
+.host-color-yellow { border-left-color: #fbbf24 !important; }
+.host-color-green  { border-left-color: #34d399 !important; }
+.host-color-blue   { border-left-color: #60a5fa !important; }
+.host-color-cyan   { border-left-color: #22d3ee !important; }
+.host-color-purple { border-left-color: #a78bfa !important; }
+.host-color-pink   { border-left-color: #f472b6 !important; }
+
+/* Color swatch circles for context menu */
+.color-swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.color-swatch-red    { background: #f87171; }
+.color-swatch-orange { background: #fb923c; }
+.color-swatch-yellow { background: #fbbf24; }
+.color-swatch-green  { background: #34d399; }
+.color-swatch-blue   { background: #60a5fa; }
+.color-swatch-cyan   { background: #22d3ee; }
+.color-swatch-purple { background: #a78bfa; }
+.color-swatch-pink   { background: #f472b6; }
