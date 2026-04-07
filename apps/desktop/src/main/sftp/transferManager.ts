@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream, mkdirSync, renameSync, statSync } from "node:fs";
-import { dirname } from "node:path";
+import { createReadStream, createWriteStream, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
+import { dirname, join, posix } from "node:path";
 
 import type { SftpTransportHandle } from "@sshterm/session-core";
 import type { TransferJob, TransferOp } from "@sshterm/shared";
@@ -164,6 +164,22 @@ export function createTransferManager(
     }
   }
 
+  function collectLocalDirectoryOps(localDir: string, remoteDir: string): TransferOp[] {
+    const ops: TransferOp[] = [];
+    const entries = readdirSync(localDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const localPath = join(localDir, entry.name);
+      const remotePath = posix.join(remoteDir, entry.name);
+      ops.push({
+        type: "upload",
+        localPath,
+        remotePath,
+        isDirectory: entry.isDirectory()
+      });
+    }
+    return ops;
+  }
+
   async function processJob(
     job: ManagedTransferJob,
     transport: SftpTransportHandle
@@ -178,6 +194,10 @@ export function createTransferManager(
 
       if (job.isDirectory) {
         await transport.mkdir(job.remotePath);
+        const childOps = collectLocalDirectoryOps(job.localPath, job.remotePath);
+        if (childOps.length > 0) {
+          enqueue(job.sftpSessionId, transport, childOps);
+        }
         return;
       }
 
@@ -249,6 +269,16 @@ export function createTransferManager(
 
     if (job.isDirectory) {
       mkdirSync(job.localPath, { recursive: true });
+      const entries = await transport.list(job.remotePath);
+      const childOps: TransferOp[] = entries.map((entry) => ({
+        type: "download" as const,
+        localPath: join(job.localPath, entry.name),
+        remotePath: entry.path,
+        isDirectory: entry.isDirectory
+      }));
+      if (childOps.length > 0) {
+        enqueue(job.sftpSessionId, transport, childOps);
+      }
       return;
     }
 

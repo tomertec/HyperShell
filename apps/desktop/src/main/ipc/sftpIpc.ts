@@ -154,9 +154,7 @@ export function registerSftpIpc(
   const handleList = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpListRequestSchema.parse(rawRequest);
     const transport = sftpSessionManager.getTransport(request.sftpSessionId);
-    const entries = await transport.list(request.path);
-    console.log("[sftp] list result:", request.path, "→", entries.length, "entries", entries.length > 0 ? `(first: ${entries[0].name})` : "");
-    return { entries };
+    return { entries: await transport.list(request.path) };
   };
 
   const handleStat = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
