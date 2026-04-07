@@ -160,7 +160,7 @@ export function FileList({
 
   return (
     <div
-      className={`relative h-full min-h-0 overflow-hidden bg-base-800/70 ${
+      className={`min-h-0 flex-1 overflow-y-auto bg-base-800/70 ${
         dropActive ? "ring-2 ring-inset ring-accent/50" : ""
       }`}
       onDragOver={handleDragOver}
@@ -169,12 +169,11 @@ export function FileList({
       onContextMenu={(event) => onContextMenu(event)}
     >
       {isLoading ? (
-        <div className="flex h-full items-center justify-center px-4 text-sm text-text-muted">
+        <div className="flex h-32 items-center justify-center px-4 text-sm text-text-muted">
           Loading files...
         </div>
       ) : (
-        <div className="absolute inset-0 overflow-y-auto">
-          <table className="w-full border-collapse text-[13px] leading-tight">
+        <table className="w-full border-collapse text-[13px] leading-tight">
             <thead className="sticky top-0 z-10 border-b border-border/30 bg-base-800/95 text-[9px] uppercase tracking-wider text-text-muted">
               <tr>
                 <th
@@ -252,8 +251,7 @@ export function FileList({
                   </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </table>
       )}
     </div>
   );
