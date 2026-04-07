@@ -159,19 +159,19 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
 
   return (
     <div className="flex h-full flex-col" onContextMenu={(event) => handleContextMenu(event)}>
-      <div className="flex items-center gap-1.5 border-b border-base-700 bg-base-900/80 px-2 py-0.5">
+      <div className="flex items-center gap-1 border-b border-base-700 bg-base-900/80 px-1.5 py-[2px]">
         <DriveSelector currentPath={localPath} onSelect={handleNavigate} />
         <button
           type="button"
           title="Go up"
-          className="rounded p-0.5 text-xs text-text-secondary transition-colors hover:bg-base-700 hover:text-text-primary"
+          className="rounded p-0.5 text-[11px] text-text-secondary transition-colors hover:bg-base-700 hover:text-text-primary"
           onClick={() => handleNavigate(getParentPath(localPath))}
         >
           ..
         </button>
+        <div className="mx-0.5 h-3 w-px bg-base-700" />
+        <PathBreadcrumb path={localPath} onNavigate={handleNavigate} separator="\\" />
       </div>
-
-      <PathBreadcrumb path={localPath} onNavigate={handleNavigate} separator="\\" />
 
       <FileList
         entries={localEntries}

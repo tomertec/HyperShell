@@ -57,7 +57,7 @@ export function PathBreadcrumb({
     : buildPosixCrumbs(path || "/");
 
   return (
-    <div className="flex items-center gap-0.5 overflow-hidden px-2 py-1 text-sm text-text-secondary">
+    <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden text-[11px] text-text-secondary">
       {crumbs.map((crumb, index) => (
         <span key={crumb.path} className="flex shrink-0 items-center">
           {index > 0 && <span className="mx-1 text-text-secondary/50">{separator}</span>}

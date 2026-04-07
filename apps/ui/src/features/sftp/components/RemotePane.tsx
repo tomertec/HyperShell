@@ -186,19 +186,19 @@ export function RemotePane({
 
   return (
     <div className="flex h-full flex-col" onContextMenu={(event) => handleContextMenu(event)}>
-      <div className="flex items-center gap-1.5 border-b border-base-700 bg-base-900/80 px-2 py-0.5">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">Remote</span>
+      <div className="flex items-center gap-1 border-b border-base-700 bg-base-900/80 px-1.5 py-[2px]">
+        <span className="font-mono text-[9px] uppercase tracking-wider text-text-muted">Remote</span>
         <button
           type="button"
           title="Go up"
-          className="rounded p-0.5 text-xs text-text-secondary transition-colors hover:bg-base-700 hover:text-text-primary"
+          className="rounded p-0.5 text-[11px] text-text-secondary transition-colors hover:bg-base-700 hover:text-text-primary"
           onClick={() => handleNavigate(getParentPath(remotePath))}
         >
           ..
         </button>
+        <div className="mx-0.5 h-3 w-px bg-base-700" />
+        <PathBreadcrumb path={remotePath} onNavigate={handleNavigate} />
       </div>
-
-      <PathBreadcrumb path={remotePath} onNavigate={handleNavigate} />
 
       <FileList
         entries={remoteEntries}
