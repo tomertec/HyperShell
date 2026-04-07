@@ -1,4 +1,5 @@
 import {
+  connectionPoolStatsSchema,
   fsEntrySchema,
   fsGetDrivesResponseSchema,
   fsListRequestSchema,
@@ -45,6 +46,9 @@ import {
   setSignalsRequestSchema,
   hostStatsRequestSchema,
   hostStatsResponseSchema,
+  hostRecordSchema,
+  hostPortForwardRecordSchema,
+  importSshConfigResponseSchema,
   type HostStatsRequest,
   type HostStatsResponse,
   type CloseSessionRequest,
@@ -98,10 +102,18 @@ import {
   saveWorkspaceRequestSchema,
   loadWorkspaceRequestSchema,
   removeWorkspaceRequestSchema,
+  serialPortInfoSchema,
+  serialProfileRecordSchema,
+  settingRecordSchema,
+  groupRecordSchema,
+  transferJobSchema,
   workspaceLayoutSchema,
+  workspaceRecordSchema,
+  sshKeyInfoSchema,
   generateSshKeyRequestSchema,
   removeSshKeyRequestSchema,
   getFingerprintRequestSchema,
+  sftpSyncStatusSchema,
   sftpSyncStartRequestSchema,
   sftpSyncStopRequestSchema,
   sftpSyncEventSchema,
@@ -109,8 +121,6 @@ import {
   upsertHostPortForwardRequestSchema,
   removeHostPortForwardRequestSchema,
   reorderHostPortForwardsRequestSchema,
-  hostPortForwardRecordSchema,
-  connectionPoolStatsSchema,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -131,6 +141,7 @@ import {
   type ReorderHostPortForwardsRequest,
   type ConnectionPoolStats,
 } from "@sshterm/shared";
+import { z } from "zod";
 
 export interface PreloadIpcRenderer {
   invoke(channel: string, ...args: unknown[]): Promise<unknown>;
@@ -366,6 +377,27 @@ function normalizeSftpListResponseShape(value: unknown): SftpListResponse | null
   return { entries };
 }
 
+const hostRecordArraySchema = z.array(hostRecordSchema);
+const reorderHostsResponseSchema = z.object({ success: z.boolean() });
+const groupRecordArraySchema = z.array(groupRecordSchema);
+const serialProfileRecordArraySchema = z.array(serialProfileRecordSchema);
+const serialPortInfoArraySchema = z.array(serialPortInfoSchema);
+const transferJobArraySchema = z.array(transferJobSchema);
+const sftpBookmarkArraySchema = z.array(sftpBookmarkSchema);
+const fsGetHomeResponseSchema = z.object({ path: z.string() });
+const fsListSshKeysResponseSchema = z.array(z.string());
+const workspaceSaveResponseSchema = z.object({ success: z.boolean() });
+const workspaceRecordNullableSchema = workspaceRecordSchema.nullable();
+const workspaceRecordArraySchema = z.array(workspaceRecordSchema);
+const sshKeyInfoArraySchema = z.array(sshKeyInfoSchema);
+const sshKeysGenerateResponseSchema = z.object({ path: z.string() });
+const sshFingerprintResponseSchema = z.object({ fingerprint: z.string().nullable() });
+const sftpSyncStartResponseSchema = z.object({ syncId: z.string() });
+const sftpSyncListResponseSchema = z.object({ syncs: z.array(sftpSyncStatusSchema) });
+const hostPortForwardRecordArraySchema = z.array(hostPortForwardRecordSchema);
+const connectionPoolStatsArraySchema = z.array(connectionPoolStatsSchema);
+const booleanResponseSchema = z.boolean();
+
 export function createDesktopApi(
   ipcRenderer: PreloadIpcRenderer,
   logger: PreloadLogger = console
@@ -436,12 +468,12 @@ export function createDesktopApi(
     },
     async listHosts(): Promise<HostRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.hosts.list);
-      return result as HostRecord[];
+      return hostRecordArraySchema.parse(result);
     },
     async upsertHost(request: UpsertHostRequest): Promise<HostRecord> {
       const parsed = upsertHostRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.hosts.upsert, parsed);
-      return result as HostRecord;
+      return hostRecordSchema.parse(result);
     },
     async removeHost(request: RemoveHostRequest): Promise<void> {
       const parsed = removeHostRequestSchema.parse(request);
@@ -450,30 +482,30 @@ export function createDesktopApi(
     async reorderHosts(request: ReorderHostsRequest): Promise<{ success: boolean }> {
       const parsed = reorderHostsRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.hosts.reorder, parsed);
-      return result as { success: boolean };
+      return reorderHostsResponseSchema.parse(result);
     },
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
-      return result as SettingRecord | null;
+      return result === null ? null : settingRecordSchema.parse(result);
     },
     async updateSetting(request: UpdateSettingRequest): Promise<SettingRecord> {
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
-      return result as SettingRecord;
+      return settingRecordSchema.parse(result);
     },
     async importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }> {
       const result = await ipcRenderer.invoke(ipcChannels.hosts.importSshConfig);
-      return result as { imported: number; hosts: HostRecord[] };
+      return importSshConfigResponseSchema.parse(result);
     },
     async listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>> {
       const result = await ipcRenderer.invoke(ipcChannels.groups.list);
-      return result as Array<{ id: string; name: string; description: string | null }>;
+      return groupRecordArraySchema.parse(result);
     },
     async upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }> {
       const parsed = upsertGroupRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.groups.upsert, parsed);
-      return result as { id: string; name: string; description: string | null };
+      return groupRecordSchema.parse(result);
     },
     async removeGroup(request: RemoveGroupRequest): Promise<void> {
       const parsed = removeGroupRequestSchema.parse(request);
@@ -481,12 +513,12 @@ export function createDesktopApi(
     },
     async listSerialProfiles(): Promise<SerialProfileRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.list);
-      return result as SerialProfileRecord[];
+      return serialProfileRecordArraySchema.parse(result);
     },
     async upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord> {
       const parsed = upsertSerialProfileRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.upsert, parsed);
-      return result as SerialProfileRecord;
+      return serialProfileRecordSchema.parse(result);
     },
     async removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void> {
       const parsed = removeSerialProfileRequestSchema.parse(request);
@@ -494,7 +526,7 @@ export function createDesktopApi(
     },
     async listSerialPorts(): Promise<SerialPortInfo[]> {
       const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.listPorts);
-      return result as SerialPortInfo[];
+      return serialPortInfoArraySchema.parse(result);
     },
     async setSessionSignals(request: SetSignalsRequest): Promise<void> {
       const parsed = setSignalsRequestSchema.parse(request);
@@ -594,7 +626,7 @@ export function createDesktopApi(
     async sftpTransferStart(request: SftpTransferStartRequest): Promise<TransferJob[]> {
       const parsed = sftpTransferStartRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sftp.transferStart, parsed);
-      return result as TransferJob[];
+      return transferJobArraySchema.parse(result);
     },
     async sftpTransferCancel(request: SftpTransferCancelRequest): Promise<void> {
       const parsed = sftpTransferCancelRequestSchema.parse(request);
@@ -636,7 +668,7 @@ export function createDesktopApi(
     async sftpBookmarksList(request: SftpBookmarkListRequest): Promise<SftpBookmark[]> {
       const parsed = sftpBookmarkListRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sftp.bookmarksList, parsed);
-      return result as SftpBookmark[];
+      return sftpBookmarkArraySchema.parse(result);
     },
     async sftpBookmarksUpsert(request: SftpBookmarkUpsertRequest): Promise<SftpBookmark> {
       const parsed = sftpBookmarkUpsertRequestSchema.parse(request);
@@ -663,7 +695,7 @@ export function createDesktopApi(
     },
     async fsGetHome(): Promise<{ path: string }> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.getHome);
-      return result as { path: string };
+      return fsGetHomeResponseSchema.parse(result);
     },
     async fsGetDrives(): Promise<FsGetDrivesResponse> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.getDrives);
@@ -671,21 +703,21 @@ export function createDesktopApi(
     },
     async fsListSshKeys(): Promise<string[]> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.listSshKeys);
-      return Array.isArray(result) ? result : [];
+      return fsListSshKeysResponseSchema.parse(result);
     },
     async workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }> {
       const parsed = saveWorkspaceRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.workspace.save, parsed);
-      return result as { success: boolean };
+      return workspaceSaveResponseSchema.parse(result);
     },
     async workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null> {
       const parsed = loadWorkspaceRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.workspace.load, parsed);
-      return result as WorkspaceRecord | null;
+      return workspaceRecordNullableSchema.parse(result);
     },
     async workspaceList(): Promise<WorkspaceRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.workspace.list);
-      return result as WorkspaceRecord[];
+      return workspaceRecordArraySchema.parse(result);
     },
     async workspaceRemove(request: RemoveWorkspaceRequest): Promise<void> {
       const parsed = removeWorkspaceRequestSchema.parse(request);
@@ -697,21 +729,21 @@ export function createDesktopApi(
     },
     async workspaceLoadLast(): Promise<WorkspaceRecord | null> {
       const result = await ipcRenderer.invoke(ipcChannels.workspace.loadLast);
-      return result as WorkspaceRecord | null;
+      return workspaceRecordNullableSchema.parse(result);
     },
     async sshKeysList(): Promise<SshKeyInfo[]> {
       const result = await ipcRenderer.invoke(ipcChannels.sshKeys.list);
-      return result as SshKeyInfo[];
+      return sshKeyInfoArraySchema.parse(result);
     },
     async sshKeysGenerate(request: GenerateSshKeyRequest): Promise<{ path: string }> {
       const parsed = generateSshKeyRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sshKeys.generate, parsed);
-      return result as { path: string };
+      return sshKeysGenerateResponseSchema.parse(result);
     },
     async sshKeysGetFingerprint(request: GetFingerprintRequest): Promise<{ fingerprint: string | null }> {
       const parsed = getFingerprintRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sshKeys.getFingerprint, parsed);
-      return result as { fingerprint: string | null };
+      return sshFingerprintResponseSchema.parse(result);
     },
     async sshKeysRemove(request: RemoveSshKeyRequest): Promise<void> {
       const parsed = removeSshKeyRequestSchema.parse(request);
@@ -720,7 +752,7 @@ export function createDesktopApi(
     async sftpSyncStart(request: SftpSyncStartRequest): Promise<{ syncId: string }> {
       const parsed = sftpSyncStartRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sftp.syncStart, parsed);
-      return result as { syncId: string };
+      return sftpSyncStartResponseSchema.parse(result);
     },
     async sftpSyncStop(request: SftpSyncStopRequest): Promise<void> {
       const parsed = sftpSyncStopRequestSchema.parse(request);
@@ -728,7 +760,7 @@ export function createDesktopApi(
     },
     async sftpSyncList(): Promise<{ syncs: SftpSyncStatus[] }> {
       const result = await ipcRenderer.invoke(ipcChannels.sftp.syncList);
-      return result as { syncs: SftpSyncStatus[] };
+      return sftpSyncListResponseSchema.parse(result);
     },
     onSftpSyncEvent(listener: (event: SftpSyncEvent) => void): () => void {
       assertListener(listener, "onSftpSyncEvent");
@@ -757,17 +789,17 @@ export function createDesktopApi(
     async hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]> {
       const parsed = listHostPortForwardsRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.list, parsed);
-      return result as HostPortForwardRecord[];
+      return hostPortForwardRecordArraySchema.parse(result);
     },
     async hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord> {
       const parsed = upsertHostPortForwardRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.upsert, parsed);
-      return result as HostPortForwardRecord;
+      return hostPortForwardRecordSchema.parse(result);
     },
     async hostPortForwardRemove(request: RemoveHostPortForwardRequest): Promise<boolean> {
       const parsed = removeHostPortForwardRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.remove, parsed);
-      return result as boolean;
+      return booleanResponseSchema.parse(result);
     },
     async hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void> {
       const parsed = reorderHostPortForwardsRequestSchema.parse(request);
@@ -776,7 +808,7 @@ export function createDesktopApi(
     // Connection pool stats
     async connectionPoolStats(): Promise<ConnectionPoolStats[]> {
       const result = await ipcRenderer.invoke(ipcChannels.connectionPool.stats);
-      return result as ConnectionPoolStats[];
+      return connectionPoolStatsArraySchema.parse(result);
     },
   };
 }

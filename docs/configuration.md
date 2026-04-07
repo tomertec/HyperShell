@@ -5,6 +5,10 @@
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `SSHTERM_RENDERER_URL` | (auto-detected) | Override renderer URL. In dev: `http://localhost:5173`. In prod: bundled `dist/renderer/index.html`. |
+| `SSHTERM_ENABLE_LOCAL_FS` | `1` | Enable local filesystem IPC (`fs:list`, `fs:stat`, `fs:get-drives`). Set to `0` to disable local browsing. |
+| `SSHTERM_FS_ALLOW_SYSTEM_ROOTS` | `0` | Expand local FS allowlist to system roots/drives. When `0`, access is scoped to home + `SSHTERM_FS_ALLOWED_ROOTS`. |
+| `SSHTERM_FS_ALLOWED_ROOTS` | (empty) | Comma-separated absolute paths added to the local FS allowlist. |
+| `SSHTERM_ENABLE_SSH_KEY_DISCOVERY` | `0` | Enable `fs:list-ssh-keys` path discovery for `~/.ssh` private keys. |
 | `SSH_AUTH_SOCK` | (none) | SSH agent socket path. Used by SFTP transport as fallback agent. |
 | `CI` | (none) | Set by GitHub Actions. Affects test timeouts and server startup. |
 

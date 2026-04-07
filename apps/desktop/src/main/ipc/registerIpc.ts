@@ -53,6 +53,7 @@ const registeredChannels = [
   ipcChannels.hosts.list,
   ipcChannels.hosts.upsert,
   ipcChannels.hosts.remove,
+  ipcChannels.hosts.reorder,
   ipcChannels.hosts.importSshConfig,
   ipcChannels.settings.get,
   ipcChannels.settings.update,
@@ -124,7 +125,7 @@ export interface RegisterIpcOptions {
   emitSftpEvent?: (event: unknown) => void;
   emitSyncEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
-  resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
+  resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; password?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
   resolveSerialProfile?: (profileId: string) => SerialProfileRecord | undefined;
 }
 
@@ -142,7 +143,7 @@ async function openSessionHandler(
 
   let resolvedHost: DbHostRecord | null = null;
 
-  let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | undefined;
+  let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; password?: string; proxyJump?: string; keepAliveSeconds?: number } | undefined;
 
   if (parsed.transport === "ssh") {
     if (resolveHostProfile) {
@@ -184,8 +185,10 @@ async function openSessionHandler(
         if (hostRecord.authMethod === "op-reference" && hostRecord.opReference) {
           try {
             const { resolveOnePasswordReference } = await import("../security/opResolver.js");
-            await resolveOnePasswordReference(hostRecord.opReference);
-            // TODO: pass resolved credential to SSH transport options
+            const resolvedCredential = await resolveOnePasswordReference(hostRecord.opReference);
+            if (resolvedCredential.length > 0) {
+              sshOptions.password = resolvedCredential;
+            }
           } catch (err) {
             console.error("[1password] failed to resolve reference:", err);
           }
@@ -518,8 +521,19 @@ async function resolveSftpConnectionOptions(
     "username" in request && request.username?.trim()
       ? request.username.trim()
       : undefined;
-  const requestedPassword =
+  let requestedPassword =
     "password" in request && request.password ? request.password : undefined;
+  if (!requestedPassword && resolvedHost?.authMethod === "op-reference" && resolvedHost.opReference) {
+    try {
+      const { resolveOnePasswordReference } = await import("../security/opResolver.js");
+      const resolvedCredential = await resolveOnePasswordReference(resolvedHost.opReference);
+      if (resolvedCredential.length > 0) {
+        requestedPassword = resolvedCredential;
+      }
+    } catch (err) {
+      console.error("[1password] failed to resolve reference for SFTP:", err);
+    }
+  }
 
   // Strip Windows domain prefix (DOMAIN\user → user) — SSH servers don't
   // understand Windows domain usernames.
@@ -664,8 +678,7 @@ async function hostStatsHandler(
   const sshBinary = resolveSshBinaryPath();
   const args: string[] = [
     "-o", "BatchMode=yes",
-    "-o", "ConnectTimeout=5",
-    "-o", "StrictHostKeyChecking=no"
+    "-o", "ConnectTimeout=5"
   ];
 
   if (port != null) {

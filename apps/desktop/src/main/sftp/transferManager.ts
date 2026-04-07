@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
-import { dirname, join, posix } from "node:path";
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, extname, join, posix } from "node:path";
 
 import type { SftpTransportHandle } from "@sshterm/session-core";
 import type { TransferJob, TransferOp } from "@sshterm/shared";
@@ -29,6 +29,8 @@ export type TransferEvent =
       localPath: string;
     };
 
+export type TransferConflictResolution = "overwrite" | "skip" | "rename";
+
 interface ManagedTransferJob extends TransferJob {
   sftpSessionId: string;
   abortController: AbortController | null;
@@ -48,8 +50,20 @@ export interface TransferManager {
     operations: TransferOp[]
   ): TransferJob[];
   cancel(transferId: string): void;
+  resolveConflict(
+    transferId: string,
+    resolution: TransferConflictResolution,
+    applyToAll?: boolean
+  ): void;
   list(): TransferJob[];
   onEvent(listener: TransferEventListener): () => void;
+}
+
+class TransferSkippedError extends Error {
+  constructor() {
+    super("Skipped by user");
+    this.name = "TransferSkippedError";
+  }
 }
 
 export function createTransferManager(
@@ -60,6 +74,12 @@ export function createTransferManager(
   const maxJobHistory = options.maxJobHistory ?? 100;
   const jobs = new Map<string, ManagedTransferJob>();
   const transports = new Map<string, SftpTransportHandle>();
+  const pendingConflicts = new Map<string, {
+    type: "upload" | "download";
+    resolve: (resolution: TransferConflictResolution) => void;
+    reject: (error: Error) => void;
+  }>();
+  const conflictDefaults = new Map<"upload" | "download", TransferConflictResolution>();
   const listeners = new Set<TransferEventListener>();
   let activeCount = 0;
   let drainScheduled = false;
@@ -89,6 +109,85 @@ export function createTransferManager(
   function snapshot(job: ManagedTransferJob): TransferJob {
     const { sftpSessionId, abortController, isDirectory, ...rest } = job;
     return rest;
+  }
+
+  async function remotePathExists(
+    transport: SftpTransportHandle,
+    remotePath: string
+  ): Promise<boolean> {
+    try {
+      await transport.stat(remotePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function resolveLocalRenamePath(localPath: string): string {
+    const baseDir = dirname(localPath);
+    const extension = extname(localPath);
+    const stem = basename(localPath, extension);
+
+    let attempt = 1;
+    while (true) {
+      const candidate = join(baseDir, `${stem} (${attempt})${extension}`);
+      if (!existsSync(candidate)) {
+        return candidate;
+      }
+      attempt += 1;
+    }
+  }
+
+  async function resolveRemoteRenamePath(
+    transport: SftpTransportHandle,
+    remotePath: string
+  ): Promise<string> {
+    const baseDir = posix.dirname(remotePath);
+    const extension = posix.extname(remotePath);
+    const stem = posix.basename(remotePath, extension);
+
+    let attempt = 1;
+    while (true) {
+      const candidateName = `${stem} (${attempt})${extension}`;
+      const candidate = baseDir === "/" ? `/${candidateName}` : `${baseDir}/${candidateName}`;
+      if (!(await remotePathExists(transport, candidate))) {
+        return candidate;
+      }
+      attempt += 1;
+    }
+  }
+
+  async function resolveConflictForJob(
+    job: ManagedTransferJob
+  ): Promise<TransferConflictResolution> {
+    const preconfigured = conflictDefaults.get(job.type);
+    if (preconfigured) {
+      return preconfigured;
+    }
+
+    job.status = "paused";
+    emit({
+      kind: "transfer-progress",
+      transferId: job.transferId,
+      bytesTransferred: job.bytesTransferred,
+      totalBytes: job.totalBytes,
+      speed: job.speed,
+      status: "paused"
+    });
+    emit({
+      kind: "transfer-conflict",
+      transferId: job.transferId,
+      remotePath: job.remotePath,
+      localPath: job.localPath
+    });
+
+    return await new Promise<TransferConflictResolution>((resolve, reject) => {
+      pendingConflicts.set(job.transferId, {
+        type: job.type,
+        resolve,
+        reject
+      });
+    });
   }
 
   function scheduleDrain(): void {
@@ -146,6 +245,16 @@ export function createTransferManager(
           });
         })
         .catch((error: unknown) => {
+          if (error instanceof TransferSkippedError) {
+            nextJob.status = "completed";
+            emit({
+              kind: "transfer-complete",
+              transferId: nextJob.transferId,
+              status: "completed"
+            });
+            return;
+          }
+
           nextJob.status = "failed";
           nextJob.error = error instanceof Error ? error.message : String(error);
           emit({
@@ -156,6 +265,7 @@ export function createTransferManager(
           });
         })
         .finally(() => {
+          pendingConflicts.delete(nextJob.transferId);
           nextJob.abortController = null;
           activeCount -= 1;
           pruneCompletedJobs();
@@ -199,6 +309,17 @@ export function createTransferManager(
           enqueue(job.sftpSessionId, transport, childOps);
         }
         return;
+      }
+
+      if (await remotePathExists(transport, job.remotePath)) {
+        const resolution = await resolveConflictForJob(job);
+        if (resolution === "skip") {
+          throw new TransferSkippedError();
+        }
+        if (resolution === "rename") {
+          job.remotePath = await resolveRemoteRenamePath(transport, job.remotePath);
+        }
+        job.status = "active";
       }
 
       const localStream = createReadStream(job.localPath);
@@ -287,6 +408,17 @@ export function createTransferManager(
       return;
     }
 
+    if (existsSync(job.localPath)) {
+      const resolution = await resolveConflictForJob(job);
+      if (resolution === "skip") {
+        throw new TransferSkippedError();
+      }
+      if (resolution === "rename") {
+        job.localPath = resolveLocalRenamePath(job.localPath);
+      }
+      job.status = "active";
+    }
+
     mkdirSync(dirname(job.localPath), { recursive: true });
     const partPath = `${job.localPath}.part`;
     const remoteStream = transport.createReadStream(job.remotePath);
@@ -340,7 +472,16 @@ export function createTransferManager(
 
       localStream.on("close", () => {
         job.abortController?.signal.removeEventListener("abort", abortHandler);
-        settle(() => { cleanup(); renameSync(partPath, job.localPath); resolve(); });
+        settle(() => {
+          cleanup();
+          try {
+            rmSync(job.localPath, { force: true });
+          } catch {
+            // Best effort; rename below will throw if destination cannot be replaced.
+          }
+          renameSync(partPath, job.localPath);
+          resolve();
+        });
       });
       localStream.on("error", (error) => {
         job.abortController?.signal.removeEventListener("abort", abortHandler);
@@ -407,6 +548,22 @@ export function createTransferManager(
       return;
     }
 
+    if (job.status === "paused") {
+      const pending = pendingConflicts.get(transferId);
+      pendingConflicts.delete(transferId);
+      pending?.reject(new Error("Cancelled by user"));
+      job.status = "failed";
+      job.error = "Cancelled by user";
+      emit({
+        kind: "transfer-complete",
+        transferId,
+        status: "failed",
+        error: job.error
+      });
+      pruneCompletedJobs();
+      return;
+    }
+
     // For active jobs, abort triggers promise rejection which emits transfer-complete.
     try {
       job.abortController?.abort();
@@ -425,6 +582,24 @@ export function createTransferManager(
     }
   }
 
+  function resolveConflict(
+    transferId: string,
+    resolution: TransferConflictResolution,
+    applyToAll = false
+  ): void {
+    const pending = pendingConflicts.get(transferId);
+    if (!pending) {
+      return;
+    }
+
+    if (applyToAll) {
+      conflictDefaults.set(pending.type, resolution);
+    }
+
+    pendingConflicts.delete(transferId);
+    pending.resolve(resolution);
+  }
+
   function list(): TransferJob[] {
     return [...jobs.values()].map(snapshot);
   }
@@ -439,6 +614,7 @@ export function createTransferManager(
   return {
     enqueue,
     cancel,
+    resolveConflict,
     list,
     onEvent
   };

@@ -7,6 +7,86 @@ import os from "node:os";
 
 import type { IpcMainLike } from "./registerIpc";
 
+const localFsEnabled = process.env.SSHTERM_ENABLE_LOCAL_FS !== "0";
+const sshKeyDiscoveryEnabled = process.env.SSHTERM_ENABLE_SSH_KEY_DISCOVERY === "1";
+const allowSystemRoots = process.env.SSHTERM_FS_ALLOW_SYSTEM_ROOTS === "1";
+const envAllowedRoots = (process.env.SSHTERM_FS_ALLOWED_ROOTS ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter((value) => value.length > 0);
+
+function normalizeAbsolutePath(inputPath: string): string {
+  if (!path.isAbsolute(inputPath)) {
+    throw new Error(`Absolute path is required: ${inputPath}`);
+  }
+
+  const resolved = path.resolve(inputPath);
+  if (process.platform === "win32") {
+    const lower = resolved.toLowerCase();
+    if (lower.startsWith("\\\\.")) {
+      throw new Error(`Blocked device path: ${inputPath}`);
+    }
+  }
+
+  return resolved;
+}
+
+function toComparablePath(inputPath: string): string {
+  return process.platform === "win32" ? inputPath.toLowerCase() : inputPath;
+}
+
+function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const comparableTarget = toComparablePath(targetPath);
+  const comparableRoot = toComparablePath(rootPath);
+  if (comparableTarget === comparableRoot) {
+    return true;
+  }
+
+  const withSep = comparableRoot.endsWith(path.sep)
+    ? comparableRoot
+    : `${comparableRoot}${path.sep}`;
+  return comparableTarget.startsWith(withSep);
+}
+
+async function getAllowedRoots(): Promise<string[]> {
+  const roots = new Set<string>();
+  roots.add(normalizeAbsolutePath(os.homedir()));
+
+  for (const extraRoot of envAllowedRoots) {
+    try {
+      roots.add(normalizeAbsolutePath(extraRoot));
+    } catch {
+      // Ignore malformed paths from environment variables.
+    }
+  }
+
+  if (allowSystemRoots) {
+    if (process.platform === "win32") {
+      for (const drive of await listDrives()) {
+        roots.add(normalizeAbsolutePath(drive));
+      }
+    } else {
+      roots.add("/");
+    }
+  }
+
+  return Array.from(roots);
+}
+
+async function assertPathAllowed(inputPath: string): Promise<string> {
+  if (!localFsEnabled) {
+    throw new Error("Local filesystem browsing is disabled by policy");
+  }
+
+  const normalizedPath = normalizeAbsolutePath(inputPath);
+  const allowedRoots = await getAllowedRoots();
+  if (!allowedRoots.some((root) => isPathWithinRoot(normalizedPath, root))) {
+    throw new Error(`Path is outside the allowed filesystem roots: ${inputPath}`);
+  }
+
+  return normalizedPath;
+}
+
 async function toEntry(basePath: string, name: string): Promise<FsEntry> {
   const fullPath = path.join(basePath, name);
   const stats = await stat(fullPath);
@@ -37,10 +117,11 @@ async function listDrives(): Promise<string[]> {
 export function registerFsIpc(ipcMain: IpcMainLike): () => void {
   ipcMain.handle(ipcChannels.fs.list, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = fsListRequestSchema.parse(rawRequest);
-    const dirents = await readdir(request.path, { withFileTypes: true });
+    const targetPath = await assertPathAllowed(request.path);
+    const dirents = await readdir(targetPath, { withFileTypes: true });
 
     const settled = await Promise.allSettled(
-      dirents.map((dirent) => toEntry(request.path, dirent.name))
+      dirents.map((dirent) => toEntry(targetPath, dirent.name))
     );
 
     const entries: FsEntry[] = [];
@@ -55,10 +136,11 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
 
   ipcMain.handle(ipcChannels.fs.stat, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = fsListRequestSchema.parse(rawRequest);
-    const stats = await stat(request.path);
+    const targetPath = await assertPathAllowed(request.path);
+    const stats = await stat(targetPath);
     return {
-      name: path.basename(request.path) || request.path,
-      path: request.path,
+      name: path.basename(targetPath) || targetPath,
+      path: targetPath,
       size: stats.size,
       modifiedAt: stats.mtime.toISOString(),
       isDirectory: stats.isDirectory()
@@ -70,10 +152,37 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
   });
 
   ipcMain.handle(ipcChannels.fs.getDrives, async () => {
-    return { drives: await listDrives() };
+    if (!localFsEnabled) {
+      return { drives: [] };
+    }
+
+    if (process.platform === "win32") {
+      if (allowSystemRoots) {
+        return { drives: await listDrives() };
+      }
+
+      const roots = await getAllowedRoots();
+      const drives = Array.from(
+        new Set(
+          roots
+            .map((root) => {
+              const match = /^[A-Za-z]:\\/.exec(root);
+              return match ? match[0] : null;
+            })
+            .filter((drive): drive is string => drive !== null)
+        )
+      );
+      return { drives };
+    }
+
+    return { drives: allowSystemRoots ? ["/"] : [] };
   });
 
   ipcMain.handle(ipcChannels.fs.listSshKeys, async () => {
+    if (!localFsEnabled || !sshKeyDiscoveryEnabled) {
+      return [];
+    }
+
     const sshDir = path.join(os.homedir(), ".ssh");
     try {
       const entries = await readdir(sshDir);

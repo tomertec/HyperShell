@@ -11,6 +11,7 @@ export interface SshConnectionProfile {
   username?: string;
   port?: number;
   identityFile?: string;
+  password?: string;
   proxyJump?: string;
   keepAliveSeconds?: number;
   requestTty?: boolean;
@@ -164,6 +165,8 @@ export function createSshPtyTransport(
   let exitSubscription: DisposableLike | null = null;
   let isClosed = false;
   let hasExited = false;
+  let authSecretSent = false;
+  let promptBuffer = "";
 
   const emit = (event: SessionTransportEvent): void => {
     for (const listener of listeners) {
@@ -216,6 +219,18 @@ export function createSshPtyTransport(
     dataSubscription = pty.onData((data) => {
       if (hasExited || isClosed) {
         return;
+      }
+
+      if (!authSecretSent && profile.password) {
+        promptBuffer = `${promptBuffer}${data}`.slice(-512);
+        if (/(pass(word|phrase)|verification code|otp).*:\s*$/im.test(promptBuffer)) {
+          authSecretSent = true;
+          try {
+            pty?.write(`${profile.password}\r`);
+          } catch {
+            // Ignore write failures and let normal SSH auth continue.
+          }
+        }
       }
 
       emit({

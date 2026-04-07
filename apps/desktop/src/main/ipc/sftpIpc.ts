@@ -210,7 +210,12 @@ export function registerSftpIpc(
     _event: IpcMainInvokeEvent,
     rawRequest: unknown
   ) => {
-    sftpTransferResolveConflictRequestSchema.parse(rawRequest);
+    const request = sftpTransferResolveConflictRequestSchema.parse(rawRequest);
+    transferManager.resolveConflict(
+      request.transferId,
+      request.resolution,
+      request.applyToAll
+    );
   };
 
   const handleBookmarksList = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {

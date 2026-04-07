@@ -20,10 +20,10 @@ export interface SerialAdvancedOptions {
 const BAUD_RATES = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200];
 
 const inputClass =
-  "w-full bg-base-750 border border-border/60 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-colors";
+  "w-full bg-base-750 border border-border/60 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-border/60 focus:shadow-[inset_0_0_0_1px_rgba(56,189,248,0.85)] transition-colors";
 
 const selectClass =
-  "w-full bg-base-750 border border-border/60 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 transition-colors appearance-none";
+  "w-full bg-base-750 border border-border/60 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-border/60 focus:shadow-[inset_0_0_0_1px_rgba(56,189,248,0.85)] transition-colors appearance-none";
 
 export function QuickConnectForm({
   availablePorts,

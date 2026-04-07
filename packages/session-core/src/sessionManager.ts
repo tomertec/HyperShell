@@ -100,6 +100,7 @@ function createDefaultTransport(request: OpenSessionRequest): TransportHandle {
       username: opts.username,
       port: opts.port,
       identityFile: opts.identityFile,
+      password: opts.password,
       proxyJump: opts.proxyJump,
       keepAliveSeconds: opts.keepAliveSeconds
     });

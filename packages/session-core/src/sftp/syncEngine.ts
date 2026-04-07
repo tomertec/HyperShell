@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { readdir, stat as fsStat } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readdir, stat as fsStat, writeFile } from "node:fs/promises";
+import { dirname, join, posix } from "node:path";
 import type { SftpTransportHandle } from "../transports/sftpTransport";
 
 export interface SyncConfig {
@@ -56,6 +56,24 @@ export function createSyncEngine(): SyncEngine {
     return patterns.some((pattern) => filePath.includes(pattern));
   }
 
+  async function ensureRemoteDirExists(
+    transport: SftpTransportHandle,
+    remoteDir: string
+  ): Promise<void> {
+    const normalized = remoteDir.replace(/\\/g, "/");
+    const segments = normalized.split("/").filter((segment) => segment.length > 0);
+    let current = normalized.startsWith("/") ? "/" : "";
+
+    for (const segment of segments) {
+      current = current === "/" ? `/${segment}` : `${current}/${segment}`;
+      try {
+        await transport.mkdir(current);
+      } catch {
+        // Directory may already exist.
+      }
+    }
+  }
+
   async function scanLocalDir(dir: string): Promise<Array<{ relativePath: string; size: number; mtime: number }>> {
     const results: Array<{ relativePath: string; size: number; mtime: number }> = [];
     const entries = await readdir(dir, { withFileTypes: true });
@@ -71,6 +89,34 @@ export function createSyncEngine(): SyncEngine {
         }
       }
     }
+    return results;
+  }
+
+  async function scanRemoteDir(
+    transport: SftpTransportHandle,
+    dir: string,
+    relativeBase = ""
+  ): Promise<Array<{ relativePath: string; path: string; size: number; modifiedAt: string }>> {
+    const results: Array<{ relativePath: string; path: string; size: number; modifiedAt: string }> = [];
+    const entries = await transport.list(dir);
+    for (const entry of entries) {
+      const relativePath = relativeBase
+        ? posix.join(relativeBase, entry.name)
+        : entry.name;
+      if (entry.isDirectory) {
+        const nested = await scanRemoteDir(transport, entry.path, relativePath);
+        results.push(...nested);
+        continue;
+      }
+
+      results.push({
+        relativePath,
+        path: entry.path,
+        size: entry.size,
+        modifiedAt: entry.modifiedAt
+      });
+    }
+
     return results;
   }
 
@@ -150,7 +196,7 @@ export function createSyncEngine(): SyncEngine {
               });
 
               const remoteDir = remotePath.substring(0, remotePath.lastIndexOf("/"));
-              try { await transport.mkdir(remoteDir); } catch { /* directory may exist */ }
+              await ensureRemoteDirExists(transport, remoteDir);
 
               const { createReadStream } = await import("node:fs");
               const localStream = createReadStream(join(config.localPath, file.relativePath));
@@ -170,21 +216,20 @@ export function createSyncEngine(): SyncEngine {
         }
 
         if (config.direction === "remote-to-local" || config.direction === "bidirectional") {
-          const remoteEntries = await transport.list(config.remotePath);
-          managed.status.filesScanned += remoteEntries.length;
+          const remoteFiles = await scanRemoteDir(transport, config.remotePath);
+          managed.status.filesScanned += remoteFiles.length;
           managed.status.status = "syncing";
 
-          for (const entry of remoteEntries) {
+          for (const file of remoteFiles) {
             if (managed.aborted) break;
-            if (entry.isDirectory) continue;
-            if (shouldExclude(entry.name, config.excludePatterns)) continue;
+            if (shouldExclude(file.relativePath, config.excludePatterns)) continue;
 
-            const localFilePath = join(config.localPath, entry.name);
+            const localFilePath = join(config.localPath, file.relativePath);
             let needsDownload = false;
 
             try {
               const localStat = await fsStat(localFilePath);
-              const remoteModTime = new Date(entry.modifiedAt).getTime();
+              const remoteModTime = new Date(file.modifiedAt).getTime();
               if (remoteModTime > localStat.mtimeMs) {
                 needsDownload = true;
               }
@@ -198,15 +243,15 @@ export function createSyncEngine(): SyncEngine {
                 syncId,
                 filesScanned: managed.status.filesScanned,
                 filesSynced: managed.status.filesSynced,
-                currentFile: entry.name,
+                currentFile: file.relativePath,
               });
 
-              const data = await transport.readFile(entry.path);
-              const { writeFile } = await import("node:fs/promises");
+              const data = await transport.readFile(file.path);
+              await mkdir(dirname(localFilePath), { recursive: true });
               await writeFile(localFilePath, data);
 
               managed.status.filesSynced++;
-              managed.status.bytesTransferred += entry.size;
+              managed.status.bytesTransferred += file.size;
             }
           }
         }

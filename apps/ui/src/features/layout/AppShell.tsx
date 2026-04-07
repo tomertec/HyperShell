@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { TunnelManagerPanel } from "../tunnels/TunnelManagerPanel";
 import { StatusBar } from "../statusbar/StatusBar";
 
@@ -37,8 +38,24 @@ export function AppShell({ sidebar, children }: AppShellProps) {
 
           <div className="relative flex items-center justify-end px-3 py-2 border-b border-border">
             {sidebarOpen && (
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-text-primary tracking-tight select-none pointer-events-none">
-                HyperShell
+              <span className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
+                <span
+                  className="text-accent/75 text-sm font-light"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  {">_"}
+                </span>
+                <span
+                  className="text-sm font-semibold text-text-primary tracking-tight"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  HyperShell
+                </span>
+                <motion.span
+                  className="inline-block w-[2px] h-[14px] bg-accent ml-0.5 rounded-full"
+                  animate={{ opacity: [1, 1, 0, 0] }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "steps(1)" }}
+                />
               </span>
             )}
             <button

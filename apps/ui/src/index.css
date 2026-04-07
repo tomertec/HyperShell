@@ -55,6 +55,15 @@ html, body, #root {
   border-radius: 4px;
 }
 
+/* Text fields render their own focus frame.
+   Disable global outer outline to avoid clipped side edges inside animated wrappers. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 /* Reset default button/input focus outlines */
 button:focus:not(:focus-visible),
 input:focus:not(:focus-visible),

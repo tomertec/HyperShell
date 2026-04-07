@@ -43,6 +43,7 @@ export interface SshConnectionOptions {
   username?: string;
   port?: number;
   identityFile?: string;
+  password?: string;
   proxyJump?: string;
   keepAliveSeconds?: number;
 }

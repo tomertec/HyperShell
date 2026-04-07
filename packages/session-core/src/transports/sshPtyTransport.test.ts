@@ -199,4 +199,31 @@ describe("buildSshArgs", () => {
       }
     ]);
   });
+
+  it("auto-sends provided secret when SSH prompts for password", async () => {
+    const fakePty = createFakePty();
+    const transport = createSshPtyTransport(
+      {
+        sessionId: "s3",
+        transport: "ssh",
+        profileId: "host-3",
+        cols: 80,
+        rows: 24
+      },
+      {
+        hostname: "secure-host",
+        password: "super-secret"
+      },
+      {
+        spawnPty: () => fakePty.process
+      }
+    );
+
+    await Promise.resolve();
+    fakePty.emitData("user@secure-host's password: ");
+    fakePty.emitData("Password: ");
+    transport.close();
+
+    expect(fakePty.writes).toEqual(["super-secret\r"]);
+  });
 });
