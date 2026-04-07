@@ -72,6 +72,21 @@ export function getOrCreateDatabase(): unknown {
           console.error("[sshterm] Migration 004 (is_favorite) failed:", msg);
         }
       }
+      // Migration 005: add sort_order and color columns
+      for (const stmt of [
+        "ALTER TABLE hosts ADD COLUMN sort_order INTEGER",
+        "ALTER TABLE host_groups ADD COLUMN sort_order INTEGER",
+        "ALTER TABLE hosts ADD COLUMN color TEXT"
+      ]) {
+        try { db.exec(stmt); } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes("already exists") || msg.includes("duplicate column")) {
+            console.info(`[sshterm] Migration 005: column already exists`);
+          } else {
+            console.error(`[sshterm] Migration 005 failed:`, msg);
+          }
+        }
+      }
       sharedDb = db;
       console.log("[sshterm] Database initialized successfully");
     } catch (err) {
