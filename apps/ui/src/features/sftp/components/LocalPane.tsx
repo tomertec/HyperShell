@@ -175,7 +175,7 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
 
   return (
     <div
-      className={`flex h-full flex-col ${isActive ? "border-t-2 border-accent" : "border-t-2 border-transparent"}`}
+      className={`flex min-h-0 flex-1 flex-col ${isActive ? "border-t-2 border-accent" : "border-t-2 border-transparent"}`}
       onMouseDown={onActivate}
       onContextMenu={(event) => handleContextMenu(event)}
     >

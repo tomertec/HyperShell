@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 
 import {
-  formatDate,
   formatFileSize,
   sortEntries,
   type SortColumn,
@@ -39,6 +38,22 @@ export interface FileListProps {
   cursorIndex: number;
 }
 
+const ROW_HEIGHT = 22;
+
+function formatCompactDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) {
+    return isoDate || "—";
+  }
+
+  const mon = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hr = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+
+  return `${date.getFullYear()}-${mon}-${day} ${hr}:${min}`;
+}
+
 export function FileList({
   entries,
   selection,
@@ -59,6 +74,37 @@ export function FileList({
   }, []);
 
   const [dropActive, setDropActive] = useState(false);
+
+  // Resizable column widths
+  const defaultColWidths = paneType === "remote"
+    ? { size: 50, modified: 120, perms: 42 }
+    : { size: 50, modified: 120, perms: 0 };
+  const [colWidths, setColWidths] = useState(defaultColWidths);
+  const resizingRef = useRef<{ col: "size" | "modified" | "perms"; startX: number; startW: number } | null>(null);
+
+  const handleResizeStart = useCallback((col: "size" | "modified" | "perms", event: MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startW = colWidths[col];
+    resizingRef.current = { col, startX, startW };
+
+    const handleMouseMove = (e: globalThis.MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = e.clientX - resizingRef.current.startX;
+      const newWidth = Math.max(30, resizingRef.current.startW + delta);
+      setColWidths((prev) => ({ ...prev, [resizingRef.current!.col]: newWidth }));
+    };
+
+    const handleMouseUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [colWidths]);
 
   const sortedEntries = useMemo(
     () => sortEntries(entries, sortBy.column, sortBy.direction),
@@ -150,6 +196,13 @@ export function FileList({
     return sortBy.direction === "asc" ? " ▲" : " ▼";
   };
 
+  const resizeHandle = (col: "size" | "modified" | "perms") => (
+    <span
+      className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-accent/50"
+      onMouseDown={(e) => handleResizeStart(col, e)}
+    />
+  );
+
   if (error) {
     return (
       <div className="flex h-full items-center justify-center px-4 text-sm text-danger">
@@ -173,84 +226,94 @@ export function FileList({
           Loading files...
         </div>
       ) : (
-        <table className="h-fit w-full border-collapse text-[13px] leading-tight">
-            <thead className="sticky top-0 z-10 border-b border-border/30 bg-base-800/95 text-[9px] uppercase tracking-wider text-text-muted">
-              <tr>
+        <table className="w-full table-fixed border-collapse text-[12px]" style={{ height: "auto" }}>
+          <colgroup>
+            <col />
+            <col style={{ width: colWidths.size }} />
+            <col style={{ width: colWidths.modified }} />
+            {paneType === "remote" && <col style={{ width: colWidths.perms }} />}
+          </colgroup>
+          <thead className="sticky top-0 z-10 border-b border-border/30 bg-base-800 text-[9px] uppercase tracking-wider text-text-muted">
+            <tr style={{ height: 20 }}>
+              <th
+                className="cursor-pointer px-1.5 text-left font-medium"
+                onClick={() => handleHeaderClick("name")}
+              >
+                Name{renderSortIndicator("name")}
+              </th>
+              <th
+                className="relative cursor-pointer px-1.5 text-right font-medium"
+                onClick={() => handleHeaderClick("size")}
+              >
+                Size{renderSortIndicator("size")}
+                {resizeHandle("size")}
+              </th>
+              <th
+                className="relative cursor-pointer px-1.5 text-left font-medium"
+                onClick={() => handleHeaderClick("modifiedAt")}
+              >
+                Modified{renderSortIndicator("modifiedAt")}
+                {resizeHandle("modified")}
+              </th>
+              {paneType === "remote" && (
                 <th
-                  className="cursor-pointer px-1.5 py-px text-left font-medium leading-[16px]"
-                  onClick={() => handleHeaderClick("name")}
+                  className="relative cursor-pointer px-1.5 text-left font-medium"
+                  onClick={() => handleHeaderClick("permissions")}
                 >
-                  Name{renderSortIndicator("name")}
+                  Perms{renderSortIndicator("permissions")}
+                  {resizeHandle("perms")}
                 </th>
-                <th
-                  className="w-16 cursor-pointer px-1.5 py-px text-right font-medium leading-[16px]"
-                  onClick={() => handleHeaderClick("size")}
-                >
-                  Size{renderSortIndicator("size")}
-                </th>
-                <th
-                  className="w-32 cursor-pointer px-1.5 py-px text-left font-medium leading-[16px]"
-                  onClick={() => handleHeaderClick("modifiedAt")}
-                >
-                  Modified{renderSortIndicator("modifiedAt")}
-                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedEntries.map((entry, index) => (
+              <tr
+                key={entry.path}
+                ref={cursorIndex === index ? cursorRowRef : undefined}
+                style={{ height: ROW_HEIGHT }}
+                className={`transition-colors ${
+                  selection.has(entry.path)
+                    ? "bg-accent/15 border-l-2 border-l-accent"
+                    : index % 2 === 0
+                      ? "hover:bg-base-700/30"
+                      : "bg-base-800/20 hover:bg-base-700/30"
+                } ${cursorIndex === index ? "ring-1 ring-inset ring-accent/40" : ""}`}
+                onClick={(event) => handleRowClick(entry, event)}
+                onDoubleClick={() => handleRowDoubleClick(entry)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (!selection.has(entry.path)) {
+                    onSelect(new Set([entry.path]));
+                  }
+                  onContextMenu(event, entry);
+                }}
+                draggable
+                onDragStart={(event) => handleDragStart(event, entry)}
+              >
+                <td className="overflow-hidden px-1.5">
+                  <div className="flex min-w-0 items-center gap-1" style={{ height: ROW_HEIGHT }}>
+                    <FileIcon name={entry.name} isDirectory={entry.isDirectory} />
+                    <span className={`truncate text-[12px] ${entry.isDirectory ? "font-medium text-text-primary" : "text-text-primary"}`}>
+                      {entry.name}
+                    </span>
+                  </div>
+                </td>
+                <td className="overflow-hidden whitespace-nowrap px-1.5 text-right text-[11px] text-text-secondary">
+                  {entry.isDirectory ? "—" : formatFileSize(entry.size)}
+                </td>
+                <td className="overflow-hidden whitespace-nowrap px-1.5 text-[11px] text-text-secondary">
+                  {formatCompactDate(entry.modifiedAt)}
+                </td>
                 {paneType === "remote" && (
-                  <th
-                    className="w-14 cursor-pointer px-1.5 py-px text-left font-medium leading-[16px]"
-                    onClick={() => handleHeaderClick("permissions")}
-                  >
-                    Perms{renderSortIndicator("permissions")}
-                  </th>
+                  <td className="overflow-hidden whitespace-nowrap px-1.5 font-mono text-[10px] text-text-secondary">
+                    {(entry.permissions ?? 0).toString(8).padStart(4, "0")}
+                  </td>
                 )}
               </tr>
-            </thead>
-            <tbody>
-              {sortedEntries.map((entry, index) => (
-                  <tr
-                    key={entry.path}
-                    ref={cursorIndex === index ? cursorRowRef : undefined}
-                    className={`transition-colors ${
-                      selection.has(entry.path)
-                        ? "bg-accent/15 border-l-2 border-l-accent"
-                        : index % 2 === 0
-                          ? "hover:bg-base-700/30"
-                          : "bg-base-800/20 hover:bg-base-700/30"
-                    } ${cursorIndex === index ? "ring-1 ring-inset ring-accent/40" : ""}`}
-                    onClick={(event) => handleRowClick(entry, event)}
-                    onDoubleClick={() => handleRowDoubleClick(entry)}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      if (!selection.has(entry.path)) {
-                        onSelect(new Set([entry.path]));
-                      }
-                      onContextMenu(event, entry);
-                    }}
-                    draggable
-                    onDragStart={(event) => handleDragStart(event, entry)}
-                  >
-                    <td className="px-1.5 py-px">
-                      <div className="flex min-w-0 items-center gap-1">
-                        <FileIcon name={entry.name} isDirectory={entry.isDirectory} />
-                        <span className={`truncate text-[13px] leading-[18px] ${entry.isDirectory ? "font-medium text-text-primary" : "text-text-primary"}`}>
-                          {entry.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-1.5 py-px text-right text-[11px] leading-[18px] text-text-secondary">
-                      {entry.isDirectory ? "—" : formatFileSize(entry.size)}
-                    </td>
-                    <td className="px-1.5 py-px text-[11px] leading-[18px] text-text-secondary">
-                      {formatDate(entry.modifiedAt)}
-                    </td>
-                    {paneType === "remote" && (
-                      <td className="px-1.5 py-px font-mono text-[10px] leading-[18px] text-text-secondary">
-                        {(entry.permissions ?? 0).toString(8).padStart(4, "0")}
-                      </td>
-                    )}
-                  </tr>
-              ))}
-            </tbody>
+            ))}
+          </tbody>
         </table>
       )}
     </div>

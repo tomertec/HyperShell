@@ -179,13 +179,13 @@ export function SftpDualPane({
   return (
     <div
       ref={containerRef}
-      className="flex flex-1 overflow-hidden outline-none"
+      className="flex min-h-0 flex-1 overflow-hidden outline-none"
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
       <div
         style={{ width: `${splitRatio * 100}%` }}
-        className="flex min-w-[260px] flex-col border-r border-base-700"
+        className="flex min-h-0 min-w-[260px] flex-col border-r border-base-700"
       >
         <LocalPane store={store} onTransfer={onUpload} isActive={activePane === "local"} onActivate={() => setActivePane("local")} />
       </div>
@@ -199,7 +199,7 @@ export function SftpDualPane({
 
       <div
         style={{ width: `${(1 - splitRatio) * 100}%` }}
-        className="flex min-w-[260px] flex-col"
+        className="flex min-h-0 min-w-[260px] flex-col"
       >
         <RemotePane
           store={store}
