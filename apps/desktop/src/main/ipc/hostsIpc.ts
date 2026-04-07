@@ -22,6 +22,7 @@ import {
 import initSchemaSql from "@sshterm/db/src/migrations/001_init.sql";
 import sftpBookmarksSql from "@sshterm/db/src/migrations/002_sftp_bookmarks.sql";
 import hostAuthFieldsSql from "@sshterm/db/src/migrations/003_host_auth_fields.sql";
+import advancedSshSql from "@sshterm/db/src/migrations/006_advanced_ssh.sql";
 
 import type { IpcMainLike } from "./registerIpc";
 
@@ -87,6 +88,17 @@ export function getOrCreateDatabase(): unknown {
             console.info(`[sshterm] Migration 005: column already exists`);
           } else {
             console.error(`[sshterm] Migration 005 failed:`, msg);
+          }
+        }
+      }
+      // Migration 006: advanced SSH fields + host_port_forwards table
+      for (const stmt of advancedSshSql.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
+        try { db.exec(stmt); } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes("already exists") || msg.includes("duplicate column")) {
+            console.info("[sshterm] Migration 006: column/table already exists");
+          } else {
+            console.error("[sshterm] Migration 006 failed:", msg);
           }
         }
       }

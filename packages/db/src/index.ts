@@ -16,6 +16,10 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     new URL("./migrations/003_host_auth_fields.sql", import.meta.url),
     "utf8"
   );
+  const advancedSshSql = readFileSync(
+    new URL("./migrations/006_advanced_ssh.sql", import.meta.url),
+    "utf8"
+  );
 
   const db = new Database(databasePath);
 
@@ -47,6 +51,20 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0");
   } catch {
     // Column already exists — safe to ignore.
+  }
+
+  // Migration 005: sort_order and color
+  for (const stmt of [
+    "ALTER TABLE hosts ADD COLUMN sort_order INTEGER",
+    "ALTER TABLE host_groups ADD COLUMN sort_order INTEGER",
+    "ALTER TABLE hosts ADD COLUMN color TEXT"
+  ]) {
+    try { db.exec(stmt); } catch {}
+  }
+
+  // Migration 006: advanced SSH fields + host_port_forwards table
+  for (const statement of advancedSshSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0)) {
+    try { db.exec(statement); } catch {}
   }
 
   return db;
