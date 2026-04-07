@@ -9,11 +9,13 @@ import { TabBar } from "./TabBar";
 function PaneView({
   pane,
   isActive,
+  activeSessionId,
   onActivate,
   onCloseTab
 }: {
   pane: Pane;
   isActive: boolean;
+  activeSessionId: string | null;
   onActivate: () => void;
   onCloseTab: (sessionId: string) => void;
 }) {
@@ -21,9 +23,17 @@ function PaneView({
   const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
 
   const terminalTabs = tabs.filter((t) => !(t.type === "sftp" && t.sftpSessionId));
+  const hasTabForSession = (sessionId: string | null) =>
+    sessionId ? tabs.some((t) => t.sessionId === sessionId) : false;
+  const resolvedSessionId =
+    pane.sessionId && hasTabForSession(pane.sessionId)
+      ? pane.sessionId
+      : isActive && activeSessionId && hasTabForSession(activeSessionId)
+        ? activeSessionId
+        : pane.sessionId;
   const activeSftpTab =
-    pane.sessionId
-      ? tabs.find((t) => t.sessionId === pane.sessionId && t.type === "sftp" && t.sftpSessionId) ?? null
+    resolvedSessionId
+      ? tabs.find((t) => t.sessionId === resolvedSessionId && t.type === "sftp" && t.sftpSessionId) ?? null
       : null;
 
   return (
@@ -44,7 +54,7 @@ function PaneView({
       )}
 
       {terminalTabs.map((tab) => {
-        const isVisible = !activeSftpTab && tab.sessionId === pane.sessionId;
+        const isVisible = !activeSftpTab && tab.sessionId === resolvedSessionId;
         const terminalTransport = tab.transport === "serial" ? "serial" : "ssh";
         return (
           <div
@@ -67,9 +77,15 @@ function PaneView({
         );
       })}
 
-      {!pane.sessionId && terminalTabs.length === 0 && (
+      {!resolvedSessionId && terminalTabs.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm">
           Empty pane
+        </div>
+      )}
+
+      {!resolvedSessionId && terminalTabs.length > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center text-text-muted text-sm">
+          Select a session tab
         </div>
       )}
     </div>
@@ -94,14 +110,31 @@ export function Workspace() {
 
     layoutStore.setState((state) => {
       const nextTabs = state.tabs.filter((t) => t.sessionId !== sessionId);
+      const closingActiveSession = state.activeSessionId === sessionId;
       const nextActive =
-        state.activeSessionId === sessionId
+        closingActiveSession
           ? nextTabs[nextTabs.length - 1]?.sessionId ?? null
           : state.activeSessionId;
-      const nextPanes = state.panes.map((p) =>
-        p.sessionId === sessionId ? { ...p, sessionId: null } : p
-      );
-      return { tabs: nextTabs, activeSessionId: nextActive, panes: nextPanes };
+      const nextPanes = state.panes.map((p) => {
+        if (p.sessionId !== sessionId) {
+          return p;
+        }
+
+        if (closingActiveSession && p.paneId === state.activePaneId) {
+          return { ...p, sessionId: nextActive };
+        }
+
+        return { ...p, sessionId: null };
+      });
+
+      const normalizedPanes =
+        closingActiveSession
+          ? nextPanes.map((p) =>
+              p.paneId === state.activePaneId ? { ...p, sessionId: nextActive } : p
+            )
+          : nextPanes;
+
+      return { tabs: nextTabs, activeSessionId: nextActive, panes: normalizedPanes };
     });
   };
 
@@ -122,6 +155,7 @@ export function Workspace() {
               key={pane.paneId}
               pane={pane}
               isActive={pane.paneId === activePaneId}
+              activeSessionId={activeSessionId}
               onActivate={() => activatePane(pane.paneId)}
               onCloseTab={closeTab}
             />

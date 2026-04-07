@@ -18,6 +18,8 @@ import {
   writeFileSync
 } from "node:fs";
 import initSchemaSql from "@sshterm/db/src/migrations/001_init.sql";
+import sftpBookmarksSql from "@sshterm/db/src/migrations/002_sftp_bookmarks.sql";
+import hostAuthFieldsSql from "@sshterm/db/src/migrations/003_host_auth_fields.sql";
 
 import type { IpcMainLike } from "./registerIpc";
 
@@ -29,6 +31,34 @@ type HostsRepoLike = {
 };
 
 let hostsRepo: HostsRepoLike | null = null;
+let sharedDb: unknown = null;
+
+/** Returns the shared SQLite database instance, creating it on first call. */
+export function getOrCreateDatabase(): unknown {
+  if (!sharedDb) {
+    try {
+      const Database = require("better-sqlite3");
+      const dbPath = resolveDatabasePath();
+      console.log("[sshterm] Opening database at:", dbPath);
+      const db = new Database(dbPath);
+      db.pragma("foreign_keys = ON");
+      db.exec(initSchemaSql);
+      db.exec(sftpBookmarksSql);
+      // Migration 003: add identity_file and auth fields to hosts table.
+      try { db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT"); } catch { /* column exists */ }
+      for (const statement of hostAuthFieldsSql.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
+        try { db.exec(statement); } catch { /* column exists */ }
+      }
+      // Migration 004: add is_favorite column
+      try { db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"); } catch { /* column exists */ }
+      sharedDb = db;
+      console.log("[sshterm] Database initialized successfully");
+    } catch (err) {
+      console.error("[sshterm] Failed to initialize SQLite:", err);
+    }
+  }
+  return sharedDb;
+}
 
 function resolveDatabasePath(): string {
   const stableDataDir = path.join(app.getPath("appData"), "SSHTerm");
@@ -150,25 +180,63 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
 
 export function getOrCreateHostsRepo() {
   if (!hostsRepo) {
-    try {
-      const Database = require("better-sqlite3");
-      const dbPath = resolveDatabasePath();
-      console.log("[sshterm] Opening database at:", dbPath);
-      const db = new Database(dbPath);
-      db.pragma("foreign_keys = ON");
-      db.exec(initSchemaSql);
-      // Migration 004: add is_favorite column (safe to run on existing DBs)
-      try { db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"); } catch { /* column exists */ }
-      hostsRepo = createHostsRepositoryFromDatabase(db);
-      console.log("[sshterm] Database initialized successfully");
-    } catch (err) {
-      console.error("[sshterm] Failed to initialize SQLite, falling back to JSON store:", err);
+    const db = getOrCreateDatabase();
+    if (db) {
+      hostsRepo = createHostsRepositoryFromDatabase(db as Parameters<typeof createHostsRepositoryFromDatabase>[0]);
+      // One-time import: migrate hosts from JSON fallback into SQLite
+      importFallbackHosts(hostsRepo);
+    } else {
+      console.error("[sshterm] No database available, falling back to JSON store");
       const fallbackPath = resolveHostsFallbackPath();
       console.log("[sshterm] Using fallback hosts store at:", fallbackPath);
       hostsRepo = createFileBackedHostsRepo(fallbackPath);
     }
   }
   return hostsRepo;
+}
+
+function importFallbackHosts(repo: HostsRepoLike): void {
+  const fallbackPath = resolveHostsFallbackPath();
+  if (!existsSync(fallbackPath)) return;
+
+  try {
+    const raw = readFileSync(fallbackPath, "utf8");
+    const hosts = JSON.parse(raw);
+    if (!Array.isArray(hosts) || hosts.length === 0) return;
+
+    let imported = 0;
+    for (const h of hosts) {
+      if (!h?.id || !h?.name || !h?.hostname) continue;
+      // Skip if already in DB
+      if (repo.get(h.id)) continue;
+      repo.create({
+        id: h.id,
+        name: h.name,
+        hostname: h.hostname,
+        port: h.port ?? 22,
+        username: h.username ?? null,
+        identityFile: h.identityFile ?? null,
+        authProfileId: h.authProfileId ?? null,
+        groupId: h.groupId ?? null,
+        notes: h.notes ?? null,
+        authMethod: h.authMethod ?? "default",
+        agentKind: h.agentKind ?? "system",
+        opReference: h.opReference ?? null,
+        isFavorite: h.isFavorite ?? false
+      });
+      imported++;
+    }
+
+    if (imported > 0) {
+      console.log(`[sshterm] Imported ${imported} host(s) from JSON fallback into SQLite`);
+      // Rename fallback so we don't re-import
+      const donePath = fallbackPath + ".migrated";
+      try { copyFileSync(fallbackPath, donePath); } catch { /* best effort */ }
+      try { writeFileSync(fallbackPath, "[]", "utf8"); } catch { /* best effort */ }
+    }
+  } catch (err) {
+    console.warn("[sshterm] Failed to import fallback hosts:", err);
+  }
 }
 
 export const hostChannelList = [

@@ -18,7 +18,7 @@ import type {
 } from "@sshterm/shared";
 import { createSessionManager } from "@sshterm/session-core";
 import { parseSshConfig } from "@sshterm/session-core";
-import { registerHostIpc, getOrCreateHostsRepo } from "./hostsIpc";
+import { registerHostIpc, getOrCreateHostsRepo, getOrCreateDatabase } from "./hostsIpc";
 import { registerSettingsIpc } from "./settingsIpc";
 import { registerSshConfigIpc } from "./sshConfigIpc";
 import { registerPortForwardIpc } from "./portForwardIpc";
@@ -687,7 +687,7 @@ export function registerIpc(
 
   registerHostIpc(ipcMain);
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
-  registerSettingsIpc(ipcMain, () => null);
+  registerSettingsIpc(ipcMain, () => getOrCreateDatabase());
   registerPortForwardIpc(ipcMain);
   registerGroupsIpc(ipcMain, () => groupsRepo);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
