@@ -96,6 +96,21 @@ export const fsChannels = {
   listSshKeys: "fs:list-ssh-keys"
 } as const;
 
+export const hostPortForwardChannels = {
+  list: "host-port-forward:list",
+  upsert: "host-port-forward:upsert",
+  remove: "host-port-forward:remove",
+  reorder: "host-port-forward:reorder",
+} as const;
+
+export const connectionPoolChannels = {
+  stats: "connection-pool:stats",
+} as const;
+
+export const networkChannels = {
+  status: "network:status",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -107,5 +122,8 @@ export const ipcChannels = {
   sftp: sftpChannels,
   workspace: workspaceChannels,
   fs: fsChannels,
-  sshKeys: sshKeyChannels
+  sshKeys: sshKeyChannels,
+  hostPortForward: hostPortForwardChannels,
+  connectionPool: connectionPoolChannels,
+  network: networkChannels,
 } as const;

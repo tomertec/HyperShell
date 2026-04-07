@@ -6,6 +6,7 @@ export const sessionStateSchema = z.enum([
   "connecting",
   "connected",
   "reconnecting",
+  "waiting_for_network",
   "disconnected",
   "failed"
 ]);
@@ -14,7 +15,10 @@ export const openSessionRequestSchema = z.object({
   transport: transportSchema,
   profileId: z.string().min(1),
   cols: z.number().int().positive(),
-  rows: z.number().int().positive()
+  rows: z.number().int().positive(),
+  autoReconnect: z.boolean().optional(),
+  reconnectMaxAttempts: z.number().int().min(1).optional(),
+  reconnectBaseInterval: z.number().int().min(1).optional(),
 });
 
 export const openSessionResponseSchema = z.object({
@@ -84,7 +88,13 @@ export const hostRecordSchema = z.object({
   agentKind: z.enum(["system", "pageant", "1password"]).optional(),
   opReference: z.string().optional(),
   sortOrder: z.number().int().nullable().optional(),
-  color: z.string().nullable().optional()
+  color: z.string().nullable().optional(),
+  proxyJump: z.string().nullable().optional(),
+  proxyJumpHostIds: z.string().nullable().optional(),
+  keepAliveInterval: z.number().int().nullable().optional(),
+  autoReconnect: z.boolean().optional(),
+  reconnectMaxAttempts: z.number().int().optional(),
+  reconnectBaseInterval: z.number().int().optional(),
 });
 
 export const upsertHostRequestSchema = z.object({
@@ -102,7 +112,13 @@ export const upsertHostRequestSchema = z.object({
   opReference: z.string().optional(),
   isFavorite: z.boolean().optional(),
   sortOrder: z.number().int().nullable().optional(),
-  color: z.string().nullable().optional()
+  color: z.string().nullable().optional(),
+  proxyJump: z.string().nullable().optional(),
+  proxyJumpHostIds: z.string().nullable().optional(),
+  keepAliveInterval: z.number().int().min(0).nullable().optional(),
+  autoReconnect: z.boolean().optional(),
+  reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
+  reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
 });
 
 export const removeHostRequestSchema = z.object({
@@ -167,6 +183,68 @@ export const stopPortForwardRequestSchema = z.object({
 
 export type StartPortForwardRequest = z.infer<typeof startPortForwardRequestSchema>;
 export type StopPortForwardRequest = z.infer<typeof stopPortForwardRequestSchema>;
+
+// --- Host port forward schemas ---
+
+export const hostPortForwardRecordSchema = z.object({
+  id: z.string().min(1),
+  hostId: z.string().min(1),
+  name: z.string().min(1),
+  protocol: z.enum(["local", "remote", "dynamic"]),
+  localAddress: z.string(),
+  localPort: z.number().int().min(1).max(65535),
+  remoteHost: z.string(),
+  remotePort: z.number().int().min(0).max(65535),
+  autoStart: z.boolean(),
+  sortOrder: z.number().int(),
+});
+
+export const upsertHostPortForwardRequestSchema = z.object({
+  id: z.string().min(1),
+  hostId: z.string().min(1),
+  name: z.string().min(1),
+  protocol: z.enum(["local", "remote", "dynamic"]),
+  localAddress: z.string().default("127.0.0.1"),
+  localPort: z.number().int().min(1).max(65535),
+  remoteHost: z.string().default(""),
+  remotePort: z.number().int().min(0).max(65535).default(0),
+  autoStart: z.boolean().default(false),
+  sortOrder: z.number().int().default(0),
+});
+
+export const listHostPortForwardsRequestSchema = z.object({
+  hostId: z.string().min(1),
+});
+
+export const removeHostPortForwardRequestSchema = z.object({
+  id: z.string().min(1),
+});
+
+export const reorderHostPortForwardsRequestSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().min(1),
+    sortOrder: z.number().int(),
+  })),
+});
+
+export type HostPortForwardRecord = z.infer<typeof hostPortForwardRecordSchema>;
+export type UpsertHostPortForwardRequest = z.infer<typeof upsertHostPortForwardRequestSchema>;
+export type ListHostPortForwardsRequest = z.infer<typeof listHostPortForwardsRequestSchema>;
+export type RemoveHostPortForwardRequest = z.infer<typeof removeHostPortForwardRequestSchema>;
+export type ReorderHostPortForwardsRequest = z.infer<typeof reorderHostPortForwardsRequestSchema>;
+
+// --- Connection pool schemas ---
+
+export const connectionPoolStatsSchema = z.object({
+  connectionId: z.string(),
+  hostname: z.string(),
+  port: z.number(),
+  username: z.string(),
+  consumerCount: z.number().int(),
+  createdAt: z.string(),
+});
+
+export type ConnectionPoolStats = z.infer<typeof connectionPoolStatsSchema>;
 
 // --- Group schemas ---
 
