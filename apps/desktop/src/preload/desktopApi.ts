@@ -42,6 +42,10 @@ import {
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
   setSignalsRequestSchema,
+  hostStatsRequestSchema,
+  hostStatsResponseSchema,
+  type HostStatsRequest,
+  type HostStatsResponse,
   type CloseSessionRequest,
   type FsEntry,
   type FsGetDrivesResponse,
@@ -129,6 +133,7 @@ export interface DesktopApi {
   removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void>;
   listSerialPorts(): Promise<SerialPortInfo[]>;
   setSessionSignals(request: SetSignalsRequest): Promise<void>;
+  getHostStats(request: HostStatsRequest): Promise<HostStatsResponse>;
   sftpConnect(request: SftpConnectRequest): Promise<SftpConnectResponse>;
   sftpDisconnect(request: SftpDisconnectRequest): Promise<void>;
   sftpList(request: SftpListRequest): Promise<SftpListResponse>;
@@ -290,6 +295,14 @@ export function createDesktopApi(
     async setSessionSignals(request: SetSignalsRequest): Promise<void> {
       const parsed = setSignalsRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.session.setSignals, parsed);
+    },
+    async getHostStats(request: HostStatsRequest): Promise<HostStatsResponse> {
+      const parsedRequest = hostStatsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(
+        ipcChannels.session.hostStats,
+        parsedRequest
+      );
+      return hostStatsResponseSchema.parse(result);
     },
     async sftpConnect(request: SftpConnectRequest): Promise<SftpConnectResponse> {
       const parsed = sftpConnectRequestSchema.parse(request);

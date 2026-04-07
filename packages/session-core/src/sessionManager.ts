@@ -51,6 +51,7 @@ export interface SessionManager {
   listSessions(): SessionSnapshot[];
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
   setSignals(sessionId: string, signals: { dtr?: boolean; rts?: boolean }): void;
+  getSessionInput(sessionId: string): OpenSessionInput | undefined;
 }
 
 interface ManagedSession {
@@ -294,6 +295,10 @@ export function createSessionManager(
 
     setSignals(sessionId: string, signals: { dtr?: boolean; rts?: boolean }): void {
       sessions.get(sessionId)?.transport.setSignals?.(signals);
+    },
+
+    getSessionInput(sessionId: string): OpenSessionInput | undefined {
+      return sessions.get(sessionId)?.input;
     }
   };
 }

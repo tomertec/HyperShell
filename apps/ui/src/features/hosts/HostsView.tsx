@@ -9,6 +9,7 @@ import {
 export type HostRecord = HostFormValue & {
   id: string;
   notes?: string;
+  isFavorite?: boolean;
 };
 
 const demoHosts: HostRecord[] = [

@@ -1,11 +1,13 @@
 import {
   closeSessionRequestSchema,
+  hostStatsRequestSchema,
   ipcChannels,
   openSessionRequestSchema,
   resizeSessionRequestSchema,
   setSignalsRequestSchema,
   writeSessionRequestSchema
 } from "@sshterm/shared";
+import type { HostStatsResponse } from "@sshterm/shared";
 import type {
   CloseSessionRequest,
   OpenSessionRequest,
@@ -37,7 +39,8 @@ import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const registeredChannels = [
   ipcChannels.session.open,
@@ -61,6 +64,7 @@ const registeredChannels = [
   ipcChannels.serialProfiles.remove,
   ipcChannels.serialProfiles.listPorts,
   ipcChannels.session.setSignals,
+  ipcChannels.session.hostStats,
   ipcChannels.sftp.connect,
   ipcChannels.sftp.disconnect,
   ipcChannels.sftp.list,
@@ -141,6 +145,18 @@ async function openSessionHandler(
           port: host.port,
           identityFile: host.identityFile ?? undefined
         };
+
+        // 1Password op:// reference auth — resolve credential via the 1Password CLI.
+        const hostRecord = host as { authMethod?: string; opReference?: string };
+        if (hostRecord.authMethod === "op-reference" && hostRecord.opReference) {
+          try {
+            const { resolveOnePasswordReference } = await import("../security/opResolver.js");
+            await resolveOnePasswordReference(hostRecord.opReference);
+            // TODO: pass resolved credential to SSH transport options
+          } catch (err) {
+            console.error("[1password] failed to resolve reference:", err);
+          }
+        }
       }
     }
   }
@@ -520,6 +536,130 @@ async function resolveSftpConnectionOptions(
   };
 }
 
+const execFileAsync = promisify(execFile);
+
+function resolveSshBinaryPath(): string {
+  if (process.platform !== "win32") {
+    return "ssh";
+  }
+
+  const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
+  if (!systemRoot) {
+    return "ssh";
+  }
+
+  const bundledWindowsSshPath = path.join(
+    systemRoot,
+    "System32",
+    "OpenSSH",
+    "ssh.exe"
+  );
+  return existsSync(bundledWindowsSshPath) ? bundledWindowsSshPath : "ssh";
+}
+
+const STATS_COMMAND = `echo "CPU:$(cat /proc/loadavg 2>/dev/null | cut -d' ' -f1-3 || sysctl -n vm.loadavg 2>/dev/null | tr -d '{}');MEM:$(free -m 2>/dev/null | awk 'NR==2{printf \\"%d/%dMB\\",$3,$2}' || vm_stat 2>/dev/null | awk '/Pages (active|wired|free)/{s+=$NF}END{printf \\"%dMB\\",s*4096/1048576}');DISK:$(df -h / 2>/dev/null | awk 'NR==2{print $5}');UP:$(uptime -p 2>/dev/null || uptime | sed 's/.*up/up/' | sed 's/,.*load.*//' | xargs)"`;
+
+function parseStatsOutput(raw: string): Omit<HostStatsResponse, "latencyMs"> {
+  const result: Omit<HostStatsResponse, "latencyMs"> = {
+    cpuLoad: null,
+    memUsage: null,
+    diskUsage: null,
+    uptime: null
+  };
+
+  try {
+    const parts = raw.trim().split(";");
+    for (const part of parts) {
+      const colonIdx = part.indexOf(":");
+      if (colonIdx < 0) continue;
+      const key = part.slice(0, colonIdx).trim();
+      const value = part.slice(colonIdx + 1).trim();
+      if (!value) continue;
+
+      switch (key) {
+        case "CPU":
+          result.cpuLoad = value;
+          break;
+        case "MEM":
+          result.memUsage = value;
+          break;
+        case "DISK":
+          result.diskUsage = value;
+          break;
+        case "UP":
+          result.uptime = value;
+          break;
+      }
+    }
+  } catch {
+    // parse errors are non-fatal
+  }
+
+  return result;
+}
+
+async function hostStatsHandler(
+  _event: IpcMainInvokeEvent,
+  request: unknown,
+  manager: SessionManager = sessionManager
+): Promise<HostStatsResponse> {
+  const parsed = hostStatsRequestSchema.parse(request);
+  const input = manager.getSessionInput(parsed.sessionId);
+
+  if (!input?.sshOptions) {
+    throw new Error("Session not found or not an SSH session");
+  }
+
+  const { hostname, username, port, identityFile, proxyJump } = input.sshOptions;
+
+  const sshBinary = resolveSshBinaryPath();
+  const args: string[] = [
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=5",
+    "-o", "StrictHostKeyChecking=no"
+  ];
+
+  if (port != null) {
+    args.push("-p", String(port));
+  }
+
+  if (identityFile) {
+    args.push("-i", identityFile);
+  }
+
+  if (proxyJump) {
+    args.push("-J", proxyJump);
+  }
+
+  const destination = username ? `${username}@${hostname}` : hostname;
+  args.push(destination, STATS_COMMAND);
+
+  const startTime = Date.now();
+
+  try {
+    const { stdout } = await execFileAsync(sshBinary, args, {
+      timeout: 10000,
+      windowsHide: true
+    });
+
+    const latencyMs = Date.now() - startTime;
+    const stats = parseStatsOutput(stdout);
+
+    return {
+      ...stats,
+      latencyMs
+    };
+  } catch {
+    return {
+      cpuLoad: null,
+      memUsage: null,
+      diskUsage: null,
+      uptime: null,
+      latencyMs: null
+    };
+  }
+}
+
 export function getRegisteredChannels(): readonly string[] {
   return registeredChannels;
 }
@@ -555,6 +695,9 @@ export function registerIpc(
     const parsed = setSignalsRequestSchema.parse(request);
     manager.setSignals(parsed.sessionId, parsed.signals);
   });
+  ipcMain.handle(ipcChannels.session.hostStats, (event, request) =>
+    hostStatsHandler(event, request, manager)
+  );
 
   registerHostIpc(ipcMain);
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());

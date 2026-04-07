@@ -5,6 +5,8 @@ import type {
   FsListRequest,
   FsListResponse,
   HostRecord,
+  HostStatsRequest,
+  HostStatsResponse,
   OpenSessionRequest,
   OpenSessionResponse,
   RemoveHostRequest,
@@ -60,6 +62,7 @@ declare global {
       removeSerialProfile?: (request: RemoveSerialProfileRequest) => Promise<void>;
       listSerialPorts?: () => Promise<SerialPortInfo[]>;
       setSessionSignals?: (request: SetSignalsRequest) => Promise<void>;
+      getHostStats?: (request: HostStatsRequest) => Promise<HostStatsResponse>;
       sftpConnect?: (request: SftpConnectRequest) => Promise<SftpConnectResponse>;
       sftpDisconnect?: (request: SftpDisconnectRequest) => Promise<void>;
       sftpList?: (request: SftpListRequest) => Promise<SftpListResponse>;

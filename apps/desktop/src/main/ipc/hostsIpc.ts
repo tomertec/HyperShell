@@ -84,7 +84,11 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           authProfileId:
             item?.authProfileId == null ? null : String(item.authProfileId),
           groupId: item?.groupId == null ? null : String(item.groupId),
-          notes: item?.notes == null ? null : String(item.notes)
+          notes: item?.notes == null ? null : String(item.notes),
+          authMethod: item?.authMethod == null ? "default" : String(item.authMethod),
+          agentKind: item?.agentKind == null ? "system" : String(item.agentKind),
+          opReference: item?.opReference == null ? null : String(item.opReference),
+          isFavorite: Boolean(item?.isFavorite ?? false)
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
     } catch {
@@ -107,7 +111,11 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         identityFile: input.identityFile ?? null,
         authProfileId: input.authProfileId ?? null,
         groupId: input.groupId ?? null,
-        notes: input.notes ?? null
+        notes: input.notes ?? null,
+        authMethod: input.authMethod ?? "default",
+        agentKind: input.agentKind ?? "system",
+        opReference: input.opReference ?? null,
+        isFavorite: input.isFavorite ?? false
       };
 
       const hosts = readHosts();
@@ -149,6 +157,8 @@ export function getOrCreateHostsRepo() {
       const db = new Database(dbPath);
       db.pragma("foreign_keys = ON");
       db.exec(initSchemaSql);
+      // Migration 004: add is_favorite column (safe to run on existing DBs)
+      try { db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"); } catch { /* column exists */ }
       hostsRepo = createHostsRepositoryFromDatabase(db);
       console.log("[sshterm] Database initialized successfully");
     } catch (err) {
@@ -181,7 +191,11 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       port: parsed.port,
       username: parsed.username ?? null,
       identityFile: parsed.identityFile ?? null,
-      notes: parsed.notes ?? null
+      notes: parsed.notes ?? null,
+      authMethod: parsed.authMethod ?? "default",
+      agentKind: parsed.agentKind ?? "system",
+      opReference: parsed.opReference ?? null,
+      isFavorite: parsed.isFavorite ?? false
     });
   });
 

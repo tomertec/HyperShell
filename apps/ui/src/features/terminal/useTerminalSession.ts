@@ -5,7 +5,9 @@ import type { FitAddon } from "@xterm/addon-fit";
 import type { SessionEvent } from "@sshterm/shared";
 
 import { broadcastStore } from "../broadcast/broadcastStore";
-import { terminalOptions } from "./terminalTheme";
+import { sessionStateStore } from "../sessions/sessionStateStore";
+import { settingsStore } from "../settings/settingsStore";
+import { getTerminalOptions } from "./terminalTheme";
 import {
   createAsyncOperationGuard,
   mapSessionEvent,
@@ -55,6 +57,7 @@ export function useTerminalSession(
   const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const terminalSettings = useStore(settingsStore, (s) => s.settings.terminal);
   const broadcastEnabled = useStore(broadcastStore, (store) => store.enabled);
   const broadcastTargets = useStore(
     broadcastStore,
@@ -77,6 +80,11 @@ export function useTerminalSession(
     }
 
     setState(nextState);
+
+    const sessionId = sessionIdRef.current;
+    if (sessionId) {
+      sessionStateStore.getState().setSessionState(sessionId, nextState);
+    }
   }, []);
 
   const writeTerminalError = useCallback((error: unknown): void => {
@@ -151,6 +159,10 @@ export function useTerminalSession(
       mountedRef.current = false;
       asyncOperationGuardRef.current.invalidate();
       pendingSessionEventsRef.current = [];
+      const sessionId = sessionIdRef.current;
+      if (sessionId) {
+        sessionStateStore.getState().removeSession(sessionId);
+      }
     };
   }, []);
 
@@ -161,7 +173,12 @@ export function useTerminalSession(
 
     asyncOperationGuardRef.current.issueToken();
     sessionIdRef.current = input.sessionId;
-    setStateSafe("connecting");
+    // Only set "connecting" if the session hasn't already advanced
+    // (e.g. session events may have set "connected" before this effect runs).
+    const existing = sessionStateStore.getState().sessions[input.sessionId];
+    if (!existing || existing.state === "connecting") {
+      setStateSafe("connecting");
+    }
     if (pendingSessionEventsRef.current.length > 0) {
       const queued = pendingSessionEventsRef.current;
       pendingSessionEventsRef.current = [];
@@ -192,7 +209,8 @@ export function useTerminalSession(
         return;
       }
 
-      instance = new XTerm(terminalOptions);
+      const opts = getTerminalOptions(terminalSettings);
+      instance = new XTerm(opts);
       const addon = new FitAddonClass();
       instance.loadAddon(addon);
       fitAddonRef.current = addon;
@@ -273,7 +291,13 @@ export function useTerminalSession(
 
       sessionIdRef.current = result.sessionId;
       input.onSessionOpened?.(result.sessionId);
-      setStateSafe(result.state);
+      // Only apply the IPC result state if the event listener hasn't
+      // already advanced past it (e.g. "connected" arrived before the
+      // openSession promise resolved).
+      const currentStoreState = sessionStateStore.getState().sessions[result.sessionId]?.state;
+      if (currentStoreState !== "connected") {
+        setStateSafe(result.state);
+      }
 
       if (pendingSessionEventsRef.current.length > 0) {
         const queued = pendingSessionEventsRef.current;
@@ -357,6 +381,25 @@ export function useTerminalSession(
   }, [sendSessionResize]);
 
   useEffect(() => {
+    const term = terminalRef.current;
+    if (!term) return;
+    const opts = getTerminalOptions(terminalSettings);
+    const needsRefit =
+      term.options.fontFamily !== opts.fontFamily ||
+      term.options.fontSize !== opts.fontSize ||
+      term.options.lineHeight !== opts.lineHeight;
+    Object.assign(term.options, {
+      fontFamily: opts.fontFamily,
+      fontSize: opts.fontSize,
+      lineHeight: opts.lineHeight,
+      cursorBlink: opts.cursorBlink,
+      scrollback: opts.scrollback,
+      theme: opts.theme,
+    });
+    if (needsRefit) fit();
+  }, [terminalSettings, fit]);
+
+  useEffect(() => {
     if (!terminal || input.autoConnect === false || sessionIdRef.current) {
       return;
     }
@@ -399,16 +442,30 @@ export function useTerminalSession(
     if (!container) return;
 
     let raf: number | null = null;
-    const observer = new ResizeObserver(() => {
+    const resizeObserver = new ResizeObserver(() => {
       if (raf) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         fit();
         raf = null;
       });
     });
-    observer.observe(container);
+    resizeObserver.observe(container);
+
+    // Re-fit when the terminal becomes visible (e.g. tab switch).
+    // visibility:hidden keeps layout dimensions, so ResizeObserver won't fire.
+    const intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          requestAnimationFrame(() => fit());
+        }
+      },
+      { threshold: 0.1 }
+    );
+    intersectionObserver.observe(container);
+
     return () => {
-      observer.disconnect();
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
   }, [fit]);

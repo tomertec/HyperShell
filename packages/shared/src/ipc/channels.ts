@@ -5,7 +5,8 @@ export const sessionChannels = {
   close: "session:close",
   list: "session:list",
   event: "session:event",
-  setSignals: "session:set-signals"
+  setSignals: "session:set-signals",
+  hostStats: "session:host-stats"
 } as const;
 
 export const hostChannels = {

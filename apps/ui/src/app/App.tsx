@@ -18,6 +18,8 @@ import type { QuickConnectProfile } from "../features/quick-connect/searchIndex"
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
 import { sessionRecoveryStore } from "../features/sessions/sessionRecoveryStore";
 import { Sidebar } from "../features/sidebar/Sidebar";
+import { SettingsPanel } from "../features/settings/SettingsPanel";
+import { settingsStore } from "../features/settings/settingsStore";
 import type { SerialProfileRecord } from "@sshterm/shared";
 
 async function loadHosts(): Promise<HostRecord[]> {
@@ -36,7 +38,8 @@ async function loadHosts(): Promise<HostRecord[]> {
       username: String(h.username ?? ""),
       group: "",
       tags: "",
-      notes: h.notes ? String(h.notes) : undefined
+      notes: h.notes ? String(h.notes) : undefined,
+      isFavorite: Boolean(h.isFavorite ?? (h as Record<string, unknown>).is_favorite ?? false)
     }));
   } catch (err) {
     console.error("[sshterm] failed to load hosts:", err);
@@ -80,7 +83,8 @@ async function persistHost(host: HostRecord): Promise<void> {
       identityFile: host.identityFile || null,
       group: host.group,
       tags: host.tags,
-      notes: host.notes || null
+      notes: host.notes || null,
+      isFavorite: host.isFavorite ?? false
     });
     console.log("[sshterm] persisted host:", result);
   } catch (err) {
@@ -113,6 +117,7 @@ export function App() {
   const [hosts, setHosts] = useState<HostRecord[]>([]);
   const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
   const [hostModalOpen, setHostModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [editingHost, setEditingHost] = useState<HostRecord | null>(null);
   const [serialProfiles, setSerialProfiles] = useState<SerialProfileRecord[]>([]);
@@ -138,6 +143,7 @@ export function App() {
     void Promise.all([loadHosts(), loadSerialProfiles()]).then(
       ([h, sp]) => { setHosts(h); setSerialProfiles(sp); }
     );
+    void settingsStore.getState().load();
   }, []);
 
   const tabSessionIds = useMemo(() => tabs.map((t) => t.sessionId), [tabs]);
@@ -158,6 +164,10 @@ export function App() {
       if (e.key.toLowerCase() === "b" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         toggleBroadcast();
+      }
+      if (e.key === "," && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setSettingsOpen(true);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -280,6 +290,26 @@ export function App() {
     sftpAuthUsername
   ]);
 
+  const duplicateHost = useCallback((host: HostRecord) => {
+    const newHost: HostRecord = { ...host, id: `host-${Date.now()}`, name: `${host.name} (copy)` };
+    setHosts((prev) => [...prev, newHost]);
+    void persistHost(newHost);
+  }, []);
+
+  const deleteHost = useCallback(async (host: HostRecord) => {
+    setHosts((prev) => prev.filter((h) => h.id !== host.id));
+    await window.sshterm?.removeHost?.({ id: host.id });
+  }, []);
+
+  const toggleFavoriteHost = useCallback(
+    (host: HostRecord) => {
+      const updated = { ...host, isFavorite: !host.isFavorite };
+      setHosts((prev) => prev.map((h) => (h.id === host.id ? updated : h)));
+      void persistHost(updated);
+    },
+    []
+  );
+
   const openSftpHost = useCallback(
     async (host: HostRecord) => {
       if (!window.sshterm?.sftpConnect) {
@@ -351,6 +381,10 @@ export function App() {
             onConnectSerial={connectSerial}
             onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
             onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); refreshPorts(); }}
+            onDuplicateHost={duplicateHost}
+            onDeleteHost={(host) => { void deleteHost(host); }}
+            onToggleFavoriteHost={toggleFavoriteHost}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
         }
       >
@@ -466,6 +500,14 @@ export function App() {
             setSerialModalOpen(false);
           }}
         />
+      </Modal>
+
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="Settings"
+      >
+        <SettingsPanel />
       </Modal>
 
       <Modal

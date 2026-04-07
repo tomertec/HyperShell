@@ -15,6 +15,10 @@ export interface SidebarProps {
   onConnectSerial: (profile: SerialProfileRecord) => void;
   onEditSerial: (profile: SerialProfileRecord) => void;
   onNewSerial: () => void;
+  onDuplicateHost: (host: HostRecord) => void;
+  onDeleteHost: (host: HostRecord) => void;
+  onToggleFavoriteHost: (host: HostRecord) => void;
+  onOpenSettings: () => void;
 }
 
 export function Sidebar({
@@ -28,6 +32,10 @@ export function Sidebar({
   onConnectSerial,
   onEditSerial,
   onNewSerial,
+  onDuplicateHost,
+  onDeleteHost,
+  onToggleFavoriteHost,
+  onOpenSettings,
 }: SidebarProps) {
 
   return (
@@ -79,6 +87,11 @@ export function Sidebar({
           onConnect={onConnectHost}
           onOpenSftp={onOpenSftpHost}
           onEdit={onEditHost}
+          onDuplicate={onDuplicateHost}
+          onDelete={onDeleteHost}
+          onToggleFavorite={onToggleFavoriteHost}
+          onCopyHostname={(host) => void navigator.clipboard.writeText(host.hostname)}
+          onCopyAddress={(host) => void navigator.clipboard.writeText(host.hostname)}
         />
       </SidebarSection>
 
@@ -103,8 +116,23 @@ export function Sidebar({
         />
       </SidebarSection>
 
-      <div className="mt-auto border-t border-border px-3 py-2">
+      <div className="mt-auto border-t border-border px-3 py-2 flex items-center justify-between">
         <div className="text-[10px] text-text-muted/60 tracking-wide select-none">SSHTerm v0.1.0</div>
+        <button
+          onClick={onOpenSettings}
+          className="p-1 rounded text-text-muted/60 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"
+          title="Settings"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4" />
+            <path
+              d="M8 1.5V3M8 13V14.5M1.5 8H3M13 8H14.5M3.2 3.2L4.3 4.3M11.7 11.7L12.8 12.8M3.2 12.8L4.3 11.7M11.7 4.3L12.8 3.2"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   );

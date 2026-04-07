@@ -75,7 +75,10 @@ function createFakeSessionManager() {
         listener = null;
       };
     },
-    setSignals() {}
+    setSignals() {},
+    getSessionInput() {
+      return undefined;
+    }
   };
 
   return {

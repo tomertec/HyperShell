@@ -79,7 +79,10 @@ export const hostRecordSchema = z.object({
   identityFile: z.string().nullable(),
   authProfileId: z.string().nullable(),
   groupId: z.string().nullable(),
-  notes: z.string().nullable()
+  notes: z.string().nullable(),
+  authMethod: z.enum(["default", "password", "keyfile", "agent", "op-reference"]).optional(),
+  agentKind: z.enum(["system", "pageant", "1password"]).optional(),
+  opReference: z.string().optional()
 });
 
 export const upsertHostRequestSchema = z.object({
@@ -91,7 +94,11 @@ export const upsertHostRequestSchema = z.object({
   identityFile: z.string().nullable().optional(),
   group: z.string().optional(),
   tags: z.string().optional(),
-  notes: z.string().nullable().optional()
+  notes: z.string().nullable().optional(),
+  authMethod: z.enum(["default", "password", "keyfile", "agent", "op-reference"]).optional(),
+  agentKind: z.enum(["system", "pageant", "1password"]).optional(),
+  opReference: z.string().optional(),
+  isFavorite: z.boolean().optional()
 });
 
 export const removeHostRequestSchema = z.object({
@@ -221,6 +228,23 @@ export const setSignalsRequestSchema = z.object({
     rts: z.boolean().optional()
   })
 });
+
+// --- Host stats schemas ---
+
+export const hostStatsRequestSchema = z.object({
+  sessionId: z.string().min(1)
+});
+
+export const hostStatsResponseSchema = z.object({
+  cpuLoad: z.string().nullable(),
+  memUsage: z.string().nullable(),
+  diskUsage: z.string().nullable(),
+  uptime: z.string().nullable(),
+  latencyMs: z.number().nullable()
+});
+
+export type HostStatsRequest = z.infer<typeof hostStatsRequestSchema>;
+export type HostStatsResponse = z.infer<typeof hostStatsResponseSchema>;
 
 export type SerialProfileRecord = z.infer<typeof serialProfileRecordSchema>;
 export type UpsertSerialProfileRequest = z.infer<typeof upsertSerialProfileRequestSchema>;

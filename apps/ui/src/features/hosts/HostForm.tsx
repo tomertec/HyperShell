@@ -8,6 +8,9 @@ export type HostFormValue = {
   identityFile: string;
   group: string;
   tags: string;
+  authMethod: "default" | "password" | "keyfile" | "agent" | "op-reference";
+  agentKind: "system" | "pageant" | "1password";
+  opReference: string;
 };
 
 export interface HostFormProps {
@@ -23,7 +26,10 @@ const defaultValue: HostFormValue = {
   username: "",
   identityFile: "",
   group: "",
-  tags: ""
+  tags: "",
+  authMethod: "default",
+  agentKind: "system",
+  opReference: ""
 };
 
 const inputClasses =
@@ -127,6 +133,67 @@ export function HostForm({
           )}
         </select>
       </label>
+
+      <div className="grid gap-3">
+        <span className="text-xs font-medium text-text-secondary">Authentication</span>
+
+        <label htmlFor={`${formId}-authMethod`} className="grid gap-1.5">
+          <span className="text-xs font-medium text-text-secondary">Method</span>
+          <select
+            id={`${formId}-authMethod`}
+            value={value.authMethod}
+            onChange={(e) =>
+              setValue({
+                ...value,
+                authMethod: e.target.value as HostFormValue["authMethod"]
+              })
+            }
+            className={inputClasses}
+          >
+            <option value="default">Default (SSH config)</option>
+            <option value="keyfile">Key File</option>
+            <option value="agent">SSH Agent</option>
+            <option value="op-reference">1Password Reference</option>
+          </select>
+        </label>
+
+        {value.authMethod === "agent" && (
+          <label htmlFor={`${formId}-agentKind`} className="grid gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">Agent Type</span>
+            <select
+              id={`${formId}-agentKind`}
+              value={value.agentKind}
+              onChange={(e) =>
+                setValue({
+                  ...value,
+                  agentKind: e.target.value as HostFormValue["agentKind"]
+                })
+              }
+              className={inputClasses}
+            >
+              <option value="system">System SSH Agent</option>
+              <option value="pageant">Pageant</option>
+              <option value="1password">1Password SSH Agent</option>
+            </select>
+          </label>
+        )}
+
+        {value.authMethod === "op-reference" && (
+          <label htmlFor={`${formId}-opReference`} className="grid gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">1Password Reference</span>
+            <input
+              id={`${formId}-opReference`}
+              value={value.opReference}
+              onChange={(e) => setValue({ ...value, opReference: e.target.value })}
+              placeholder="op://vault/item/field"
+              className={inputClasses}
+            />
+            <span className="text-xs text-text-muted/70">
+              Enter an <code>op://</code> reference to a credential stored in 1Password.
+            </span>
+          </label>
+        )}
+      </div>
 
       <label htmlFor={`${formId}-group`} className="grid gap-1.5">
         <span className="text-xs font-medium text-text-secondary">Group</span>
