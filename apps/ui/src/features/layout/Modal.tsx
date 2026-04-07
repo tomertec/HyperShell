@@ -35,7 +35,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
           transition={{ duration: 0.15 }}
         >
           <motion.div
-            className="w-full max-w-lg mx-4 rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/40"
+            className="w-full max-w-2xl mx-4 rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/40"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}

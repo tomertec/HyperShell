@@ -26,6 +26,8 @@ import { registerGroupsIpc } from "./groupsIpc";
 import { registerSerialProfilesIpc } from "./serialProfilesIpc";
 import { registerSftpIpc } from "./sftpIpc";
 import { registerFsIpc } from "./fsIpc";
+import { registerWorkspaceIpc } from "./workspaceIpc";
+import { registerSshKeysIpc } from "./sshKeysIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord } from "@sshterm/db";
 import type {
@@ -83,11 +85,25 @@ const registeredChannels = [
   ipcChannels.sftp.bookmarksUpsert,
   ipcChannels.sftp.bookmarksRemove,
   ipcChannels.sftp.bookmarksReorder,
+  ipcChannels.sftp.syncStart,
+  ipcChannels.sftp.syncStop,
+  ipcChannels.sftp.syncList,
+  ipcChannels.sftp.syncEvent,
+  ipcChannels.workspace.save,
+  ipcChannels.workspace.load,
+  ipcChannels.workspace.list,
+  ipcChannels.workspace.remove,
+  ipcChannels.workspace.saveLast,
+  ipcChannels.workspace.loadLast,
   ipcChannels.fs.list,
   ipcChannels.fs.stat,
   ipcChannels.fs.getHome,
   ipcChannels.fs.getDrives,
-  ipcChannels.fs.listSshKeys
+  ipcChannels.fs.listSshKeys,
+  ipcChannels.sshKeys.list,
+  ipcChannels.sshKeys.generate,
+  ipcChannels.sshKeys.getFingerprint,
+  ipcChannels.sshKeys.remove
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -100,6 +116,7 @@ let cleanupRegisteredIpc: (() => void) | null = null;
 export interface RegisterIpcOptions {
   emitSessionEvent?: (event: unknown) => void;
   emitSftpEvent?: (event: unknown) => void;
+  emitSyncEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
   resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
   resolveSerialProfile?: (profileId: string) => SerialProfileRecord | undefined;
@@ -697,8 +714,13 @@ export function registerIpc(
       resolveSftpConnectionOptions(hostId, options, request),
     emitSftpEvent: (event) => {
       options.emitSftpEvent?.(event);
+    },
+    emitSyncEvent: (event) => {
+      options.emitSyncEvent?.(event);
     }
   });
+  registerWorkspaceIpc(ipcMain, () => getOrCreateDatabase());
+  registerSshKeysIpc(ipcMain);
   const cleanupFs = registerFsIpc(ipcMain);
 
   const cleanup = () => {

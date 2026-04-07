@@ -92,7 +92,30 @@ import {
   type SftpTransferResolveConflictRequest,
   type SftpTransferStartRequest,
   type SftpWriteFileRequest,
-  type TransferJob
+  type TransferJob,
+  saveWorkspaceRequestSchema,
+  loadWorkspaceRequestSchema,
+  removeWorkspaceRequestSchema,
+  workspaceLayoutSchema,
+  generateSshKeyRequestSchema,
+  removeSshKeyRequestSchema,
+  getFingerprintRequestSchema,
+  sftpSyncStartRequestSchema,
+  sftpSyncStopRequestSchema,
+  sftpSyncEventSchema,
+  type SaveWorkspaceRequest,
+  type LoadWorkspaceRequest,
+  type RemoveWorkspaceRequest,
+  type WorkspaceLayout,
+  type WorkspaceRecord,
+  type SshKeyInfo,
+  type GenerateSshKeyRequest,
+  type RemoveSshKeyRequest,
+  type GetFingerprintRequest,
+  type SftpSyncStartRequest,
+  type SftpSyncStopRequest,
+  type SftpSyncStatus,
+  type SftpSyncEvent
 } from "@sshterm/shared";
 
 export interface PreloadIpcRenderer {
@@ -157,6 +180,20 @@ export interface DesktopApi {
   fsGetHome(): Promise<{ path: string }>;
   fsGetDrives(): Promise<FsGetDrivesResponse>;
   fsListSshKeys(): Promise<string[]>;
+  workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }>;
+  workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null>;
+  workspaceList(): Promise<WorkspaceRecord[]>;
+  workspaceRemove(request: RemoveWorkspaceRequest): Promise<void>;
+  workspaceSaveLast(layout: WorkspaceLayout): Promise<void>;
+  workspaceLoadLast(): Promise<WorkspaceRecord | null>;
+  sshKeysList(): Promise<SshKeyInfo[]>;
+  sshKeysGenerate(request: GenerateSshKeyRequest): Promise<{ path: string }>;
+  sshKeysGetFingerprint(request: GetFingerprintRequest): Promise<{ fingerprint: string | null }>;
+  sshKeysRemove(request: RemoveSshKeyRequest): Promise<void>;
+  sftpSyncStart(request: SftpSyncStartRequest): Promise<{ syncId: string }>;
+  sftpSyncStop(request: SftpSyncStopRequest): Promise<void>;
+  sftpSyncList(): Promise<{ syncs: SftpSyncStatus[] }>;
+  onSftpSyncEvent(listener: (event: SftpSyncEvent) => void): () => void;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -425,6 +462,86 @@ export function createDesktopApi(
     async fsListSshKeys(): Promise<string[]> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.listSshKeys);
       return Array.isArray(result) ? result : [];
+    },
+    async workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }> {
+      const parsed = saveWorkspaceRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.workspace.save, parsed);
+      return result as { success: boolean };
+    },
+    async workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null> {
+      const parsed = loadWorkspaceRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.workspace.load, parsed);
+      return result as WorkspaceRecord | null;
+    },
+    async workspaceList(): Promise<WorkspaceRecord[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.workspace.list);
+      return result as WorkspaceRecord[];
+    },
+    async workspaceRemove(request: RemoveWorkspaceRequest): Promise<void> {
+      const parsed = removeWorkspaceRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.workspace.remove, parsed);
+    },
+    async workspaceSaveLast(layout: WorkspaceLayout): Promise<void> {
+      const parsed = workspaceLayoutSchema.parse(layout);
+      await ipcRenderer.invoke(ipcChannels.workspace.saveLast, parsed);
+    },
+    async workspaceLoadLast(): Promise<WorkspaceRecord | null> {
+      const result = await ipcRenderer.invoke(ipcChannels.workspace.loadLast);
+      return result as WorkspaceRecord | null;
+    },
+    async sshKeysList(): Promise<SshKeyInfo[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.list);
+      return result as SshKeyInfo[];
+    },
+    async sshKeysGenerate(request: GenerateSshKeyRequest): Promise<{ path: string }> {
+      const parsed = generateSshKeyRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.generate, parsed);
+      return result as { path: string };
+    },
+    async sshKeysGetFingerprint(request: GetFingerprintRequest): Promise<{ fingerprint: string | null }> {
+      const parsed = getFingerprintRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.getFingerprint, parsed);
+      return result as { fingerprint: string | null };
+    },
+    async sshKeysRemove(request: RemoveSshKeyRequest): Promise<void> {
+      const parsed = removeSshKeyRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sshKeys.remove, parsed);
+    },
+    async sftpSyncStart(request: SftpSyncStartRequest): Promise<{ syncId: string }> {
+      const parsed = sftpSyncStartRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.syncStart, parsed);
+      return result as { syncId: string };
+    },
+    async sftpSyncStop(request: SftpSyncStopRequest): Promise<void> {
+      const parsed = sftpSyncStopRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.syncStop, parsed);
+    },
+    async sftpSyncList(): Promise<{ syncs: SftpSyncStatus[] }> {
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.syncList);
+      return result as { syncs: SftpSyncStatus[] };
+    },
+    onSftpSyncEvent(listener: (event: SftpSyncEvent) => void): () => void {
+      assertListener(listener, "onSftpSyncEvent");
+
+      const wrappedListener = (_event: unknown, payload: unknown) => {
+        const parsed = sftpSyncEventSchema.safeParse(payload);
+        if (!parsed.success) {
+          logger.warn?.("Ignored invalid SFTP sync event payload from IPC", parsed.error);
+          return;
+        }
+
+        try {
+          listener(parsed.data);
+        } catch (error) {
+          logger.error?.("SFTP sync event listener threw", error);
+        }
+      };
+
+      ipcRenderer.on(ipcChannels.sftp.syncEvent, wrappedListener);
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.sftp.syncEvent, wrappedListener);
+      };
     }
   };
 }

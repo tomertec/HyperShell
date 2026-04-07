@@ -179,8 +179,12 @@ export const terminalThemes: Record<string, TerminalTheme> = {
   }
 };
 
-export function resolveTerminalTheme(themeName?: string): TerminalTheme {
-  return terminalThemes[themeName ?? ""] ?? terminalThemes["default"];
+export function resolveTerminalTheme(
+  themeName?: string,
+  customThemes?: Record<string, TerminalTheme>
+): TerminalTheme {
+  const name = themeName ?? "";
+  return customThemes?.[name] ?? terminalThemes[name] ?? terminalThemes["default"];
 }
 
 export function getTerminalOptions(settings?: {
@@ -190,8 +194,9 @@ export function getTerminalOptions(settings?: {
   cursorBlink?: boolean;
   scrollback?: number;
   theme?: string;
+  customThemes?: Record<string, TerminalTheme>;
 }): typeof terminalOptions {
-  const resolvedTheme = resolveTerminalTheme(settings?.theme);
+  const resolvedTheme = resolveTerminalTheme(settings?.theme, settings?.customThemes);
 
   return {
     ...terminalOptions,

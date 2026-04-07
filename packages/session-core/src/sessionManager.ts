@@ -47,6 +47,7 @@ export interface SessionManager {
   write(sessionId: string, data: string): void;
   resize(sessionId: string, cols: number, rows: number): void;
   close(sessionId: string): void;
+  destroyAll(): void;
   getSession(sessionId: string): SessionSnapshot | undefined;
   listSessions(): SessionSnapshot[];
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
@@ -276,6 +277,20 @@ export function createSessionManager(
       session.unsubscribe();
       session.snapshot.state = "disconnected";
       sessions.delete(sessionId);
+    },
+
+    destroyAll(): void {
+      for (const [sessionId, session] of sessions) {
+        if (session.reconnectTimer !== null) {
+          clearTimeout(session.reconnectTimer);
+          session.reconnectTimer = null;
+        }
+        session.snapshot.autoReconnect = false;
+        session.transport.close();
+        session.unsubscribe();
+        session.snapshot.state = "disconnected";
+        sessions.delete(sessionId);
+      }
     },
 
     getSession(sessionId: string): SessionSnapshot | undefined {

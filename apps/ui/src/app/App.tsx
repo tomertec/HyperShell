@@ -114,6 +114,22 @@ function toSerialFormInitialValue(
   };
 }
 
+function serializeCurrentLayout() {
+  const state = layoutStore.getState();
+  return {
+    tabs: state.tabs.map((t) => ({
+      transport: t.transport ?? ("ssh" as const),
+      profileId: t.profileId ?? t.sessionId,
+      title: t.title,
+      type: t.type,
+      hostId: t.hostId,
+    })),
+    splitDirection: state.splitDirection,
+    paneSizes: state.paneSizes,
+    paneCount: state.panes.length,
+  };
+}
+
 export function App() {
   const [hosts, setHosts] = useState<HostRecord[]>([]);
   const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
@@ -131,6 +147,14 @@ export function App() {
   const [sftpAuthPassword, setSftpAuthPassword] = useState("");
   const [sftpAuthError, setSftpAuthError] = useState<string | null>(null);
   const [sftpAuthSubmitting, setSftpAuthSubmitting] = useState(false);
+  const [restoreBannerVisible, setRestoreBannerVisible] = useState(false);
+  const [lastWorkspaceTabs, setLastWorkspaceTabs] = useState<Array<{
+    transport: string;
+    profileId: string;
+    title: string;
+    type?: string;
+    hostId?: string;
+  }>>([]);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
   const tabs = useStore(layoutStore, (s) => s.tabs);
@@ -138,6 +162,7 @@ export function App() {
     settingsStore,
     (s) => s.settings.terminal.theme
   );
+  const customThemes = useStore(settingsStore, (s) => s.settings.customThemes);
   const broadcastEnabled = useStore(broadcastStore, (s) => s.enabled);
   const broadcastTargets = useStore(broadcastStore, (s) => s.targetSessionIds);
   const toggleBroadcast = useStore(broadcastStore, (s) => s.toggle);
@@ -149,6 +174,26 @@ export function App() {
       ([h, sp]) => { setHosts(h); setSerialProfiles(sp); }
     );
     void settingsStore.getState().load();
+
+    // Check for last workspace to restore
+    void window.sshterm?.workspaceLoadLast?.().then((last) => {
+      if (last?.layout?.tabs && last.layout.tabs.length > 0) {
+        setLastWorkspaceTabs(last.layout.tabs);
+        setRestoreBannerVisible(true);
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Auto-save workspace on window close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const state = layoutStore.getState();
+      if (state.tabs.length === 0) return;
+      const layout = serializeCurrentLayout();
+      void window.sshterm?.workspaceSaveLast?.(layout);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
   const tabSessionIds = useMemo(() => tabs.map((t) => t.sessionId), [tabs]);
@@ -186,9 +231,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const terminalBg = resolveTerminalTheme(terminalThemeName).background;
+    const terminalBg = resolveTerminalTheme(terminalThemeName, customThemes).background;
     document.documentElement.style.setProperty("--terminal-bg", terminalBg);
-  }, [terminalThemeName]);
+  }, [terminalThemeName, customThemes]);
 
   const refreshPorts = useCallback(() => {
     window.sshterm?.listSerialPorts?.()
@@ -355,6 +400,24 @@ export function App() {
     [openSftpAuthModal, openSftpTab]
   );
 
+  const restoreLastWorkspace = useCallback(() => {
+    for (const tab of lastWorkspaceTabs) {
+      layoutStore.getState().openTab({
+        sessionId: `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        title: tab.title,
+        transport: tab.transport as "ssh" | "serial" | "sftp",
+        profileId: tab.profileId,
+        type: (tab.type as "terminal" | "sftp") ?? "terminal",
+        hostId: tab.hostId,
+      });
+    }
+    setRestoreBannerVisible(false);
+  }, [lastWorkspaceTabs]);
+
+  const dismissRestoreBanner = useCallback(() => {
+    setRestoreBannerVisible(false);
+  }, []);
+
   const profiles = useMemo<QuickConnectProfile[]>(
     () => [
       ...hosts.map((h) => ({
@@ -403,6 +466,26 @@ export function App() {
             <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
             Broadcast mode active &mdash; {broadcastTargets.length} session
             {broadcastTargets.length === 1 ? "" : "s"}
+          </div>
+        )}
+
+        {restoreBannerVisible && (
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-accent/20 bg-accent/5 text-xs">
+            <span className="text-text-secondary">
+              Restore {lastWorkspaceTabs.length} session{lastWorkspaceTabs.length === 1 ? "" : "s"} from your last session?
+            </span>
+            <button
+              onClick={restoreLastWorkspace}
+              className="rounded bg-accent/15 border border-accent/30 px-3 py-1 text-accent hover:bg-accent/25 transition-colors font-medium"
+            >
+              Restore
+            </button>
+            <button
+              onClick={dismissRestoreBanner}
+              className="text-text-muted hover:text-text-primary transition-colors"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useStore } from "zustand";
 import { broadcastStore } from "./broadcastStore";
 import { layoutStore } from "../layout/layoutStore";
@@ -8,6 +9,15 @@ export function BroadcastBar() {
   const toggle = useStore(broadcastStore, (s) => s.toggle);
   const setTargets = useStore(broadcastStore, (s) => s.setTargets);
   const tabs = useStore(layoutStore, (s) => s.tabs);
+
+  const activeSessionIds = useMemo(
+    () => new Set(tabs.map((t) => t.sessionId)),
+    [tabs]
+  );
+  const activeTargets = useMemo(
+    () => targets.filter((id) => activeSessionIds.has(id)),
+    [targets, activeSessionIds]
+  );
 
   if (!enabled) {
     return (
@@ -31,19 +41,19 @@ export function BroadcastBar() {
         BROADCAST ACTIVE
       </span>
       <span className="text-xs text-text-muted mx-1">
-        Input sent to {targets.length} session{targets.length !== 1 ? "s" : ""}
+        Input sent to {activeTargets.length} session{activeTargets.length !== 1 ? "s" : ""}
       </span>
 
       <div className="flex gap-1 ml-2">
         {tabs.map((tab) => {
-          const isTarget = targets.includes(tab.sessionId);
+          const isTarget = activeTargets.includes(tab.sessionId);
           return (
             <button
               key={tab.sessionId}
               onClick={() => {
                 const next = isTarget
-                  ? targets.filter((id) => id !== tab.sessionId)
-                  : [...targets, tab.sessionId];
+                  ? activeTargets.filter((id) => id !== tab.sessionId)
+                  : [...activeTargets, tab.sessionId];
                 setTargets(next);
               }}
               className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${

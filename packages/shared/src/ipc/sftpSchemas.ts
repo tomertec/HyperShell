@@ -234,3 +234,57 @@ export const sftpBookmarkReorderRequestSchema = z.object({
   bookmarkIds: z.array(z.string())
 });
 export type SftpBookmarkReorderRequest = z.infer<typeof sftpBookmarkReorderRequestSchema>;
+
+// --- Sync schemas ---
+
+export const sftpSyncConfigSchema = z.object({
+  sftpSessionId: z.string().min(1),
+  localPath: z.string().min(1),
+  remotePath: z.string().min(1),
+  direction: z.enum(["local-to-remote", "remote-to-local", "bidirectional"]),
+  excludePatterns: z.array(z.string()).default([]),
+  deleteOrphans: z.boolean().default(false),
+});
+
+export const sftpSyncStartRequestSchema = sftpSyncConfigSchema;
+
+export const sftpSyncStopRequestSchema = z.object({
+  syncId: z.string().min(1),
+});
+
+export const sftpSyncStatusSchema = z.object({
+  syncId: z.string().min(1),
+  status: z.enum(["scanning", "syncing", "idle", "error", "stopped"]),
+  filesScanned: z.number().int(),
+  filesSynced: z.number().int(),
+  bytesTransferred: z.number(),
+  lastError: z.string().nullable(),
+  lastSyncAt: z.string().nullable(),
+});
+
+export const sftpSyncEventSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("sync-progress"),
+    syncId: z.string(),
+    filesScanned: z.number(),
+    filesSynced: z.number(),
+    currentFile: z.string(),
+  }),
+  z.object({
+    kind: z.literal("sync-complete"),
+    syncId: z.string(),
+    filesSynced: z.number(),
+    bytesTransferred: z.number(),
+  }),
+  z.object({
+    kind: z.literal("sync-error"),
+    syncId: z.string(),
+    error: z.string(),
+  }),
+]);
+
+export type SftpSyncConfig = z.infer<typeof sftpSyncConfigSchema>;
+export type SftpSyncStartRequest = z.infer<typeof sftpSyncStartRequestSchema>;
+export type SftpSyncStopRequest = z.infer<typeof sftpSyncStopRequestSchema>;
+export type SftpSyncStatus = z.infer<typeof sftpSyncStatusSchema>;
+export type SftpSyncEvent = z.infer<typeof sftpSyncEventSchema>;

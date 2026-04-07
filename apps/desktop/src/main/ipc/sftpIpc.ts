@@ -17,7 +17,10 @@ import {
   sftpTransferResolveConflictRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
+  sftpSyncStartRequestSchema,
+  sftpSyncStopRequestSchema,
   type SftpEvent,
+  type SftpSyncEvent,
   type SftpDeleteRequest,
   type SftpDisconnectRequest,
   type SftpConnectRequest,
@@ -32,6 +35,7 @@ import {
   type SftpWriteFileRequest
 } from "@sshterm/shared";
 import type { SessionManager, SftpConnectionOptions } from "@sshterm/session-core";
+import { createSyncEngine } from "@sshterm/session-core";
 import type { IpcMainInvokeEvent } from "electron";
 
 import type { IpcMainLike } from "./registerIpc";
@@ -45,6 +49,7 @@ export interface RegisterSftpIpcOptions {
     request: SftpConnectRequest
   ) => Promise<SftpConnectionOptions | null>;
   emitSftpEvent?: (event: SftpEvent) => void;
+  emitSyncEvent?: (event: SftpSyncEvent) => void;
   db?: ReturnType<typeof openDatabase>;
 }
 
@@ -232,6 +237,32 @@ export function registerSftpIpc(
     bookmarksRepo.reorder(request.bookmarkIds);
   };
 
+  const syncEngine = createSyncEngine();
+
+  const handleSyncStart = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = sftpSyncStartRequestSchema.parse(rawRequest);
+    const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+    const syncId = syncEngine.start(transport, {
+      localPath: request.localPath,
+      remotePath: request.remotePath,
+      direction: request.direction,
+      excludePatterns: request.excludePatterns,
+      deleteOrphans: request.deleteOrphans,
+    });
+    // Run sync in background — events emitted via syncEvent channel
+    void syncEngine.runOnce(syncId);
+    return { syncId };
+  };
+
+  const handleSyncStop = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = sftpSyncStopRequestSchema.parse(rawRequest);
+    syncEngine.stop(request.syncId);
+  };
+
+  const handleSyncList = async () => {
+    return { syncs: syncEngine.list() };
+  };
+
   ipcMain.handle(ipcChannels.sftp.connect, handleConnect);
   ipcMain.handle(ipcChannels.sftp.disconnect, handleDisconnect);
   ipcMain.handle(ipcChannels.sftp.list, handleList);
@@ -249,6 +280,13 @@ export function registerSftpIpc(
   ipcMain.handle(ipcChannels.sftp.bookmarksUpsert, handleBookmarksUpsert);
   ipcMain.handle(ipcChannels.sftp.bookmarksRemove, handleBookmarksRemove);
   ipcMain.handle(ipcChannels.sftp.bookmarksReorder, handleBookmarksReorder);
+  ipcMain.handle(ipcChannels.sftp.syncStart, handleSyncStart);
+  ipcMain.handle(ipcChannels.sftp.syncStop, handleSyncStop);
+  ipcMain.handle(ipcChannels.sftp.syncList, handleSyncList);
+
+  const unsubscribeSyncEvents = syncEngine.onEvent((event) => {
+    options.emitSyncEvent?.(event);
+  });
 
   const unsubscribeSftpSessionEvents = sftpSessionManager.onEvent((event) => {
     if (event.type === "status") {
@@ -312,6 +350,7 @@ export function registerSftpIpc(
   return () => {
     unsubscribeSftpSessionEvents();
     unsubscribeTransferEvents();
+    unsubscribeSyncEvents();
     sftpSessionManager.disconnectAll();
     for (const channel of Object.values(ipcChannels.sftp)) {
       ipcMain.removeHandler?.(channel);

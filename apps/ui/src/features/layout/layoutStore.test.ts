@@ -55,6 +55,37 @@ describe("layoutStore", () => {
     expect(store.getState().activeSessionId).toBe("session-42");
   });
 
+  it("splitPane stores direction and default sizes", () => {
+    const store = createLayoutStore();
+    store.getState().splitPane("sess-1", "horizontal");
+    const state = store.getState();
+    expect(state.panes).toHaveLength(2);
+    expect(state.splitDirection).toBe("horizontal");
+    expect(state.paneSizes).toEqual([50, 50]);
+  });
+
+  it("splitPane vertical creates vertical split", () => {
+    const store = createLayoutStore();
+    store.getState().splitPane("sess-1", "vertical");
+    expect(store.getState().splitDirection).toBe("vertical");
+  });
+
+  it("setPaneSizes updates sizes array", () => {
+    const store = createLayoutStore();
+    store.getState().splitPane("sess-1", "horizontal");
+    store.getState().setPaneSizes([30, 70]);
+    expect(store.getState().paneSizes).toEqual([30, 70]);
+  });
+
+  it("closePane resets to single pane sizes", () => {
+    const store = createLayoutStore();
+    store.getState().splitPane("sess-1", "horizontal");
+    expect(store.getState().panes).toHaveLength(2);
+    store.getState().closePane("pane-2");
+    expect(store.getState().panes).toHaveLength(1);
+    expect(store.getState().paneSizes).toEqual([100]);
+  });
+
   it("preserves sftp tab metadata", () => {
     const store = createLayoutStore();
 

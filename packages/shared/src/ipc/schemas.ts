@@ -140,12 +140,12 @@ export type SettingRecord = z.infer<typeof settingRecordSchema>;
 export const startPortForwardRequestSchema = z.object({
   hostname: z.string().min(1),
   username: z.string().optional(),
-  port: z.number().int().positive().optional(),
+  port: z.number().int().min(1).max(65535).optional(),
   protocol: z.enum(["local", "remote", "dynamic"]),
   localAddress: z.string().default("127.0.0.1"),
-  localPort: z.number().int().positive(),
+  localPort: z.number().int().min(1).max(65535),
   remoteHost: z.string().default(""),
-  remotePort: z.number().int().min(0).default(0)
+  remotePort: z.number().int().min(0).max(65535).default(0)
 });
 
 export const stopPortForwardRequestSchema = z.object({
@@ -251,3 +251,79 @@ export type UpsertSerialProfileRequest = z.infer<typeof upsertSerialProfileReque
 export type RemoveSerialProfileRequest = z.infer<typeof removeSerialProfileRequestSchema>;
 export type SerialPortInfo = z.infer<typeof serialPortInfoSchema>;
 export type SetSignalsRequest = z.infer<typeof setSignalsRequestSchema>;
+
+// --- Workspace schemas ---
+
+export const workspaceTabSchema = z.object({
+  transport: transportSchema,
+  profileId: z.string().min(1),
+  title: z.string(),
+  type: z.enum(["terminal", "sftp"]).optional(),
+  hostId: z.string().optional(),
+});
+
+export const workspaceLayoutSchema = z.object({
+  tabs: z.array(workspaceTabSchema),
+  splitDirection: z.enum(["horizontal", "vertical"]),
+  paneSizes: z.array(z.number()),
+  paneCount: z.number().int().min(1),
+});
+
+export const saveWorkspaceRequestSchema = z.object({
+  name: z.string().min(1),
+  layout: workspaceLayoutSchema,
+});
+
+export const loadWorkspaceRequestSchema = z.object({
+  name: z.string().min(1),
+});
+
+export const removeWorkspaceRequestSchema = z.object({
+  name: z.string().min(1),
+});
+
+export const workspaceRecordSchema = z.object({
+  name: z.string().min(1),
+  layout: workspaceLayoutSchema,
+  updatedAt: z.string(),
+});
+
+export type WorkspaceTab = z.infer<typeof workspaceTabSchema>;
+export type WorkspaceLayout = z.infer<typeof workspaceLayoutSchema>;
+export type SaveWorkspaceRequest = z.infer<typeof saveWorkspaceRequestSchema>;
+export type LoadWorkspaceRequest = z.infer<typeof loadWorkspaceRequestSchema>;
+export type RemoveWorkspaceRequest = z.infer<typeof removeWorkspaceRequestSchema>;
+export type WorkspaceRecord = z.infer<typeof workspaceRecordSchema>;
+
+// --- SSH Key schemas ---
+
+export const sshKeyInfoSchema = z.object({
+  path: z.string(),
+  name: z.string(),
+  type: z.enum(["rsa", "ed25519", "ecdsa", "dsa", "unknown"]),
+  bits: z.number().nullable(),
+  fingerprint: z.string().nullable(),
+  hasPublicKey: z.boolean(),
+  createdAt: z.string().nullable(),
+});
+
+export const generateSshKeyRequestSchema = z.object({
+  type: z.enum(["rsa", "ed25519", "ecdsa"]),
+  bits: z.number().int().optional(),
+  name: z.string().min(1),
+  passphrase: z.string().optional(),
+  comment: z.string().optional(),
+});
+
+export const removeSshKeyRequestSchema = z.object({
+  path: z.string().min(1),
+});
+
+export const getFingerprintRequestSchema = z.object({
+  path: z.string().min(1),
+});
+
+export type SshKeyInfo = z.infer<typeof sshKeyInfoSchema>;
+export type GenerateSshKeyRequest = z.infer<typeof generateSshKeyRequestSchema>;
+export type RemoveSshKeyRequest = z.infer<typeof removeSshKeyRequestSchema>;
+export type GetFingerprintRequest = z.infer<typeof getFingerprintRequestSchema>;

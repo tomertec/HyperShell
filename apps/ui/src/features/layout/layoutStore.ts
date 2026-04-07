@@ -22,12 +22,15 @@ export type LayoutState = {
   activeSessionId: string | null;
   panes: Pane[];
   activePaneId: string;
+  splitDirection: "horizontal" | "vertical";
+  paneSizes: number[];
   openTab: (tab: LayoutTab) => void;
   activateTab: (sessionId: string) => void;
   replaceSessionId: (oldSessionId: string, nextSessionId: string) => void;
-  splitPane: (sessionId: string) => void;
+  splitPane: (sessionId: string, direction?: "horizontal" | "vertical") => void;
   closePane: (paneId: string) => void;
   activatePane: (paneId: string) => void;
+  setPaneSizes: (sizes: number[]) => void;
 };
 
 export function createLayoutStore() {
@@ -38,6 +41,8 @@ export function createLayoutStore() {
     activeSessionId: null,
     panes: [{ paneId: "pane-1", sessionId: null }],
     activePaneId: "pane-1",
+    splitDirection: "horizontal" as const,
+    paneSizes: [100],
 
     openTab: (tab) =>
       set((state) => {
@@ -77,13 +82,21 @@ export function createLayoutStore() {
 
         const dedupedTabs: LayoutTab[] = [];
         const seen = new Set<string>();
+        const removedTabKeys: string[] = [];
         for (const tab of tabs) {
           if (seen.has(tab.sessionId)) {
+            removedTabKeys.push(tab.tabKey ?? tab.sessionId);
             continue;
           }
 
           seen.add(tab.sessionId);
           dedupedTabs.push(tab);
+        }
+
+        if (removedTabKeys.length > 0) {
+          console.warn(
+            `[layoutStore] replaceSessionId removed duplicate tabs: ${removedTabKeys.join(", ")}`
+          );
         }
 
         const panes = state.panes.map((p) =>
@@ -100,13 +113,20 @@ export function createLayoutStore() {
         };
       }),
 
-    splitPane: (sessionId) =>
+    splitPane: (sessionId, direction) =>
       set((state) => {
         paneCounter++;
         const newPaneId = `pane-${paneCounter}`;
+        const nextPanes = [...state.panes, { paneId: newPaneId, sessionId }];
+        const equalSize = Math.round(100 / nextPanes.length);
+        const sizes = nextPanes.map((_, i) =>
+          i < nextPanes.length - 1 ? equalSize : 100 - equalSize * (nextPanes.length - 1)
+        );
         return {
-          panes: [...state.panes, { paneId: newPaneId, sessionId }],
-          activePaneId: newPaneId
+          panes: nextPanes,
+          activePaneId: newPaneId,
+          splitDirection: direction ?? state.splitDirection,
+          paneSizes: sizes,
         };
       }),
 
@@ -114,17 +134,24 @@ export function createLayoutStore() {
       set((state) => {
         if (state.panes.length <= 1) return state;
         const nextPanes = state.panes.filter((p) => p.paneId !== paneId);
+        const equalSize = Math.round(100 / nextPanes.length);
+        const sizes = nextPanes.map((_, i) =>
+          i < nextPanes.length - 1 ? equalSize : 100 - equalSize * (nextPanes.length - 1)
+        );
         return {
           panes: nextPanes,
           activePaneId:
             state.activePaneId === paneId
               ? nextPanes[nextPanes.length - 1].paneId
-              : state.activePaneId
+              : state.activePaneId,
+          paneSizes: sizes,
         };
       }),
 
     activatePane: (paneId) =>
-      set({ activePaneId: paneId })
+      set({ activePaneId: paneId }),
+
+    setPaneSizes: (sizes) => set({ paneSizes: sizes })
   }));
 }
 

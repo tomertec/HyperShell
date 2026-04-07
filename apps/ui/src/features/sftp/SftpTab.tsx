@@ -9,6 +9,7 @@ import { SftpDualPane } from "./components/SftpDualPane";
 import { RemoteEditor } from "./components/RemoteEditor";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { TransferPanel } from "./components/TransferPanel";
+import { SyncPanel } from "./components/SyncPanel";
 
 export interface SftpTabProps {
   sftpSessionId: string;
@@ -39,6 +40,7 @@ function mergeTransfers(existing: TransferJob[], next: TransferJob[]): TransferJ
 export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   const store = useMemo(() => getSftpStore(sftpSessionId), [sftpSessionId]);
   const [editingFile, setEditingFile] = useState<string | null>(null);
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const remotePath = useStore(store, (state) => state.remotePath);
   const activePane = useStore(store, (state) => state.activePane);
@@ -323,6 +325,8 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         filterMatchCount={filterMatchCount}
         filterTotalCount={filterTotalCount}
         filterInputRef={filterInputRef}
+        onToggleSync={() => setShowSyncPanel((v) => !v)}
+        syncActive={showSyncPanel}
       />
 
       <SftpDualPane
@@ -337,6 +341,15 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         onRefresh={handleRefresh}
         filterInputRef={filterInputRef}
       />
+
+      {showSyncPanel && (
+        <SyncPanel
+          sftpSessionId={sftpSessionId}
+          localPath={store.getState().localPath}
+          remotePath={remotePath}
+          onClose={() => setShowSyncPanel(false)}
+        />
+      )}
 
       <TransferPanel />
 

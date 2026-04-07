@@ -42,7 +42,20 @@ import type {
   TransferJob,
   UpsertHostRequest,
   UpsertSerialProfileRequest,
-  WriteSessionRequest
+  WriteSessionRequest,
+  SaveWorkspaceRequest,
+  LoadWorkspaceRequest,
+  RemoveWorkspaceRequest,
+  WorkspaceLayout,
+  WorkspaceRecord,
+  SshKeyInfo,
+  GenerateSshKeyRequest,
+  RemoveSshKeyRequest,
+  GetFingerprintRequest,
+  SftpSyncStartRequest,
+  SftpSyncStopRequest,
+  SftpSyncStatus,
+  SftpSyncEvent
 } from "@sshterm/shared";
 
 declare global {
@@ -86,6 +99,20 @@ declare global {
       fsGetHome?: () => Promise<{ path: string }>;
       fsGetDrives?: () => Promise<FsGetDrivesResponse>;
       fsListSshKeys?: () => Promise<string[]>;
+      workspaceSave?: (request: SaveWorkspaceRequest) => Promise<{ success: boolean }>;
+      workspaceLoad?: (request: LoadWorkspaceRequest) => Promise<WorkspaceRecord | null>;
+      workspaceList?: () => Promise<WorkspaceRecord[]>;
+      workspaceRemove?: (request: RemoveWorkspaceRequest) => Promise<void>;
+      workspaceSaveLast?: (layout: WorkspaceLayout) => Promise<void>;
+      workspaceLoadLast?: () => Promise<WorkspaceRecord | null>;
+      sshKeysList?: () => Promise<SshKeyInfo[]>;
+      sshKeysGenerate?: (request: GenerateSshKeyRequest) => Promise<{ path: string }>;
+      sshKeysGetFingerprint?: (request: GetFingerprintRequest) => Promise<{ fingerprint: string | null }>;
+      sshKeysRemove?: (request: RemoveSshKeyRequest) => Promise<void>;
+      sftpSyncStart?: (request: SftpSyncStartRequest) => Promise<{ syncId: string }>;
+      sftpSyncStop?: (request: SftpSyncStopRequest) => Promise<void>;
+      sftpSyncList?: () => Promise<{ syncs: SftpSyncStatus[] }>;
+      onSftpSyncEvent?: (listener: (event: SftpSyncEvent) => void) => () => void;
     };
   }
 }

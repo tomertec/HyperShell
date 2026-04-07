@@ -15,6 +15,8 @@ export interface SftpToolbarProps {
   filterMatchCount: number;
   filterTotalCount: number;
   filterInputRef: React.RefObject<HTMLInputElement | null>;
+  onToggleSync?: () => void;
+  syncActive?: boolean;
 }
 
 export function SftpToolbar({
@@ -26,6 +28,8 @@ export function SftpToolbar({
   filterMatchCount,
   filterTotalCount,
   filterInputRef,
+  onToggleSync,
+  syncActive,
 }: SftpToolbarProps) {
   const back = useStore(store, (state) => state.back);
   const forward = useStore(store, (state) => state.forward);
@@ -132,6 +136,21 @@ export function SftpToolbar({
           </div>
         )}
       </div>
+
+      {onToggleSync && (
+        <button
+          type="button"
+          onClick={onToggleSync}
+          className={[
+            "rounded px-2 py-0.5 text-xs transition-colors",
+            syncActive
+              ? "bg-accent/20 text-accent"
+              : "text-text-secondary hover:bg-base-700 hover:text-text-primary",
+          ].join(" ")}
+        >
+          Sync
+        </button>
+      )}
 
       <button
         type="button"

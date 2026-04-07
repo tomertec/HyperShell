@@ -1,9 +1,12 @@
+import { Fragment, useCallback, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import { BroadcastBar } from "../broadcast/BroadcastBar";
 import { SftpTab } from "../sftp";
 import { TerminalPane } from "../terminal/TerminalPane";
+import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
 import { type Pane, layoutStore } from "./layoutStore";
+import { PaneResizeHandle } from "./PaneResizeHandle";
 import { TabBar } from "./TabBar";
 
 function PaneView({
@@ -99,6 +102,32 @@ export function Workspace() {
   const panes = useStore(layoutStore, (s) => s.panes);
   const activePaneId = useStore(layoutStore, (s) => s.activePaneId);
   const activatePane = useStore(layoutStore, (s) => s.activatePane);
+  const splitDirection = useStore(layoutStore, (s) => s.splitDirection);
+  const paneSizes = useStore(layoutStore, (s) => s.paneSizes);
+  const setPaneSizes = useStore(layoutStore, (s) => s.setPaneSizes);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
+
+  const handleResize = useCallback(
+    (index: number, delta: number) => {
+      const container = containerRef.current;
+      if (!container) return;
+      const totalPx =
+        splitDirection === "horizontal" ? container.offsetWidth : container.offsetHeight;
+      if (totalPx === 0) return;
+      const deltaPct = (delta / totalPx) * 100;
+      const next = [...paneSizes];
+      const minSize = 10;
+      const newLeft = next[index] + deltaPct;
+      const newRight = next[index + 1] - deltaPct;
+      if (newLeft >= minSize && newRight >= minSize) {
+        next[index] = newLeft;
+        next[index + 1] = newRight;
+        setPaneSizes(next);
+      }
+    },
+    [paneSizes, splitDirection, setPaneSizes]
+  );
 
   const closeTab = (sessionId: string) => {
     const tab = layoutStore.getState().tabs.find((candidate) => candidate.sessionId === sessionId);
@@ -141,24 +170,65 @@ export function Workspace() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <BroadcastBar />
-      <TabBar
-        tabs={tabs}
-        activeSessionId={activeSessionId}
-        onActivate={activateTab}
-        onClose={closeTab}
-      />
+      <div className="flex items-end bg-base-800 border-b border-border">
+        <div className="flex-1 min-w-0">
+          <TabBar
+            tabs={tabs}
+            activeSessionId={activeSessionId}
+            onActivate={activateTab}
+            onClose={closeTab}
+          />
+        </div>
+        <div className="relative flex items-center px-2 pb-1.5 pt-2">
+          <button
+            onClick={() => setWorkspaceMenuOpen((prev) => !prev)}
+            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
+            title="Workspaces"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+              <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" />
+            </svg>
+          </button>
+          {workspaceMenuOpen && (
+            <WorkspaceMenu onClose={() => setWorkspaceMenuOpen(false)} />
+          )}
+        </div>
+      </div>
 
       {tabs.length > 0 ? (
-        <div className="flex-1 min-h-0 flex flex-row">
-          {panes.map((pane) => (
-            <PaneView
-              key={pane.paneId}
-              pane={pane}
-              isActive={pane.paneId === activePaneId}
-              activeSessionId={activeSessionId}
-              onActivate={() => activatePane(pane.paneId)}
-              onCloseTab={closeTab}
-            />
+        <div
+          ref={containerRef}
+          className={`flex-1 min-h-0 flex ${
+            splitDirection === "horizontal" ? "flex-row" : "flex-col"
+          }`}
+        >
+          {panes.map((pane, i) => (
+            <Fragment key={pane.paneId}>
+              {i > 0 && (
+                <PaneResizeHandle
+                  direction={splitDirection}
+                  onResize={(delta) => handleResize(i - 1, delta)}
+                  onResizeEnd={() => {}}
+                />
+              )}
+              <div
+                style={{
+                  [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
+                }}
+                className="min-h-0 min-w-0 relative"
+              >
+                <PaneView
+                  pane={pane}
+                  isActive={pane.paneId === activePaneId}
+                  activeSessionId={activeSessionId}
+                  onActivate={() => activatePane(pane.paneId)}
+                  onCloseTab={closeTab}
+                />
+              </div>
+            </Fragment>
           ))}
         </div>
       ) : (

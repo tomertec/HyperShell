@@ -38,6 +38,7 @@ interface ManagedTransferJob extends TransferJob {
 export interface TransferManagerOptions {
   maxConcurrent?: number;
   autoStart?: boolean;
+  maxJobHistory?: number;
 }
 
 export interface TransferManager {
@@ -56,6 +57,7 @@ export function createTransferManager(
 ): TransferManager {
   const maxConcurrent = options.maxConcurrent ?? 3;
   const autoStart = options.autoStart ?? false;
+  const maxJobHistory = options.maxJobHistory ?? 100;
   const jobs = new Map<string, ManagedTransferJob>();
   const transports = new Map<string, SftpTransportHandle>();
   const listeners = new Set<TransferEventListener>();
@@ -65,6 +67,22 @@ export function createTransferManager(
   function emit(event: TransferEvent): void {
     for (const listener of listeners) {
       listener(event);
+    }
+  }
+
+  function pruneCompletedJobs(): void {
+    const finished: string[] = [];
+    for (const [id, job] of jobs) {
+      if (job.status === "completed" || job.status === "failed") {
+        finished.push(id);
+      }
+    }
+
+    const excess = finished.length - maxJobHistory;
+    if (excess > 0) {
+      for (let i = 0; i < excess; i++) {
+        jobs.delete(finished[i]);
+      }
     }
   }
 
@@ -110,6 +128,7 @@ export function createTransferManager(
           status: "failed",
           error: nextJob.error
         });
+        pruneCompletedJobs();
         continue;
       }
 
@@ -139,6 +158,7 @@ export function createTransferManager(
         .finally(() => {
           nextJob.abortController = null;
           activeCount -= 1;
+          pruneCompletedJobs();
           scheduleDrain();
         });
     }
@@ -344,6 +364,7 @@ export function createTransferManager(
         status: "failed",
         error: job.error
       });
+      pruneCompletedJobs();
       return;
     }
 

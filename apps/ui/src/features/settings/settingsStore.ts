@@ -1,4 +1,7 @@
 import { createStore } from "zustand/vanilla";
+import type { TerminalTheme } from "../terminal/terminalTheme";
+
+export type { TerminalTheme };
 
 export interface TerminalSettings {
   fontFamily: string;
@@ -11,6 +14,7 @@ export interface TerminalSettings {
 
 export interface AppSettings {
   terminal: TerminalSettings;
+  customThemes: Record<string, TerminalTheme>;
 }
 
 const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
@@ -23,7 +27,8 @@ const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
 };
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
-  terminal: DEFAULT_TERMINAL_SETTINGS
+  terminal: DEFAULT_TERMINAL_SETTINGS,
+  customThemes: {}
 };
 
 const SETTINGS_KEY = "app.settings";
@@ -33,6 +38,8 @@ interface SettingsState {
   loaded: boolean;
   load: () => Promise<void>;
   updateTerminal: (partial: Partial<TerminalSettings>) => Promise<void>;
+  saveCustomTheme: (name: string, theme: TerminalTheme) => Promise<void>;
+  deleteCustomTheme: (name: string) => Promise<void>;
 }
 
 export const settingsStore = createStore<SettingsState>()((set, get) => ({
@@ -49,7 +56,8 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
             terminal: {
               ...DEFAULT_TERMINAL_SETTINGS,
               ...(parsed.terminal ?? {})
-            }
+            },
+            customThemes: parsed.customThemes ?? {}
           };
           set({ settings: merged, loaded: true });
           return;
@@ -78,5 +86,33 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     } catch {
       // persist failure is non-fatal; in-memory state is already updated
     }
+  },
+
+  saveCustomTheme: async (name, theme) => {
+    const current = get().settings;
+    const next: AppSettings = {
+      ...current,
+      customThemes: { ...current.customThemes, [name]: theme },
+    };
+    set({ settings: next });
+    try {
+      await window.sshterm?.updateSetting({
+        key: SETTINGS_KEY,
+        value: JSON.stringify(next),
+      });
+    } catch {}
+  },
+
+  deleteCustomTheme: async (name) => {
+    const current = get().settings;
+    const { [name]: _, ...rest } = current.customThemes ?? {};
+    const next: AppSettings = { ...current, customThemes: rest };
+    set({ settings: next });
+    try {
+      await window.sshterm?.updateSetting({
+        key: SETTINGS_KEY,
+        value: JSON.stringify(next),
+      });
+    } catch {}
   }
 }));

@@ -58,6 +58,7 @@ export function useTerminalSession(
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const terminalSettings = useStore(settingsStore, (s) => s.settings.terminal);
+  const customThemes = useStore(settingsStore, (s) => s.settings.customThemes);
   const broadcastEnabled = useStore(broadcastStore, (store) => store.enabled);
   const broadcastTargets = useStore(
     broadcastStore,
@@ -69,6 +70,7 @@ export function useTerminalSession(
   const broadcastEnabledRef = useRef(broadcastEnabled);
   const broadcastTargetsRef = useRef<string[]>(broadcastTargets);
   const pendingSessionEventsRef = useRef<SessionEvent[]>([]);
+  const eventUnsubscribeRef = useRef<(() => void) | null>(null);
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [state, setState] = useState<TerminalSessionState>(
     input.sessionId ? "connecting" : "idle"
@@ -183,9 +185,19 @@ export function useTerminalSession(
       mountedRef.current = false;
       asyncOperationGuardRef.current.invalidate();
       pendingSessionEventsRef.current = [];
+
+      // Clean up event listener if still active
+      eventUnsubscribeRef.current?.();
+      eventUnsubscribeRef.current = null;
+
       const sessionId = sessionIdRef.current;
       if (sessionId) {
         sessionStateStore.getState().removeSession(sessionId);
+        // Close the session on the main process side
+        window.sshterm?.closeSession?.({ sessionId })?.catch((error) => {
+          logAsyncError("closeSession on unmount failed", error);
+        });
+        sessionIdRef.current = null;
       }
     };
   }, []);
@@ -233,7 +245,7 @@ export function useTerminalSession(
         return;
       }
 
-      const opts = getTerminalOptions(terminalSettings);
+      const opts = getTerminalOptions({ ...terminalSettings, customThemes });
       instance = new XTerm(opts);
       const addon = new FitAddonClass();
       instance.loadAddon(addon);
@@ -408,7 +420,7 @@ export function useTerminalSession(
   useEffect(() => {
     const term = terminalRef.current;
     if (!term) return;
-    const opts = getTerminalOptions(terminalSettings);
+    const opts = getTerminalOptions({ ...terminalSettings, customThemes });
     const needsRefit =
       term.options.fontFamily !== opts.fontFamily ||
       term.options.fontSize !== opts.fontSize ||
@@ -423,7 +435,7 @@ export function useTerminalSession(
     });
     applyTerminalBackground(opts.theme.background);
     if (needsRefit) fit();
-  }, [applyTerminalBackground, terminalSettings, fit]);
+  }, [applyTerminalBackground, terminalSettings, customThemes, fit]);
 
   useEffect(() => {
     if (!terminal || input.autoConnect === false || sessionIdRef.current) {
@@ -438,7 +450,7 @@ export function useTerminalSession(
       return;
     }
 
-    return window.sshterm.onSessionEvent((event) => {
+    const unsubscribe = window.sshterm.onSessionEvent((event) => {
       if (!sessionIdRef.current) {
         const queue = pendingSessionEventsRef.current;
         queue.push(event);
@@ -450,6 +462,13 @@ export function useTerminalSession(
 
       applySessionEvent(event);
     });
+
+    eventUnsubscribeRef.current = unsubscribe;
+
+    return () => {
+      unsubscribe();
+      eventUnsubscribeRef.current = null;
+    };
   }, [applySessionEvent]);
 
   useEffect(() => {

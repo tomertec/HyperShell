@@ -78,7 +78,8 @@ function createFakeSessionManager() {
     setSignals() {},
     getSessionInput() {
       return undefined;
-    }
+    },
+    destroyAll() {}
   };
 
   return {

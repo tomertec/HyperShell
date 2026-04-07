@@ -64,7 +64,27 @@ export const sftpChannels = {
   bookmarksList: "sftp:bookmarks:list",
   bookmarksUpsert: "sftp:bookmarks:upsert",
   bookmarksRemove: "sftp:bookmarks:remove",
-  bookmarksReorder: "sftp:bookmarks:reorder"
+  bookmarksReorder: "sftp:bookmarks:reorder",
+  syncStart: "sftp:sync:start",
+  syncStop: "sftp:sync:stop",
+  syncList: "sftp:sync:list",
+  syncEvent: "sftp:sync:event"
+} as const;
+
+export const workspaceChannels = {
+  save: "workspace:save",
+  load: "workspace:load",
+  list: "workspace:list",
+  remove: "workspace:remove",
+  saveLast: "workspace:save-last",
+  loadLast: "workspace:load-last",
+} as const;
+
+export const sshKeyChannels = {
+  list: "ssh-keys:list",
+  generate: "ssh-keys:generate",
+  getFingerprint: "ssh-keys:get-fingerprint",
+  remove: "ssh-keys:remove",
 } as const;
 
 export const fsChannels = {
@@ -84,5 +104,7 @@ export const ipcChannels = {
   groups: groupChannels,
   serialProfiles: serialProfileChannels,
   sftp: sftpChannels,
-  fs: fsChannels
+  workspace: workspaceChannels,
+  fs: fsChannels,
+  sshKeys: sshKeyChannels
 } as const;

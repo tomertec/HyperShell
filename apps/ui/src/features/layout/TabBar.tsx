@@ -11,7 +11,7 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarPro
   if (tabs.length === 0) return null;
 
   return (
-    <div className="flex items-end bg-base-800 px-1 pt-2 overflow-x-auto border-b border-border">
+    <div className="flex items-end bg-base-800 px-1 pt-2 overflow-x-auto">
       {tabs.map((tab, index) => {
         const isActive = tab.sessionId === activeSessionId;
         return (

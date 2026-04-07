@@ -1,4 +1,37 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+
+// --- Validation helpers ---
+
+const hostnameRegex =
+  /^(?:localhost|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)$/;
+
+const ipv4Regex =
+  /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+
+const ipv6Regex = /^\[?[0-9a-fA-F:]+\]?$/;
+
+function isValidHostname(value: string): boolean {
+  if (!value.trim()) return false;
+  const v = value.trim();
+  return hostnameRegex.test(v) || ipv4Regex.test(v) || ipv6Regex.test(v);
+}
+
+function isValidPort(port: number): boolean {
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
+}
+
+function isIdentityFilePathSuspicious(path: string): string | null {
+  if (!path) return null; // empty = "Auto-detect", fine
+  const trimmed = path.trim();
+  if (!trimmed) return "Selected key path is empty.";
+  // Warn if path doesn't look like a typical key file
+  const hasExtension = /\.[a-zA-Z0-9]+$/.test(trimmed);
+  const inSshDir = /[\\/]\.ssh[\\/]/.test(trimmed);
+  if (!hasExtension && !inSshDir) {
+    return "Path does not appear to be in a .ssh directory or have a file extension.";
+  }
+  return null;
+}
 
 export type HostFormValue = {
   name: string;
@@ -46,6 +79,27 @@ export function HostForm({
     ...initialValue
   });
   const [sshKeys, setSshKeys] = useState<string[]>([]);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const errors = useMemo(() => {
+    const e: Record<string, string | null> = {};
+    e.hostname = value.hostname && !isValidHostname(value.hostname)
+      ? "Enter a valid DNS name, IPv4, IPv6, or \"localhost\"."
+      : !value.hostname
+        ? "Hostname is required."
+        : null;
+    e.port = !isValidPort(value.port)
+      ? "Port must be between 1 and 65535."
+      : null;
+    return e;
+  }, [value.hostname, value.port]);
+
+  const identityWarning = useMemo(
+    () => isIdentityFilePathSuspicious(value.identityFile),
+    [value.identityFile]
+  );
+
+  const hasErrors = Object.values(errors).some(Boolean);
 
   useEffect(() => {
     setValue({ ...defaultValue, ...initialValue });
@@ -85,9 +139,13 @@ export function HostForm({
           id={`${formId}-hostname`}
           value={value.hostname}
           onChange={(e) => setValue({ ...value, hostname: e.target.value })}
+          onBlur={() => setTouched((t) => ({ ...t, hostname: true }))}
           placeholder="web-01.example.com"
           className={inputClasses}
         />
+        {touched.hostname && errors.hostname && (
+          <span className="text-xs text-red-400">{errors.hostname}</span>
+        )}
       </label>
 
       <div className="grid grid-cols-2 gap-3">
@@ -96,10 +154,16 @@ export function HostForm({
           <input
             id={`${formId}-port`}
             type="number"
+            min={1}
+            max={65535}
             value={value.port}
             onChange={(e) => setValue({ ...value, port: Number(e.target.value) || 22 })}
+            onBlur={() => setTouched((t) => ({ ...t, port: true }))}
             className={inputClasses}
           />
+          {touched.port && errors.port && (
+            <span className="text-xs text-red-400">{errors.port}</span>
+          )}
         </label>
         <label htmlFor={`${formId}-username`} className="grid gap-1.5">
           <span className="text-xs font-medium text-text-secondary">Username</span>
@@ -132,6 +196,9 @@ export function HostForm({
             </option>
           )}
         </select>
+        {identityWarning && (
+          <span className="text-xs text-amber-400">{identityWarning}</span>
+        )}
       </label>
 
       <div className="grid gap-3">
@@ -218,7 +285,12 @@ export function HostForm({
 
       <button
         type="submit"
-        className="justify-self-start rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40 active:bg-accent/30 transition-all duration-150"
+        disabled={hasErrors}
+        className={`justify-self-start rounded-lg px-5 py-2 text-sm font-medium transition-all duration-150 ${
+          hasErrors
+            ? "bg-surface/50 border border-border text-text-muted cursor-not-allowed"
+            : "bg-accent/15 border border-accent/30 text-accent hover:bg-accent/25 hover:border-accent/40 active:bg-accent/30"
+        }`}
       >
         {submitLabel}
       </button>

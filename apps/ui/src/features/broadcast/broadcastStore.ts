@@ -7,6 +7,8 @@ export interface BroadcastState {
   disable: () => void;
   toggle: () => void;
   setTargets: (sessionIds: string[]) => void;
+  removeTarget: (sessionId: string) => void;
+  cleanTargets: (activeSessionIds: string[]) => void;
 }
 
 export function createBroadcastStore() {
@@ -29,6 +31,23 @@ export function createBroadcastStore() {
           return state;
         }
         return { targetSessionIds: deduped };
+      }),
+    removeTarget: (sessionId) =>
+      set((state) => {
+        const filtered = state.targetSessionIds.filter((id) => id !== sessionId);
+        if (filtered.length === state.targetSessionIds.length) {
+          return state;
+        }
+        return { targetSessionIds: filtered };
+      }),
+    cleanTargets: (activeSessionIds) =>
+      set((state) => {
+        const activeSet = new Set(activeSessionIds);
+        const filtered = state.targetSessionIds.filter((id) => activeSet.has(id));
+        if (filtered.length === state.targetSessionIds.length) {
+          return state;
+        }
+        return { targetSessionIds: filtered };
       })
   }));
 }

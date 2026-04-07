@@ -45,12 +45,33 @@ export function getOrCreateDatabase(): unknown {
       db.exec(initSchemaSql);
       db.exec(sftpBookmarksSql);
       // Migration 003: add identity_file and auth fields to hosts table.
-      try { db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT"); } catch { /* column exists */ }
+      try { db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT"); } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("already exists") || msg.includes("duplicate column")) {
+          console.info("[sshterm] Migration 003 (identity_file): column already exists");
+        } else {
+          console.error("[sshterm] Migration 003 (identity_file) failed:", msg);
+        }
+      }
       for (const statement of hostAuthFieldsSql.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
-        try { db.exec(statement); } catch { /* column exists */ }
+        try { db.exec(statement); } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes("already exists") || msg.includes("duplicate column")) {
+            console.info("[sshterm] Migration 003 (auth fields): column already exists");
+          } else {
+            console.error("[sshterm] Migration 003 (auth fields) failed:", msg);
+          }
+        }
       }
       // Migration 004: add is_favorite column
-      try { db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"); } catch { /* column exists */ }
+      try { db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"); } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("already exists") || msg.includes("duplicate column")) {
+          console.info("[sshterm] Migration 004 (is_favorite): column already exists");
+        } else {
+          console.error("[sshterm] Migration 004 (is_favorite) failed:", msg);
+        }
+      }
       sharedDb = db;
       console.log("[sshterm] Database initialized successfully");
     } catch (err) {
@@ -269,6 +290,10 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
 
   ipcMain.handle(ipcChannels.hosts.remove, (_event: IpcMainInvokeEvent, request: RemoveHostRequest) => {
     const parsed = removeHostRequestSchema.parse(request);
-    getOrCreateHostsRepo().remove(parsed.id);
+    const removed = getOrCreateHostsRepo().remove(parsed.id);
+    if (!removed) {
+      throw new Error(`Host not found: ${parsed.id}`);
+    }
+    return { success: true };
   });
 }
