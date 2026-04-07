@@ -25,8 +25,16 @@ export interface SftpStoreState {
   remoteHistory: string[];
   localHistoryIndex: number;
   remoteHistoryIndex: number;
+  activePane: SftpPane;
+  localCursorIndex: number;
+  remoteCursorIndex: number;
+  localFilterText: string;
+  remoteFilterText: string;
   isLoading: { local: boolean; remote: boolean };
   error: { local: string | null; remote: string | null };
+  setActivePane: (pane: SftpPane) => void;
+  setCursorIndex: (pane: SftpPane, index: number) => void;
+  setFilterText: (pane: SftpPane, text: string) => void;
   setLocalPath: (path: string) => void;
   setRemotePath: (path: string) => void;
   setLocalEntries: (entries: FsEntry[]) => void;
@@ -91,8 +99,21 @@ export function createSftpStore(sftpSessionId: string): StoreApi<SftpStoreState>
     remoteHistory: ["/"],
     localHistoryIndex: -1,
     remoteHistoryIndex: 0,
+    activePane: "local" as SftpPane,
+    localCursorIndex: 0,
+    remoteCursorIndex: 0,
+    localFilterText: "",
+    remoteFilterText: "",
     isLoading: { local: false, remote: false },
     error: { local: null, remote: null },
+
+    setActivePane: (pane) => set({ activePane: pane }),
+
+    setCursorIndex: (pane, index) =>
+      set(pane === "local" ? { localCursorIndex: index } : { remoteCursorIndex: index }),
+
+    setFilterText: (pane, text) =>
+      set(pane === "local" ? { localFilterText: text } : { remoteFilterText: text }),
 
     setLocalPath: (path) =>
       set((state) => {
@@ -105,7 +126,9 @@ export function createSftpStore(sftpSessionId: string): StoreApi<SftpStoreState>
         return {
           localPath: path.trim(),
           localHistory: history,
-          localHistoryIndex: historyIndex
+          localHistoryIndex: historyIndex,
+          localCursorIndex: 0,
+          localFilterText: ""
         };
       }),
 
@@ -120,7 +143,9 @@ export function createSftpStore(sftpSessionId: string): StoreApi<SftpStoreState>
         return {
           remotePath: path.trim(),
           remoteHistory: history,
-          remoteHistoryIndex: historyIndex
+          remoteHistoryIndex: historyIndex,
+          remoteCursorIndex: 0,
+          remoteFilterText: ""
         };
       }),
 
