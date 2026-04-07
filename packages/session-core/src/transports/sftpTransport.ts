@@ -7,8 +7,13 @@ import type {
   SessionTransportEvent,
   SftpConnectionOptions
 } from "./transportEvents";
+import type { Ssh2ConnectionPool, Ssh2PoolTarget, ResolvedAuth } from "../ssh2ConnectionPool";
 
 export type { SftpConnectionOptions } from "./transportEvents";
+
+export interface SftpTransportOptions {
+  pool?: Ssh2ConnectionPool;
+}
 
 export interface SftpEntry {
   name: string;
@@ -113,13 +118,39 @@ function combineRemotePath(parentPath: string, name: string): string {
   return `${normalizedParent}/${name}`;
 }
 
+function resolveAuth(options: SftpConnectionOptions): ResolvedAuth {
+  if (options.authMethod === "password" && options.password) {
+    return { type: "password", password: options.password };
+  }
+  if (options.authMethod === "agent" || options.agentPath || process.env.SSH_AUTH_SOCK) {
+    return { type: "agent", agent: options.agentPath ?? process.env.SSH_AUTH_SOCK ?? "" };
+  }
+  if (options.privateKeyPath) {
+    try {
+      const privateKey = readFileSync(options.privateKeyPath);
+      return { type: "key", privateKey, passphrase: options.passphrase };
+    } catch {
+      // Fall through
+    }
+  }
+  // Default to password if available
+  if (options.password) {
+    return { type: "password", password: options.password };
+  }
+  return { type: "agent", agent: process.env.SSH_AUTH_SOCK ?? "" };
+}
+
 export function createSftpTransport(
   sessionId: string,
-  options: SftpConnectionOptions
+  options: SftpConnectionOptions,
+  transportOptions?: SftpTransportOptions
 ): SftpTransportHandle {
   const listeners = new Set<(event: SessionTransportEvent) => void>();
   let client: Client | null = null;
   let sftp: SFTPWrapper | null = null;
+  let poolConnectionId: string | null = null;
+  let poolConsumerId: string | null = null;
+  const pool = transportOptions?.pool;
 
   const emit = (event: SessionTransportEvent) => {
     queueMicrotask(() => {
@@ -187,6 +218,40 @@ export function createSftpTransport(
   async function connect(): Promise<void> {
     emitStatus("connecting");
 
+    // If pool is provided, use pooled connection
+    if (pool) {
+      try {
+        const target: Ssh2PoolTarget = {
+          hostname: options.hostname,
+          port: options.port ?? 22,
+          username: options.username ?? "",
+          auth: resolveAuth(options),
+          keepAliveSeconds: options.keepAliveSeconds,
+        };
+
+        const pooled = await pool.acquire(target);
+        poolConnectionId = pooled.connectionId;
+        poolConsumerId = pooled.consumerId;
+        client = pooled.client;
+
+        // Get SFTP session from the pooled client
+        sftp = await new Promise<SFTPWrapper>((resolve, reject) => {
+          pooled.client.sftp((err, sftpSession) => {
+            if (err) reject(err);
+            else resolve(sftpSession);
+          });
+        });
+
+        emitStatus("connected");
+        return;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        emitError(message);
+        emitStatus("failed");
+        throw error;
+      }
+    }
+
     // Collect all candidate key paths and try each one sequentially,
     // just like the system ssh binary does.
     const keyPaths = collectKeyPaths(options);
@@ -195,18 +260,13 @@ export function createSftpTransport(
     let lastError: Error | null = null;
     for (const keyPath of attempts) {
       const config = buildConnectConfig(options, keyPath);
-      if (keyPath) {
-        console.log("[sftp-auth] trying key:", keyPath);
-      }
 
       try {
         await tryConnect(config);
-        console.log("[sftp-auth] CONNECTED successfully as", config.username, "to", config.host);
         emitStatus("connected");
         return;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.log("[sftp-auth] key failed:", keyPath ?? "(no key)", lastError.message);
       }
     }
 
@@ -216,6 +276,16 @@ export function createSftpTransport(
   }
 
   function disconnect(): void {
+    if (pool && poolConnectionId && poolConsumerId) {
+      // Release back to pool — don't end the client
+      pool.release(poolConnectionId, poolConsumerId);
+      poolConnectionId = null;
+      poolConsumerId = null;
+      client = null;
+      sftp = null;
+      return;
+    }
+
     if (!client) {
       return;
     }
@@ -226,7 +296,6 @@ export function createSftpTransport(
   }
 
   async function list(remotePath: string): Promise<SftpEntry[]> {
-    console.log("[sftp] list called for:", remotePath);
     const sftpSession = requireSftp();
     return await new Promise<SftpEntry[]>((resolve, reject) => {
       sftpSession.readdir(remotePath, (error, entries) => {
