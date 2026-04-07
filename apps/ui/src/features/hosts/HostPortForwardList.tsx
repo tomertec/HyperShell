@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { HostPortForwardRecord } from "@sshterm/shared";
+import { inputClasses, protocolBadgeClasses } from "../../lib/formStyles";
 
 interface HostPortForwardListProps {
   hostId: string;
 }
-
-const inputClasses =
-  "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright";
-
-const protocolBadge: Record<string, string> = {
-  local: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  remote: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  dynamic: "bg-purple-500/15 text-purple-400 border-purple-500/30",
-};
 
 export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
   const [forwards, setForwards] = useState<HostPortForwardRecord[]>([]);
@@ -93,7 +85,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
         <div className="grid gap-1">
           {forwards.map((fwd) => (
             <div key={fwd.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-surface/40 border border-border/30 text-sm">
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${protocolBadge[fwd.protocol] ?? ""}`}>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${protocolBadgeClasses[fwd.protocol] ?? ""}`}>
                 {fwd.protocol === "local" ? "L" : fwd.protocol === "remote" ? "R" : "D"}
               </span>
               <span className="text-text-primary font-medium truncate">{fwd.name}</span>

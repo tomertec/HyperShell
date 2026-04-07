@@ -30,7 +30,7 @@ import { registerWorkspaceIpc } from "./workspaceIpc";
 import { registerSshKeysIpc } from "./sshKeysIpc";
 import { registerHostPortForwardIpc } from "./hostPortForwardIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
-import type { SerialProfileRecord } from "@sshterm/db";
+import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
 import type {
   SessionManager,
   SessionTransportEvent,
@@ -140,7 +140,7 @@ async function openSessionHandler(
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
 
-  let resolvedHost: any = null;
+  let resolvedHost: DbHostRecord | null = null;
 
   let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | undefined;
 
@@ -172,13 +172,11 @@ async function openSessionHandler(
           identityFile: host.identityFile ?? undefined
         };
 
-        // Advanced SSH options from host record
-        const hostAdvanced = host as any;
-        if (hostAdvanced.proxyJump) {
-          sshOptions.proxyJump = hostAdvanced.proxyJump;
+        if (resolvedHost?.proxyJump) {
+          sshOptions.proxyJump = resolvedHost.proxyJump;
         }
-        if (hostAdvanced.keepAliveInterval != null) {
-          sshOptions.keepAliveSeconds = hostAdvanced.keepAliveInterval;
+        if (resolvedHost?.keepAliveInterval != null) {
+          sshOptions.keepAliveSeconds = resolvedHost.keepAliveInterval;
         }
 
         // 1Password op:// reference auth — resolve credential via the 1Password CLI.
@@ -757,7 +755,7 @@ export function registerIpc(
   registerGroupsIpc(ipcMain, () => groupsRepo);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
   const cleanupSftp = registerSftpIpc(ipcMain, {
-    db: getOrCreateDatabase() as any,
+    db: getOrCreateDatabase() as SqliteDatabase,
     sessionManager: manager,
     resolveConnectionOptions: (hostId, request) =>
       resolveSftpConnectionOptions(hostId, options, request),
@@ -770,7 +768,7 @@ export function registerIpc(
   });
   registerWorkspaceIpc(ipcMain, () => getOrCreateDatabase());
   registerSshKeysIpc(ipcMain);
-  registerHostPortForwardIpc(ipcMain, () => getOrCreateDatabase() as any);
+  registerHostPortForwardIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created

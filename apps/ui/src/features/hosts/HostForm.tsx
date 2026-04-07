@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { HostPortForwardList } from "./HostPortForwardList";
+import { inputClasses } from "../../lib/formStyles";
 
 // --- Validation helpers ---
 
@@ -46,7 +47,6 @@ export type HostFormValue = {
   agentKind: "system" | "pageant" | "1password";
   opReference: string;
   color?: string | null;
-  // Advanced SSH
   proxyJump: string;
   proxyJumpHostIds: string;
   keepAliveInterval: string;  // text input, empty = default
@@ -80,9 +80,6 @@ const defaultValue: HostFormValue = {
   reconnectMaxAttempts: 5,
   reconnectBaseInterval: 1,
 };
-
-const inputClasses =
-  "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright";
 
 export function HostForm({
   hostId,

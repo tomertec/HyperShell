@@ -1,11 +1,6 @@
 import { useEffect } from "react";
 import { useTunnelStore } from "./tunnelStore";
-
-const protocolBadge: Record<string, string> = {
-  local: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  remote: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  dynamic: "bg-purple-500/15 text-purple-400 border-purple-500/30",
-};
+import { protocolBadgeClasses } from "../../lib/formStyles";
 
 export function TunnelList() {
   const { activeForwards, selectedForwardId, selectForward, refresh } = useTunnelStore();
@@ -35,7 +30,7 @@ export function TunnelList() {
               : "bg-surface/40 border border-transparent hover:border-border/30"
           }`}
         >
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${protocolBadge[fwd.protocol ?? "local"] ?? ""}`}>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${protocolBadgeClasses[fwd.protocol ?? "local"] ?? ""}`}>
             {fwd.protocol === "local" ? "L" : fwd.protocol === "remote" ? "R" : "D"}
           </span>
           <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
