@@ -9,6 +9,7 @@ import type {
 } from "./transports/transportEvents";
 import { createSerialTransport } from "./transports/serialTransport";
 import { createSshPtyTransport } from "./transports/sshPtyTransport";
+import type { NetworkMonitor } from "./networkMonitor";
 
 export interface SessionSnapshot {
   sessionId: string;
@@ -25,6 +26,7 @@ export interface SessionSnapshot {
 export interface SessionManagerDeps {
   createTransport?: (request: OpenSessionRequest) => TransportHandle;
   sessionIdFactory?: () => string;
+  networkMonitor?: NetworkMonitor;
 }
 
 export interface OpenSessionInput {
@@ -63,6 +65,7 @@ interface ManagedSession {
   unsubscribe: () => void;
   input: OpenSessionInput;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
+  networkOnlineUnsub: (() => void) | null;
 }
 
 function createNoopTransport(sessionId: string): TransportHandle {
@@ -128,6 +131,7 @@ export function createSessionManager(
   const sessionIdFactory =
     deps.sessionIdFactory ?? (() => `session-${sessions.size + 1}`);
   const createTransport = deps.createTransport ?? createDefaultTransport;
+  const networkMonitor = deps.networkMonitor;
 
   function updateSession(
     sessionId: string,
@@ -165,39 +169,50 @@ export function createSessionManager(
         const maxAttempts = input.maxReconnectAttempts ?? 5;
 
         if (snapshot.autoReconnect && snapshot.reconnectAttempts < maxAttempts) {
-          snapshot.reconnectAttempts += 1;
-          snapshot.state = "reconnecting";
           session.unsubscribe();
 
-          for (const listener of listeners) {
-            listener({ type: "status", sessionId, state: "reconnecting" });
+          // Check network status before attempting reconnect
+          if (networkMonitor && !networkMonitor.isOnline()) {
+            // Network is down — enter waiting_for_network state (don't burn an attempt)
+            snapshot.state = "waiting_for_network";
+            for (const listener of listeners) {
+              listener({ type: "status", sessionId, state: "waiting_for_network" });
+            }
+
+            // When network comes back, reset attempts and start reconnecting
+            session.networkOnlineUnsub = networkMonitor.onOnline(() => {
+              const current = sessions.get(sessionId);
+              if (!current) return;
+
+              if (current.networkOnlineUnsub) {
+                current.networkOnlineUnsub();
+                current.networkOnlineUnsub = null;
+              }
+
+              current.snapshot.reconnectAttempts = 0;
+              current.snapshot.state = "reconnecting";
+              for (const listener of listeners) {
+                listener({ type: "status", sessionId, state: "reconnecting" });
+              }
+
+              // Start reconnection immediately (no delay on first attempt after network restore)
+              attemptReconnect(sessionId);
+            });
+          } else {
+            // Network is up (or no monitor) — normal reconnect with backoff
+            snapshot.reconnectAttempts += 1;
+            snapshot.state = "reconnecting";
+
+            for (const listener of listeners) {
+              listener({ type: "status", sessionId, state: "reconnecting" });
+            }
+
+            const baseMs = (snapshot.reconnectBaseInterval ?? 1) * 1000;
+            const delay = Math.min(baseMs * Math.pow(2, snapshot.reconnectAttempts - 1), 30000);
+            session.reconnectTimer = setTimeout(() => {
+              attemptReconnect(sessionId);
+            }, delay);
           }
-
-          const baseMs = (snapshot.reconnectBaseInterval ?? 1) * 1000;
-          const delay = Math.min(baseMs * Math.pow(2, snapshot.reconnectAttempts - 1), 30000);
-          session.reconnectTimer = setTimeout(() => {
-            const current = sessions.get(sessionId);
-            if (!current) return;
-
-            const newTransport = createTransport({
-              sessionId,
-              transport: input.transport,
-              profileId: input.profileId,
-              cols: current.snapshot.cols,
-              rows: current.snapshot.rows,
-              sshOptions: input.sshOptions,
-              serialOptions: input.serialOptions
-            });
-
-            const newUnsubscribe = newTransport.onEvent((e) => {
-              handleEvent(sessionId, e);
-            });
-
-            current.transport = newTransport;
-            current.unsubscribe = newUnsubscribe;
-            current.reconnectTimer = null;
-            current.snapshot.state = "connecting";
-          }, delay);
         } else {
           session.snapshot.state = "disconnected";
           session.unsubscribe();
@@ -205,6 +220,31 @@ export function createSessionManager(
         }
       }
     }
+  }
+
+  function attemptReconnect(sessionId: string): void {
+    const current = sessions.get(sessionId);
+    if (!current) return;
+
+    const { input } = current;
+    const newTransport = createTransport({
+      sessionId,
+      transport: input.transport,
+      profileId: input.profileId,
+      cols: current.snapshot.cols,
+      rows: current.snapshot.rows,
+      sshOptions: input.sshOptions,
+      serialOptions: input.serialOptions,
+    });
+
+    const newUnsubscribe = newTransport.onEvent((e) => {
+      handleEvent(sessionId, e);
+    });
+
+    current.transport = newTransport;
+    current.unsubscribe = newUnsubscribe;
+    current.reconnectTimer = null;
+    current.snapshot.state = "connecting";
   }
 
   return {
@@ -241,7 +281,8 @@ export function createSessionManager(
         transport,
         unsubscribe,
         input,
-        reconnectTimer: null
+        reconnectTimer: null,
+        networkOnlineUnsub: null
       });
 
       return {
@@ -275,6 +316,10 @@ export function createSessionManager(
         clearTimeout(session.reconnectTimer);
         session.reconnectTimer = null;
       }
+      if (session.networkOnlineUnsub) {
+        session.networkOnlineUnsub();
+        session.networkOnlineUnsub = null;
+      }
       session.snapshot.autoReconnect = false;
 
       session.transport.close();
@@ -288,6 +333,10 @@ export function createSessionManager(
         if (session.reconnectTimer !== null) {
           clearTimeout(session.reconnectTimer);
           session.reconnectTimer = null;
+        }
+        if (session.networkOnlineUnsub) {
+          session.networkOnlineUnsub();
+          session.networkOnlineUnsub = null;
         }
         session.snapshot.autoReconnect = false;
         session.transport.close();

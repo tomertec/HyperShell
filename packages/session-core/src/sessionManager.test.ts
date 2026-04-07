@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { createSessionManager } from "./sessionManager";
+import { createNetworkMonitor } from "./networkMonitor";
 import type {
   OpenSessionRequest,
   SessionTransportEvent,
@@ -301,5 +302,149 @@ describe("sessionManager", () => {
       username: "admin",
       port: 2222
     });
+  });
+});
+
+describe("network-aware reconnect", () => {
+  function createControllableTransportFactory() {
+    const emitters: Array<(event: SessionTransportEvent) => void> = [];
+    let callCount = 0;
+
+    function factory(request: OpenSessionRequest): TransportHandle {
+      callCount++;
+      const listeners = new Set<(event: SessionTransportEvent) => void>();
+      const transport: TransportHandle = {
+        write() {},
+        resize() {},
+        close() {},
+        onEvent(listener) {
+          listeners.add(listener);
+          emitters.push((e) => {
+            for (const l of listeners) l(e);
+          });
+          return () => { listeners.delete(listener); };
+        }
+      };
+      return transport;
+    }
+
+    return {
+      factory,
+      get callCount() { return callCount; },
+      emitOnLatest(event: SessionTransportEvent) {
+        emitters[emitters.length - 1]?.(event);
+      }
+    };
+  }
+
+  it("enters waiting_for_network when offline at disconnect", () => {
+    const monitor = createNetworkMonitor({ probeIntervalMs: 0 });
+    monitor._setOnline(false);
+
+    const { factory, emitOnLatest } = createControllableTransportFactory();
+    const manager = createSessionManager({
+      sessionIdFactory: () => "s-net-1",
+      createTransport: factory,
+      networkMonitor: monitor
+    });
+
+    const events: SessionTransportEvent[] = [];
+    manager.onEvent((e) => events.push(e));
+
+    manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true,
+      maxReconnectAttempts: 3
+    });
+
+    emitOnLatest({ type: "exit", sessionId: "s-net-1", exitCode: 1 });
+
+    expect(manager.getSession("s-net-1")?.state).toBe("waiting_for_network");
+    expect(events.some((e) => e.type === "status" && e.state === "waiting_for_network")).toBe(true);
+
+    monitor.dispose();
+  });
+
+  it("reconnects when network comes back online", () => {
+    const monitor = createNetworkMonitor({ probeIntervalMs: 0 });
+    monitor._setOnline(false);
+
+    const { factory, callCount: _ignore, emitOnLatest } = createControllableTransportFactory();
+    let transportCallCount = 0;
+
+    const manager = createSessionManager({
+      sessionIdFactory: () => "s-net-2",
+      createTransport(req) {
+        transportCallCount++;
+        return factory(req);
+      },
+      networkMonitor: monitor
+    });
+
+    const events: SessionTransportEvent[] = [];
+    manager.onEvent((e) => events.push(e));
+
+    manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true,
+      maxReconnectAttempts: 3
+    });
+
+    emitOnLatest({ type: "exit", sessionId: "s-net-2", exitCode: 1 });
+
+    expect(manager.getSession("s-net-2")?.state).toBe("waiting_for_network");
+
+    // Network comes back
+    monitor._setOnline(true);
+
+    // Should have reset attempts to 0 and created a new transport
+    expect(manager.getSession("s-net-2")?.reconnectAttempts).toBe(0);
+    expect(manager.getSession("s-net-2")?.state).toBe("connecting");
+    expect(transportCallCount).toBe(2);
+    expect(events.some((e) => e.type === "status" && e.state === "reconnecting")).toBe(true);
+
+    monitor.dispose();
+  });
+
+  it("uses normal backoff when network is online at disconnect", () => {
+    vi.useFakeTimers();
+
+    const monitor = createNetworkMonitor({ probeIntervalMs: 0 });
+    // monitor starts online by default
+
+    const { factory, emitOnLatest } = createControllableTransportFactory();
+    const manager = createSessionManager({
+      sessionIdFactory: () => "s-net-3",
+      createTransport: factory,
+      networkMonitor: monitor
+    });
+
+    const events: SessionTransportEvent[] = [];
+    manager.onEvent((e) => events.push(e));
+
+    manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true,
+      maxReconnectAttempts: 3
+    });
+
+    emitOnLatest({ type: "exit", sessionId: "s-net-3", exitCode: 1 });
+
+    // Should be in reconnecting state (not waiting_for_network) because network is online
+    expect(manager.getSession("s-net-3")?.state).toBe("reconnecting");
+    expect(events.some((e) => e.type === "status" && e.state === "waiting_for_network")).toBe(false);
+    expect(events.some((e) => e.type === "status" && e.state === "reconnecting")).toBe(true);
+
+    monitor.dispose();
+    vi.useRealTimers();
   });
 });
