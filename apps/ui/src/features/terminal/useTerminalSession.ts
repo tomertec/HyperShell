@@ -8,6 +8,7 @@ import { broadcastStore } from "../broadcast/broadcastStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 import { settingsStore } from "../settings/settingsStore";
 import { getTerminalOptions } from "./terminalTheme";
+import { getTerminalClipboardAction } from "./terminalClipboard";
 import {
   createAsyncOperationGuard,
   mapSessionEvent,
@@ -119,6 +120,31 @@ export function useTerminalSession(
     }
 
     terminalRef.current?.writeln(`\r\n[error] ${toErrorMessage(error)}`);
+  }, []);
+
+  const writeClipboardText = useCallback(async (text: string): Promise<void> => {
+    if (!text || !navigator.clipboard?.writeText) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      logAsyncError("clipboard write failed", error);
+    }
+  }, []);
+
+  const readClipboardText = useCallback(async (): Promise<string> => {
+    if (!navigator.clipboard?.readText) {
+      return "";
+    }
+
+    try {
+      return await navigator.clipboard.readText();
+    } catch (error) {
+      logAsyncError("clipboard read failed", error);
+      return "";
+    }
   }, []);
 
   const sendSessionWrite = useCallback((sessionId: string, data: string): void => {
@@ -272,6 +298,42 @@ export function useTerminalSession(
         };
       }
 
+      const isMacLike = /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+      instance.attachCustomKeyEventHandler((event) => {
+        if (event.type !== "keydown") {
+          return true;
+        }
+
+        const action = getTerminalClipboardAction({
+          event,
+          hasSelection: instance?.hasSelection() ?? false,
+          isMacLike
+        });
+
+        if (!action) {
+          return true;
+        }
+
+        event.preventDefault();
+
+        if (action === "copy") {
+          const selection = instance?.getSelection() ?? "";
+          if (selection) {
+            void writeClipboardText(selection);
+          }
+          return false;
+        }
+
+        void (async () => {
+          const clipboardText = await readClipboardText();
+          if (clipboardText) {
+            instance?.paste(clipboardText);
+          }
+        })();
+
+        return false;
+      });
+
       disposeInput = instance.onData((data) => {
         const activeSessionId = sessionIdRef.current;
 
@@ -299,7 +361,7 @@ export function useTerminalSession(
       fitAddonRef.current = null;
       setTerminal(null);
     };
-  }, [applyTerminalBackground, sendSessionWrite]);
+  }, [applyTerminalBackground, readClipboardText, sendSessionWrite, writeClipboardText]);
 
   const connect = useCallback(async (): Promise<void> => {
     const instance = terminalRef.current;

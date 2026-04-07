@@ -209,9 +209,15 @@ export function createTransferManager(
       const startedAt = Date.now();
 
       await new Promise<void>((resolve, reject) => {
+        let settled = false;
         const cleanup = () => {
           localStream.removeAllListeners();
           remoteStream.removeAllListeners();
+        };
+        const settle = (fn: () => void) => {
+          if (settled) return;
+          settled = true;
+          fn();
         };
 
         localStream.on("data", (chunk: string | Buffer) => {
@@ -234,28 +240,27 @@ export function createTransferManager(
         });
 
         const abortHandler = () => {
-          cleanup();
-          localStream.destroy(new Error("Cancelled by user"));
-          remoteStream.destroy(new Error("Cancelled by user"));
-          reject(new Error("Cancelled by user"));
+          settle(() => {
+            cleanup();
+            localStream.destroy();
+            remoteStream.destroy();
+            reject(new Error("Cancelled by user"));
+          });
         };
 
         job.abortController?.signal.addEventListener("abort", abortHandler, { once: true });
 
         remoteStream.on("close", () => {
           job.abortController?.signal.removeEventListener("abort", abortHandler);
-          cleanup();
-          resolve();
+          settle(() => { cleanup(); resolve(); });
         });
         remoteStream.on("error", (error) => {
           job.abortController?.signal.removeEventListener("abort", abortHandler);
-          cleanup();
-          reject(error);
+          settle(() => { cleanup(); reject(error); });
         });
         localStream.on("error", (error) => {
           job.abortController?.signal.removeEventListener("abort", abortHandler);
-          cleanup();
-          reject(error);
+          settle(() => { cleanup(); reject(error); });
         });
 
         localStream.pipe(remoteStream);
@@ -292,9 +297,15 @@ export function createTransferManager(
     const startedAt = Date.now();
 
     await new Promise<void>((resolve, reject) => {
+      let settled = false;
       const cleanup = () => {
         remoteStream.removeAllListeners();
         localStream.removeAllListeners();
+      };
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        fn();
       };
 
       remoteStream.on("data", (chunk: string | Buffer) => {
@@ -317,29 +328,27 @@ export function createTransferManager(
       });
 
       const abortHandler = () => {
-        cleanup();
-        remoteStream.destroy(new Error("Cancelled by user"));
-        localStream.destroy(new Error("Cancelled by user"));
-        reject(new Error("Cancelled by user"));
+        settle(() => {
+          cleanup();
+          remoteStream.destroy();
+          localStream.destroy();
+          reject(new Error("Cancelled by user"));
+        });
       };
 
       job.abortController?.signal.addEventListener("abort", abortHandler, { once: true });
 
       localStream.on("close", () => {
         job.abortController?.signal.removeEventListener("abort", abortHandler);
-        cleanup();
-        renameSync(partPath, job.localPath);
-        resolve();
+        settle(() => { cleanup(); renameSync(partPath, job.localPath); resolve(); });
       });
       localStream.on("error", (error) => {
         job.abortController?.signal.removeEventListener("abort", abortHandler);
-        cleanup();
-        reject(error);
+        settle(() => { cleanup(); reject(error); });
       });
       remoteStream.on("error", (error) => {
         job.abortController?.signal.removeEventListener("abort", abortHandler);
-        cleanup();
-        reject(error);
+        settle(() => { cleanup(); reject(error); });
       });
 
       remoteStream.pipe(localStream);
@@ -399,7 +408,21 @@ export function createTransferManager(
     }
 
     // For active jobs, abort triggers promise rejection which emits transfer-complete.
-    job.abortController?.abort();
+    try {
+      job.abortController?.abort();
+    } catch {
+      // Abort may fire after the job has already settled — ignore.
+      if (job.status !== "completed" && job.status !== "failed") {
+        job.status = "failed";
+        job.error = "Cancelled by user";
+        emit({
+          kind: "transfer-complete",
+          transferId,
+          status: "failed",
+          error: job.error
+        });
+      }
+    }
   }
 
   function list(): TransferJob[] {
