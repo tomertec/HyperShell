@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import type { TransferJob } from "@sshterm/shared";
@@ -39,7 +39,21 @@ function mergeTransfers(existing: TransferJob[], next: TransferJob[]): TransferJ
 export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   const store = useMemo(() => getSftpStore(sftpSessionId), [sftpSessionId]);
   const [editingFile, setEditingFile] = useState<string | null>(null);
+  const filterInputRef = useRef<HTMLInputElement>(null);
   const remotePath = useStore(store, (state) => state.remotePath);
+  const activePane = useStore(store, (state) => state.activePane);
+  const localFilterText = useStore(store, (state) => state.localFilterText);
+  const remoteFilterText = useStore(store, (state) => state.remoteFilterText);
+  const localEntries = useStore(store, (state) => state.localEntries);
+  const remoteEntries = useStore(store, (state) => state.remoteEntries);
+  const setFilterText = useStore(store, (state) => state.setFilterText);
+
+  const filterText = activePane === "local" ? localFilterText : remoteFilterText;
+  const activeEntries = activePane === "local" ? localEntries : remoteEntries;
+  const filterTotalCount = activeEntries.length;
+  const filterMatchCount = filterText
+    ? activeEntries.filter((e) => e.name.toLowerCase().includes(filterText.toLowerCase())).length
+    : filterTotalCount;
 
   const refreshTransfers = useCallback(async () => {
     try {
@@ -269,6 +283,13 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     [hostId]
   );
 
+  const handleFilterChange = useCallback(
+    (text: string) => {
+      setFilterText(activePane, text);
+    },
+    [activePane, setFilterText]
+  );
+
   const handleDisconnect = useCallback(async () => {
     await window.sshterm?.sftpDisconnect?.({ sftpSessionId });
     onClose();
@@ -276,7 +297,16 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
   return (
     <div className="relative flex h-full flex-col">
-      <SftpToolbar store={store} hostId={hostId} onDisconnect={handleDisconnect} />
+      <SftpToolbar
+        store={store}
+        hostId={hostId}
+        onDisconnect={handleDisconnect}
+        filterText={filterText}
+        onFilterChange={handleFilterChange}
+        filterMatchCount={filterMatchCount}
+        filterTotalCount={filterTotalCount}
+        filterInputRef={filterInputRef}
+      />
 
       <SftpDualPane
         store={store}
