@@ -422,3 +422,43 @@ export type SshKeyInfo = z.infer<typeof sshKeyInfoSchema>;
 export type GenerateSshKeyRequest = z.infer<typeof generateSshKeyRequestSchema>;
 export type RemoveSshKeyRequest = z.infer<typeof removeSshKeyRequestSchema>;
 export type GetFingerprintRequest = z.infer<typeof getFingerprintRequestSchema>;
+
+// 1Password vault picker
+export const opVaultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type OpVault = z.infer<typeof opVaultSchema>;
+
+export const opListVaultsResponseSchema = z.array(opVaultSchema);
+export type OpListVaultsResponse = z.infer<typeof opListVaultsResponseSchema>;
+
+export const opItemSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  category: z.string().optional(),
+});
+export type OpItemSummary = z.infer<typeof opItemSummarySchema>;
+
+export const opListItemsRequestSchema = z.object({
+  vaultId: z.string().min(1),
+});
+export type OpListItemsRequest = z.infer<typeof opListItemsRequestSchema>;
+
+export const opListItemsResponseSchema = z.array(opItemSummarySchema);
+export type OpListItemsResponse = z.infer<typeof opListItemsResponseSchema>;
+
+export const opFieldSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: z.string().optional(),
+});
+export type OpField = z.infer<typeof opFieldSchema>;
+
+export const opGetItemFieldsRequestSchema = z.object({
+  itemId: z.string().min(1),
+});
+export type OpGetItemFieldsRequest = z.infer<typeof opGetItemFieldsRequestSchema>;
+
+export const opGetItemFieldsResponseSchema = z.array(opFieldSchema);
+export type OpGetItemFieldsResponse = z.infer<typeof opGetItemFieldsResponseSchema>;

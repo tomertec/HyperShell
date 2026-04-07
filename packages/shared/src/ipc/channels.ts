@@ -111,6 +111,12 @@ export const networkChannels = {
   status: "network:status",
 } as const;
 
+export const opChannels = {
+  listVaults: "op:list-vaults",
+  listItems: "op:list-items",
+  getItemFields: "op:get-item-fields",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -126,4 +132,5 @@ export const ipcChannels = {
   hostPortForward: hostPortForwardChannels,
   connectionPool: connectionPoolChannels,
   network: networkChannels,
+  op: opChannels,
 } as const;
