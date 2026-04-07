@@ -64,6 +64,11 @@ import type {
   RemoveHostPortForwardRequest,
   ReorderHostPortForwardsRequest,
   ConnectionPoolStats,
+  OpListVaultsResponse,
+  OpListItemsRequest,
+  OpListItemsResponse,
+  OpGetItemFieldsRequest,
+  OpGetItemFieldsResponse,
 } from "@sshterm/shared";
 
 declare global {
@@ -129,6 +134,9 @@ declare global {
       startPortForward?: (request: StartPortForwardRequest) => Promise<{ id: string }>;
       stopPortForward?: (request: StopPortForwardRequest) => Promise<void>;
       listPortForwards?: () => Promise<{ id: string }[]>;
+      opListVaults?: () => Promise<OpListVaultsResponse>;
+      opListItems?: (request: OpListItemsRequest) => Promise<OpListItemsResponse>;
+      opGetItemFields?: (request: OpGetItemFieldsRequest) => Promise<OpGetItemFieldsResponse>;
     };
   }
 }

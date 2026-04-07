@@ -121,6 +121,16 @@ import {
   upsertHostPortForwardRequestSchema,
   removeHostPortForwardRequestSchema,
   reorderHostPortForwardsRequestSchema,
+  opListVaultsResponseSchema,
+  opListItemsRequestSchema,
+  opListItemsResponseSchema,
+  opGetItemFieldsRequestSchema,
+  opGetItemFieldsResponseSchema,
+  type OpListVaultsResponse,
+  type OpListItemsRequest,
+  type OpListItemsResponse,
+  type OpGetItemFieldsRequest,
+  type OpGetItemFieldsResponse,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -227,6 +237,10 @@ export interface DesktopApi {
   hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void>;
   // Connection pool
   connectionPoolStats(): Promise<ConnectionPoolStats[]>;
+  // 1Password
+  opListVaults(): Promise<OpListVaultsResponse>;
+  opListItems(request: OpListItemsRequest): Promise<OpListItemsResponse>;
+  opGetItemFields(request: OpGetItemFieldsRequest): Promise<OpGetItemFieldsResponse>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -809,6 +823,21 @@ export function createDesktopApi(
     async connectionPoolStats(): Promise<ConnectionPoolStats[]> {
       const result = await ipcRenderer.invoke(ipcChannels.connectionPool.stats);
       return connectionPoolStatsArraySchema.parse(result);
+    },
+    // 1Password
+    async opListVaults(): Promise<OpListVaultsResponse> {
+      const result = await ipcRenderer.invoke(ipcChannels.op.listVaults);
+      return opListVaultsResponseSchema.parse(result);
+    },
+    async opListItems(request: OpListItemsRequest): Promise<OpListItemsResponse> {
+      const parsed = opListItemsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.op.listItems, parsed);
+      return opListItemsResponseSchema.parse(result);
+    },
+    async opGetItemFields(request: OpGetItemFieldsRequest): Promise<OpGetItemFieldsResponse> {
+      const parsed = opGetItemFieldsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.op.getItemFields, parsed);
+      return opGetItemFieldsResponseSchema.parse(result);
     },
   };
 }
