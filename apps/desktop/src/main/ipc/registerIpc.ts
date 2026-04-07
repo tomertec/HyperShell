@@ -485,54 +485,40 @@ async function resolveSftpConnectionOptions(
     fromConfig?.proxyJump;
   const keepAliveSeconds = profileFromResolver?.keepAliveSeconds;
 
-  if (requestedPassword) {
-    return {
-      hostname: resolvedHostname,
-      port: resolvedPort,
-      username: resolvedUsername,
-      proxyJump: resolvedProxyJump,
-      keepAliveSeconds,
-      authMethod: "password",
-      password: requestedPassword
-    };
-  }
-
   const privateKeyPath = resolveIdentityFile();
   const agentPath = resolveAgentPath();
 
-  if (!privateKeyPath && !agentPath) {
+  if (!requestedPassword && !privateKeyPath && !agentPath) {
     throw new Error(
       "SFTP auth unavailable: no usable private key or SSH agent was found. Configure IdentityFile in ~/.ssh/config, start an SSH agent, or retry and enter a password."
     );
   }
 
-  // If the host has an explicit identity file configured, use it directly.
-  // Only fall back to agent for auto-detected keys (where the agent can
-  // handle passphrase prompting transparently).
+  // Determine primary auth method but always include all available credentials.
+  // ssh2 will try publickey (key or agent) first, then fall back to password.
   const hasExplicitKey = Boolean(resolvedHost?.identityFile?.trim());
+  const authMethod: "password" | "key" | "agent" =
+    hasExplicitKey && privateKeyPath
+      ? "key"
+      : agentPath
+        ? "agent"
+        : privateKeyPath
+          ? "key"
+          : "password";
 
-  if (hasExplicitKey && privateKeyPath) {
-    return {
-      hostname: resolvedHostname,
-      port: resolvedPort,
-      username: resolvedUsername,
-      proxyJump: resolvedProxyJump,
-      keepAliveSeconds,
-      authMethod: "key",
-      privateKeyPath
-    };
-  }
-
-  // For auto-detected keys, prefer agent (handles passphrases transparently).
   return {
     hostname: resolvedHostname,
     port: resolvedPort,
     username: resolvedUsername,
     proxyJump: resolvedProxyJump,
     keepAliveSeconds,
-    authMethod: agentPath ? "agent" : "key",
-    privateKeyPath: agentPath ? undefined : privateKeyPath,
-    agentPath
+    authMethod,
+    privateKeyPath: privateKeyPath ?? undefined,
+    agentPath: agentPath ?? undefined,
+    // When user provides a password, use it as both key passphrase and password
+    // fallback — ssh2 tries publickey first, then password.
+    passphrase: requestedPassword ?? undefined,
+    password: requestedPassword ?? undefined
   };
 }
 

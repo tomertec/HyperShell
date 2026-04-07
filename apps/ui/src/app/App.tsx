@@ -271,8 +271,8 @@ export function App() {
     }
 
     const username = sftpAuthUsername.trim();
-    if (!username || !sftpAuthPassword) {
-      setSftpAuthError("Username and password are required.");
+    if (!username) {
+      setSftpAuthError("Username is required.");
       return;
     }
 
@@ -282,7 +282,7 @@ export function App() {
       const { sftpSessionId } = await window.sshterm.sftpConnect({
         hostId: sftpAuthHost.id,
         username,
-        password: sftpAuthPassword
+        ...(sftpAuthPassword ? { password: sftpAuthPassword } : {})
       });
       openSftpTab(sftpAuthHost, sftpSessionId);
       closeSftpAuthModal();
@@ -550,7 +550,7 @@ export function App() {
           </label>
 
           <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-text-secondary">Password</span>
+            <span className="text-xs font-medium text-text-secondary">Password / Key Passphrase</span>
             <input
               type="password"
               value={sftpAuthPassword}

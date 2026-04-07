@@ -44,18 +44,26 @@ function buildConnectConfig(options: SftpConnectionOptions): ConnectConfig {
     keepaliveInterval: (options.keepAliveSeconds ?? 60) * 1000
   };
 
-  if (options.authMethod === "password" && options.password) {
+  // Provide all available credentials — ssh2 tries publickey first, then password.
+  if (options.privateKeyPath) {
+    try {
+      config.privateKey = readFileSync(options.privateKeyPath);
+    } catch {
+      // Key file unreadable — skip key auth, fall through to agent/password.
+    }
+  }
+
+  if (options.passphrase) {
+    config.passphrase = options.passphrase;
+  }
+
+  const agentPath = options.agentPath ?? process.env.SSH_AUTH_SOCK;
+  if (agentPath) {
+    config.agent = agentPath;
+  }
+
+  if (options.password) {
     config.password = options.password;
-  } else if (options.authMethod === "agent") {
-    const agentPath = options.agentPath ?? process.env.SSH_AUTH_SOCK;
-    if (agentPath) {
-      config.agent = agentPath;
-    }
-  } else if (options.authMethod === "key" && options.privateKeyPath) {
-    config.privateKey = readFileSync(options.privateKeyPath);
-    if (options.passphrase) {
-      config.passphrase = options.passphrase;
-    }
   }
 
   return config;
