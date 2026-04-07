@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent, type MouseEvent } from "react";
+import { useCallback, useMemo, useState, type DragEvent, type MouseEvent } from "react";
 
 import {
   formatDate,
@@ -54,6 +54,10 @@ export function FileList({
   paneType,
   cursorIndex
 }: FileListProps) {
+  const cursorRowRef = useCallback((node: HTMLTableRowElement | null) => {
+    node?.scrollIntoView({ block: "nearest" });
+  }, []);
+
   const [dropActive, setDropActive] = useState(false);
 
   const sortedEntries = useMemo(
@@ -205,6 +209,7 @@ export function FileList({
               {sortedEntries.map((entry, index) => (
                   <tr
                     key={entry.path}
+                    ref={cursorIndex === index ? cursorRowRef : undefined}
                     className={`transition-colors ${
                       selection.has(entry.path)
                         ? "bg-accent/15 border-l-2 border-l-accent"
