@@ -174,30 +174,30 @@ export function FileList({
         </div>
       ) : (
         <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse text-[13px]">
-            <thead className="sticky top-0 z-10 bg-base-800/95 text-[10px] uppercase tracking-wider text-text-muted">
+          <table className="w-full border-collapse text-[13px] leading-tight">
+            <thead className="sticky top-0 z-10 border-b border-border/30 bg-base-800/95 text-[9px] uppercase tracking-wider text-text-muted">
               <tr>
                 <th
-                  className="cursor-pointer px-1.5 py-[3px] text-left font-medium"
+                  className="cursor-pointer px-1.5 py-px text-left font-medium leading-[16px]"
                   onClick={() => handleHeaderClick("name")}
                 >
                   Name{renderSortIndicator("name")}
                 </th>
                 <th
-                  className="w-20 cursor-pointer px-1.5 py-[3px] text-right font-medium"
+                  className="w-16 cursor-pointer px-1.5 py-px text-right font-medium leading-[16px]"
                   onClick={() => handleHeaderClick("size")}
                 >
                   Size{renderSortIndicator("size")}
                 </th>
                 <th
-                  className="w-36 cursor-pointer px-1.5 py-[3px] text-left font-medium"
+                  className="w-32 cursor-pointer px-1.5 py-px text-left font-medium leading-[16px]"
                   onClick={() => handleHeaderClick("modifiedAt")}
                 >
                   Modified{renderSortIndicator("modifiedAt")}
                 </th>
                 {paneType === "remote" && (
                   <th
-                    className="w-16 cursor-pointer px-1.5 py-[3px] text-left font-medium"
+                    className="w-14 cursor-pointer px-1.5 py-px text-left font-medium leading-[16px]"
                     onClick={() => handleHeaderClick("permissions")}
                   >
                     Perms{renderSortIndicator("permissions")}
@@ -230,22 +230,22 @@ export function FileList({
                     draggable
                     onDragStart={(event) => handleDragStart(event, entry)}
                   >
-                    <td className="px-1.5 py-[2px]">
-                      <div className="flex min-w-0 items-center gap-1.5">
+                    <td className="px-1.5 py-px">
+                      <div className="flex min-w-0 items-center gap-1">
                         <FileIcon name={entry.name} isDirectory={entry.isDirectory} />
-                        <span className={`truncate text-[13px] ${entry.isDirectory ? "font-medium text-text-primary" : "text-text-primary"}`}>
+                        <span className={`truncate text-[13px] leading-[18px] ${entry.isDirectory ? "font-medium text-text-primary" : "text-text-primary"}`}>
                           {entry.name}
                         </span>
                       </div>
                     </td>
-                    <td className="px-1.5 py-[2px] text-right text-[12px] text-text-secondary">
+                    <td className="px-1.5 py-px text-right text-[11px] leading-[18px] text-text-secondary">
                       {entry.isDirectory ? "—" : formatFileSize(entry.size)}
                     </td>
-                    <td className="px-1.5 py-[2px] text-[12px] text-text-secondary">
+                    <td className="px-1.5 py-px text-[11px] leading-[18px] text-text-secondary">
                       {formatDate(entry.modifiedAt)}
                     </td>
                     {paneType === "remote" && (
-                      <td className="px-1.5 py-[2px] font-mono text-[11px] text-text-secondary">
+                      <td className="px-1.5 py-px font-mono text-[10px] leading-[18px] text-text-secondary">
                         {(entry.permissions ?? 0).toString(8).padStart(4, "0")}
                       </td>
                     )}

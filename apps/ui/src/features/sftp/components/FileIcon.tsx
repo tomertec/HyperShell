@@ -9,10 +9,10 @@ interface FileIconProps {
 function FolderIcon({ className }: { className?: string }) {
   return (
     <svg
-      width={14}
-      height={14}
+      width={13}
+      height={13}
       viewBox="0 0 16 16"
-      className={`text-accent ${className ?? ""}`}
+      className={`shrink-0 text-accent ${className ?? ""}`}
     >
       <path
         d="M1.5 3.5a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1v7.5a1 1 0 0 1-1 1H2.5a1 1 0 0 1-1-1z"
@@ -32,15 +32,15 @@ function FileBaseIcon({
 }) {
   return (
     <svg
-      width={14}
-      height={14}
+      width={13}
+      height={13}
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`text-text-muted ${className ?? ""}`}
+      className={`shrink-0 text-text-muted ${className ?? ""}`}
     >
       <path d="M4 1.5a.5.5 0 0 0-.5.5v12a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5V5.5L9 1.5H4z" />
       <path d="M9 1.5v4h3.5" />
