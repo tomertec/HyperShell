@@ -105,6 +105,12 @@ import {
   sftpSyncStartRequestSchema,
   sftpSyncStopRequestSchema,
   sftpSyncEventSchema,
+  listHostPortForwardsRequestSchema,
+  upsertHostPortForwardRequestSchema,
+  removeHostPortForwardRequestSchema,
+  reorderHostPortForwardsRequestSchema,
+  hostPortForwardRecordSchema,
+  connectionPoolStatsSchema,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -117,7 +123,13 @@ import {
   type SftpSyncStartRequest,
   type SftpSyncStopRequest,
   type SftpSyncStatus,
-  type SftpSyncEvent
+  type SftpSyncEvent,
+  type HostPortForwardRecord,
+  type UpsertHostPortForwardRequest,
+  type ListHostPortForwardsRequest,
+  type RemoveHostPortForwardRequest,
+  type ReorderHostPortForwardsRequest,
+  type ConnectionPoolStats,
 } from "@sshterm/shared";
 
 export interface PreloadIpcRenderer {
@@ -197,6 +209,13 @@ export interface DesktopApi {
   sftpSyncStop(request: SftpSyncStopRequest): Promise<void>;
   sftpSyncList(): Promise<{ syncs: SftpSyncStatus[] }>;
   onSftpSyncEvent(listener: (event: SftpSyncEvent) => void): () => void;
+  // Host port forwards
+  hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]>;
+  hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord>;
+  hostPortForwardRemove(request: RemoveHostPortForwardRequest): Promise<boolean>;
+  hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void>;
+  // Connection pool
+  connectionPoolStats(): Promise<ConnectionPoolStats[]>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -733,6 +752,31 @@ export function createDesktopApi(
       return () => {
         ipcRenderer.removeListener(ipcChannels.sftp.syncEvent, wrappedListener);
       };
-    }
+    },
+    // Host port forwards
+    async hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]> {
+      const parsed = listHostPortForwardsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.list, parsed);
+      return result as HostPortForwardRecord[];
+    },
+    async hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord> {
+      const parsed = upsertHostPortForwardRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.upsert, parsed);
+      return result as HostPortForwardRecord;
+    },
+    async hostPortForwardRemove(request: RemoveHostPortForwardRequest): Promise<boolean> {
+      const parsed = removeHostPortForwardRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.remove, parsed);
+      return result as boolean;
+    },
+    async hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void> {
+      const parsed = reorderHostPortForwardsRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.hostPortForward.reorder, parsed);
+    },
+    // Connection pool stats
+    async connectionPoolStats(): Promise<ConnectionPoolStats[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.connectionPool.stats);
+      return result as ConnectionPoolStats[];
+    },
   };
 }

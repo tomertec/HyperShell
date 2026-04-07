@@ -55,7 +55,13 @@ import type {
   SftpSyncStartRequest,
   SftpSyncStopRequest,
   SftpSyncStatus,
-  SftpSyncEvent
+  SftpSyncEvent,
+  HostPortForwardRecord,
+  UpsertHostPortForwardRequest,
+  ListHostPortForwardsRequest,
+  RemoveHostPortForwardRequest,
+  ReorderHostPortForwardsRequest,
+  ConnectionPoolStats,
 } from "@sshterm/shared";
 
 declare global {
@@ -113,6 +119,13 @@ declare global {
       sftpSyncStop?: (request: SftpSyncStopRequest) => Promise<void>;
       sftpSyncList?: () => Promise<{ syncs: SftpSyncStatus[] }>;
       onSftpSyncEvent?: (listener: (event: SftpSyncEvent) => void) => () => void;
+      // Host port forwards
+      hostPortForwardList?: (request: ListHostPortForwardsRequest) => Promise<HostPortForwardRecord[]>;
+      hostPortForwardUpsert?: (request: UpsertHostPortForwardRequest) => Promise<HostPortForwardRecord>;
+      hostPortForwardRemove?: (request: RemoveHostPortForwardRequest) => Promise<boolean>;
+      hostPortForwardReorder?: (request: ReorderHostPortForwardsRequest) => Promise<void>;
+      // Connection pool
+      connectionPoolStats?: () => Promise<ConnectionPoolStats[]>;
     };
   }
 }
