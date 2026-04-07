@@ -34,6 +34,7 @@ import { registerFsIpc } from "./fsIpc";
 import { registerWorkspaceIpc } from "./workspaceIpc";
 import { registerSshKeysIpc } from "./sshKeysIpc";
 import { registerHostPortForwardIpc } from "./hostPortForwardIpc";
+import { registerOpIpc } from "./opIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
 import type {
@@ -117,6 +118,9 @@ const registeredChannels = [
   ipcChannels.hostPortForward.remove,
   ipcChannels.hostPortForward.reorder,
   ipcChannels.connectionPool.stats,
+  ipcChannels.op.listVaults,
+  ipcChannels.op.listItems,
+  ipcChannels.op.getItemFields,
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -930,6 +934,7 @@ export function registerIpc(
   registerWorkspaceIpc(ipcMain, () => getOrCreateDatabase());
   registerSshKeysIpc(ipcMain);
   registerHostPortForwardIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerOpIpc(ipcMain);
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created
