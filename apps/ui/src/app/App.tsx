@@ -305,6 +305,38 @@ export function App() {
     [openTab]
   );
 
+  const connectSshAdHoc = useCallback(
+    (host: string, port: number, username: string, _password: string) => {
+      const sessionId = `ssh-adhoc-${Date.now()}`;
+      const portSuffix = port !== 22 ? `:${port}` : "";
+      const profileId = username ? `${username}@${host}${portSuffix}` : `${host}${portSuffix}`;
+      openTab({
+        tabKey: sessionId,
+        sessionId,
+        title: username ? `${username}@${host}` : host,
+        transport: "ssh",
+        profileId,
+        preopened: false,
+      });
+    },
+    [openTab]
+  );
+
+  const connectSerialAdHoc = useCallback(
+    (port: string, _baudRate: number) => {
+      const sessionId = `serial-adhoc-${Date.now()}`;
+      openTab({
+        tabKey: sessionId,
+        sessionId,
+        title: port,
+        transport: "serial",
+        profileId: port,
+        preopened: false,
+      });
+    },
+    [openTab]
+  );
+
   const openSftpTab = useCallback(
     (host: HostRecord, sftpSessionId: string) => {
       const tabSessionId = `sftp-tab-${sftpSessionId}`;
@@ -548,7 +580,12 @@ export function App() {
           </div>
         )}
 
-        <Workspace />
+        <Workspace
+          availablePorts={availablePorts}
+          onRefreshPorts={refreshPorts}
+          onConnectSsh={connectSshAdHoc}
+          onConnectSerial={connectSerialAdHoc}
+        />
       </AppShell>
 
       <QuickConnectDialog
