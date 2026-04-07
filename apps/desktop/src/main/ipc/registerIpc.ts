@@ -28,6 +28,7 @@ import { registerSftpIpc } from "./sftpIpc";
 import { registerFsIpc } from "./fsIpc";
 import { registerWorkspaceIpc } from "./workspaceIpc";
 import { registerSshKeysIpc } from "./sshKeysIpc";
+import { registerHostPortForwardIpc } from "./hostPortForwardIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord } from "@sshterm/db";
 import type {
@@ -103,7 +104,12 @@ const registeredChannels = [
   ipcChannels.sshKeys.list,
   ipcChannels.sshKeys.generate,
   ipcChannels.sshKeys.getFingerprint,
-  ipcChannels.sshKeys.remove
+  ipcChannels.sshKeys.remove,
+  ipcChannels.hostPortForward.list,
+  ipcChannels.hostPortForward.upsert,
+  ipcChannels.hostPortForward.remove,
+  ipcChannels.hostPortForward.reorder,
+  ipcChannels.connectionPool.stats,
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -134,6 +140,8 @@ async function openSessionHandler(
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
 
+  let resolvedHost: any = null;
+
   let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; proxyJump?: string; keepAliveSeconds?: number } | undefined;
 
   if (parsed.transport === "ssh") {
@@ -156,12 +164,22 @@ async function openSessionHandler(
           || parsed.profileId === h.name
         );
       if (host) {
+        resolvedHost = host;
         sshOptions = {
           hostname: host.hostname,
           username: host.username ?? undefined,
           port: host.port,
           identityFile: host.identityFile ?? undefined
         };
+
+        // Advanced SSH options from host record
+        const hostAdvanced = host as any;
+        if (hostAdvanced.proxyJump) {
+          sshOptions.proxyJump = hostAdvanced.proxyJump;
+        }
+        if (hostAdvanced.keepAliveInterval != null) {
+          sshOptions.keepAliveSeconds = hostAdvanced.keepAliveInterval;
+        }
 
         // 1Password op:// reference auth — resolve credential via the 1Password CLI.
         const hostRecord = host as { authMethod?: string; opReference?: string };
@@ -200,7 +218,10 @@ async function openSessionHandler(
   return manager.open({
     ...parsed,
     sshOptions: sshOptions ?? { hostname: parsed.profileId },
-    serialOptions
+    serialOptions,
+    autoReconnect: parsed.autoReconnect ?? Boolean(resolvedHost?.autoReconnect),
+    maxReconnectAttempts: parsed.reconnectMaxAttempts ?? resolvedHost?.reconnectMaxAttempts ?? 5,
+    reconnectBaseInterval: parsed.reconnectBaseInterval ?? resolvedHost?.reconnectBaseInterval ?? 1,
   });
 }
 
@@ -530,15 +551,6 @@ async function resolveSftpConnectionOptions(
   const fallbackKeyPaths = allKeyPaths.slice(1);
   const agentPath = resolveAgentPath();
 
-  console.log("[sftp-auth] resolved credentials:", {
-    hostname: effectiveConfig?.hostname ?? hostname,
-    username: effectiveConfig?.user ?? username,
-    privateKeyPath: privateKeyPath ?? "(none)",
-    agentPath: agentPath ?? "(none)",
-    hasPassword: Boolean(requestedPassword),
-    effectiveIdentityFiles: effectiveConfig?.identityFiles ?? [],
-    effectiveIdentityAgent: effectiveConfig?.identityAgent ?? "(none)",
-  });
 
   if (!requestedPassword && !privateKeyPath && !agentPath) {
     throw new Error(
@@ -758,6 +770,13 @@ export function registerIpc(
   });
   registerWorkspaceIpc(ipcMain, () => getOrCreateDatabase());
   registerSshKeysIpc(ipcMain);
+  registerHostPortForwardIpc(ipcMain, () => getOrCreateDatabase() as any);
+
+  ipcMain.handle(ipcChannels.connectionPool.stats, () => {
+    // Pool stats will be wired up when the pool is created
+    return [];
+  });
+
   const cleanupFs = registerFsIpc(ipcMain);
 
   const cleanup = () => {
