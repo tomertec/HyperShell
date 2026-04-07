@@ -44,6 +44,7 @@ export type HostFormValue = {
   authMethod: "default" | "password" | "keyfile" | "agent" | "op-reference";
   agentKind: "system" | "pageant" | "1password";
   opReference: string;
+  color?: string | null;
 };
 
 export interface HostFormProps {

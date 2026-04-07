@@ -10,6 +10,8 @@ export type HostRecord = HostFormValue & {
   id: string;
   notes?: string;
   isFavorite?: boolean;
+  sortOrder?: number | null;
+  color?: string | null;
 };
 
 const demoHosts: HostRecord[] = [

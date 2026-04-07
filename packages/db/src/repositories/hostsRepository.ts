@@ -15,6 +15,8 @@ export type HostRecord = {
   agentKind: string;
   opReference: string | null;
   isFavorite: boolean;
+  sortOrder: number | null;
+  color: string | null;
 };
 
 export type HostInput = {
@@ -31,6 +33,8 @@ export type HostInput = {
   agentKind?: string | null;
   opReference?: string | null;
   isFavorite?: boolean;
+  sortOrder?: number | null;
+  color?: string | null;
 };
 
 type HostRow = {
@@ -47,6 +51,8 @@ type HostRow = {
   agent_kind: string | null;
   op_reference: string | null;
   is_favorite: number;
+  sort_order: number | null;
+  color: string | null;
 };
 
 function mapRow(row: HostRow): HostRecord {
@@ -63,7 +69,9 @@ function mapRow(row: HostRow): HostRecord {
     authMethod: row.auth_method ?? "default",
     agentKind: row.agent_kind ?? "system",
     opReference: row.op_reference ?? null,
-    isFavorite: Boolean(row.is_favorite)
+    isFavorite: Boolean(row.is_favorite),
+    sortOrder: row.sort_order ?? null,
+    color: row.color ?? null
   };
 }
 
@@ -83,11 +91,11 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
   const insertHost = db.prepare(`
     INSERT INTO hosts (
       id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
-      auth_method, agent_kind, op_reference, is_favorite
+      auth_method, agent_kind, op_reference, is_favorite, sort_order, color
     )
     VALUES (
       @id, @name, @hostname, @port, @username, @identityFile, @authProfileId, @groupId, @notes,
-      @authMethod, @agentKind, @opReference, @isFavorite
+      @authMethod, @agentKind, @opReference, @isFavorite, @sortOrder, @color
     )
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -102,26 +110,33 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       agent_kind = excluded.agent_kind,
       op_reference = excluded.op_reference,
       is_favorite = excluded.is_favorite,
+      sort_order = excluded.sort_order,
+      color = excluded.color,
       updated_at = CURRENT_TIMESTAMP
   `);
 
   const listHosts = db.prepare(`
     SELECT
       id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
-      auth_method, agent_kind, op_reference, is_favorite
+      auth_method, agent_kind, op_reference, is_favorite, sort_order, color
     FROM hosts
-    ORDER BY is_favorite DESC, name COLLATE NOCASE ASC
+    ORDER BY COALESCE(sort_order, 999999) ASC, is_favorite DESC, name COLLATE NOCASE ASC
   `);
   const getHostById = db.prepare(
     `
       SELECT
         id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
-        auth_method, agent_kind, op_reference, is_favorite
+        auth_method, agent_kind, op_reference, is_favorite, sort_order, color
       FROM hosts
       WHERE id = ?
     `
   );
   const deleteHost = db.prepare(`DELETE FROM hosts WHERE id = ?`);
+
+  const updateSortOrder = db.prepare(`
+    UPDATE hosts SET sort_order = @sortOrder, group_id = @groupId, updated_at = CURRENT_TIMESTAMP
+    WHERE id = @id
+  `);
 
   return {
     create(input: HostInput): HostRecord {
@@ -136,7 +151,9 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         authMethod: input.authMethod ?? "default",
         agentKind: input.agentKind ?? "system",
         opReference: input.opReference ?? null,
-        isFavorite: input.isFavorite ? 1 : 0
+        isFavorite: input.isFavorite ? 1 : 0,
+        sortOrder: input.sortOrder ?? null,
+        color: input.color ?? null
       };
 
       insertHost.run(normalized);
@@ -158,6 +175,14 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
     remove(id: string): boolean {
       const result = deleteHost.run(id);
       return result.changes > 0;
+    },
+    updateSortOrders(items: Array<{ id: string; sortOrder: number; groupId: string | null }>): void {
+      const tx = db.transaction(() => {
+        for (const item of items) {
+          updateSortOrder.run({ id: item.id, sortOrder: item.sortOrder, groupId: item.groupId });
+        }
+      });
+      tx();
     }
   };
 }
@@ -180,7 +205,9 @@ function createInMemoryHostsRepository() {
         authMethod: input.authMethod ?? "default",
         agentKind: input.agentKind ?? "system",
         opReference: input.opReference ?? null,
-        isFavorite: input.isFavorite ?? false
+        isFavorite: input.isFavorite ?? false,
+        sortOrder: input.sortOrder ?? null,
+        color: input.color ?? null
       };
 
       hosts.set(record.id, record);
@@ -199,6 +226,14 @@ function createInMemoryHostsRepository() {
     },
     remove(id: string): boolean {
       return hosts.delete(id);
+    },
+    updateSortOrders(items: Array<{ id: string; sortOrder: number; groupId: string | null }>): void {
+      for (const item of items) {
+        const host = hosts.get(item.id);
+        if (host) {
+          hosts.set(item.id, { ...host, sortOrder: item.sortOrder, groupId: item.groupId });
+        }
+      }
     }
   };
 }

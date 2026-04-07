@@ -13,7 +13,8 @@ export const hostChannels = {
   list: "hosts:list",
   upsert: "hosts:upsert",
   remove: "hosts:remove",
-  importSshConfig: "hosts:import-ssh-config"
+  importSshConfig: "hosts:import-ssh-config",
+  reorder: "hosts:reorder"
 } as const;
 
 export const settingsChannels = {

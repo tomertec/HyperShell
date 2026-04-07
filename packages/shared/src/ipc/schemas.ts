@@ -82,7 +82,9 @@ export const hostRecordSchema = z.object({
   notes: z.string().nullable(),
   authMethod: z.enum(["default", "password", "keyfile", "agent", "op-reference"]).optional(),
   agentKind: z.enum(["system", "pageant", "1password"]).optional(),
-  opReference: z.string().optional()
+  opReference: z.string().optional(),
+  sortOrder: z.number().int().nullable().optional(),
+  color: z.string().nullable().optional()
 });
 
 export const upsertHostRequestSchema = z.object({
@@ -98,12 +100,23 @@ export const upsertHostRequestSchema = z.object({
   authMethod: z.enum(["default", "password", "keyfile", "agent", "op-reference"]).optional(),
   agentKind: z.enum(["system", "pageant", "1password"]).optional(),
   opReference: z.string().optional(),
-  isFavorite: z.boolean().optional()
+  isFavorite: z.boolean().optional(),
+  sortOrder: z.number().int().nullable().optional(),
+  color: z.string().nullable().optional()
 });
 
 export const removeHostRequestSchema = z.object({
   id: z.string().min(1)
 });
+
+export const reorderHostsRequestSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().min(1),
+    sortOrder: z.number().int(),
+    groupId: z.string().nullable()
+  }))
+});
+export type ReorderHostsRequest = z.infer<typeof reorderHostsRequestSchema>;
 
 export const importSshConfigResponseSchema = z.object({
   imported: z.number().int().min(0),

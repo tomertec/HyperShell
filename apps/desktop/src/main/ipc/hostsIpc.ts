@@ -28,6 +28,7 @@ type HostsRepoLike = {
   get(id: string): HostRecord | undefined;
   list(): HostRecord[];
   remove(id: string): boolean;
+  updateSortOrders(items: Array<{ id: string; sortOrder: number; groupId: string | null }>): void;
 };
 
 let hostsRepo: HostsRepoLike | null = null;
@@ -154,7 +155,9 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           authMethod: item?.authMethod == null ? "default" : String(item.authMethod),
           agentKind: item?.agentKind == null ? "system" : String(item.agentKind),
           opReference: item?.opReference == null ? null : String(item.opReference),
-          isFavorite: Boolean(item?.isFavorite ?? false)
+          isFavorite: Boolean(item?.isFavorite ?? false),
+          sortOrder: item?.sortOrder == null ? null : Number(item.sortOrder),
+          color: item?.color == null ? null : String(item.color)
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
     } catch {
@@ -181,7 +184,9 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         authMethod: input.authMethod ?? "default",
         agentKind: input.agentKind ?? "system",
         opReference: input.opReference ?? null,
-        isFavorite: input.isFavorite ?? false
+        isFavorite: input.isFavorite ?? false,
+        sortOrder: input.sortOrder ?? null,
+        color: input.color ?? null
       };
 
       const hosts = readHosts();
@@ -210,6 +215,17 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
       hosts.splice(index, 1);
       writeHosts(hosts);
       return true;
+    },
+    updateSortOrders(items: Array<{ id: string; sortOrder: number; groupId: string | null }>): void {
+      const hosts = readHosts();
+      for (const item of items) {
+        const host = hosts.find((h) => h.id === item.id);
+        if (host) {
+          host.sortOrder = item.sortOrder;
+          host.groupId = item.groupId;
+        }
+      }
+      writeHosts(hosts);
     }
   };
 }
