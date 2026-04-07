@@ -40,7 +40,9 @@ async function loadHosts(): Promise<HostRecord[]> {
       group: "",
       tags: "",
       notes: h.notes ? String(h.notes) : undefined,
-      isFavorite: Boolean(h.isFavorite ?? (h as Record<string, unknown>).is_favorite ?? false)
+      isFavorite: Boolean(h.isFavorite ?? (h as Record<string, unknown>).is_favorite ?? false),
+      sortOrder: h.sortOrder != null ? Number(h.sortOrder) : null,
+      color: h.color ? String(h.color) : null,
     }));
   } catch (err) {
     console.error("[sshterm] failed to load hosts:", err);
@@ -85,7 +87,9 @@ async function persistHost(host: HostRecord): Promise<void> {
       group: host.group,
       tags: host.tags,
       notes: host.notes || null,
-      isFavorite: host.isFavorite ?? false
+      isFavorite: host.isFavorite ?? false,
+      color: host.color ?? null,
+      sortOrder: host.sortOrder ?? null,
     });
     console.log("[sshterm] persisted host:", result);
   } catch (err) {

@@ -11,6 +11,7 @@ import {
   sessionEventSchema,
   upsertHostRequestSchema,
   removeHostRequestSchema,
+  reorderHostsRequestSchema,
   writeSessionRequestSchema,
   getSettingRequestSchema,
   updateSettingRequestSchema,
@@ -54,6 +55,7 @@ import {
   type HostRecord,
   type OpenSessionRequest,
   type OpenSessionResponse,
+  type ReorderHostsRequest,
   type RemoveHostRequest,
   type ResizeSessionRequest,
   type SessionEvent,
@@ -145,6 +147,7 @@ export interface DesktopApi {
   listHosts(): Promise<HostRecord[]>;
   upsertHost(request: UpsertHostRequest): Promise<HostRecord>;
   removeHost(request: RemoveHostRequest): Promise<void>;
+  reorderHosts(request: ReorderHostsRequest): Promise<{ success: boolean }>;
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
   importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }>;
@@ -284,6 +287,11 @@ export function createDesktopApi(
     async removeHost(request: RemoveHostRequest): Promise<void> {
       const parsed = removeHostRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.hosts.remove, parsed);
+    },
+    async reorderHosts(request: ReorderHostsRequest): Promise<{ success: boolean }> {
+      const parsed = reorderHostsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hosts.reorder, parsed);
+      return result as { success: boolean };
     },
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);

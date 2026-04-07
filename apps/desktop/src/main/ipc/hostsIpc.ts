@@ -4,8 +4,10 @@ import {
   ipcChannels,
   upsertHostRequestSchema,
   removeHostRequestSchema,
+  reorderHostsRequestSchema,
   type UpsertHostRequest,
-  type RemoveHostRequest
+  type RemoveHostRequest,
+  type ReorderHostsRequest
 } from "@sshterm/shared";
 import { app } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
@@ -294,7 +296,8 @@ function importFallbackHosts(repo: HostsRepoLike): void {
 export const hostChannelList = [
   ipcChannels.hosts.list,
   ipcChannels.hosts.upsert,
-  ipcChannels.hosts.remove
+  ipcChannels.hosts.remove,
+  ipcChannels.hosts.reorder
 ] as const;
 
 export function registerHostIpc(ipcMain: IpcMainLike): void {
@@ -315,8 +318,19 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       authMethod: parsed.authMethod ?? "default",
       agentKind: parsed.agentKind ?? "system",
       opReference: parsed.opReference ?? null,
-      isFavorite: parsed.isFavorite ?? false
+      isFavorite: parsed.isFavorite ?? false,
+      color: parsed.color ?? null,
+      sortOrder: parsed.sortOrder ?? null,
     });
+  });
+
+  ipcMain.handle(ipcChannels.hosts.reorder, (_event: IpcMainInvokeEvent, request: ReorderHostsRequest) => {
+    const parsed = reorderHostsRequestSchema.parse(request);
+    const repo = getOrCreateHostsRepo();
+    if ('updateSortOrders' in repo) {
+      (repo as any).updateSortOrders(parsed.items);
+    }
+    return { success: true };
   });
 
   ipcMain.handle(ipcChannels.hosts.remove, (_event: IpcMainInvokeEvent, request: RemoveHostRequest) => {
