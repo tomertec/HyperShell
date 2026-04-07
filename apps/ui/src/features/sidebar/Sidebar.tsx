@@ -1,6 +1,5 @@
 import type { SerialProfileRecord } from "@sshterm/shared";
 import type { HostRecord } from "../hosts/HostsView";
-import { useTunnelStore } from "../tunnels/tunnelStore";
 import { SidebarHostList } from "./SidebarHostList";
 import { SidebarSection } from "./SidebarSection";
 import { SidebarSerialList } from "./SidebarSerialList";
@@ -24,6 +23,9 @@ export interface SidebarProps {
   onSetHostColor: (host: HostRecord, color: string | null) => void;
   onReorderHosts: (items: Array<{ id: string; sortOrder: number; group: string }>) => void;
   onOpenSettings: () => void;
+  restoreCount?: number;
+  onRestore?: () => void;
+  onDismissRestore?: () => void;
 }
 
 export function Sidebar({
@@ -45,8 +47,10 @@ export function Sidebar({
   onSetHostColor,
   onReorderHosts,
   onOpenSettings,
+  restoreCount,
+  onRestore,
+  onDismissRestore,
 }: SidebarProps) {
-  const toggleTunnelPanel = useTunnelStore((s) => s.togglePanel);
 
   return (
     <div className="flex flex-col h-full">
@@ -130,17 +134,29 @@ export function Sidebar({
         />
       </SidebarSection>
 
-      <div className="mt-auto border-t border-border px-3 py-2 flex items-center justify-between">
-        <button
-          onClick={toggleTunnelPanel}
-          className="flex items-center gap-2 px-1 py-0.5 rounded text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"
-          title="Tunnel Manager"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted">
-            <path d="M2 4h12M2 8h8M2 12h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-          <span className="text-xs tracking-wide">Tunnels</span>
-        </button>
+      {restoreCount != null && restoreCount > 0 && onRestore && onDismissRestore && (
+        <div className="mt-auto border-t border-border px-3 py-2.5 flex flex-col gap-2">
+          <span className="text-xs text-text-secondary">
+            Restore {restoreCount} session{restoreCount === 1 ? "" : "s"} from last session?
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onRestore}
+              className="rounded bg-accent/15 border border-accent/30 px-3 py-1 text-xs text-accent hover:bg-accent/25 transition-colors font-medium"
+            >
+              Restore
+            </button>
+            <button
+              onClick={onDismissRestore}
+              className="text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={`${restoreCount ? "" : "mt-auto "}border-t border-border px-3 py-2 flex items-center justify-between`}>
         <button
           onClick={onOpenSettings}
           className="flex items-center gap-2 px-1 py-0.5 rounded text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"

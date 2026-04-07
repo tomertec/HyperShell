@@ -3,6 +3,33 @@ import { useStore } from "zustand";
 import { broadcastStore } from "./broadcastStore";
 import { layoutStore } from "../layout/layoutStore";
 
+/** Icon button for the top-right toolbar — toggles broadcast on/off */
+export function BroadcastButton() {
+  const enabled = useStore(broadcastStore, (s) => s.enabled);
+  const toggle = useStore(broadcastStore, (s) => s.toggle);
+
+  return (
+    <button
+      onClick={toggle}
+      className={`p-1.5 rounded transition-colors ${
+        enabled
+          ? "text-warning hover:bg-warning/20"
+          : "text-text-muted hover:text-text-primary hover:bg-base-700/60"
+      }`}
+      title={enabled ? "Stop broadcast" : "Broadcast to all sessions"}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
+        <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4" />
+        <circle cx="12" cy="12" r="2" />
+        <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
+        <path d="M19.1 4.9C23 8.8 23 15.2 19.1 19.1" />
+      </svg>
+    </button>
+  );
+}
+
+/** Active broadcast bar — renders above tabs when broadcast is enabled */
 export function BroadcastBar() {
   const enabled = useStore(broadcastStore, (s) => s.enabled);
   const targets = useStore(broadcastStore, (s) => s.targetSessionIds);
@@ -19,17 +46,7 @@ export function BroadcastBar() {
     [targets, activeSessionIds]
   );
 
-  if (!enabled) {
-    return (
-      <button
-        onClick={toggle}
-        className="px-3 py-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-        title="Enable broadcast mode"
-      >
-        Broadcast
-      </button>
-    );
-  }
+  if (!enabled) return null;
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 bg-warning/10 border-b border-warning/30">

@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { useStore } from "zustand";
 import type { LayoutTab } from "./layoutStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
@@ -11,6 +12,15 @@ const tabStateColors: Record<string, string> = {
   failed: "bg-red-400",
 };
 
+const stateTextColors: Record<string, string> = {
+  connected: "text-green-400",
+  connecting: "text-yellow-400",
+  reconnecting: "text-yellow-400",
+  waiting_for_network: "text-orange-400",
+  disconnected: "text-gray-400",
+  failed: "text-red-400",
+};
+
 export interface TabBarProps {
   tabs: LayoutTab[];
   activeSessionId: string | null;
@@ -18,10 +28,47 @@ export interface TabBarProps {
   onClose: (sessionId: string) => void;
 }
 
+function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: string | undefined }) {
+  const transport = tab.transport === "serial" ? "Serial" : tab.transport === "sftp" ? "SFTP" : "SSH";
+  const state = sessionState ?? "disconnected";
+
+  return (
+    <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] py-2 px-3 rounded-lg bg-base-700 border border-border shadow-xl text-xs pointer-events-none">
+      <div className="font-medium text-text-primary text-[13px] mb-1">{tab.title}</div>
+      <div className="flex items-center gap-1.5 text-text-muted">
+        <span className="text-text-secondary">{transport}</span>
+        {tab.profileId && (
+          <>
+            <span className="text-text-muted/50">&middot;</span>
+            <span>{tab.profileId}</span>
+          </>
+        )}
+      </div>
+      <div className={`mt-1.5 flex items-center gap-1.5 uppercase tracking-wider text-[10px] font-medium ${stateTextColors[state] ?? "text-gray-400"}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${tabStateColors[state] ?? "bg-gray-400"}`} />
+        {state}
+      </div>
+    </div>
+  );
+}
+
 export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarProps) {
   const sessionStates = useStore(sessionStateStore, (s) => s.sessions);
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (tabs.length === 0) return null;
+
+  const handleMouseEnter = (sessionId: string) => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = setTimeout(() => setHoveredTab(sessionId), 400);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    hoverTimeout.current = null;
+    setHoveredTab(null);
+  };
 
   return (
     <div className="flex items-end bg-base-800 px-1 pt-2 overflow-x-auto">
@@ -36,6 +83,8 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarPro
             )}
             <button
               onClick={() => onActivate(tab.sessionId)}
+              onMouseEnter={() => handleMouseEnter(tab.sessionId)}
+              onMouseLeave={handleMouseLeave}
               className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-all duration-150 max-w-[200px] ${
                 isActive
                   ? "bg-base-900 text-text-primary"
@@ -62,6 +111,10 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarPro
               {/* Bottom edge blend for active tab */}
               {isActive && (
                 <span className="absolute -bottom-px left-0 right-0 h-px bg-base-900" />
+              )}
+              {/* Hover tooltip */}
+              {hoveredTab === tab.sessionId && (
+                <TabTooltip tab={tab} sessionState={sessionState} />
               )}
             </button>
           </div>

@@ -2,9 +2,10 @@ import { Fragment, useCallback, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import { WelcomeScreen } from "../welcome";
-import { BroadcastBar } from "../broadcast/BroadcastBar";
+import { BroadcastBar, BroadcastButton } from "../broadcast/BroadcastBar";
 import { SftpTab } from "../sftp";
 import { TerminalPane } from "../terminal/TerminalPane";
+import { useTunnelStore } from "../tunnels/tunnelStore";
 import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
 import { type Pane, layoutStore } from "./layoutStore";
 import { PaneResizeHandle } from "./PaneResizeHandle";
@@ -68,7 +69,6 @@ function PaneView({
             }`}
           >
             <TerminalPane
-              title={tab.title}
               transport={terminalTransport}
               profileId={tab.profileId ?? tab.sessionId}
               sessionId={tab.preopened ? tab.sessionId : undefined}
@@ -113,6 +113,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   const splitDirection = useStore(layoutStore, (s) => s.splitDirection);
   const paneSizes = useStore(layoutStore, (s) => s.paneSizes);
   const setPaneSizes = useStore(layoutStore, (s) => s.setPaneSizes);
+  const toggleTunnelPanel = useTunnelStore((s) => s.togglePanel);
   const containerRef = useRef<HTMLDivElement>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
 
@@ -187,7 +188,17 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
             onClose={closeTab}
           />
         </div>
-        <div className="relative flex items-center px-2 pb-1.5 pt-2">
+        <div className="relative flex items-center gap-0.5 px-2 pb-1.5 pt-2">
+          <BroadcastButton />
+          <button
+            onClick={toggleTunnelPanel}
+            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
+            title="Tunnels"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+          </button>
           <button
             onClick={() => setWorkspaceMenuOpen((prev) => !prev)}
             className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"

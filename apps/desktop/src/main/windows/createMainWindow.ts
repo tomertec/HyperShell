@@ -51,8 +51,14 @@ export function createMainWindow(): BrowserWindow {
     height: state.height,
     minWidth: 1024,
     minHeight: 720,
-    title: "sshterm",
+    title: "HyperShell",
     backgroundColor: "#07111f",
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#0a1929",
+      symbolColor: "#8899aa",
+      height: 36
+    },
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

@@ -168,8 +168,6 @@ export function App() {
     (s) => s.settings.terminal.theme
   );
   const customThemes = useStore(settingsStore, (s) => s.settings.customThemes);
-  const broadcastEnabled = useStore(broadcastStore, (s) => s.enabled);
-  const broadcastTargets = useStore(broadcastStore, (s) => s.targetSessionIds);
   const toggleBroadcast = useStore(broadcastStore, (s) => s.toggle);
   const setBroadcastTargets = useStore(broadcastStore, (s) => s.setTargets);
   const rememberSession = useStore(sessionRecoveryStore, (s) => s.remember);
@@ -535,37 +533,12 @@ export function App() {
             onSetHostColor={setHostColor}
             onReorderHosts={reorderHosts}
             onOpenSettings={() => setSettingsOpen(true)}
+            restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}
+            onRestore={restoreLastWorkspace}
+            onDismissRestore={dismissRestoreBanner}
           />
         }
       >
-        {broadcastEnabled && (
-          <div className="flex items-center gap-2 px-4 py-1.5 border-b border-yellow-900/50 bg-yellow-950/30 text-yellow-300 text-xs">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-            Broadcast mode active &mdash; {broadcastTargets.length} session
-            {broadcastTargets.length === 1 ? "" : "s"}
-          </div>
-        )}
-
-        {restoreBannerVisible && (
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-accent/20 bg-accent/5 text-xs">
-            <span className="text-text-secondary">
-              Restore {lastWorkspaceTabs.length} session{lastWorkspaceTabs.length === 1 ? "" : "s"} from your last session?
-            </span>
-            <button
-              onClick={restoreLastWorkspace}
-              className="rounded bg-accent/15 border border-accent/30 px-3 py-1 text-accent hover:bg-accent/25 transition-colors font-medium"
-            >
-              Restore
-            </button>
-            <button
-              onClick={dismissRestoreBanner}
-              className="text-text-muted hover:text-text-primary transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
         <Workspace
           availablePorts={availablePorts}
           onRefreshPorts={refreshPorts}
