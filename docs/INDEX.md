@@ -81,7 +81,15 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 | SFTP bookmarks | Complete | `db/repositories/sftpBookmarksRepository.ts` |
 | SFTP sync engine | Complete | `session-core/sftp/syncEngine.ts` |
 | Broadcast mode | Complete | `ui/features/broadcast/` |
-| Port forwarding profiles | Complete | `session-core/portForwarding.ts` |
+| Port forwarding (standalone) | Complete | `session-core/portForwarding.ts` |
+| Port forwarding (host-linked) | Complete | `db/repositories/hostPortForwardsRepository.ts`, `desktop/ipc/hostPortForwardIpc.ts` |
+| Visual Tunnel Manager | Complete | `ui/features/tunnels/` |
+| Jump host (ProxyJump) per host | Complete | `session-core/transports/sshPtyTransport.ts` |
+| SSH2 connection pool | Complete | `session-core/ssh2ConnectionPool.ts` |
+| Network-aware auto-reconnect | Complete | `session-core/networkMonitor.ts`, `sessionManager.ts` |
+| Per-host keep-alive | Complete | Host record `keep_alive_interval` → `sshPtyTransport.ts` |
+| Terminal reconnect overlay | Complete | `ui/features/terminal/TerminalReconnectOverlay.tsx` |
+| Tab status badges | Complete | `ui/features/layout/TabBar.tsx` |
 | Session recovery | Complete | `ui/features/sessions/` |
 | Workspace save/restore | Complete | `db/repositories/workspaceRepository.ts` |
 | Settings and themes | Complete | `ui/features/settings/` |

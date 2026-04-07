@@ -18,7 +18,8 @@ sshterm/
 │   │   │   │   │   ├── serialProfilesIpc.ts # Serial profile CRUD + port enum
 │   │   │   │   │   ├── settingsIpc.ts       # App preferences
 │   │   │   │   │   ├── groupsIpc.ts         # Host grouping
-│   │   │   │   │   ├── portForwardIpc.ts    # SSH port forwarding
+│   │   │   │   │   ├── portForwardIpc.ts    # Standalone SSH port forwarding
+│   │   │   │   │   ├── hostPortForwardIpc.ts # Host-linked port forward CRUD
 │   │   │   │   │   ├── sshConfigIpc.ts      # ~/.ssh/config parsing
 │   │   │   │   │   ├── sshKeysIpc.ts        # SSH key management
 │   │   │   │   │   └── workspaceIpc.ts      # Workspace save/restore
@@ -48,11 +49,14 @@ sshterm/
 │       │   │   └── App.tsx                  # Root component (dialogs, routing, stores)
 │       │   ├── types/
 │       │   │   └── global.d.ts              # window.sshterm type declarations
+│       │   ├── lib/
+│       │   │   └── formStyles.ts            # Shared input/badge CSS classes
 │       │   ├── components/
 │       │   │   └── ContextMenu.tsx          # Reusable context menu
 │       │   └── features/
 │       │       ├── layout/                  # AppShell, Workspace, TabBar, Panes
-│       │       ├── terminal/                # TerminalPane, useTerminalSession, themes
+│       │       ├── terminal/                # TerminalPane, useTerminalSession, reconnect overlay
+│       │       ├── tunnels/                 # Tunnel Manager (topology, list, form, store)
 │       │       ├── sftp/                    # Dual-pane browser, transfers, editor
 │       │       │   ├── components/          # FileList, RemotePane, LocalPane, etc.
 │       │       │   ├── hooks/               # useFileKeyboard
@@ -87,7 +91,9 @@ sshterm/
 │   │
 │   ├── session-core/               # Transport abstraction layer
 │   │   └── src/
-│   │       ├── sessionManager.ts            # Session lifecycle + reconnection
+│   │       ├── sessionManager.ts            # Session lifecycle + network-aware reconnection
+│   │       ├── networkMonitor.ts           # DNS-based network status probing
+│   │       ├── ssh2ConnectionPool.ts       # Shared ssh2 connections (ref counting, idle timeout)
 │   │       ├── transports/
 │   │       │   ├── sshPtyTransport.ts       # System SSH via node-pty
 │   │       │   ├── serialTransport.ts       # Serial port via serialport
@@ -108,12 +114,14 @@ sshterm/
 │           │   ├── 002_sftp_bookmarks.sql   # SFTP bookmarks table
 │           │   ├── 003_host_auth.ts         # Identity file + auth fields
 │           │   ├── 004_favorites.ts         # Host favorites
-│           │   └── 005_host_enhancements.ts # Sort order, color, 1Password ref
+│           │   ├── 005_host_enhancements.ts # Sort order, color, 1Password ref
+│           │   └── 006_advanced_ssh.sql    # Jump host, keep-alive, auto-reconnect, host_port_forwards
 │           └── repositories/
 │               ├── hostsRepository.ts       # Host CRUD + reorder
 │               ├── groupsRepository.ts      # Group CRUD
 │               ├── serialProfilesRepository.ts
 │               ├── sftpBookmarksRepository.ts
+│               ├── hostPortForwardsRepository.ts
 │               └── workspaceRepository.ts
 │
 ├── .github/workflows/

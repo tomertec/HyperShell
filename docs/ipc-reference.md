@@ -6,13 +6,15 @@ All IPC channels are defined in `packages/shared/src/ipc/channels.ts`. Schemas a
 
 | Channel | Direction | Request | Response | Handler |
 |---------|-----------|---------|----------|---------|
-| `session:open` | renderer → main | `{ transport, profileId, cols, rows }` | `{ sessionId, state }` | `registerIpc.ts` |
+| `session:open` | renderer → main | `{ transport, profileId, cols, rows, autoReconnect?, reconnectMaxAttempts?, reconnectBaseInterval? }` | `{ sessionId, state }` | `registerIpc.ts` |
 | `session:write` | renderer → main | `{ sessionId, data }` | void | `registerIpc.ts` |
 | `session:resize` | renderer → main | `{ sessionId, cols, rows }` | void | `registerIpc.ts` |
 | `session:close` | renderer → main | `{ sessionId }` | void | `registerIpc.ts` |
 | `session:set-signals` | renderer → main | `{ sessionId, signals }` | void | `registerIpc.ts` |
 | `session:host-stats` | renderer → main | `{ sessionId }` | `{ cpuLoad, memUsage, diskUsage, uptime, latencyMs }` | `registerIpc.ts` |
 | `session:event` | main → renderer | — | `SessionEvent` (data\|status\|exit\|error) | broadcast |
+
+Session states: `connecting`, `connected`, `reconnecting`, `waiting_for_network`, `disconnected`, `failed`.
 
 ## Host Channels
 
@@ -111,3 +113,26 @@ All IPC channels are defined in `packages/shared/src/ipc/channels.ts`. Schemas a
 | `ssh-keys:generate` | `{ type, path, passphrase? }` | void | `sshKeysIpc.ts` |
 | `ssh-keys:get-fingerprint` | `{ path }` | `{ fingerprint }` | `sshKeysIpc.ts` |
 | `ssh-keys:remove` | `{ path }` | void | `sshKeysIpc.ts` |
+
+## Host Port Forward Channels
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `host-port-forward:list` | `{ hostId }` | `HostPortForwardRecord[]` | `hostPortForwardIpc.ts` |
+| `host-port-forward:upsert` | `UpsertHostPortForwardRequest` | `HostPortForwardRecord` | `hostPortForwardIpc.ts` |
+| `host-port-forward:remove` | `{ id }` | boolean | `hostPortForwardIpc.ts` |
+| `host-port-forward:reorder` | `{ items: [{ id, sortOrder }] }` | void | `hostPortForwardIpc.ts` |
+
+Host port forwards are linked to a specific host via `hostId`. Forwards with `autoStart: true` activate when the host's SSH session opens and tear down on disconnect.
+
+## Connection Pool Channels
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `connection-pool:stats` | — | `ConnectionPoolStats[]` | `registerIpc.ts` |
+
+## Network Channels
+
+| Channel | Direction | Request | Response | Handler |
+|---------|-----------|---------|----------|---------|
+| `network:status` | main → renderer | — | `{ online: boolean }` | broadcast |

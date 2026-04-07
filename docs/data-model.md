@@ -11,9 +11,9 @@ Foreign keys are enabled globally. Schema is managed through numbered migrations
 ```
 host_groups 1──* hosts *──* host_tags *──1 tags
                   │
-                  │ 1
+                  ├── 1──* sftp_bookmarks
                   │
-                  * sftp_bookmarks
+                  └── 1──* host_port_forwards
 
 serial_profiles (standalone)
 workspace_layouts (standalone)
@@ -41,6 +41,12 @@ Primary host records for SSH connections.
 | is_favorite | INTEGER | 0 or 1 |
 | sort_order | INTEGER | Drag-and-drop position |
 | color | TEXT | Color tag (red\|orange\|yellow\|green\|blue\|cyan\|purple\|pink) |
+| proxy_jump | TEXT | ProxyJump value for `-J` (e.g. `user@bastion:22`) |
+| proxy_jump_host_ids | TEXT | JSON array of host IDs for jump host picker UI state |
+| keep_alive_interval | INTEGER | ServerAliveInterval in seconds (NULL = default 30s, 0 = disabled) |
+| auto_reconnect | INTEGER | 0 or 1 — enable network-aware auto-reconnect |
+| reconnect_max_attempts | INTEGER | Max reconnection attempts (default 5) |
+| reconnect_base_interval | INTEGER | Base reconnect delay in seconds (default 1, exponential backoff) |
 | notes | TEXT | Freeform notes |
 | created_at | TEXT | ISO timestamp |
 | updated_at | TEXT | ISO timestamp |
@@ -105,6 +111,24 @@ Key-value store for user preferences.
 | created_at | TEXT | ISO timestamp |
 | updated_at | TEXT | ISO timestamp |
 
+### host_port_forwards
+Port forwarding rules linked to a specific host. Auto-start on connect is optional.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT PK | UUID |
+| host_id | TEXT FK NOT NULL | → hosts.id (ON DELETE CASCADE) |
+| name | TEXT NOT NULL | Display name (e.g. "DB tunnel") |
+| protocol | TEXT NOT NULL | local\|remote\|dynamic |
+| local_address | TEXT | Default 127.0.0.1 |
+| local_port | INTEGER NOT NULL | Local listening port |
+| remote_host | TEXT | Remote target host (empty for dynamic) |
+| remote_port | INTEGER | Remote target port (0 for dynamic) |
+| auto_start | INTEGER | 0 or 1 — start automatically on host connect |
+| sort_order | INTEGER | Display order |
+| created_at | TEXT | ISO timestamp |
+| updated_at | TEXT | ISO timestamp |
+
 ## Migrations
 
 | Migration | Description |
@@ -114,6 +138,7 @@ Key-value store for user preferences.
 | 003_host_auth.ts | Adds identity_file, auth_method, op_reference, agent_kind to hosts |
 | 004_favorites.ts | Adds is_favorite to hosts |
 | 005_host_enhancements.ts | Adds sort_order + color to hosts and host_groups |
+| 006_advanced_ssh.sql | Adds proxy_jump, keep_alive_interval, auto_reconnect fields to hosts; creates host_port_forwards table |
 
 Migrations are idempotent — they use `column already exists` guards. They run automatically on `openDatabase()`.
 
@@ -128,3 +153,4 @@ All repositories are in `packages/db/src/repositories/`. They follow a consisten
 | `serialProfilesRepository` | serial_profiles | `create`, `get`, `list`, `update`, `remove` |
 | `sftpBookmarksRepository` | sftp_bookmarks | `create`, `list` (by host), `update`, `remove`, `reorder` |
 | `workspaceRepository` | workspace_layouts | `save`, `load`, `list`, `remove` |
+| `hostPortForwardsRepository` | host_port_forwards | `create`, `update`, `listForHost`, `remove`, `updateSortOrders` |

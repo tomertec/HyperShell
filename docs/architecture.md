@@ -98,7 +98,30 @@ Uses the **ssh2 npm library** for programmatic SFTP access. This is separate fro
 - Stream-based transfers with progress tracking
 - Transfer queue management
 
-The SFTP transport handles multi-key authentication (tries all candidate keys sequentially) and strips Windows domain prefixes from usernames.
+The SFTP transport handles multi-key authentication (tries all candidate keys sequentially) and strips Windows domain prefixes from usernames. When an `Ssh2ConnectionPool` is provided, it acquires a pooled connection instead of creating a new `ssh2.Client`.
+
+### SSH2 Connection Pool
+
+`Ssh2ConnectionPool` manages shared `ssh2.Client` connections keyed by `host:port:username`. Multiple consumers (SFTP sessions, port forwards) can share a single underlying connection.
+
+- **Reference counting** — `acquire()` increments consumers, `release()` decrements
+- **Idle timeout** — Connections with 0 consumers stay alive for 30s before closing
+- **Error propagation** — If the underlying client errors, all consumers are notified and the entry is removed
+- **Auth resolution** — Callers resolve credentials before accessing the pool; the pool doesn't handle auth strategy
+
+### Network Monitor
+
+`NetworkMonitor` tracks network connectivity via periodic DNS probes (`dns.resolve("dns.google")` every 10s). It provides `onOnline`/`onOffline` callbacks that the `SessionManager` uses for network-aware auto-reconnect.
+
+### Auto-Reconnect with Network Awareness
+
+When a session disconnects with `autoReconnect` enabled:
+1. Check `NetworkMonitor.isOnline()`
+2. If offline → enter `waiting_for_network` state (no attempt counter burned)
+3. When network restores → reset attempts, reconnect immediately
+4. If online → exponential backoff: `baseInterval * 2^(attempt-1)`, capped at 30s
+
+Per-host configuration: `autoReconnect` (boolean), `reconnectMaxAttempts` (default 5), `reconnectBaseInterval` (default 1s).
 
 ### Serial Transport
 
@@ -129,6 +152,7 @@ Both sides validate. The preload validates outgoing requests AND incoming respon
 | `sessionRecoveryStore` | `ui/features/sessions/` | Session metadata for crash recovery |
 | `sftpStore` (per session) | `ui/features/sftp/` | SFTP pane state, entries, selection, sort |
 | `transferStore` | `ui/features/sftp/` | Active transfer jobs and progress |
+| `tunnelStore` | `ui/features/tunnels/` | Tunnel Manager panel state, active forwards |
 
 ## Key Design Decisions
 
