@@ -151,6 +151,7 @@ export function App() {
   const [sftpAuthPassword, setSftpAuthPassword] = useState("");
   const [sftpAuthError, setSftpAuthError] = useState<string | null>(null);
   const [sftpAuthSubmitting, setSftpAuthSubmitting] = useState(false);
+  const [connectingHostIds, setConnectingHostIds] = useState<Set<string>>(new Set());
   const [restoreBannerVisible, setRestoreBannerVisible] = useState(false);
   const [lastWorkspaceTabs, setLastWorkspaceTabs] = useState<Array<{
     transport: string;
@@ -201,6 +202,30 @@ export function App() {
   }, []);
 
   const tabSessionIds = useMemo(() => tabs.map((t) => t.sessionId), [tabs]);
+
+  const activeSessionHostIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const tab of tabs) {
+      const match = tab.sessionId.match(/^ssh-(.+)-\d+$/);
+      if (match) ids.add(match[1]);
+      if (tab.hostId) ids.add(tab.hostId);
+    }
+    return ids;
+  }, [tabs]);
+
+  useEffect(() => {
+    setConnectingHostIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const id of prev) {
+        if (activeSessionHostIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [activeSessionHostIds]);
 
   useEffect(() => {
     for (const id of tabSessionIds) {
@@ -262,6 +287,7 @@ export function App() {
 
   const connectHost = useCallback(
     (host: HostRecord) => {
+      setConnectingHostIds((prev) => new Set(prev).add(host.id));
       const optimisticSessionId = `ssh-${host.id}-${Date.now()}`;
       const destination = host.username
         ? `${host.username}@${host.hostname}`
@@ -272,6 +298,7 @@ export function App() {
         title: host.name,
         transport: "ssh",
         profileId: destination,
+        hostId: host.id,
         preopened: false
       });
     },
@@ -369,6 +396,30 @@ export function App() {
     []
   );
 
+  const setHostColor = useCallback((host: HostRecord, color: string | null) => {
+    const updated = { ...host, color };
+    setHosts((prev) => prev.map((h) => (h.id === host.id ? updated : h)));
+    void persistHost(updated);
+  }, []);
+
+  const reorderHosts = useCallback((items: Array<{ id: string; sortOrder: number; group: string }>) => {
+    setHosts((prev) => {
+      const updated = [...prev];
+      for (const item of items) {
+        const idx = updated.findIndex((h) => h.id === item.id);
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], sortOrder: item.sortOrder, group: item.group };
+        }
+      }
+      return updated.sort((a, b) =>
+        (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999)
+      );
+    });
+    void window.sshterm?.reorderHosts?.({
+      items: items.map((i) => ({ id: i.id, sortOrder: i.sortOrder, groupId: null }))
+    });
+  }, []);
+
   const openSftpHost = useCallback(
     async (host: HostRecord) => {
       if (!window.sshterm?.sftpConnect) {
@@ -449,6 +500,8 @@ export function App() {
         sidebar={
           <Sidebar
             hosts={hosts}
+            activeSessionHostIds={activeSessionHostIds}
+            connectingHostIds={connectingHostIds}
             onConnectHost={connectHost}
             onOpenSftpHost={openSftpHost}
             onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
@@ -461,6 +514,8 @@ export function App() {
             onDuplicateHost={duplicateHost}
             onDeleteHost={(host) => { void deleteHost(host); }}
             onToggleFavoriteHost={toggleFavoriteHost}
+            onSetHostColor={setHostColor}
+            onReorderHosts={reorderHosts}
             onOpenSettings={() => setSettingsOpen(true)}
           />
         }

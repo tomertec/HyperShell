@@ -6,6 +6,8 @@ import { SidebarSerialList } from "./SidebarSerialList";
 
 export interface SidebarProps {
   hosts: HostRecord[];
+  activeSessionHostIds: Set<string>;
+  connectingHostIds: Set<string>;
   onConnectHost: (host: HostRecord) => void;
   onOpenSftpHost: (host: HostRecord) => void;
   onEditHost: (host: HostRecord) => void;
@@ -18,11 +20,15 @@ export interface SidebarProps {
   onDuplicateHost: (host: HostRecord) => void;
   onDeleteHost: (host: HostRecord) => void;
   onToggleFavoriteHost: (host: HostRecord) => void;
+  onSetHostColor: (host: HostRecord, color: string | null) => void;
+  onReorderHosts: (items: Array<{ id: string; sortOrder: number; group: string }>) => void;
   onOpenSettings: () => void;
 }
 
 export function Sidebar({
   hosts,
+  activeSessionHostIds,
+  connectingHostIds,
   onConnectHost,
   onOpenSftpHost,
   onEditHost,
@@ -35,6 +41,8 @@ export function Sidebar({
   onDuplicateHost,
   onDeleteHost,
   onToggleFavoriteHost,
+  onSetHostColor,
+  onReorderHosts,
   onOpenSettings,
 }: SidebarProps) {
 
@@ -84,6 +92,8 @@ export function Sidebar({
       >
         <SidebarHostList
           hosts={hosts}
+          activeSessionHostIds={activeSessionHostIds}
+          connectingHostIds={connectingHostIds}
           onConnect={onConnectHost}
           onOpenSftp={onOpenSftpHost}
           onEdit={onEditHost}
@@ -92,6 +102,8 @@ export function Sidebar({
           onToggleFavorite={onToggleFavoriteHost}
           onCopyHostname={(host) => void navigator.clipboard.writeText(host.hostname)}
           onCopyAddress={(host) => void navigator.clipboard.writeText(host.hostname)}
+          onSetColor={onSetHostColor}
+          onReorder={onReorderHosts}
         />
       </SidebarSection>
 
