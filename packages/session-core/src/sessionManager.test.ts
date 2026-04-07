@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { createSessionManager } from "./sessionManager";
 import type {
@@ -207,6 +207,69 @@ describe("sessionManager", () => {
 
     manager.close(result.sessionId);
     expect(transportCount).toBe(1);
+  });
+
+  it("uses configurable reconnect base interval", () => {
+    vi.useFakeTimers();
+
+    let transportCount = 0;
+    const listeners = new Set<(event: SessionTransportEvent) => void>();
+    let capturedSessionId = "";
+
+    const manager = createSessionManager({
+      createTransport(request) {
+        transportCount++;
+        capturedSessionId = request.sessionId;
+        return {
+          write() {},
+          resize() {},
+          close() {},
+          onEvent(listener) {
+            listeners.add(listener);
+            // Emit exit immediately on first transport creation
+            if (transportCount === 1) {
+              Promise.resolve().then(() => {
+                for (const l of listeners) {
+                  l({ type: "exit", sessionId: request.sessionId, exitCode: 1 });
+                }
+              });
+            }
+            return () => { listeners.delete(listener); };
+          }
+        };
+      }
+    });
+
+    const events: SessionTransportEvent[] = [];
+    manager.onEvent((e) => events.push(e));
+
+    manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true,
+      maxReconnectAttempts: 3,
+      reconnectBaseInterval: 3
+    });
+
+    // Flush the microtask that emits the exit event
+    return Promise.resolve().then(() => {
+      // After exit, should be in reconnecting state
+      expect(events.some((e) => e.type === "status" && e.state === "reconnecting")).toBe(true);
+      // Only 1 transport created so far — delay hasn't elapsed
+      expect(transportCount).toBe(1);
+
+      // Advance by 2999ms — not enough for 3s base interval
+      vi.advanceTimersByTime(2999);
+      expect(transportCount).toBe(1);
+
+      // Advance 1 more ms — now at 3000ms, timer should fire
+      vi.advanceTimersByTime(1);
+      expect(transportCount).toBe(2);
+
+      vi.useRealTimers();
+    });
   });
 
   it("passes sshOptions to transport when provided", () => {

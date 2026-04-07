@@ -4,6 +4,7 @@ export type SessionState =
   | "connecting"
   | "connected"
   | "reconnecting"
+  | "waiting_for_network"
   | "disconnected"
   | "failed";
 

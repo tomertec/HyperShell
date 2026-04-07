@@ -19,6 +19,7 @@ export interface SessionSnapshot {
   state: SessionState;
   autoReconnect: boolean;
   reconnectAttempts: number;
+  reconnectBaseInterval: number;
 }
 
 export interface SessionManagerDeps {
@@ -35,6 +36,7 @@ export interface OpenSessionInput {
   serialOptions?: SerialConnectionOptions;
   autoReconnect?: boolean;
   maxReconnectAttempts?: number;
+  reconnectBaseInterval?: number;
 }
 
 export interface OpenSessionResult {
@@ -171,7 +173,8 @@ export function createSessionManager(
             listener({ type: "status", sessionId, state: "reconnecting" });
           }
 
-          const delay = Math.min(1000 * Math.pow(2, snapshot.reconnectAttempts - 1), 30000);
+          const baseMs = (snapshot.reconnectBaseInterval ?? 1) * 1000;
+          const delay = Math.min(baseMs * Math.pow(2, snapshot.reconnectAttempts - 1), 30000);
           session.reconnectTimer = setTimeout(() => {
             const current = sessions.get(sessionId);
             if (!current) return;
@@ -215,7 +218,8 @@ export function createSessionManager(
         rows: input.rows,
         state: "connecting",
         autoReconnect: input.autoReconnect ?? false,
-        reconnectAttempts: 0
+        reconnectAttempts: 0,
+        reconnectBaseInterval: input.reconnectBaseInterval ?? 1
       };
 
       const transport = createTransport({
