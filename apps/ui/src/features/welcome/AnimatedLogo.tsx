@@ -1,16 +1,32 @@
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import "./animated-logo.css";
 
 interface AnimatedLogoProps {
   compact?: boolean;
   onClick?: () => void;
 }
 
+// Pick 2-3 random indices to apply glitch effect to
+function pickGlitchIndices(length: number): Set<number> {
+  const indices = new Set<number>();
+  if (length < 3) return indices;
+  while (indices.size < 3) {
+    indices.add(Math.floor(Math.random() * length));
+  }
+  return indices;
+}
+
+const GLITCH_CLASSES = ["logo-glitch-1", "logo-glitch-2", "logo-glitch-3"];
+
 export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
   const [phase, setPhase] = useState<"typing" | "idle">("typing");
   const [visibleChars, setVisibleChars] = useState(0);
   const text = "HyperShell";
   const prompt = ">_ ";
+
+  // Stable glitch indices per mount
+  const glitchIndices = useMemo(() => pickGlitchIndices(text.length), []);
 
   // Typing effect
   useEffect(() => {
@@ -30,6 +46,41 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
     Math.max(0, visibleChars - prompt.length)
   );
 
+  // Render text characters individually for glitch effect in idle mode
+  const renderText = () => {
+    if (phase !== "idle") {
+      return (
+        <span
+          className="font-semibold text-text-primary tracking-tight"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {displayedText}
+        </span>
+      );
+    }
+
+    // In idle mode: shimmer overlay + individual glitch chars
+    return (
+      <span
+        className="font-semibold text-text-primary tracking-tight logo-shimmer-track"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        {displayedText.split("").map((char, i) => {
+          const glitchIdx = [...glitchIndices].indexOf(i);
+          if (glitchIdx !== -1) {
+            return (
+              <span key={i} className={GLITCH_CLASSES[glitchIdx]}>
+                {char}
+              </span>
+            );
+          }
+          return char;
+        })}
+        <span className="logo-shimmer-highlight" aria-hidden="true" />
+      </span>
+    );
+  };
+
   return (
     <motion.button
       layout
@@ -39,23 +90,44 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
       whileTap={{ scale: 0.98 }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
     >
-      {/* Glow effect */}
+      {/* Animated glow effect */}
       <div
         className={`absolute -inset-8 rounded-full blur-2xl transition-opacity duration-1000 ${
           phase === "idle"
-            ? "opacity-100 bg-accent/[0.06]"
+            ? "logo-glow-pulse bg-accent/[0.06]"
             : "opacity-0"
         }`}
       />
+
+      {/* CRT scanline overlay — large bleed area, no visible edges */}
+      {phase === "idle" && (
+        <div className="absolute -inset-12 overflow-hidden pointer-events-none">
+          <div
+            className="logo-scanline absolute left-[10%] right-[10%] h-[1px] blur-[1px] bg-gradient-to-r from-transparent via-accent/[0.06] to-transparent"
+          />
+        </div>
+      )}
+
       <motion.div
         layout
         className="relative flex items-baseline gap-0"
         style={{ fontSize: compact ? "1.5rem" : "2.5rem" }}
       >
-        <span className="text-accent/70 font-light" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{displayedPrompt}</span>
-        <span className="font-semibold text-text-primary tracking-tight" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-          {displayedText}
+        {/* Prompt with breathing animation */}
+        <span
+          className={`font-light ${phase === "idle" ? "logo-prompt-breathe" : ""}`}
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            color: "var(--color-accent)",
+            opacity: phase === "idle" ? undefined : 0.7,
+          }}
+        >
+          {displayedPrompt}
         </span>
+
+        {/* Text with shimmer + glitch */}
+        {renderText()}
+
         {/* Blinking cursor */}
         <motion.span
           className="inline-block w-[2px] bg-accent ml-0.5 rounded-full"
@@ -67,6 +139,23 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
           transition={{ duration: 1, repeat: Infinity, ease: "steps(1)" }}
         />
       </motion.div>
+
+      {/* Glowing underline scan */}
+      {phase === "idle" && (
+        <div
+          className="logo-underline-track absolute left-0 right-0"
+          style={{ bottom: compact ? "2rem" : "2.2rem" }}
+        >
+          <div
+            className="logo-underline h-[1px] w-1/2"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, var(--color-accent), transparent)",
+              opacity: 0.4,
+            }}
+          />
+        </div>
+      )}
 
       {/* Subtitle - only when not compact */}
       {!compact && phase === "idle" && (

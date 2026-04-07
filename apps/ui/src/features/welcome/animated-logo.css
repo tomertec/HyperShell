@@ -1,0 +1,151 @@
+/* GPU-composited animations for AnimatedLogo */
+
+/* Shimmer sweep — overlay highlight, no text masking */
+@keyframes shimmer-sweep {
+  0%, 100% {
+    left: -40%;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 1;
+  }
+  50% {
+    left: 100%;
+    opacity: 0;
+  }
+  51%, 99% {
+    opacity: 0;
+  }
+}
+
+.logo-shimmer-track {
+  position: relative;
+  overflow: visible;
+}
+
+.logo-shimmer-highlight {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(56, 189, 248, 0.12) 0%,
+    rgba(56, 189, 248, 0.04) 40%,
+    transparent 70%
+  );
+  filter: blur(4px);
+  pointer-events: none;
+  animation: shimmer-sweep 5s ease-in-out infinite;
+}
+
+/* Glowing underline that scans left to right */
+@keyframes underline-scan {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.logo-underline-track {
+  overflow: hidden;
+}
+
+.logo-underline {
+  animation: underline-scan 3s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  animation-delay: 2s;
+}
+
+/* CRT scanline overlay */
+@keyframes scanline-move {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(300%);
+  }
+}
+
+.logo-scanline {
+  animation: scanline-move 4s linear infinite;
+}
+
+/* Subtle ambient pulse on the glow */
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 0.06;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.12;
+    transform: scale(1.05);
+  }
+}
+
+.logo-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Character glitch flicker — opacity only, no transform to avoid layout shift */
+@keyframes char-glitch {
+  0%, 92%, 100% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0.3;
+  }
+  94% {
+    opacity: 0.9;
+  }
+  95% {
+    opacity: 0.15;
+  }
+  96% {
+    opacity: 0.7;
+  }
+  97% {
+    opacity: 1;
+  }
+}
+
+.logo-glitch-1 {
+  animation: char-glitch 8s linear infinite;
+  animation-delay: -2s;
+}
+
+.logo-glitch-2 {
+  animation: char-glitch 8s linear infinite;
+  animation-delay: -5s;
+}
+
+.logo-glitch-3 {
+  animation: char-glitch 8s linear infinite;
+  animation-delay: -7s;
+}
+
+/* Prompt bracket bounce */
+@keyframes bracket-breathe {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.logo-prompt-breathe {
+  animation: bracket-breathe 2s ease-in-out infinite;
+}
