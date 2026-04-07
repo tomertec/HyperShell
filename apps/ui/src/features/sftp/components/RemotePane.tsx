@@ -49,6 +49,7 @@ export function RemotePane({
   const remoteSelection = useStore(store, (state) => state.remoteSelection);
   const remoteSortBy = useStore(store, (state) => state.remoteSortBy);
   const remoteCursorIndex = useStore(store, (state) => state.remoteCursorIndex);
+  const remoteFilterText = useStore(store, (state) => state.remoteFilterText);
   const isLoading = useStore(store, (state) => state.isLoading.remote);
   const error = useStore(store, (state) => state.error.remote);
 
@@ -58,6 +59,19 @@ export function RemotePane({
   const setRemoteSortBy = useStore(store, (state) => state.setRemoteSortBy);
   const setLoading = useStore(store, (state) => state.setLoading);
   const setError = useStore(store, (state) => state.setError);
+
+  const filteredEntries = useMemo(() => {
+    if (!remoteFilterText) return remoteEntries;
+    const lower = remoteFilterText.toLowerCase();
+    return remoteEntries.filter((entry) => entry.name.toLowerCase().includes(lower));
+  }, [remoteEntries, remoteFilterText]);
+
+  useEffect(() => {
+    const maxIndex = Math.max(0, filteredEntries.length - 1);
+    if (remoteCursorIndex > maxIndex) {
+      store.getState().setCursorIndex("remote", maxIndex);
+    }
+  }, [filteredEntries.length, remoteCursorIndex, store]);
 
   const [contextMenu, setContextMenu] = useState<RemoteContextMenuState | null>(null);
 
@@ -209,7 +223,7 @@ export function RemotePane({
       </div>
 
       <FileList
-        entries={remoteEntries}
+        entries={filteredEntries}
         selection={remoteSelection}
         sortBy={remoteSortBy}
         isLoading={isLoading}

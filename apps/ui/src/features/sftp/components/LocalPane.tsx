@@ -29,6 +29,7 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
   const localSelection = useStore(store, (state) => state.localSelection);
   const localSortBy = useStore(store, (state) => state.localSortBy);
   const localCursorIndex = useStore(store, (state) => state.localCursorIndex);
+  const localFilterText = useStore(store, (state) => state.localFilterText);
   const isLoading = useStore(store, (state) => state.isLoading.local);
   const error = useStore(store, (state) => state.error.local);
 
@@ -38,6 +39,19 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
   const setLocalSortBy = useStore(store, (state) => state.setLocalSortBy);
   const setLoading = useStore(store, (state) => state.setLoading);
   const setError = useStore(store, (state) => state.setError);
+
+  const filteredEntries = useMemo(() => {
+    if (!localFilterText) return localEntries;
+    const lower = localFilterText.toLowerCase();
+    return localEntries.filter((entry) => entry.name.toLowerCase().includes(lower));
+  }, [localEntries, localFilterText]);
+
+  useEffect(() => {
+    const maxIndex = Math.max(0, filteredEntries.length - 1);
+    if (localCursorIndex > maxIndex) {
+      store.getState().setCursorIndex("local", maxIndex);
+    }
+  }, [filteredEntries.length, localCursorIndex, store]);
 
   const [contextMenu, setContextMenu] = useState<LocalContextMenuState | null>(null);
 
@@ -180,7 +194,7 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
       </div>
 
       <FileList
-        entries={localEntries}
+        entries={filteredEntries}
         selection={localSelection}
         sortBy={localSortBy}
         isLoading={isLoading}
