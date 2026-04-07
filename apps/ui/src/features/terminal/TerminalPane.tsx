@@ -52,7 +52,7 @@ export function TerminalPane({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center justify-between gap-4 px-4 py-1.5 border-b border-border bg-base-800/80">
+      <div className="flex items-center justify-between gap-4 px-4 py-1.5 border-b border-border bg-base-800">
         <div className="flex items-center gap-3 min-w-0">
           {/* Status dot */}
           <span className="relative flex items-center justify-center shrink-0">
@@ -96,14 +96,17 @@ export function TerminalPane({
               )}
             </div>
           )}
-          <div className="text-[10px] uppercase tracking-wider text-text-muted/70 font-medium">{session.state}</div>
+          <div className={`text-[10px] uppercase tracking-wider font-medium ${session.state === "connected" ? "text-green-400" : "text-text-muted/70"}`}>{session.state}</div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 relative bg-surface">
+      <div
+        className="flex-1 min-h-0 relative"
+        style={{ backgroundColor: "var(--terminal-bg, var(--color-surface))" }}
+      >
         <div
           ref={session.containerRef}
-          className="absolute inset-0 p-1"
+          className="absolute inset-0"
         />
       </div>
     </div>

@@ -31,12 +31,12 @@ export const terminalOptions: ITerminalOptions = {
   lineHeight: 1.2,
   cursorBlink: true,
   convertEol: true,
-  allowTransparency: true,
+  allowTransparency: false,
   scrollback: 5000,
   theme: terminalTheme
 };
 
-type TerminalTheme = {
+export type TerminalTheme = {
   background: string;
   foreground: string;
   cursor: string;
@@ -179,6 +179,10 @@ export const terminalThemes: Record<string, TerminalTheme> = {
   }
 };
 
+export function resolveTerminalTheme(themeName?: string): TerminalTheme {
+  return terminalThemes[themeName ?? ""] ?? terminalThemes["default"];
+}
+
 export function getTerminalOptions(settings?: {
   fontFamily?: string;
   fontSize?: number;
@@ -187,8 +191,7 @@ export function getTerminalOptions(settings?: {
   scrollback?: number;
   theme?: string;
 }): typeof terminalOptions {
-  const resolvedTheme =
-    terminalThemes[settings?.theme ?? ""] ?? terminalThemes["default"];
+  const resolvedTheme = resolveTerminalTheme(settings?.theme);
 
   return {
     ...terminalOptions,

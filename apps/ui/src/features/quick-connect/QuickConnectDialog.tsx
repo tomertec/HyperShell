@@ -124,7 +124,7 @@ export function QuickConnectDialog({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search hosts, tags, groups..."
-                className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted/70 focus:outline-none"
+                className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted/70 placeholder:text-xs focus:outline-none"
               />
               <kbd className="text-[10px] text-text-muted bg-base-700/80 px-1.5 py-0.5 rounded border border-border/50">ESC</kbd>
             </div>

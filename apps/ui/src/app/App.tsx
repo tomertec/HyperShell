@@ -20,6 +20,7 @@ import { sessionRecoveryStore } from "../features/sessions/sessionRecoveryStore"
 import { Sidebar } from "../features/sidebar/Sidebar";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
+import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import type { SerialProfileRecord } from "@sshterm/shared";
 
 async function loadHosts(): Promise<HostRecord[]> {
@@ -133,6 +134,10 @@ export function App() {
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
   const tabs = useStore(layoutStore, (s) => s.tabs);
+  const terminalThemeName = useStore(
+    settingsStore,
+    (s) => s.settings.terminal.theme
+  );
   const broadcastEnabled = useStore(broadcastStore, (s) => s.enabled);
   const broadcastTargets = useStore(broadcastStore, (s) => s.targetSessionIds);
   const toggleBroadcast = useStore(broadcastStore, (s) => s.toggle);
@@ -179,6 +184,11 @@ export function App() {
       setIsQuickConnectOpen(true);
     });
   }, []);
+
+  useEffect(() => {
+    const terminalBg = resolveTerminalTheme(terminalThemeName).background;
+    document.documentElement.style.setProperty("--terminal-bg", terminalBg);
+  }, [terminalThemeName]);
 
   const refreshPorts = useCallback(() => {
     window.sshterm?.listSerialPorts?.()

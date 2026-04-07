@@ -29,7 +29,7 @@ function PaneView({
   return (
     <div
       className={`flex-1 min-h-0 min-w-0 border-l border-border/40 first:border-l-0 relative ${
-        isActive ? "ring-1 ring-inset ring-accent/20" : ""
+        isActive ? "shadow-[inset_0_1px_0_rgba(56,189,248,0.22)]" : ""
       }`}
       onClick={onActivate}
     >

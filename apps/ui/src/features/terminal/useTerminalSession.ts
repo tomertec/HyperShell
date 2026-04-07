@@ -74,6 +74,30 @@ export function useTerminalSession(
     input.sessionId ? "connecting" : "idle"
   );
 
+  const applyTerminalBackground = useCallback((background: string): void => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.style.backgroundColor = background;
+
+    const root = container.querySelector(".xterm") as HTMLElement | null;
+    if (root) {
+      root.style.backgroundColor = background;
+    }
+
+    const viewport = container.querySelector(".xterm-viewport") as HTMLElement | null;
+    if (viewport) {
+      viewport.style.backgroundColor = background;
+    }
+
+    const canvases = container.querySelectorAll(".xterm-screen canvas");
+    for (const canvas of canvases) {
+      (canvas as HTMLCanvasElement).style.backgroundColor = background;
+    }
+  }, []);
+
   const setStateSafe = useCallback((nextState: TerminalSessionState): void => {
     if (!mountedRef.current) {
       return;
@@ -220,6 +244,7 @@ export function useTerminalSession(
       container = containerRef.current;
       if (container) {
         instance.open(container);
+        applyTerminalBackground(opts.theme.background);
         try { addon.fit(); } catch { /* container may not have dimensions yet */ }
         instance.focus();
         instance.writeln("sshterm ready.");
@@ -262,7 +287,7 @@ export function useTerminalSession(
       fitAddonRef.current = null;
       setTerminal(null);
     };
-  }, [sendSessionWrite]);
+  }, [applyTerminalBackground, sendSessionWrite]);
 
   const connect = useCallback(async (): Promise<void> => {
     const instance = terminalRef.current;
@@ -396,8 +421,9 @@ export function useTerminalSession(
       scrollback: opts.scrollback,
       theme: opts.theme,
     });
+    applyTerminalBackground(opts.theme.background);
     if (needsRefit) fit();
-  }, [terminalSettings, fit]);
+  }, [applyTerminalBackground, terminalSettings, fit]);
 
   useEffect(() => {
     if (!terminal || input.autoConnect === false || sessionIdRef.current) {

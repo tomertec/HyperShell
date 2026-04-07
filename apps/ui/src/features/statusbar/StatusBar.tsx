@@ -61,7 +61,10 @@ export function StatusBar() {
   const stats = useSessionStats(activeSessionId, sessionState);
 
   return (
-    <div className="flex items-center justify-between h-6 px-3 border-t border-border bg-base-800/80 shrink-0 select-none">
+    <div
+      className="relative z-10 flex items-center justify-between h-6 px-3 shrink-0 select-none"
+      style={{ backgroundColor: "var(--terminal-bg, var(--color-surface))" }}
+    >
       {/* Left side */}
       <div className="flex items-center gap-2 text-[11px] overflow-hidden">
         {activeTab ? (

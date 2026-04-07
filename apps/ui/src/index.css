@@ -9,7 +9,7 @@
   --color-base-700: #1e293b;
   --color-base-600: #334155;
   --color-base-500: #475569;
-  --color-surface: #020617;
+  --color-surface: #07111f;
   --color-border: rgba(148, 163, 184, 0.10);
   --color-border-bright: rgba(148, 163, 184, 0.22);
   --color-accent: #38bdf8;
@@ -26,11 +26,15 @@
   --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
+:root {
+  --terminal-bg: var(--color-surface);
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--color-base-900);
+  background: var(--color-surface);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -89,14 +93,23 @@ kbd {
   letter-spacing: 0.02em;
 }
 
-/* xterm fills its container */
+/* xterm fills its container — background must match the terminal theme
+   so leftover pixels below the last character row blend seamlessly. */
 .xterm {
   height: 100%;
   width: 100%;
+  background: var(--terminal-bg, var(--color-surface)) !important;
 }
-.xterm-viewport {
+.xterm .xterm-viewport {
   overflow-y: auto !important;
+  background-color: var(--terminal-bg, var(--color-surface)) !important;
 }
-.xterm-screen {
+.xterm .xterm-screen {
   height: 100% !important;
+}
+.xterm .xterm-screen canvas {
+  background-color: var(--terminal-bg, var(--color-surface)) !important;
+}
+.xterm .xterm-scrollable-element > .shadow {
+  display: none !important;
 }
