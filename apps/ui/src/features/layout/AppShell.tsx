@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TunnelManagerPanel } from "../tunnels/TunnelManagerPanel";
 import { StatusBar } from "../statusbar/StatusBar";
 
 export interface AppShellProps {
@@ -70,6 +71,8 @@ export function AppShell({ sidebar, children }: AppShellProps) {
         </div>
         <StatusBar />
       </main>
+
+      <TunnelManagerPanel />
     </div>
   );
 }

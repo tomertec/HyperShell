@@ -1,5 +1,6 @@
 import type { SerialProfileRecord } from "@sshterm/shared";
 import type { HostRecord } from "../hosts/HostsView";
+import { useTunnelStore } from "../tunnels/tunnelStore";
 import { SidebarHostList } from "./SidebarHostList";
 import { SidebarSection } from "./SidebarSection";
 import { SidebarSerialList } from "./SidebarSerialList";
@@ -45,6 +46,7 @@ export function Sidebar({
   onReorderHosts,
   onOpenSettings,
 }: SidebarProps) {
+  const toggleTunnelPanel = useTunnelStore((s) => s.togglePanel);
 
   return (
     <div className="flex flex-col h-full">
@@ -129,6 +131,16 @@ export function Sidebar({
       </SidebarSection>
 
       <div className="mt-auto border-t border-border px-3 py-2 flex items-center justify-between">
+        <button
+          onClick={toggleTunnelPanel}
+          className="flex items-center gap-2 px-1 py-0.5 rounded text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"
+          title="Tunnel Manager"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted">
+            <path d="M2 4h12M2 8h8M2 12h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          <span className="text-xs tracking-wide">Tunnels</span>
+        </button>
         <button
           onClick={onOpenSettings}
           className="flex items-center gap-2 px-1 py-0.5 rounded text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"

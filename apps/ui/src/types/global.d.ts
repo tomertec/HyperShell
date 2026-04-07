@@ -1,5 +1,7 @@
 import type {
   CloseSessionRequest,
+  StartPortForwardRequest,
+  StopPortForwardRequest,
   FsEntry,
   FsGetDrivesResponse,
   FsListRequest,
@@ -126,6 +128,10 @@ declare global {
       hostPortForwardReorder?: (request: ReorderHostPortForwardsRequest) => Promise<void>;
       // Connection pool
       connectionPoolStats?: () => Promise<ConnectionPoolStats[]>;
+      // Active port forwards
+      startPortForward?: (request: StartPortForwardRequest) => Promise<{ id: string }>;
+      stopPortForward?: (request: StopPortForwardRequest) => Promise<void>;
+      listPortForwards?: () => Promise<{ id: string }[]>;
     };
   }
 }
