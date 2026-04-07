@@ -67,12 +67,14 @@ function SortableHostItem({
   activeSessionHostIds,
   connectingHostIds,
   onConnect,
+  showDivider,
   onContextMenu,
 }: {
   host: HostRecord;
   activeSessionHostIds: Set<string>;
   connectingHostIds: Set<string>;
   onConnect: (host: HostRecord) => void;
+  showDivider: boolean;
   onContextMenu: (e: React.MouseEvent, host: HostRecord) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -86,7 +88,13 @@ function SortableHostItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="group flex items-center gap-2 px-1">
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="group relative flex items-center gap-2 px-1 py-0.5"
+    >
       <button
         type="button"
         onClick={() => onConnect(host)}
@@ -119,6 +127,12 @@ function SortableHostItem({
           </div>
         </div>
       </button>
+      {showDivider && !isDragging && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-px left-8 right-2 h-px bg-gradient-to-r from-transparent via-border/70 to-transparent"
+        />
+      )}
     </div>
   );
 }
@@ -328,13 +342,14 @@ export function SidebarHostList({
                 {group}
               </div>
 
-              {groupHosts.map((host) => (
+              {groupHosts.map((host, index) => (
                 <SortableHostItem
                   key={host.id}
                   host={host}
                   activeSessionHostIds={activeSessionHostIds}
                   connectingHostIds={connectingHostIds}
                   onConnect={onConnect}
+                  showDivider={index < groupHosts.length - 1}
                   onContextMenu={(e, h) => setContextMenu({ x: e.clientX, y: e.clientY, host: h })}
                 />
               ))}
