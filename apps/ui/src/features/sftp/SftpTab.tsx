@@ -290,6 +290,23 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     [activePane, setFilterText]
   );
 
+  const handleRefresh = useCallback(async () => {
+    const state = store.getState();
+    if (state.activePane === "remote") {
+      await refreshRemoteDirectory();
+    } else {
+      const currentLocalPath = state.localPath;
+      if (currentLocalPath) {
+        try {
+          const response = await window.sshterm?.fsList?.({ path: currentLocalPath });
+          store.getState().setLocalEntries(response?.entries ?? []);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [refreshRemoteDirectory, store]);
+
   const handleDisconnect = useCallback(async () => {
     await window.sshterm?.sftpDisconnect?.({ sftpSessionId });
     onClose();
@@ -317,6 +334,8 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         onDelete={handleDelete}
         onMkdir={handleMkdir}
         onBookmark={handleBookmark}
+        onRefresh={handleRefresh}
+        filterInputRef={filterInputRef}
       />
 
       <TransferPanel />
