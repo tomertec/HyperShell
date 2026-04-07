@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { HostPortForwardList } from "./HostPortForwardList";
 
 // --- Validation helpers ---
 
@@ -45,9 +46,17 @@ export type HostFormValue = {
   agentKind: "system" | "pageant" | "1password";
   opReference: string;
   color?: string | null;
+  // Advanced SSH
+  proxyJump: string;
+  proxyJumpHostIds: string;
+  keepAliveInterval: string;  // text input, empty = default
+  autoReconnect: boolean;
+  reconnectMaxAttempts: number;
+  reconnectBaseInterval: number;
 };
 
 export interface HostFormProps {
+  hostId?: string;  // set when editing existing host
   initialValue?: Partial<HostFormValue>;
   submitLabel?: string;
   onSubmit: (value: HostFormValue) => void;
@@ -63,13 +72,20 @@ const defaultValue: HostFormValue = {
   tags: "",
   authMethod: "default",
   agentKind: "system",
-  opReference: ""
+  opReference: "",
+  proxyJump: "",
+  proxyJumpHostIds: "",
+  keepAliveInterval: "",
+  autoReconnect: false,
+  reconnectMaxAttempts: 5,
+  reconnectBaseInterval: 1,
 };
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright";
 
 export function HostForm({
+  hostId,
   initialValue,
   submitLabel = "Save host",
   onSubmit
@@ -283,6 +299,95 @@ export function HostForm({
           className={inputClasses}
         />
       </label>
+
+      {/* --- Connection --- */}
+      <div className="grid gap-3 pt-2 border-t border-border/40">
+        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Connection</span>
+
+        <label htmlFor={`${formId}-proxyJump`} className="grid gap-1.5">
+          <span className="text-xs font-medium text-text-secondary">Jump Host (ProxyJump)</span>
+          <input
+            id={`${formId}-proxyJump`}
+            value={value.proxyJump}
+            onChange={(e) => setValue({ ...value, proxyJump: e.target.value })}
+            placeholder="user@bastion:22"
+            className={inputClasses}
+          />
+          <span className="text-xs text-text-muted/70">
+            SSH ProxyJump chain. Comma-separate for multi-hop (e.g. bastion1,bastion2).
+          </span>
+        </label>
+
+        <label htmlFor={`${formId}-keepAlive`} className="grid gap-1.5">
+          <span className="text-xs font-medium text-text-secondary">Keep-Alive Interval</span>
+          <div className="flex items-center gap-2">
+            <input
+              id={`${formId}-keepAlive`}
+              type="number"
+              min={0}
+              value={value.keepAliveInterval}
+              onChange={(e) => setValue({ ...value, keepAliveInterval: e.target.value })}
+              placeholder="30"
+              className={inputClasses}
+            />
+            <span className="text-xs text-text-muted shrink-0">seconds</span>
+          </div>
+          <span className="text-xs text-text-muted/70">
+            Leave empty for default (30s). Set to 0 to disable.
+          </span>
+        </label>
+      </div>
+
+      {/* --- Reliability --- */}
+      <div className="grid gap-3 pt-2 border-t border-border/40">
+        <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Reliability</span>
+
+        <label htmlFor={`${formId}-autoReconnect`} className="flex items-center gap-3 cursor-pointer">
+          <input
+            id={`${formId}-autoReconnect`}
+            type="checkbox"
+            checked={value.autoReconnect}
+            onChange={(e) => setValue({ ...value, autoReconnect: e.target.checked })}
+            className="rounded border-border accent-accent"
+          />
+          <span className="text-sm text-text-primary">Auto-reconnect on disconnect</span>
+        </label>
+
+        {value.autoReconnect && (
+          <div className="grid grid-cols-2 gap-3 pl-6">
+            <label htmlFor={`${formId}-maxAttempts`} className="grid gap-1.5">
+              <span className="text-xs font-medium text-text-secondary">Max Attempts</span>
+              <input
+                id={`${formId}-maxAttempts`}
+                type="number"
+                min={1}
+                max={50}
+                value={value.reconnectMaxAttempts}
+                onChange={(e) => setValue({ ...value, reconnectMaxAttempts: Number(e.target.value) || 5 })}
+                className={inputClasses}
+              />
+            </label>
+            <label htmlFor={`${formId}-baseInterval`} className="grid gap-1.5">
+              <span className="text-xs font-medium text-text-secondary">Base Interval</span>
+              <div className="flex items-center gap-2">
+                <input
+                  id={`${formId}-baseInterval`}
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={value.reconnectBaseInterval}
+                  onChange={(e) => setValue({ ...value, reconnectBaseInterval: Number(e.target.value) || 1 })}
+                  className={inputClasses}
+                />
+                <span className="text-xs text-text-muted shrink-0">sec</span>
+              </div>
+            </label>
+          </div>
+        )}
+      </div>
+
+      {/* --- Port Forwards --- */}
+      {hostId && <HostPortForwardList hostId={hostId} />}
 
       <button
         type="submit"
