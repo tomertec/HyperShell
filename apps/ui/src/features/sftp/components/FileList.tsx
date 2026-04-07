@@ -173,7 +173,7 @@ export function FileList({
           Loading files...
         </div>
       ) : (
-        <table className="w-full border-collapse text-[13px] leading-tight">
+        <table className="h-fit w-full border-collapse text-[13px] leading-tight">
             <thead className="sticky top-0 z-10 border-b border-border/30 bg-base-800/95 text-[9px] uppercase tracking-wider text-text-muted">
               <tr>
                 <th
