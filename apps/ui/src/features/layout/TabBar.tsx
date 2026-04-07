@@ -1,4 +1,15 @@
+import { useStore } from "zustand";
 import type { LayoutTab } from "./layoutStore";
+import { sessionStateStore } from "../sessions/sessionStateStore";
+
+const tabStateColors: Record<string, string> = {
+  connected: "bg-green-400",
+  connecting: "bg-yellow-400",
+  reconnecting: "bg-yellow-400",
+  waiting_for_network: "bg-orange-400",
+  disconnected: "bg-gray-400",
+  failed: "bg-red-400",
+};
 
 export interface TabBarProps {
   tabs: LayoutTab[];
@@ -8,12 +19,15 @@ export interface TabBarProps {
 }
 
 export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarProps) {
+  const sessionStates = useStore(sessionStateStore, (s) => s.sessions);
+
   if (tabs.length === 0) return null;
 
   return (
     <div className="flex items-end bg-base-800 px-1 pt-2 overflow-x-auto">
       {tabs.map((tab, index) => {
         const isActive = tab.sessionId === activeSessionId;
+        const sessionState = sessionStates[tab.sessionId]?.state;
         return (
           <div key={tab.tabKey ?? tab.sessionId} className="flex items-end">
             {/* Tab separator */}
@@ -28,6 +42,7 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarPro
                   : "text-text-secondary hover:text-text-primary hover:bg-base-700/40"
               }`}
             >
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabStateColors[sessionState ?? ""] ?? "bg-gray-400"}`} />
               <span className="truncate">{tab.title}</span>
               <span
                 onClick={(e) => {
