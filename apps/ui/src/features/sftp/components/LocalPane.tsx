@@ -26,6 +26,7 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
   const localEntries = useStore(store, (state) => state.localEntries);
   const localSelection = useStore(store, (state) => state.localSelection);
   const localSortBy = useStore(store, (state) => state.localSortBy);
+  const localCursorIndex = useStore(store, (state) => state.localCursorIndex);
   const isLoading = useStore(store, (state) => state.isLoading.local);
   const error = useStore(store, (state) => state.error.local);
 
@@ -158,12 +159,12 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
 
   return (
     <div className="flex h-full flex-col" onContextMenu={(event) => handleContextMenu(event)}>
-      <div className="flex items-center gap-2 border-b border-base-700 bg-base-900 px-2 py-1">
+      <div className="flex items-center gap-1.5 border-b border-base-700 bg-base-900/80 px-2 py-0.5">
         <DriveSelector currentPath={localPath} onSelect={handleNavigate} />
         <button
           type="button"
           title="Go up"
-          className="px-1 text-sm text-text-secondary hover:text-text-primary"
+          className="rounded p-0.5 text-xs text-text-secondary transition-colors hover:bg-base-700 hover:text-text-primary"
           onClick={() => handleNavigate(getParentPath(localPath))}
         >
           ..
@@ -184,6 +185,7 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
         onDrop={() => {}}
         onContextMenu={handleContextMenu}
         paneType="local"
+        cursorIndex={localCursorIndex}
       />
 
       {contextMenu && (

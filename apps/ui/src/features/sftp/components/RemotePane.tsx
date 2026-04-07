@@ -44,6 +44,7 @@ export function RemotePane({
   const remoteEntries = useStore(store, (state) => state.remoteEntries);
   const remoteSelection = useStore(store, (state) => state.remoteSelection);
   const remoteSortBy = useStore(store, (state) => state.remoteSortBy);
+  const remoteCursorIndex = useStore(store, (state) => state.remoteCursorIndex);
   const isLoading = useStore(store, (state) => state.isLoading.remote);
   const error = useStore(store, (state) => state.error.remote);
 
@@ -185,12 +186,12 @@ export function RemotePane({
 
   return (
     <div className="flex h-full flex-col" onContextMenu={(event) => handleContextMenu(event)}>
-      <div className="flex items-center gap-2 border-b border-base-700 bg-base-900 px-2 py-1">
-        <span className="font-mono text-xs text-text-secondary">REMOTE</span>
+      <div className="flex items-center gap-1.5 border-b border-base-700 bg-base-900/80 px-2 py-0.5">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-text-muted">Remote</span>
         <button
           type="button"
           title="Go up"
-          className="px-1 text-sm text-text-secondary hover:text-text-primary"
+          className="rounded p-0.5 text-xs text-text-secondary transition-colors hover:bg-base-700 hover:text-text-primary"
           onClick={() => handleNavigate(getParentPath(remotePath))}
         >
           ..
@@ -212,6 +213,7 @@ export function RemotePane({
         onContextMenu={handleContextMenu}
         onEdit={onEdit}
         paneType="remote"
+        cursorIndex={remoteCursorIndex}
       />
 
       {contextMenu && (

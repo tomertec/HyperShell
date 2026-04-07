@@ -3,11 +3,11 @@ import { useMemo, useState, type DragEvent, type MouseEvent } from "react";
 import {
   formatDate,
   formatFileSize,
-  getFileIcon,
   sortEntries,
   type SortColumn,
   type SortDirection
 } from "../utils/fileUtils";
+import { FileIcon } from "./FileIcon";
 
 export interface FileListEntry {
   name: string;
@@ -36,18 +36,7 @@ export interface FileListProps {
   onContextMenu: (event: MouseEvent, entry?: FileListEntry) => void;
   onEdit?: (path: string) => void;
   paneType: "local" | "remote";
-}
-
-function getIconBadge(iconKey: string): string {
-  if (iconKey === "folder") {
-    return "DIR";
-  }
-
-  if (iconKey.startsWith("file-")) {
-    return iconKey.slice(5, 8).toUpperCase();
-  }
-
-  return "FILE";
+  cursorIndex: number;
 }
 
 export function FileList({
@@ -62,7 +51,8 @@ export function FileList({
   onDrop,
   onContextMenu,
   onEdit,
-  paneType
+  paneType,
+  cursorIndex
 }: FileListProps) {
   const [dropActive, setDropActive] = useState(false);
 
@@ -166,7 +156,7 @@ export function FileList({
 
   return (
     <div
-      className={`flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-base-800/70 ${
+      className={`flex h-full min-h-0 flex-col overflow-hidden bg-base-800/70 ${
         dropActive ? "ring-2 ring-inset ring-accent/50" : ""
       }`}
       onDragOver={handleDragOver}
@@ -174,40 +164,36 @@ export function FileList({
       onDrop={handleDrop}
       onContextMenu={(event) => onContextMenu(event)}
     >
-      <div className="border-b border-border/70 bg-base-900/50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-        {paneType === "remote" ? "Remote Files" : "Local Files"}
-      </div>
-
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center px-4 text-sm text-text-muted">
           Loading files...
         </div>
       ) : (
         <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead className="sticky top-0 z-10 bg-base-800/95 text-[11px] uppercase tracking-wider text-text-muted">
+          <table className="w-full border-collapse text-[13px]">
+            <thead className="sticky top-0 z-10 bg-base-800/95 text-[10px] uppercase tracking-wider text-text-muted">
               <tr>
                 <th
-                  className="cursor-pointer px-3 py-2 text-left font-medium"
+                  className="cursor-pointer px-1.5 py-[3px] text-left font-medium"
                   onClick={() => handleHeaderClick("name")}
                 >
                   Name{renderSortIndicator("name")}
                 </th>
                 <th
-                  className="w-28 cursor-pointer px-3 py-2 text-right font-medium"
+                  className="w-20 cursor-pointer px-1.5 py-[3px] text-right font-medium"
                   onClick={() => handleHeaderClick("size")}
                 >
                   Size{renderSortIndicator("size")}
                 </th>
                 <th
-                  className="w-44 cursor-pointer px-3 py-2 text-left font-medium"
+                  className="w-36 cursor-pointer px-1.5 py-[3px] text-left font-medium"
                   onClick={() => handleHeaderClick("modifiedAt")}
                 >
                   Modified{renderSortIndicator("modifiedAt")}
                 </th>
                 {paneType === "remote" && (
                   <th
-                    className="w-24 cursor-pointer px-3 py-2 text-left font-medium"
+                    className="w-16 cursor-pointer px-1.5 py-[3px] text-left font-medium"
                     onClick={() => handleHeaderClick("permissions")}
                   >
                     Perms{renderSortIndicator("permissions")}
@@ -216,17 +202,16 @@ export function FileList({
               </tr>
             </thead>
             <tbody>
-              {sortedEntries.map((entry) => {
-                const iconKey = getFileIcon(entry.name, entry.isDirectory);
-
-                return (
+              {sortedEntries.map((entry, index) => (
                   <tr
                     key={entry.path}
-                    className={`border-t border-border/50 transition-colors ${
+                    className={`transition-colors ${
                       selection.has(entry.path)
-                        ? "bg-accent/10"
-                        : "hover:bg-base-700/50"
-                    }`}
+                        ? "bg-accent/15 border-l-2 border-l-accent"
+                        : index % 2 === 0
+                          ? "hover:bg-base-700/30"
+                          : "bg-base-800/20 hover:bg-base-700/30"
+                    } ${cursorIndex === index ? "ring-1 ring-inset ring-accent/40" : ""}`}
                     onClick={(event) => handleRowClick(entry, event)}
                     onDoubleClick={() => handleRowDoubleClick(entry)}
                     onContextMenu={(event) => {
@@ -240,31 +225,27 @@ export function FileList({
                     draggable
                     onDragStart={(event) => handleDragStart(event, entry)}
                   >
-                    <td className="px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="inline-flex h-5 min-w-10 items-center justify-center rounded bg-base-700/80 px-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted"
-                          title={iconKey}
-                        >
-                          {getIconBadge(iconKey)}
+                    <td className="px-1.5 py-[2px]">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <FileIcon name={entry.name} isDirectory={entry.isDirectory} />
+                        <span className={`truncate text-[13px] ${entry.isDirectory ? "font-medium text-text-primary" : "text-text-primary"}`}>
+                          {entry.name}
                         </span>
-                        <span className="truncate text-text-primary">{entry.name}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-right text-text-secondary">
+                    <td className="px-1.5 py-[2px] text-right text-[12px] text-text-secondary">
                       {entry.isDirectory ? "—" : formatFileSize(entry.size)}
                     </td>
-                    <td className="px-3 py-2 text-text-secondary">
+                    <td className="px-1.5 py-[2px] text-[12px] text-text-secondary">
                       {formatDate(entry.modifiedAt)}
                     </td>
                     {paneType === "remote" && (
-                      <td className="px-3 py-2 font-mono text-text-secondary">
+                      <td className="px-1.5 py-[2px] font-mono text-[11px] text-text-secondary">
                         {(entry.permissions ?? 0).toString(8).padStart(4, "0")}
                       </td>
                     )}
                   </tr>
-                );
-              })}
+              ))}
             </tbody>
           </table>
         </div>
