@@ -152,6 +152,22 @@ function toErrorMessage(error: unknown): string {
   return "Unknown PTY error";
 }
 
+function normalizePromptText(value: string): string {
+  return value
+    // CSI/OSC/escape sequences that can wrap prompts.
+    .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, "")
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\u001b[@-Z\\-_]/g, "")
+    // Keep tabs/newlines/carriage returns/spaces; drop other controls.
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+}
+
+function isPasswordPrompt(value: string): boolean {
+  return /\b(?:password|passphrase|verification code|security code|otp)\b[^:\r\n]{0,120}:\s*$/i.test(
+    normalizePromptText(value)
+  );
+}
+
 export function createSshPtyTransport(
   request: OpenSessionRequest,
   profile: SshConnectionProfile,
@@ -223,7 +239,7 @@ export function createSshPtyTransport(
 
       if (!authSecretSent && profile.password) {
         promptBuffer = `${promptBuffer}${data}`.slice(-512);
-        if (/(pass(word|phrase)|verification code|otp).*:\s*$/im.test(promptBuffer)) {
+        if (isPasswordPrompt(promptBuffer)) {
           authSecretSent = true;
           try {
             pty?.write(`${profile.password}\r`);

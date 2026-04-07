@@ -95,6 +95,7 @@ export const hostRecordSchema = z.object({
   autoReconnect: z.boolean().optional(),
   reconnectMaxAttempts: z.number().int().optional(),
   reconnectBaseInterval: z.number().int().optional(),
+  passwordSavedAt: z.string().nullable().optional(),
 });
 
 export const upsertHostRequestSchema = z.object({
@@ -119,6 +120,9 @@ export const upsertHostRequestSchema = z.object({
   autoReconnect: z.boolean().optional(),
   reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
+  password: z.string().optional(),
+  savePassword: z.boolean().optional(),
+  clearSavedPassword: z.boolean().optional(),
 });
 
 export const removeHostRequestSchema = z.object({

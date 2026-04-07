@@ -23,6 +23,11 @@ import initSchemaSql from "@sshterm/db/src/migrations/001_init.sql";
 import sftpBookmarksSql from "@sshterm/db/src/migrations/002_sftp_bookmarks.sql";
 import hostAuthFieldsSql from "@sshterm/db/src/migrations/003_host_auth_fields.sql";
 import advancedSshSql from "@sshterm/db/src/migrations/006_advanced_ssh.sql";
+import {
+  protectSecretStrict,
+  revealSecretStrict,
+  SecureStorageUnavailableError
+} from "../security/secureStorage";
 
 import type { IpcMainLike } from "./registerIpc";
 
@@ -36,6 +41,138 @@ type HostsRepoLike = {
 
 let hostsRepo: HostsRepoLike | null = null;
 let sharedDb: unknown = null;
+
+type AuthProfileRow = {
+  id: string;
+  type: string;
+  secret_ref: string | null;
+  updated_at?: string | null;
+};
+
+function getDatabaseOrNull(): any | null {
+  const db = getOrCreateDatabase();
+  if (!db || typeof db !== "object") {
+    return null;
+  }
+  return db as any;
+}
+
+function normalizeSqliteTimestampToIso(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+    return `${value.replace(" ", "T")}Z`;
+  }
+
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+  return new Date(parsed).toISOString();
+}
+
+function deleteAuthProfileById(authProfileId: string | null | undefined): void {
+  if (!authProfileId) {
+    return;
+  }
+  const db = getDatabaseOrNull();
+  if (!db) {
+    return;
+  }
+  db.prepare(`DELETE FROM auth_profiles WHERE id = ?`).run(authProfileId);
+}
+
+function upsertHostPasswordProfile(input: {
+  hostId: string;
+  hostName: string;
+  username: string | null;
+  password: string;
+  existingAuthProfileId?: string | null;
+}): string {
+  const db = getDatabaseOrNull();
+  if (!db) {
+    throw new Error("Database is unavailable; cannot store host password.");
+  }
+
+  const profileId = input.existingAuthProfileId ?? `host-password-${input.hostId}`;
+  const protectedSecret = protectSecretStrict(input.password);
+
+  db.prepare(
+    `
+      INSERT INTO auth_profiles (id, name, type, username, secret_ref, key_path)
+      VALUES (@id, @name, 'password', @username, @secretRef, NULL)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        type = 'password',
+        username = excluded.username,
+        secret_ref = excluded.secret_ref,
+        key_path = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    `
+  ).run({
+    id: profileId,
+    name: `host-password:${input.hostId}:${input.hostName}`,
+    username: input.username,
+    secretRef: protectedSecret
+  });
+
+  return profileId;
+}
+
+export function resolveStoredHostPassword(host: {
+  authMethod?: string | null;
+  authProfileId?: string | null;
+}): string | null {
+  if (host.authMethod !== "password" || !host.authProfileId) {
+    return null;
+  }
+
+  const db = getDatabaseOrNull();
+  if (!db) {
+    return null;
+  }
+
+  const row = db
+    .prepare(`SELECT id, type, secret_ref FROM auth_profiles WHERE id = ?`)
+    .get(host.authProfileId) as AuthProfileRow | undefined;
+
+  if (!row || row.type !== "password" || !row.secret_ref) {
+    return null;
+  }
+
+  return revealSecretStrict(row.secret_ref);
+}
+
+function resolvePasswordSavedAt(host: {
+  authMethod?: string | null;
+  authProfileId?: string | null;
+}): string | null {
+  if (host.authMethod !== "password" || !host.authProfileId) {
+    return null;
+  }
+
+  const db = getDatabaseOrNull();
+  if (!db) {
+    return null;
+  }
+
+  const row = db
+    .prepare(`SELECT updated_at FROM auth_profiles WHERE id = ? AND type = 'password'`)
+    .get(host.authProfileId) as { updated_at?: string | null } | undefined;
+
+  return normalizeSqliteTimestampToIso(row?.updated_at ?? null);
+}
+
+function attachPasswordMetadata(host: HostRecord): HostRecord & {
+  passwordSavedAt: string | null;
+} {
+  return {
+    ...host,
+    passwordSavedAt: resolvePasswordSavedAt(host)
+  };
+}
 
 /** Returns the shared SQLite database instance, creating it on first call. */
 export function getOrCreateDatabase(): unknown {
@@ -326,26 +463,76 @@ export const hostChannelList = [
 
 export function registerHostIpc(ipcMain: IpcMainLike): void {
   ipcMain.handle(ipcChannels.hosts.list, () => {
-    return getOrCreateHostsRepo().list();
+    return getOrCreateHostsRepo().list().map(attachPasswordMetadata);
   });
 
   ipcMain.handle(ipcChannels.hosts.upsert, (_event: IpcMainInvokeEvent, request: UpsertHostRequest) => {
     const parsed = upsertHostRequestSchema.parse(request);
-    return getOrCreateHostsRepo().create({
+    const repo = getOrCreateHostsRepo();
+    const existing = repo.get(parsed.id);
+    const requestedAuthMethod = parsed.authMethod ?? "default";
+    let nextAuthProfileId = existing?.authProfileId ?? null;
+
+    const trimmedPassword = parsed.password?.trim() ?? "";
+    const savePassword = Boolean(parsed.savePassword);
+    const clearSavedPassword = Boolean(parsed.clearSavedPassword);
+
+    if (requestedAuthMethod === "password") {
+      if (clearSavedPassword) {
+        deleteAuthProfileById(nextAuthProfileId);
+        nextAuthProfileId = null;
+      }
+
+      if (savePassword) {
+        if (!trimmedPassword) {
+          throw new Error("Password is required when 'Save password' is enabled.");
+        }
+        try {
+          nextAuthProfileId = upsertHostPasswordProfile({
+            hostId: parsed.id,
+            hostName: parsed.name,
+            username: parsed.username ?? null,
+            password: trimmedPassword,
+            existingAuthProfileId: nextAuthProfileId
+          });
+        } catch (error) {
+          if (error instanceof SecureStorageUnavailableError) {
+            throw new Error(
+              "Secure storage is unavailable. Unlock your OS keychain and try again."
+            );
+          }
+          throw error;
+        }
+      }
+    } else if (nextAuthProfileId) {
+      // Leaving password auth: remove any saved password profile.
+      deleteAuthProfileById(nextAuthProfileId);
+      nextAuthProfileId = null;
+    }
+
+    const persistedHost = repo.create({
       id: parsed.id,
       name: parsed.name,
       hostname: parsed.hostname,
       port: parsed.port,
       username: parsed.username ?? null,
       identityFile: parsed.identityFile ?? null,
+      authProfileId: nextAuthProfileId,
       notes: parsed.notes ?? null,
-      authMethod: parsed.authMethod ?? "default",
+      authMethod: requestedAuthMethod,
       agentKind: parsed.agentKind ?? "system",
       opReference: parsed.opReference ?? null,
       isFavorite: parsed.isFavorite ?? false,
       color: parsed.color ?? null,
       sortOrder: parsed.sortOrder ?? null,
+      proxyJump: parsed.proxyJump ?? null,
+      proxyJumpHostIds: parsed.proxyJumpHostIds ?? null,
+      keepAliveInterval: parsed.keepAliveInterval ?? null,
+      autoReconnect: parsed.autoReconnect ?? false,
+      reconnectMaxAttempts: parsed.reconnectMaxAttempts ?? 5,
+      reconnectBaseInterval: parsed.reconnectBaseInterval ?? 1
     });
+    return attachPasswordMetadata(persistedHost);
   });
 
   ipcMain.handle(ipcChannels.hosts.reorder, (_event: IpcMainInvokeEvent, request: ReorderHostsRequest) => {
@@ -359,10 +546,13 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
 
   ipcMain.handle(ipcChannels.hosts.remove, (_event: IpcMainInvokeEvent, request: RemoveHostRequest) => {
     const parsed = removeHostRequestSchema.parse(request);
-    const removed = getOrCreateHostsRepo().remove(parsed.id);
+    const repo = getOrCreateHostsRepo();
+    const existing = repo.get(parsed.id);
+    const removed = repo.remove(parsed.id);
     if (!removed) {
       throw new Error(`Host not found: ${parsed.id}`);
     }
+    deleteAuthProfileById(existing?.authProfileId);
     return { success: true };
   });
 }

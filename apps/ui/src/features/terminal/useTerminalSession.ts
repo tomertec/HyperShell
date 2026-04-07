@@ -9,6 +9,7 @@ import { sessionStateStore } from "../sessions/sessionStateStore";
 import { settingsStore } from "../settings/settingsStore";
 import { getTerminalOptions } from "./terminalTheme";
 import { getTerminalClipboardAction } from "./terminalClipboard";
+import { getTerminalFontSizeAction } from "./terminalFontSize";
 import {
   createAsyncOperationGuard,
   mapSessionEvent,
@@ -30,6 +31,11 @@ export interface UseTerminalSessionResult {
   terminal: Terminal | null;
   sessionId: string | null;
   state: TerminalSessionState;
+  fontSize: number;
+  setFontSize: (fontSize: number) => void;
+  increaseFontSize: () => void;
+  decreaseFontSize: () => void;
+  resetFontSize: () => void;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   write: (data: string) => void;
@@ -145,6 +151,22 @@ export function useTerminalSession(
       logAsyncError("clipboard read failed", error);
       return "";
     }
+  }, []);
+
+  const setFontSize = useCallback((fontSize: number): void => {
+    void settingsStore.getState().setTerminalFontSize(fontSize);
+  }, []);
+
+  const increaseFontSize = useCallback((): void => {
+    void settingsStore.getState().changeTerminalFontSize(1);
+  }, []);
+
+  const decreaseFontSize = useCallback((): void => {
+    void settingsStore.getState().changeTerminalFontSize(-1);
+  }, []);
+
+  const resetFontSize = useCallback((): void => {
+    void settingsStore.getState().resetTerminalFontSize();
   }, []);
 
   const sendSessionWrite = useCallback((sessionId: string, data: string): void => {
@@ -304,6 +326,22 @@ export function useTerminalSession(
           return true;
         }
 
+        const fontSizeAction = getTerminalFontSizeAction({
+          event,
+          isMacLike
+        });
+        if (fontSizeAction) {
+          event.preventDefault();
+          if (fontSizeAction === "increase") {
+            increaseFontSize();
+          } else if (fontSizeAction === "decrease") {
+            decreaseFontSize();
+          } else {
+            resetFontSize();
+          }
+          return false;
+        }
+
         const action = getTerminalClipboardAction({
           event,
           hasSelection: instance?.hasSelection() ?? false,
@@ -361,7 +399,15 @@ export function useTerminalSession(
       fitAddonRef.current = null;
       setTerminal(null);
     };
-  }, [applyTerminalBackground, readClipboardText, sendSessionWrite, writeClipboardText]);
+  }, [
+    applyTerminalBackground,
+    decreaseFontSize,
+    increaseFontSize,
+    readClipboardText,
+    resetFontSize,
+    sendSessionWrite,
+    writeClipboardText
+  ]);
 
   const connect = useCallback(async (): Promise<void> => {
     const instance = terminalRef.current;
@@ -486,11 +532,13 @@ export function useTerminalSession(
     const needsRefit =
       term.options.fontFamily !== opts.fontFamily ||
       term.options.fontSize !== opts.fontSize ||
-      term.options.lineHeight !== opts.lineHeight;
+      term.options.lineHeight !== opts.lineHeight ||
+      term.options.letterSpacing !== opts.letterSpacing;
     Object.assign(term.options, {
       fontFamily: opts.fontFamily,
       fontSize: opts.fontSize,
       lineHeight: opts.lineHeight,
+      letterSpacing: opts.letterSpacing,
       cursorBlink: opts.cursorBlink,
       scrollback: opts.scrollback,
       theme: opts.theme,
@@ -582,6 +630,11 @@ export function useTerminalSession(
     terminal,
     sessionId: sessionIdRef.current,
     state,
+    fontSize: terminalSettings.fontSize,
+    setFontSize,
+    increaseFontSize,
+    decreaseFontSize,
+    resetFontSize,
     connect,
     disconnect,
     write,

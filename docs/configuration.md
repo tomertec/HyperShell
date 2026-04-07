@@ -31,9 +31,10 @@ User preferences are stored in the `app_settings` SQLite table as JSON key-value
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `terminal.theme` | string | `"default"` | Active terminal color theme |
-| `terminal.fontSize` | number | `14` | Terminal font size in pixels |
-| `terminal.fontFamily` | string | `"IBM Plex Mono"` | Terminal font family |
-| `terminal.lineHeight` | number | `1.2` | Terminal line height multiplier |
+| `terminal.fontSize` | number | `13` | Terminal font size in pixels |
+| `terminal.fontFamily` | string | `"Cascadia Mono"` | Terminal font family |
+| `terminal.lineHeight` | number | `1.0` | Terminal line height multiplier |
+| `terminal.letterSpacing` | number | `0` | Character spacing in pixels |
 | `terminal.cursorStyle` | string | `"block"` | Cursor style: block, underline, bar |
 | `terminal.cursorBlink` | boolean | `true` | Whether cursor blinks |
 

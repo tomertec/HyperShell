@@ -53,6 +53,11 @@ export type HostFormValue = {
   autoReconnect: boolean;
   reconnectMaxAttempts: number;
   reconnectBaseInterval: number;
+  password?: string;
+  savePassword?: boolean;
+  clearSavedPassword?: boolean;
+  hasSavedPassword?: boolean;
+  passwordSavedAt?: string | null;
 };
 
 export interface HostFormProps {
@@ -79,7 +84,28 @@ const defaultValue: HostFormValue = {
   autoReconnect: false,
   reconnectMaxAttempts: 5,
   reconnectBaseInterval: 1,
+  password: "",
+  savePassword: true,
+  clearSavedPassword: false,
+  hasSavedPassword: false,
+  passwordSavedAt: null,
 };
+
+function buildInitialValue(initialValue?: Partial<HostFormValue>): HostFormValue {
+  const hasSavedPassword = Boolean(initialValue?.hasSavedPassword);
+  return {
+    ...defaultValue,
+    ...initialValue,
+    // Never prefill password input from persisted state.
+    password: "",
+    savePassword:
+      initialValue?.savePassword !== undefined
+        ? initialValue.savePassword
+        : !hasSavedPassword,
+    clearSavedPassword: false,
+    hasSavedPassword
+  };
+}
 
 export function HostForm({
   hostId,
@@ -88,10 +114,7 @@ export function HostForm({
   onSubmit
 }: HostFormProps) {
   const formId = useId();
-  const [value, setValue] = useState<HostFormValue>({
-    ...defaultValue,
-    ...initialValue
-  });
+  const [value, setValue] = useState<HostFormValue>(buildInitialValue(initialValue));
   const [sshKeys, setSshKeys] = useState<string[]>([]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -105,8 +128,14 @@ export function HostForm({
     e.port = !isValidPort(value.port)
       ? "Port must be between 1 and 65535."
       : null;
+    e.password =
+      value.authMethod === "password" &&
+      value.savePassword &&
+      !(value.password ?? "").trim()
+        ? "Password is required when saving credentials."
+        : null;
     return e;
-  }, [value.hostname, value.port]);
+  }, [value.authMethod, value.hostname, value.password, value.port, value.savePassword]);
 
   const identityWarning = useMemo(
     () => isIdentityFilePathSuspicious(value.identityFile),
@@ -114,9 +143,22 @@ export function HostForm({
   );
 
   const hasErrors = Object.values(errors).some(Boolean);
+  const passwordSavedLabel = useMemo(() => {
+    if (!value.passwordSavedAt) {
+      return null;
+    }
+    const parsed = new Date(value.passwordSavedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return "Saved";
+    }
+    return `Saved ${new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(parsed)}`;
+  }, [value.passwordSavedAt]);
 
   useEffect(() => {
-    setValue({ ...defaultValue, ...initialValue });
+    setValue(buildInitialValue(initialValue));
   }, [initialValue]);
 
   useEffect(() => {
@@ -223,20 +265,105 @@ export function HostForm({
           <select
             id={`${formId}-authMethod`}
             value={value.authMethod}
-            onChange={(e) =>
+            onChange={(e) => {
+              const nextMethod = e.target.value as HostFormValue["authMethod"];
+              if (nextMethod === "password") {
+                setValue({
+                  ...value,
+                  authMethod: nextMethod,
+                  savePassword: value.hasSavedPassword ? false : true,
+                  clearSavedPassword: false,
+                  password: ""
+                });
+                return;
+              }
+
               setValue({
                 ...value,
-                authMethod: e.target.value as HostFormValue["authMethod"]
-              })
-            }
+                authMethod: nextMethod,
+                savePassword: false,
+                clearSavedPassword: false,
+                password: ""
+              });
+            }}
             className={inputClasses}
           >
             <option value="default">Default (SSH config)</option>
+            <option value="password">Password</option>
             <option value="keyfile">Key File</option>
             <option value="agent">SSH Agent</option>
             <option value="op-reference">1Password Reference</option>
           </select>
         </label>
+
+        {value.authMethod === "password" && (
+          <div className="grid gap-2">
+            {value.hasSavedPassword && !value.clearSavedPassword && (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
+                  {passwordSavedLabel ?? "Password saved securely"}
+                </span>
+                <span className="text-xs text-text-muted/70">
+                  A password is already saved for this host.
+                </span>
+              </div>
+            )}
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={value.savePassword}
+                onChange={(e) =>
+                  setValue({
+                    ...value,
+                    savePassword: e.target.checked,
+                    clearSavedPassword: e.target.checked ? false : value.clearSavedPassword
+                  })
+                }
+                className="rounded border-border accent-accent"
+              />
+              <span className="text-sm text-text-primary">
+                {value.hasSavedPassword ? "Replace saved password" : "Save password securely"}
+              </span>
+            </label>
+
+            {value.hasSavedPassword && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={value.clearSavedPassword}
+                  onChange={(e) =>
+                    setValue({
+                      ...value,
+                      clearSavedPassword: e.target.checked,
+                      savePassword: e.target.checked ? false : value.savePassword,
+                      password: e.target.checked ? "" : value.password
+                    })
+                  }
+                  className="rounded border-border accent-accent"
+                />
+                <span className="text-sm text-text-primary">Remove saved password</span>
+              </label>
+            )}
+
+            {value.savePassword && (
+              <label htmlFor={`${formId}-password`} className="grid gap-1.5">
+                <span className="text-xs font-medium text-text-secondary">Password</span>
+                <input
+                  id={`${formId}-password`}
+                  type="password"
+                  value={value.password}
+                  onChange={(e) => setValue({ ...value, password: e.target.value })}
+                  autoComplete="new-password"
+                  className={inputClasses}
+                />
+                {errors.password && (
+                  <span className="text-xs text-red-400">{errors.password}</span>
+                )}
+              </label>
+            )}
+          </div>
+        )}
 
         {value.authMethod === "agent" && (
           <label htmlFor={`${formId}-agentKind`} className="grid gap-1.5">

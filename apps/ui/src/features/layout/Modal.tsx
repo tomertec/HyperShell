@@ -10,6 +10,7 @@ export interface ModalProps {
 
 export function Modal({ open, onClose, title, children }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
+  const mouseDownTargetRef = useRef<EventTarget | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -25,17 +26,20 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       {open && (
         <motion.div
           ref={backdropRef}
-          onClick={(e) => {
-            if (e.target === backdropRef.current) onClose();
+          onMouseDown={(e) => {
+            mouseDownTargetRef.current = e.target;
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === backdropRef.current && mouseDownTargetRef.current === backdropRef.current) onClose();
+          }}
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:p-6 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
         >
           <motion.div
-            className="w-full max-w-2xl mx-4 rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/40"
+            className="my-8 flex max-h-[calc(100dvh-4rem)] w-full max-w-2xl flex-col rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/40"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -52,7 +56,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
                 </svg>
               </button>
             </div>
-            <div className="p-5">{children}</div>
+            <div className="min-h-0 overflow-y-auto p-5">{children}</div>
           </motion.div>
         </motion.div>
       )}

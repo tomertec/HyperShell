@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useStore } from "zustand";
-import { settingsStore } from "./settingsStore";
+import {
+  MAX_TERMINAL_LETTER_SPACING,
+  MAX_TERMINAL_LINE_HEIGHT,
+  MAX_TERMINAL_FONT_SIZE,
+  MIN_TERMINAL_LETTER_SPACING,
+  MIN_TERMINAL_LINE_HEIGHT,
+  MIN_TERMINAL_FONT_SIZE,
+  settingsStore
+} from "./settingsStore";
 import { terminalThemes } from "../terminal/terminalTheme";
 import { ThemeEditor } from "./ThemeEditor";
 import { SshKeyManager } from "../ssh-keys/SshKeyManager";
@@ -9,16 +17,23 @@ const inputClasses =
   "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright";
 
 const FONT_OPTIONS: { label: string; value: string }[] = [
-  { label: "IBM Plex Mono", value: '"IBM Plex Mono", monospace' },
+  {
+    label: "Cascadia Mono",
+    value: '"Cascadia Mono", "Cascadia Code", Consolas, "IBM Plex Mono", monospace'
+  },
+  { label: "IBM Plex Mono", value: '"IBM Plex Mono", Consolas, monospace' },
   { label: "JetBrains Mono", value: '"JetBrains Mono", monospace' },
   { label: "Fira Code", value: '"Fira Code", monospace' },
-  { label: "Cascadia Code", value: '"Cascadia Code", monospace' },
+  { label: "Cascadia Code", value: '"Cascadia Code", Consolas, monospace' },
   { label: "Source Code Pro", value: '"Source Code Pro", monospace' },
   { label: "Consolas", value: "Consolas, monospace" },
   { label: "Courier New", value: '"Courier New", monospace' },
 ];
 
-const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+const FONT_SIZES = Array.from(
+  { length: MAX_TERMINAL_FONT_SIZE - MIN_TERMINAL_FONT_SIZE + 1 },
+  (_, index) => MIN_TERMINAL_FONT_SIZE + index
+);
 
 const SCROLLBACK_OPTIONS = [1000, 2000, 5000, 10000, 25000, 50000];
 
@@ -73,7 +88,10 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }
 function TerminalSection() {
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateTerminal = useStore(settingsStore, (s) => s.updateTerminal);
-  const { fontFamily, fontSize, lineHeight, cursorBlink, scrollback } = settings.terminal;
+  const updateDebug = useStore(settingsStore, (s) => s.updateDebug);
+  const { fontFamily, fontSize, lineHeight, letterSpacing, cursorBlink, scrollback } =
+    settings.terminal;
+  const authTracing = settings.debug.authTracing;
 
   const activeFontValue =
     FONT_OPTIONS.find((f) => fontFamily.includes(f.label))?.value ?? FONT_OPTIONS[0].value;
@@ -115,13 +133,17 @@ function TerminalSection() {
               <span className="text-xs font-medium text-text-secondary">Line Height</span>
               <input
                 type="number"
-                min={1.0}
-                max={2.0}
-                step={0.1}
+                min={MIN_TERMINAL_LINE_HEIGHT}
+                max={MAX_TERMINAL_LINE_HEIGHT}
+                step={0.05}
                 value={lineHeight}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
-                  if (!isNaN(val) && val >= 1.0 && val <= 2.0) {
+                  if (
+                    !isNaN(val) &&
+                    val >= MIN_TERMINAL_LINE_HEIGHT &&
+                    val <= MAX_TERMINAL_LINE_HEIGHT
+                  ) {
                     void updateTerminal({ lineHeight: val });
                   }
                 }}
@@ -129,6 +151,28 @@ function TerminalSection() {
               />
             </label>
           </div>
+
+          <label className="grid gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">Character Spacing</span>
+            <input
+              type="number"
+              min={MIN_TERMINAL_LETTER_SPACING}
+              max={MAX_TERMINAL_LETTER_SPACING}
+              step={1}
+              value={letterSpacing}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (
+                  !Number.isNaN(val) &&
+                  val >= MIN_TERMINAL_LETTER_SPACING &&
+                  val <= MAX_TERMINAL_LETTER_SPACING
+                ) {
+                  void updateTerminal({ letterSpacing: val });
+                }
+              }}
+              className={inputClasses}
+            />
+          </label>
         </div>
       </div>
 
@@ -173,6 +217,34 @@ function TerminalSection() {
               ))}
             </select>
           </label>
+
+          <div className="pt-2 border-t border-border/40">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-text-primary">Auth Trace Logging</div>
+                <div className="text-xs text-text-muted">
+                  Log whether saved credentials were resolved and used (never logs secrets)
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={authTracing}
+                onClick={() => void updateDebug({ authTracing: !authTracing })}
+                className={[
+                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 focus:ring-offset-base-900",
+                  authTracing ? "bg-accent" : "bg-base-600",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out",
+                    authTracing ? "translate-x-4" : "translate-x-0.5",
+                  ].join(" ")}
+                />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

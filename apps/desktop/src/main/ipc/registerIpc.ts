@@ -18,7 +18,12 @@ import type {
 } from "@sshterm/shared";
 import { createSessionManager } from "@sshterm/session-core";
 import { parseSshConfig } from "@sshterm/session-core";
-import { registerHostIpc, getOrCreateHostsRepo, getOrCreateDatabase } from "./hostsIpc";
+import {
+  registerHostIpc,
+  getOrCreateHostsRepo,
+  getOrCreateDatabase,
+  resolveStoredHostPassword
+} from "./hostsIpc";
 import { registerSettingsIpc } from "./settingsIpc";
 import { registerSshConfigIpc } from "./sshConfigIpc";
 import { registerPortForwardIpc } from "./portForwardIpc";
@@ -35,6 +40,7 @@ import type {
   SessionManager,
   SessionTransportEvent,
   TransportHandle,
+  OpenSessionInput,
   SerialConnectionOptions,
   SftpConnectionOptions
 } from "@sshterm/session-core";
@@ -132,6 +138,58 @@ export interface RegisterIpcOptions {
 export type IpcMainLike = Pick<IpcMain, "handle"> &
   Partial<Pick<IpcMain, "removeHandler">>;
 
+const APP_SETTINGS_KEY = "app.settings";
+
+type DbWithPrepare = {
+  prepare(sql: string): {
+    get(...args: unknown[]): unknown;
+  };
+};
+
+function isAuthTraceEnabled(): boolean {
+  if (process.env.VITEST || process.env.NODE_ENV === "test") {
+    return false;
+  }
+
+  const db = getOrCreateDatabase() as DbWithPrepare | null;
+  if (!db) {
+    return false;
+  }
+
+  try {
+    const row = db
+      .prepare("SELECT value FROM app_settings WHERE key = ?")
+      .get(APP_SETTINGS_KEY) as { value?: unknown } | undefined;
+    if (!row || typeof row.value !== "string") {
+      return false;
+    }
+    const parsed = JSON.parse(row.value) as {
+      debug?: { authTracing?: boolean };
+    };
+    return Boolean(parsed.debug?.authTracing);
+  } catch {
+    return false;
+  }
+}
+
+function logAuthTrace(
+  enabled: boolean,
+  scope: "ssh" | "sftp",
+  message: string,
+  metadata?: Record<string, unknown>
+): void {
+  if (!enabled) {
+    return;
+  }
+
+  const prefix = `[sshterm][auth:${scope}] ${message}`;
+  if (metadata) {
+    console.info(prefix, metadata);
+    return;
+  }
+  console.info(prefix);
+}
+
 async function openSessionHandler(
   _event: IpcMainInvokeEvent,
   request: OpenSessionRequest,
@@ -140,16 +198,26 @@ async function openSessionHandler(
   resolveSerialProfile?: RegisterIpcOptions["resolveSerialProfile"]
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
+  const authTraceEnabled = isAuthTraceEnabled();
 
   let resolvedHost: DbHostRecord | null = null;
 
   let sshOptions: { hostname: string; username?: string; port?: number; identityFile?: string; password?: string; proxyJump?: string; keepAliveSeconds?: number } | undefined;
 
   if (parsed.transport === "ssh") {
+    logAuthTrace(authTraceEnabled, "ssh", "Open request received", {
+      profileId: parsed.profileId
+    });
+
     if (resolveHostProfile) {
       const profile = await resolveHostProfile(parsed.profileId);
       if (profile) {
         sshOptions = profile;
+        logAuthTrace(authTraceEnabled, "ssh", "Resolved profile from resolver", {
+          profileId: parsed.profileId,
+          hasPassword: Boolean(profile.password),
+          hasIdentityFile: Boolean(profile.identityFile)
+        });
       }
     }
 
@@ -180,14 +248,47 @@ async function openSessionHandler(
           sshOptions.keepAliveSeconds = resolvedHost.keepAliveInterval;
         }
 
+        const hostRecord = host as {
+          authMethod?: string;
+          authProfileId?: string | null;
+          opReference?: string;
+        };
+        logAuthTrace(authTraceEnabled, "ssh", "Resolved host from DB", {
+          hostId: host.id,
+          authMethod: hostRecord.authMethod ?? "default",
+          hasAuthProfile: Boolean(hostRecord.authProfileId)
+        });
+
+        if (hostRecord.authMethod === "password") {
+          try {
+            const savedPassword = resolveStoredHostPassword(hostRecord);
+            if (savedPassword) {
+              sshOptions.password = savedPassword;
+              logAuthTrace(authTraceEnabled, "ssh", "Loaded saved password from secure storage", {
+                hostId: host.id,
+                authProfileId: hostRecord.authProfileId ?? null
+              });
+            } else {
+              logAuthTrace(authTraceEnabled, "ssh", "Password auth selected but no saved password found", {
+                hostId: host.id,
+                authProfileId: hostRecord.authProfileId ?? null
+              });
+            }
+          } catch (err) {
+            console.error("[auth] failed to resolve saved host password:", err);
+          }
+        }
+
         // 1Password op:// reference auth — resolve credential via the 1Password CLI.
-        const hostRecord = host as { authMethod?: string; opReference?: string };
         if (hostRecord.authMethod === "op-reference" && hostRecord.opReference) {
           try {
             const { resolveOnePasswordReference } = await import("../security/opResolver.js");
             const resolvedCredential = await resolveOnePasswordReference(hostRecord.opReference);
             if (resolvedCredential.length > 0) {
               sshOptions.password = resolvedCredential;
+              logAuthTrace(authTraceEnabled, "ssh", "Resolved credential from 1Password reference", {
+                hostId: host.id
+              });
             }
           } catch (err) {
             console.error("[1password] failed to resolve reference:", err);
@@ -216,14 +317,25 @@ async function openSessionHandler(
     }
   }
 
-  return manager.open({
+  const openInput: OpenSessionInput = {
     ...parsed,
     sshOptions: sshOptions ?? { hostname: parsed.profileId },
     serialOptions,
     autoReconnect: parsed.autoReconnect ?? Boolean(resolvedHost?.autoReconnect),
     maxReconnectAttempts: parsed.reconnectMaxAttempts ?? resolvedHost?.reconnectMaxAttempts ?? 5,
     reconnectBaseInterval: parsed.reconnectBaseInterval ?? resolvedHost?.reconnectBaseInterval ?? 1,
-  });
+  };
+
+  if (parsed.transport === "ssh") {
+    logAuthTrace(authTraceEnabled, "ssh", "Opening SSH session", {
+      profileId: parsed.profileId,
+      hostname: openInput.sshOptions?.hostname ?? parsed.profileId,
+      hasPassword: Boolean(openInput.sshOptions?.password),
+      hasIdentityFile: Boolean(openInput.sshOptions?.identityFile)
+    });
+  }
+
+  return manager.open(openInput);
 }
 
 async function resizeSessionHandler(
@@ -258,6 +370,7 @@ async function resolveSftpConnectionOptions(
   options: RegisterIpcOptions,
   request: SftpConnectRequest
 ): Promise<SftpConnectionOptions | null> {
+  const authTraceEnabled = isAuthTraceEnabled();
   const allHosts = getOrCreateHostsRepo().list();
   const resolvedHost = allHosts.find(
     (candidate) =>
@@ -523,12 +636,39 @@ async function resolveSftpConnectionOptions(
       : undefined;
   let requestedPassword =
     "password" in request && request.password ? request.password : undefined;
+  if (requestedPassword) {
+    logAuthTrace(authTraceEnabled, "sftp", "Using explicit password from SFTP prompt", {
+      hostId
+    });
+  }
+  if (!requestedPassword && resolvedHost?.authMethod === "password") {
+    try {
+      const savedPassword = resolveStoredHostPassword(resolvedHost);
+      if (savedPassword) {
+        requestedPassword = savedPassword;
+        logAuthTrace(authTraceEnabled, "sftp", "Loaded saved password from secure storage", {
+          hostId: resolvedHost.id,
+          authProfileId: resolvedHost.authProfileId ?? null
+        });
+      } else {
+        logAuthTrace(authTraceEnabled, "sftp", "Password auth selected but no saved password found", {
+          hostId: resolvedHost.id,
+          authProfileId: resolvedHost.authProfileId ?? null
+        });
+      }
+    } catch (err) {
+      console.error("[auth] failed to resolve saved host password for SFTP:", err);
+    }
+  }
   if (!requestedPassword && resolvedHost?.authMethod === "op-reference" && resolvedHost.opReference) {
     try {
       const { resolveOnePasswordReference } = await import("../security/opResolver.js");
       const resolvedCredential = await resolveOnePasswordReference(resolvedHost.opReference);
       if (resolvedCredential.length > 0) {
         requestedPassword = resolvedCredential;
+        logAuthTrace(authTraceEnabled, "sftp", "Resolved credential from 1Password reference", {
+          hostId: resolvedHost.id
+        });
       }
     } catch (err) {
       console.error("[1password] failed to resolve reference for SFTP:", err);
@@ -581,6 +721,14 @@ async function resolveSftpConnectionOptions(
         : privateKeyPath
           ? "key"
           : "password";
+
+  logAuthTrace(authTraceEnabled, "sftp", "Resolved connection options", {
+    hostId,
+    authMethod,
+    hasPassword: Boolean(requestedPassword),
+    hasPrivateKey: Boolean(privateKeyPath),
+    hasAgent: Boolean(agentPath)
+  });
 
   return {
     hostname: resolvedHostname,
@@ -834,11 +982,49 @@ function createInertTransport(sessionId: string): TransportHandle {
 export async function openSessionForTest(
   request: OpenSessionRequest
 ): Promise<OpenSessionResponse> {
+  const result = await openSessionForTestInspectInput(request);
+  return result.session;
+}
+
+export async function openSessionForTestInspectInput(
+  request: OpenSessionRequest,
+  options?: {
+    resolveHostProfile?: RegisterIpcOptions["resolveHostProfile"] | null;
+    resolveSerialProfile?: RegisterIpcOptions["resolveSerialProfile"];
+  }
+): Promise<{ session: OpenSessionResponse; input: OpenSessionInput | undefined }> {
+  let capturedInput: OpenSessionInput | undefined;
   const testSessionManager = createSessionManager({
     createTransport(input) {
       return createInertTransport(input.sessionId);
-    }
+    },
+    sessionIdFactory: () => "test-session-1"
   });
 
-  return openSessionHandler({} as IpcMainInvokeEvent, request, testSessionManager);
+  const originalOpen = testSessionManager.open.bind(testSessionManager);
+  const managerWithCapture: SessionManager = {
+    ...testSessionManager,
+    open(input) {
+      capturedInput = input;
+      return originalOpen(input);
+    }
+  };
+
+  const effectiveResolveHostProfile =
+    options?.resolveHostProfile === undefined
+      ? async (profileId: string) => ({ hostname: profileId })
+      : options.resolveHostProfile ?? undefined;
+
+  const session = await openSessionHandler(
+    {} as IpcMainInvokeEvent,
+    request,
+    managerWithCapture,
+    effectiveResolveHostProfile,
+    options?.resolveSerialProfile
+  );
+
+  return {
+    session,
+    input: capturedInput
+  };
 }

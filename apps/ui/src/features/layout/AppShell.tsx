@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { cloneElement, isValidElement, useState } from "react";
 import { motion } from "framer-motion";
 import { TunnelManagerPanel } from "../tunnels/TunnelManagerPanel";
 import { StatusBar } from "../statusbar/StatusBar";
@@ -10,6 +10,11 @@ export interface AppShellProps {
 
 export function AppShell({ sidebar, children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarContent = isValidElement(sidebar)
+    ? cloneElement(sidebar as React.ReactElement<{ collapsed?: boolean }>, {
+        collapsed: !sidebarOpen
+      })
+    : sidebar;
 
   return (
     <div className="flex flex-col h-full">
@@ -82,11 +87,9 @@ export function AppShell({ sidebar, children }: AppShellProps) {
             </button>
           </div>
 
-          {sidebarOpen && (
-            <div className="relative flex-1 overflow-y-auto py-2">
-              {sidebar}
-            </div>
-          )}
+          <div className="relative flex-1 overflow-y-auto py-2">
+            {sidebarContent}
+          </div>
         </aside>
 
         <main className="flex-1 flex flex-col min-w-0 bg-surface">

@@ -16,6 +16,13 @@ type SafeStorageLike = {
   decryptString(value: Buffer): string;
 };
 
+export class SecureStorageUnavailableError extends Error {
+  constructor(message = "Secure storage is unavailable on this system") {
+    super(message);
+    this.name = "SecureStorageUnavailableError";
+  }
+}
+
 function getSafeStorage(): SafeStorageLike | null {
   try {
     const electron = require("electron") as { safeStorage?: SafeStorageLike };
@@ -43,6 +50,14 @@ export function protectSecret(secret: string): string {
   return safeStorage.encryptString(secret).toString("base64");
 }
 
+export function protectSecretStrict(secret: string): string {
+  const safeStorage = getSafeStorage();
+  if (!safeStorage || !safeStorage.isEncryptionAvailable()) {
+    throw new SecureStorageUnavailableError();
+  }
+  return safeStorage.encryptString(secret).toString("base64");
+}
+
 export function revealSecret(payload: string): string {
   const safeStorage = getSafeStorage();
 
@@ -54,6 +69,16 @@ export function revealSecret(payload: string): string {
     return decodeSecret(payload);
   }
 
+  return safeStorage.decryptString(Buffer.from(payload, "base64"));
+}
+
+export function revealSecretStrict(payload: string): string {
+  const safeStorage = getSafeStorage();
+  if (!safeStorage || !safeStorage.isEncryptionAvailable()) {
+    throw new SecureStorageUnavailableError(
+      "Secure storage is unavailable; unlock your OS keychain and try again."
+    );
+  }
   return safeStorage.decryptString(Buffer.from(payload, "base64"));
 }
 

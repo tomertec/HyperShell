@@ -23,6 +23,43 @@ import { settingsStore } from "../features/settings/settingsStore";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import type { SerialProfileRecord } from "@sshterm/shared";
 
+function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
+  return {
+    id: String(h.id ?? ""),
+    name: String(h.name ?? ""),
+    hostname: String(h.hostname ?? ""),
+    port: Number(h.port ?? 22),
+    username: h.username == null ? "" : String(h.username),
+    identityFile: h.identityFile == null ? "" : String(h.identityFile),
+    group: "",
+    tags: "",
+    authMethod: (h.authMethod as HostRecord["authMethod"]) ?? "default",
+    agentKind: (h.agentKind as HostRecord["agentKind"]) ?? "system",
+    opReference: h.opReference == null ? "" : String(h.opReference),
+    notes: h.notes ? String(h.notes) : undefined,
+    isFavorite: Boolean(h.isFavorite ?? (h as Record<string, unknown>).is_favorite ?? false),
+    sortOrder: h.sortOrder != null ? Number(h.sortOrder) : null,
+    color: h.color ? String(h.color) : null,
+    proxyJump: h.proxyJump == null ? "" : String(h.proxyJump),
+    proxyJumpHostIds: h.proxyJumpHostIds == null ? "" : String(h.proxyJumpHostIds),
+    keepAliveInterval:
+      h.keepAliveInterval == null ? "" : String(h.keepAliveInterval),
+    autoReconnect: Boolean(h.autoReconnect ?? false),
+    reconnectMaxAttempts:
+      h.reconnectMaxAttempts == null ? 5 : Number(h.reconnectMaxAttempts),
+    reconnectBaseInterval:
+      h.reconnectBaseInterval == null ? 1 : Number(h.reconnectBaseInterval),
+    password: "",
+    savePassword: false,
+    clearSavedPassword: false,
+    hasSavedPassword:
+      ((h.authMethod as string | undefined) ?? "default") === "password" &&
+      h.authProfileId != null,
+    passwordSavedAt:
+      typeof h.passwordSavedAt === "string" ? h.passwordSavedAt : null
+  };
+}
+
 async function loadHosts(): Promise<HostRecord[]> {
   if (!window.sshterm?.listHosts) {
     console.warn("[sshterm] listHosts not available on window.sshterm");
@@ -31,19 +68,7 @@ async function loadHosts(): Promise<HostRecord[]> {
   try {
     const dbHosts = await window.sshterm.listHosts();
     console.log("[sshterm] loaded hosts from DB:", dbHosts.length);
-    return dbHosts.map((h: Record<string, unknown>) => ({
-      id: String(h.id ?? ""),
-      name: String(h.name ?? ""),
-      hostname: String(h.hostname ?? ""),
-      port: Number(h.port ?? 22),
-      username: String(h.username ?? ""),
-      group: "",
-      tags: "",
-      notes: h.notes ? String(h.notes) : undefined,
-      isFavorite: Boolean(h.isFavorite ?? (h as Record<string, unknown>).is_favorite ?? false),
-      sortOrder: h.sortOrder != null ? Number(h.sortOrder) : null,
-      color: h.color ? String(h.color) : null,
-    }));
+    return dbHosts.map((h: Record<string, unknown>) => mapDbHostToUiHost(h));
   } catch (err) {
     console.error("[sshterm] failed to load hosts:", err);
     return [];
@@ -71,12 +96,35 @@ async function persistSerialProfile(profile: SerialProfileRecord): Promise<void>
   }
 }
 
-async function persistHost(host: HostRecord): Promise<void> {
+async function persistHost(host: HostRecord): Promise<HostRecord | null> {
   if (!window.sshterm?.upsertHost) {
     console.warn("[sshterm] upsertHost not available");
     return;
   }
   try {
+    const authMethod = host.authMethod ?? "default";
+    const agentKind = host.agentKind ?? "system";
+    const opReference = host.opReference ?? "";
+    const proxyJump = host.proxyJump ?? "";
+    const proxyJumpHostIds = host.proxyJumpHostIds ?? "";
+    const autoReconnect = host.autoReconnect ?? false;
+    const reconnectMaxAttempts = host.reconnectMaxAttempts ?? 5;
+    const reconnectBaseInterval = host.reconnectBaseInterval ?? 1;
+
+    const keepAliveSource =
+      typeof host.keepAliveInterval === "string" ? host.keepAliveInterval : "";
+    const trimmedKeepAlive = keepAliveSource.trim();
+    const parsedKeepAlive =
+      trimmedKeepAlive.length === 0 ? null : Number.parseInt(trimmedKeepAlive, 10);
+    const keepAliveInterval =
+      parsedKeepAlive == null || Number.isNaN(parsedKeepAlive)
+        ? null
+        : Math.max(0, parsedKeepAlive);
+
+    const savePassword = authMethod === "password" && host.savePassword;
+    const clearSavedPassword =
+      authMethod !== "password" || host.clearSavedPassword;
+
     const result = await window.sshterm.upsertHost({
       id: host.id,
       name: host.name,
@@ -87,13 +135,29 @@ async function persistHost(host: HostRecord): Promise<void> {
       group: host.group,
       tags: host.tags,
       notes: host.notes || null,
+      authMethod,
+      agentKind,
+      opReference: opReference || null,
       isFavorite: host.isFavorite ?? false,
       color: host.color ?? null,
       sortOrder: host.sortOrder ?? null,
+      proxyJump: proxyJump || null,
+      proxyJumpHostIds: proxyJumpHostIds || null,
+      keepAliveInterval,
+      autoReconnect,
+      reconnectMaxAttempts,
+      reconnectBaseInterval,
+      savePassword,
+      clearSavedPassword,
+      ...(savePassword && (host.password ?? "").trim()
+        ? { password: (host.password ?? "").trim() }
+        : {})
     });
     console.log("[sshterm] persisted host:", result);
+    return mapDbHostToUiHost(result as unknown as Record<string, unknown>);
   } catch (err) {
     console.error("[sshterm] failed to persist host:", err);
+    return null;
   }
 }
 
@@ -287,15 +351,14 @@ export function App() {
     (host: HostRecord) => {
       setConnectingHostIds((prev) => new Set(prev).add(host.id));
       const optimisticSessionId = `ssh-${host.id}-${Date.now()}`;
-      const destination = host.username
-        ? `${host.username}@${host.hostname}`
-        : host.hostname;
       openTab({
         tabKey: optimisticSessionId,
         sessionId: optimisticSessionId,
         title: host.name,
         transport: "ssh",
-        profileId: destination,
+        // Use stable host id so main process resolves the exact saved host record
+        // (auth method, password ref, identity file, proxy jump, keep-alive, etc.).
+        profileId: host.id,
         hostId: host.id,
         preopened: false
       });
@@ -581,14 +644,42 @@ export function App() {
               return;
             }
             const record: HostRecord = { id, ...value };
+            const nowIso = new Date().toISOString();
+            const sanitizedRecord: HostRecord = {
+              ...record,
+              password: "",
+              savePassword: false,
+              clearSavedPassword: false,
+              hasSavedPassword:
+                record.authMethod === "password"
+                  ? record.clearSavedPassword
+                    ? false
+                    : record.savePassword
+                      ? true
+                      : record.hasSavedPassword
+                  : false,
+              passwordSavedAt:
+                record.authMethod === "password"
+                  ? record.clearSavedPassword
+                    ? null
+                    : record.savePassword && (record.password ?? "").trim().length > 0
+                      ? nowIso
+                      : record.passwordSavedAt ?? null
+                  : null
+            };
             if (editingHost) {
               setHosts((prev) =>
-                prev.map((h) => (h.id === id ? record : h))
+                prev.map((h) => (h.id === id ? sanitizedRecord : h))
               );
             } else {
-              setHosts((prev) => [...prev, record]);
+              setHosts((prev) => [...prev, sanitizedRecord]);
             }
-            void persistHost(record);
+            void persistHost(record).then((persisted) => {
+              if (!persisted) {
+                return;
+              }
+              setHosts((prev) => prev.map((h) => (h.id === id ? persisted : h)));
+            });
             setHostModalOpen(false);
           }}
         />

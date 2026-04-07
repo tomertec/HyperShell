@@ -26,9 +26,10 @@ export const terminalTheme = {
 
 export const terminalOptions: ITerminalOptions = {
   fontFamily:
-    '"IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace',
+    '"Cascadia Mono", "Cascadia Code", Consolas, "IBM Plex Mono", "Liberation Mono", monospace',
   fontSize: 13,
-  lineHeight: 1.2,
+  lineHeight: 1.0,
+  letterSpacing: 0,
   cursorBlink: true,
   convertEol: true,
   allowTransparency: false,
@@ -191,6 +192,7 @@ export function getTerminalOptions(settings?: {
   fontFamily?: string;
   fontSize?: number;
   lineHeight?: number;
+  letterSpacing?: number;
   cursorBlink?: boolean;
   scrollback?: number;
   theme?: string;
@@ -203,6 +205,7 @@ export function getTerminalOptions(settings?: {
     ...(settings?.fontFamily !== undefined && { fontFamily: settings.fontFamily }),
     ...(settings?.fontSize !== undefined && { fontSize: settings.fontSize }),
     ...(settings?.lineHeight !== undefined && { lineHeight: settings.lineHeight }),
+    ...(settings?.letterSpacing !== undefined && { letterSpacing: settings.letterSpacing }),
     ...(settings?.cursorBlink !== undefined && { cursorBlink: settings.cursorBlink }),
     ...(settings?.scrollback !== undefined && { scrollback: settings.scrollback }),
     theme: resolvedTheme

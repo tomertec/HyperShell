@@ -226,4 +226,54 @@ describe("buildSshArgs", () => {
 
     expect(fakePty.writes).toEqual(["super-secret\r"]);
   });
+
+  it("auto-sends secret when prompt includes ANSI/control formatting", async () => {
+    const fakePty = createFakePty();
+    createSshPtyTransport(
+      {
+        sessionId: "s4",
+        transport: "ssh",
+        profileId: "host-4",
+        cols: 80,
+        rows: 24
+      },
+      {
+        hostname: "secure-host",
+        password: "super-secret"
+      },
+      {
+        spawnPty: () => fakePty.process
+      }
+    );
+
+    await Promise.resolve();
+    fakePty.emitData("\u001b[1muser@secure-host's password:\u001b[0m ");
+
+    expect(fakePty.writes).toEqual(["super-secret\r"]);
+  });
+
+  it("does not auto-send when no auth prompt is detected", async () => {
+    const fakePty = createFakePty();
+    createSshPtyTransport(
+      {
+        sessionId: "s5",
+        transport: "ssh",
+        profileId: "host-5",
+        cols: 80,
+        rows: 24
+      },
+      {
+        hostname: "secure-host",
+        password: "super-secret"
+      },
+      {
+        spawnPty: () => fakePty.process
+      }
+    );
+
+    await Promise.resolve();
+    fakePty.emitData("Permission denied, please try again.\r\n");
+
+    expect(fakePty.writes).toEqual([]);
+  });
 });

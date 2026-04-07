@@ -60,7 +60,7 @@ If Electron loads from `apps/desktop/dist/renderer/` (bundled build) instead of 
 
 ### Terminal shows garbled output or wrong encoding
 
-Check the terminal theme and font settings in Settings. Ensure the font supports the required character set. Default font is IBM Plex Mono.
+Check the terminal theme and font settings in Settings. Ensure the font supports the required character set. Default font is Cascadia Mono.
 
 ### SSH connection hangs on "connecting"
 
