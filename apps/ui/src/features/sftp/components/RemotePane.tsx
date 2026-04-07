@@ -22,6 +22,8 @@ export interface RemotePaneProps {
   onDelete: (paths: string[]) => void;
   onMkdir: () => void;
   onBookmark: (remotePath: string) => void;
+  isActive: boolean;
+  onActivate: () => void;
 }
 
 interface RemoteContextMenuState {
@@ -37,7 +39,9 @@ export function RemotePane({
   onRename,
   onDelete,
   onMkdir,
-  onBookmark
+  onBookmark,
+  isActive,
+  onActivate
 }: RemotePaneProps) {
   const sftpSessionId = useStore(store, (state) => state.sftpSessionId);
   const remotePath = useStore(store, (state) => state.remotePath);
@@ -185,7 +189,11 @@ export function RemotePane({
   ]);
 
   return (
-    <div className="flex h-full flex-col" onContextMenu={(event) => handleContextMenu(event)}>
+    <div
+      className={`flex h-full flex-col ${isActive ? "border-t-2 border-accent" : "border-t-2 border-transparent"}`}
+      onMouseDown={onActivate}
+      onContextMenu={(event) => handleContextMenu(event)}
+    >
       <div className="flex items-center gap-1 border-b border-base-700 bg-base-900/80 px-1.5 py-[2px]">
         <span className="font-mono text-[9px] uppercase tracking-wider text-text-muted">Remote</span>
         <button

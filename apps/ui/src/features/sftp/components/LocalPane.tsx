@@ -13,6 +13,8 @@ import { PathBreadcrumb } from "./PathBreadcrumb";
 export interface LocalPaneProps {
   store: StoreApi<SftpStoreState>;
   onTransfer: (localPaths: string[], remotePath: string) => void;
+  isActive: boolean;
+  onActivate: () => void;
 }
 
 interface LocalContextMenuState {
@@ -21,7 +23,7 @@ interface LocalContextMenuState {
   entry?: FsEntry;
 }
 
-export function LocalPane({ store, onTransfer }: LocalPaneProps) {
+export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPaneProps) {
   const localPath = useStore(store, (state) => state.localPath);
   const localEntries = useStore(store, (state) => state.localEntries);
   const localSelection = useStore(store, (state) => state.localSelection);
@@ -158,7 +160,11 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
   }, [contextMenu, handleNavigate, loadDirectory, localPath, localSelection, onTransfer]);
 
   return (
-    <div className="flex h-full flex-col" onContextMenu={(event) => handleContextMenu(event)}>
+    <div
+      className={`flex h-full flex-col ${isActive ? "border-t-2 border-accent" : "border-t-2 border-transparent"}`}
+      onMouseDown={onActivate}
+      onContextMenu={(event) => handleContextMenu(event)}
+    >
       <div className="flex items-center gap-1 border-b border-base-700 bg-base-900/80 px-1.5 py-[2px]">
         <DriveSelector currentPath={localPath} onSelect={handleNavigate} />
         <button

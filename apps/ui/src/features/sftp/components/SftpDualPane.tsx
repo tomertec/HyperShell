@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 
 import type { SftpStoreState } from "../sftpStore";
@@ -26,6 +27,9 @@ export function SftpDualPane({
   onMkdir,
   onBookmark
 }: SftpDualPaneProps) {
+  const activePane = useStore(store, (state) => state.activePane);
+  const setActivePane = useStore(store, (state) => state.setActivePane);
+
   const [splitRatio, setSplitRatio] = useState(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
@@ -59,7 +63,7 @@ export function SftpDualPane({
         style={{ width: `${splitRatio * 100}%` }}
         className="flex min-w-[260px] flex-col border-r border-base-700"
       >
-        <LocalPane store={store} onTransfer={onUpload} />
+        <LocalPane store={store} onTransfer={onUpload} isActive={activePane === "local"} onActivate={() => setActivePane("local")} />
       </div>
 
       <div
@@ -81,6 +85,8 @@ export function SftpDualPane({
           onDelete={onDelete}
           onMkdir={onMkdir}
           onBookmark={onBookmark}
+          isActive={activePane === "remote"}
+          onActivate={() => setActivePane("remote")}
         />
       </div>
     </div>
