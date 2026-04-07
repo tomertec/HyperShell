@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useTerminalSession } from "./useTerminalSession";
+import { TerminalReconnectOverlay } from "./TerminalReconnectOverlay";
 
 export interface TerminalPaneProps {
   transport: "ssh" | "serial";
@@ -14,13 +15,18 @@ export interface TerminalPaneProps {
 const stateColors: Record<string, string> = {
   connected: "bg-success",
   connecting: "bg-warning",
+  reconnecting: "bg-warning",
+  waiting_for_network: "bg-amber-500",
   disconnected: "bg-text-muted/50",
+  failed: "bg-danger",
   error: "bg-danger",
 };
 
 const stateGlowColors: Record<string, string> = {
   connected: "bg-success/40",
   connecting: "bg-warning/40",
+  reconnecting: "bg-warning/40",
+  waiting_for_network: "bg-amber-500/40",
 };
 
 export function TerminalPane({
@@ -107,6 +113,10 @@ export function TerminalPane({
         <div
           ref={session.containerRef}
           className="absolute inset-0"
+        />
+        <TerminalReconnectOverlay
+          state={session.state}
+          onRetry={() => session.connect()}
         />
       </div>
     </div>
