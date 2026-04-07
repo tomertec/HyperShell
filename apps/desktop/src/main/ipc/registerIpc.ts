@@ -709,6 +709,7 @@ export function registerIpc(
   registerGroupsIpc(ipcMain, () => groupsRepo);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
   const cleanupSftp = registerSftpIpc(ipcMain, {
+    db: getOrCreateDatabase() as any,
     sessionManager: manager,
     resolveConnectionOptions: (hostId, request) =>
       resolveSftpConnectionOptions(hostId, options, request),
