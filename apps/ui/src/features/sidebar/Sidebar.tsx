@@ -152,7 +152,7 @@ export function Sidebar({
           </svg>
           <span className="text-xs tracking-wide">Settings</span>
         </button>
-        <div className="text-[10px] text-text-muted/60 tracking-wide select-none">SSHTerm v0.1.0</div>
+        <div className="text-[10px] text-text-muted/60 tracking-wide select-none">HyperShell v0.1.0</div>
       </div>
     </div>
   );

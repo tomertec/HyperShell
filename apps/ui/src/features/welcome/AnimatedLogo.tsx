@@ -9,7 +9,7 @@ interface AnimatedLogoProps {
 export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
   const [phase, setPhase] = useState<"typing" | "idle">("typing");
   const [visibleChars, setVisibleChars] = useState(0);
-  const text = "SSHTerm";
+  const text = "HyperShell";
   const prompt = ">_ ";
 
   // Typing effect
@@ -52,8 +52,8 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
         className="relative flex items-baseline gap-0"
         style={{ fontSize: compact ? "1.5rem" : "2.5rem" }}
       >
-        <span className="font-mono text-accent/70 font-light">{displayedPrompt}</span>
-        <span className="font-mono font-semibold text-text-primary tracking-tight">
+        <span className="text-accent/70 font-light" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{displayedPrompt}</span>
+        <span className="font-semibold text-text-primary tracking-tight" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
           {displayedText}
         </span>
         {/* Blinking cursor */}

@@ -30,7 +30,7 @@ export function AppShell({ sidebar, children }: AppShellProps) {
         <div className="relative flex items-center justify-between px-3 py-2.5 border-b border-border">
           {sidebarOpen && (
             <span className="text-sm font-semibold text-text-primary tracking-tight select-none">
-              SSHTerm
+              HyperShell
             </span>
           )}
           <button
