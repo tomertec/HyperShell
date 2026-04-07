@@ -46,7 +46,7 @@ export function DriveSelector({ currentPath, onSelect }: DriveSelectorProps) {
     <select
       value={currentDrive}
       onChange={(event) => onSelect(event.target.value)}
-      className="rounded border border-base-600 bg-base-800 px-2 py-1 text-sm text-text-primary"
+      className="rounded border border-base-600 bg-base-800 px-1.5 py-0.5 text-xs text-text-primary"
       title="Local drive"
     >
       {options.map((drive) => (

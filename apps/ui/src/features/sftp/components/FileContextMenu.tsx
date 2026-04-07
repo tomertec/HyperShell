@@ -52,7 +52,7 @@ export function FileContextMenu({
     <div
       ref={ref}
       role="menu"
-      className="fixed z-50 min-w-48 overflow-hidden rounded-lg border border-border bg-base-800/95 py-1 shadow-xl shadow-black/30 backdrop-blur"
+      className="fixed z-50 min-w-44 overflow-hidden rounded-md border border-border bg-base-800/95 py-0.5 shadow-xl shadow-black/30 backdrop-blur"
       style={{ left: x, top: y }}
     >
       {actions.map((item, index) =>
@@ -72,7 +72,7 @@ export function FileContextMenu({
               item.action();
               onClose();
             }}
-            className="flex w-full items-center px-3 py-1.5 text-left text-sm text-text-primary transition-colors hover:bg-base-700/80 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex w-full items-center px-3 py-1 text-left text-xs text-text-primary transition-colors hover:bg-base-700/80 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {item.label}
           </button>
