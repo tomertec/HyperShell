@@ -3,6 +3,7 @@ import { useStore } from "zustand";
 import { Toaster } from "sonner";
 
 import { broadcastStore } from "../features/broadcast/broadcastStore";
+import { useSnippetStore } from "../features/snippets/snippetStore";
 import type { HostFormValue } from "../features/hosts/HostForm";
 import { HostForm } from "../features/hosts/HostForm";
 import type { HostRecord } from "../features/hosts/HostsView";
@@ -311,6 +312,10 @@ function MainApp() {
       if (e.key === "," && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         setSettingsOpen(true);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "S") {
+        e.preventDefault();
+        useSnippetStore.getState().toggle();
       }
     };
     window.addEventListener("keydown", onKeyDown);

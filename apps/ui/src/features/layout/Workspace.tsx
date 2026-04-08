@@ -7,6 +7,8 @@ import { SftpTab } from "../sftp";
 import { TerminalPane } from "../terminal/TerminalPane";
 import { useTunnelStore } from "../tunnels/tunnelStore";
 import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
+import { useSnippetStore } from "../snippets/snippetStore";
+import { SnippetsPanel } from "../snippets/SnippetsPanel";
 import { type Pane, layoutStore } from "./layoutStore";
 import { PaneResizeHandle } from "./PaneResizeHandle";
 import { TabBar } from "./TabBar";
@@ -114,6 +116,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   const paneSizes = useStore(layoutStore, (s) => s.paneSizes);
   const setPaneSizes = useStore(layoutStore, (s) => s.setPaneSizes);
   const toggleTunnelPanel = useTunnelStore((s) => s.togglePanel);
+  const snippetsIsOpen = useSnippetStore((s) => s.isOpen);
   const containerRef = useRef<HTMLDivElement>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
 
@@ -191,6 +194,20 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
         <div className="relative flex items-center gap-0.5 px-2 pb-1.5 pt-2">
           <BroadcastButton />
           <button
+            onClick={() => useSnippetStore.getState().toggle()}
+            className={`p-1.5 rounded transition-colors ${
+              snippetsIsOpen
+                ? "text-accent bg-accent/10"
+                : "text-text-muted hover:text-text-primary hover:bg-base-700/60"
+            }`}
+            title="Snippets (Ctrl+Shift+S)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+            </svg>
+          </button>
+          <button
             onClick={toggleTunnelPanel}
             className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
             title="Tunnels"
@@ -217,47 +234,50 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
         </div>
       </div>
 
-      {tabs.length > 0 ? (
-        <div
-          ref={containerRef}
-          className={`flex-1 min-h-0 flex ${
-            splitDirection === "horizontal" ? "flex-row" : "flex-col"
-          }`}
-        >
-          {panes.map((pane, i) => (
-            <Fragment key={pane.paneId}>
-              {i > 0 && (
-                <PaneResizeHandle
-                  direction={splitDirection}
-                  onResize={(delta) => handleResize(i - 1, delta)}
-                  onResizeEnd={() => {}}
-                />
-              )}
-              <div
-                style={{
-                  [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
-                }}
-                className="h-full min-h-0 min-w-0 relative"
-              >
-                <PaneView
-                  pane={pane}
-                  isActive={pane.paneId === activePaneId}
-                  activeSessionId={activeSessionId}
-                  onActivate={() => activatePane(pane.paneId)}
-                  onCloseTab={closeTab}
-                />
-              </div>
-            </Fragment>
-          ))}
-        </div>
-      ) : (
-        <WelcomeScreen
-          availablePorts={availablePorts}
-          onRefreshPorts={onRefreshPorts}
-          onConnectSsh={onConnectSsh}
-          onConnectSerial={onConnectSerial}
-        />
-      )}
+      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
+        {tabs.length > 0 ? (
+          <div
+            ref={containerRef}
+            className={`flex-1 min-h-0 flex ${
+              splitDirection === "horizontal" ? "flex-row" : "flex-col"
+            }`}
+          >
+            {panes.map((pane, i) => (
+              <Fragment key={pane.paneId}>
+                {i > 0 && (
+                  <PaneResizeHandle
+                    direction={splitDirection}
+                    onResize={(delta) => handleResize(i - 1, delta)}
+                    onResizeEnd={() => {}}
+                  />
+                )}
+                <div
+                  style={{
+                    [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
+                  }}
+                  className="h-full min-h-0 min-w-0 relative"
+                >
+                  <PaneView
+                    pane={pane}
+                    isActive={pane.paneId === activePaneId}
+                    activeSessionId={activeSessionId}
+                    onActivate={() => activatePane(pane.paneId)}
+                    onCloseTab={closeTab}
+                  />
+                </div>
+              </Fragment>
+            ))}
+          </div>
+        ) : (
+          <WelcomeScreen
+            availablePorts={availablePorts}
+            onRefreshPorts={onRefreshPorts}
+            onConnectSsh={onConnectSsh}
+            onConnectSerial={onConnectSerial}
+          />
+        )}
+        <SnippetsPanel />
+      </div>
     </div>
   );
 }

@@ -1,0 +1,46 @@
+import { create } from "zustand";
+
+type SnippetRecord = {
+  id: string;
+  name: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type SnippetStore = {
+  snippets: SnippetRecord[];
+  isOpen: boolean;
+  loading: boolean;
+  toggle: () => void;
+  open: () => void;
+  close: () => void;
+  load: () => Promise<void>;
+  upsert: (id: string, name: string, body: string) => Promise<void>;
+  remove: (id: string) => Promise<void>;
+};
+
+export const useSnippetStore = create<SnippetStore>((set, get) => ({
+  snippets: [],
+  isOpen: false,
+  loading: false,
+  toggle: () => set((s) => ({ isOpen: !s.isOpen })),
+  open: () => {
+    set({ isOpen: true });
+    void get().load();
+  },
+  close: () => set({ isOpen: false }),
+  load: async () => {
+    set({ loading: true });
+    const snippets = await window.sshterm?.snippetsList?.() ?? [];
+    set({ snippets, loading: false });
+  },
+  upsert: async (id, name, body) => {
+    await window.sshterm?.snippetsUpsert?.({ id, name, body });
+    void get().load();
+  },
+  remove: async (id) => {
+    await window.sshterm?.snippetsRemove?.({ id });
+    void get().load();
+  },
+}));
