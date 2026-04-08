@@ -661,8 +661,12 @@ function MainApp() {
   const parseHostKeyVerificationError = useCallback(
     (error: unknown): HostKeyVerificationInfo | null => {
       const message = error instanceof Error ? error.message : String(error);
+      // Electron wraps IPC errors: "Error invoking remote method '...': ClassName: {json}"
+      // Extract the JSON substring from the message
+      const jsonStart = message.indexOf("{");
+      if (jsonStart === -1) return null;
       try {
-        const parsed = JSON.parse(message);
+        const parsed = JSON.parse(message.slice(jsonStart));
         if (parsed && parsed.__hostKeyVerification) {
           return {
             hostname: parsed.hostname,
