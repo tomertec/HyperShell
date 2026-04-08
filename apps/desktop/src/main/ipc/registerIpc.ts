@@ -37,6 +37,7 @@ import { registerHostPortForwardIpc } from "./hostPortForwardIpc";
 import { registerOpIpc } from "./opIpc";
 import { registerEditorIpc } from "./editorIpc";
 import { registerSnippetsIpc } from "./snippetsIpc";
+import { createSessionLogger, registerLoggingIpc } from "./loggingIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
 import type {
@@ -127,9 +128,13 @@ const registeredChannels = [
   ipcChannels.snippets.list,
   ipcChannels.snippets.upsert,
   ipcChannels.snippets.remove,
+  ipcChannels.logging.start,
+  ipcChannels.logging.stop,
+  ipcChannels.logging.getState,
 ] as const;
 
 const sessionManager = createSessionManager();
+const sessionLogger = createSessionLogger();
 
 const groupsRepo = createGroupsRepository();
 const serialProfilesRepo = createSerialProfilesRepository();
@@ -893,6 +898,10 @@ export function registerIpc(
   const manager = options.sessionManager ?? sessionManager;
   const unsubscribeSessionEvents = manager.onEvent((event) => {
     options.emitSessionEvent?.(event);
+    // Session logging: intercept data events
+    if ("type" in event && event.type === "data" && "sessionId" in event && "data" in event) {
+      sessionLogger.onSessionData(event.sessionId as string, event.data as string);
+    }
   });
 
   for (const channel of registeredChannels) {
@@ -943,6 +952,7 @@ export function registerIpc(
   registerOpIpc(ipcMain);
   const unregisterEditor = registerEditorIpc(ipcMain);
   registerSnippetsIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerLoggingIpc(ipcMain, sessionLogger);
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created

@@ -129,6 +129,12 @@ export const snippetChannels = {
   remove: "snippets:remove",
 } as const;
 
+export const loggingChannels = {
+  start: "logging:start",
+  stop: "logging:stop",
+  getState: "logging:get-state",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -147,4 +153,5 @@ export const ipcChannels = {
   op: opChannels,
   editor: editorChannels,
   snippets: snippetChannels,
+  logging: loggingChannels,
 } as const;

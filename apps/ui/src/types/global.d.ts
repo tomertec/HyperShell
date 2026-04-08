@@ -2,6 +2,10 @@ import type {
   SnippetRecord,
   UpsertSnippetRequest,
   RemoveSnippetRequest,
+  StartLoggingRequest,
+  StopLoggingRequest,
+  GetLoggingStateRequest,
+  LoggingStateResponse,
   CloseSessionRequest,
   StartPortForwardRequest,
   StopPortForwardRequest,
@@ -149,6 +153,9 @@ declare global {
       snippetsList?: () => Promise<SnippetRecord[]>;
       snippetsUpsert?: (request: UpsertSnippetRequest) => Promise<SnippetRecord>;
       snippetsRemove?: (request: RemoveSnippetRequest) => Promise<void>;
+      loggingStart?: (request: StartLoggingRequest) => Promise<void>;
+      loggingStop?: (request: StopLoggingRequest) => Promise<void>;
+      loggingGetState?: (request: GetLoggingStateRequest) => Promise<LoggingStateResponse>;
     };
   }
 }

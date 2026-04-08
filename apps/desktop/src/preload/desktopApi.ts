@@ -140,9 +140,17 @@ import {
   snippetRecordSchema,
   upsertSnippetRequestSchema,
   removeSnippetRequestSchema,
+  startLoggingRequestSchema,
+  stopLoggingRequestSchema,
+  getLoggingStateRequestSchema,
+  loggingStateResponseSchema,
   type SnippetRecord,
   type UpsertSnippetRequest,
   type RemoveSnippetRequest,
+  type StartLoggingRequest,
+  type StopLoggingRequest,
+  type GetLoggingStateRequest,
+  type LoggingStateResponse,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -261,6 +269,10 @@ export interface DesktopApi {
   snippetsList(): Promise<SnippetRecord[]>;
   snippetsUpsert(request: UpsertSnippetRequest): Promise<SnippetRecord>;
   snippetsRemove(request: RemoveSnippetRequest): Promise<void>;
+  // Session logging
+  loggingStart(request: StartLoggingRequest): Promise<void>;
+  loggingStop(request: StopLoggingRequest): Promise<void>;
+  loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -909,6 +921,17 @@ export function createDesktopApi(
     },
     async snippetsRemove(request: RemoveSnippetRequest): Promise<void> {
       await ipcRenderer.invoke(ipcChannels.snippets.remove, removeSnippetRequestSchema.parse(request));
+    },
+    // Session logging
+    async loggingStart(request: StartLoggingRequest): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.logging.start, startLoggingRequestSchema.parse(request));
+    },
+    async loggingStop(request: StopLoggingRequest): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.logging.stop, stopLoggingRequestSchema.parse(request));
+    },
+    async loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse> {
+      const raw = await ipcRenderer.invoke(ipcChannels.logging.getState, getLoggingStateRequestSchema.parse(request));
+      return loggingStateResponseSchema.parse(raw);
     },
   };
 }

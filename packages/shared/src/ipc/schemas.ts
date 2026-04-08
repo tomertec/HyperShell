@@ -486,3 +486,29 @@ export const removeSnippetRequestSchema = z.object({
 export type SnippetRecord = z.infer<typeof snippetRecordSchema>;
 export type UpsertSnippetRequest = z.infer<typeof upsertSnippetRequestSchema>;
 export type RemoveSnippetRequest = z.infer<typeof removeSnippetRequestSchema>;
+
+// --- Session logging schemas ---
+
+export const startLoggingRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  filePath: z.string().min(1),
+});
+
+export const stopLoggingRequestSchema = z.object({
+  sessionId: z.string().min(1),
+});
+
+export const getLoggingStateRequestSchema = z.object({
+  sessionId: z.string().min(1),
+});
+
+export const loggingStateResponseSchema = z.object({
+  active: z.boolean(),
+  filePath: z.string().nullable(),
+  bytesWritten: z.number().int(),
+});
+
+export type StartLoggingRequest = z.infer<typeof startLoggingRequestSchema>;
+export type StopLoggingRequest = z.infer<typeof stopLoggingRequestSchema>;
+export type GetLoggingStateRequest = z.infer<typeof getLoggingStateRequestSchema>;
+export type LoggingStateResponse = z.infer<typeof loggingStateResponseSchema>;
