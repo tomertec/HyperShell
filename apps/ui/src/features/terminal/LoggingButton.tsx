@@ -11,17 +11,21 @@ export function LoggingButton({ sessionId }: { sessionId: string }) {
   }, [sessionId]);
 
   const toggle = async () => {
-    if (active) {
-      await window.sshterm?.loggingStop?.({ sessionId });
-      setActive(false);
-      toast.success("Session logging stopped");
-    } else {
-      const defaultName = `session-${new Date().toISOString().replace(/[:.]/g, "-")}.log`;
-      const filePath = prompt("Log file path:", defaultName);
-      if (!filePath) return;
-      await window.sshterm?.loggingStart?.({ sessionId, filePath });
-      setActive(true);
-      toast.success("Session logging started");
+    try {
+      if (active) {
+        await window.sshterm?.loggingStop?.({ sessionId });
+        setActive(false);
+        toast.success("Session logging stopped");
+      } else {
+        const defaultName = `session-${new Date().toISOString().replace(/[:.]/g, "-")}.log`;
+        const filePath = prompt("Log file path:", defaultName);
+        if (!filePath) return;
+        await window.sshterm?.loggingStart?.({ sessionId, filePath });
+        setActive(true);
+        toast.success("Session logging started");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Logging failed");
     }
   };
 

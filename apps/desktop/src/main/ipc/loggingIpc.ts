@@ -15,6 +15,8 @@ type LogSession = {
   bytesWritten: number;
 };
 
+const ANSI_ESCAPE_RE = /\x1b\[[0-9;]*[a-zA-Z]/g;
+
 export function createSessionLogger() {
   const sessions = new Map<string, LogSession>();
 
@@ -40,7 +42,7 @@ export function createSessionLogger() {
     onSessionData(sessionId: string, data: string) {
       const session = sessions.get(sessionId);
       if (!session) return;
-      const clean = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+      const clean = data.replace(ANSI_ESCAPE_RE, "");
       session.stream.write(clean);
       session.bytesWritten += Buffer.byteLength(clean, "utf-8");
     },

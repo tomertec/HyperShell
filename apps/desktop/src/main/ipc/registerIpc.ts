@@ -977,6 +977,7 @@ export function registerIpc(
 
   const cleanup = () => {
     unsubscribeSessionEvents();
+    sessionLogger.stopAll();
     cleanupSftp();
     cleanupFs();
     unregisterEditor();

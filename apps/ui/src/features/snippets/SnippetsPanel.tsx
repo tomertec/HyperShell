@@ -4,6 +4,55 @@ import { toast } from "sonner";
 import { useSnippetStore } from "./snippetStore";
 import { layoutStore } from "../layout/layoutStore";
 
+function SnippetForm({
+  name,
+  body,
+  onNameChange,
+  onBodyChange,
+  onSave,
+  onCancel,
+}: {
+  name: string;
+  body: string;
+  onNameChange: (v: string) => void;
+  onBodyChange: (v: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="px-3 py-2 bg-base-800/60">
+      <input
+        className="w-full rounded border border-border bg-base-700 px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 mb-2"
+        placeholder="Name"
+        value={name}
+        onChange={(e) => onNameChange(e.target.value)}
+        autoFocus
+      />
+      <textarea
+        className="w-full rounded border border-border bg-base-700 px-2 py-1.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 resize-none mb-2"
+        placeholder="Snippet body..."
+        rows={5}
+        value={body}
+        onChange={(e) => onBodyChange(e.target.value)}
+      />
+      <div className="flex gap-2 justify-end">
+        <button
+          onClick={onCancel}
+          className="px-2.5 py-1 rounded text-xs text-text-muted border border-border hover:text-text-primary hover:bg-base-700 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onSave}
+          className="px-2.5 py-1 rounded text-xs font-medium text-accent border border-accent/30 bg-accent/10 hover:bg-accent/20 transition-colors"
+        >
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SnippetsPanel() {
   const { snippets, loading, isOpen, close, upsert, remove } = useSnippetStore();
   const activeSessionId = useStore(layoutStore, (s) => s.activeSessionId);
@@ -14,7 +63,6 @@ export function SnippetsPanel() {
   const [formBody, setFormBody] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Load snippets when panel opens
   useEffect(() => {
     if (isOpen) {
       void useSnippetStore.getState().load();
@@ -73,7 +121,6 @@ export function SnippetsPanel() {
         isOpen ? "translate-x-0" : "translate-x-full"
       }`}
     >
-      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-base-800 shrink-0">
         <span className="text-sm font-semibold text-text-primary">Snippets</span>
         <div className="flex items-center gap-1">
@@ -100,42 +147,20 @@ export function SnippetsPanel() {
         </div>
       </div>
 
-      {/* New snippet form */}
       {isCreating && (
-        <div className="px-3 py-2 border-b border-border bg-base-800/60 shrink-0">
-          <div className="text-xs font-medium text-text-muted mb-2">New Snippet</div>
-          <input
-            className="w-full rounded border border-border bg-base-700 px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 mb-2"
-            placeholder="Name"
-            value={formName}
-            onChange={(e) => setFormName(e.target.value)}
-            autoFocus
+        <div className="border-b border-border shrink-0">
+          <div className="px-3 pt-2 text-xs font-medium text-text-muted">New Snippet</div>
+          <SnippetForm
+            name={formName}
+            body={formBody}
+            onNameChange={setFormName}
+            onBodyChange={setFormBody}
+            onSave={() => void saveForm()}
+            onCancel={cancelForm}
           />
-          <textarea
-            className="w-full rounded border border-border bg-base-700 px-2 py-1.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 resize-none mb-2"
-            placeholder="Snippet body..."
-            rows={5}
-            value={formBody}
-            onChange={(e) => setFormBody(e.target.value)}
-          />
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={cancelForm}
-              className="px-2.5 py-1 rounded text-xs text-text-muted border border-border hover:text-text-primary hover:bg-base-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => void saveForm()}
-              className="px-2.5 py-1 rounded text-xs font-medium text-accent border border-accent/30 bg-accent/10 hover:bg-accent/20 transition-colors"
-            >
-              Save
-            </button>
-          </div>
         </div>
       )}
 
-      {/* Snippet list */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {loading && snippets.length === 0 ? (
           <div className="flex items-center justify-center h-16 text-xs text-text-muted">
@@ -150,37 +175,15 @@ export function SnippetsPanel() {
           <ul className="divide-y divide-border/50">
             {snippets.map((snippet) => (
               <li key={snippet.id} className="group">
-                {/* Edit form inline */}
                 {editingId === snippet.id ? (
-                  <div className="px-3 py-2 bg-base-800/60">
-                    <input
-                      className="w-full rounded border border-border bg-base-700 px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 mb-2"
-                      placeholder="Name"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      autoFocus
-                    />
-                    <textarea
-                      className="w-full rounded border border-border bg-base-700 px-2 py-1.5 text-xs text-text-primary font-mono placeholder:text-text-muted focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 resize-none mb-2"
-                      rows={5}
-                      value={formBody}
-                      onChange={(e) => setFormBody(e.target.value)}
-                    />
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={cancelForm}
-                        className="px-2.5 py-1 rounded text-xs text-text-muted border border-border hover:text-text-primary hover:bg-base-700 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => void saveForm()}
-                        className="px-2.5 py-1 rounded text-xs font-medium text-accent border border-accent/30 bg-accent/10 hover:bg-accent/20 transition-colors"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
+                  <SnippetForm
+                    name={formName}
+                    body={formBody}
+                    onNameChange={setFormName}
+                    onBodyChange={setFormBody}
+                    onSave={() => void saveForm()}
+                    onCancel={cancelForm}
+                  />
                 ) : confirmDeleteId === snippet.id ? (
                   <div className="px-3 py-2 bg-base-800/60">
                     <p className="text-xs text-text-secondary mb-2">Delete "{snippet.name}"?</p>
@@ -206,11 +209,10 @@ export function SnippetsPanel() {
                         {snippet.name}
                       </div>
                       <div className="text-xs text-text-muted font-mono mt-0.5 truncate leading-tight">
-                        {snippet.body.slice(0, 50)}{snippet.body.length > 50 ? "…" : ""}
+                        {snippet.body.slice(0, 50)}{snippet.body.length > 50 ? "\u2026" : ""}
                       </div>
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {/* Send button */}
                       <button
                         onClick={() => sendToTerminal(snippet.body)}
                         className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
@@ -220,7 +222,6 @@ export function SnippetsPanel() {
                           <polygon points="5 3 19 12 5 21 5 3" />
                         </svg>
                       </button>
-                      {/* Edit button */}
                       <button
                         onClick={() => startEdit(snippet.id, snippet.name, snippet.body)}
                         className="p-1 rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
@@ -231,7 +232,6 @@ export function SnippetsPanel() {
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
                       </button>
-                      {/* Delete button */}
                       <button
                         onClick={() => setConfirmDeleteId(snippet.id)}
                         className="p-1 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"

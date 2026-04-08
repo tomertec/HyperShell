@@ -24,7 +24,11 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
   snippets: [],
   isOpen: false,
   loading: false,
-  toggle: () => set((s) => ({ isOpen: !s.isOpen })),
+  toggle: () => {
+    const wasOpen = get().isOpen;
+    set({ isOpen: !wasOpen });
+    if (!wasOpen) void get().load();
+  },
   open: () => {
     set({ isOpen: true });
     void get().load();

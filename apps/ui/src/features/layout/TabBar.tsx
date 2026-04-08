@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import {
   DndContext,
@@ -171,7 +171,7 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }
     }
   };
 
-  const tabIds = tabs.map((t) => t.tabKey ?? t.sessionId);
+  const tabIds = useMemo(() => tabs.map((t) => t.tabKey ?? t.sessionId), [tabs]);
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
