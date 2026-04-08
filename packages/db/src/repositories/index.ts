@@ -5,3 +5,4 @@ export * from "./sftpBookmarksRepository";
 export * from "./workspaceRepository";
 export * from "./hostPortForwardsRepository";
 export * from "./snippetsRepository";
+export * from "./hostFingerprintRepository";

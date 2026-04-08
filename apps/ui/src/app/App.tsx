@@ -26,6 +26,10 @@ import { settingsStore } from "../features/settings/settingsStore";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import type { SerialProfileRecord } from "@sshterm/shared";
 import { EditorApp } from "../features/editor/EditorApp";
+import {
+  HostKeyVerificationDialog,
+  type HostKeyVerificationInfo,
+} from "../features/hosts/HostKeyVerificationDialog";
 
 function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
   return {
@@ -220,6 +224,10 @@ function MainApp() {
   const [sftpAuthError, setSftpAuthError] = useState<string | null>(null);
   const [sftpAuthSubmitting, setSftpAuthSubmitting] = useState(false);
   const [connectingHostIds, setConnectingHostIds] = useState<Set<string>>(new Set());
+  const [hostKeyVerifyOpen, setHostKeyVerifyOpen] = useState(false);
+  const [hostKeyVerifyInfo, setHostKeyVerifyInfo] = useState<HostKeyVerificationInfo | null>(null);
+  const [hostKeyVerifyHost, setHostKeyVerifyHost] = useState<HostRecord | null>(null);
+  const [hostKeyVerifyFromAuth, setHostKeyVerifyFromAuth] = useState(false);
   const [restoreBannerVisible, setRestoreBannerVisible] = useState(false);
   const [lastWorkspaceTabs, setLastWorkspaceTabs] = useState<Array<{
     transport: string;
@@ -469,6 +477,15 @@ function MainApp() {
       openSftpTab(sftpAuthHost, sftpSessionId);
       closeSftpAuthModal();
     } catch (error) {
+      const verifyInfo = parseHostKeyVerificationError(error);
+      if (verifyInfo) {
+        closeSftpAuthModal();
+        setHostKeyVerifyInfo(verifyInfo);
+        setHostKeyVerifyHost(sftpAuthHost);
+        setHostKeyVerifyFromAuth(true);
+        setHostKeyVerifyOpen(true);
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       setSftpAuthError(message);
     } finally {
@@ -477,6 +494,7 @@ function MainApp() {
   }, [
     closeSftpAuthModal,
     openSftpTab,
+    parseHostKeyVerificationError,
     sftpAuthHost,
     sftpAuthPassword,
     sftpAuthUsername
@@ -526,6 +544,79 @@ function MainApp() {
     });
   }, []);
 
+  const parseHostKeyVerificationError = useCallback(
+    (error: unknown): HostKeyVerificationInfo | null => {
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        const parsed = JSON.parse(message);
+        if (parsed && parsed.__hostKeyVerification) {
+          return {
+            hostname: parsed.hostname,
+            port: parsed.port,
+            algorithm: parsed.algorithm,
+            fingerprint: parsed.fingerprint,
+            verificationStatus: parsed.verificationStatus,
+            previousFingerprint: parsed.previousFingerprint,
+          };
+        }
+      } catch {
+        // Not a host key verification error
+      }
+      return null;
+    },
+    []
+  );
+
+  const handleHostKeyTrust = useCallback(async () => {
+    if (!hostKeyVerifyInfo || !hostKeyVerifyHost || !window.sshterm?.hostFingerprintTrust) {
+      setHostKeyVerifyOpen(false);
+      return;
+    }
+
+    const id = `fp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await window.sshterm.hostFingerprintTrust({
+      id,
+      hostname: hostKeyVerifyInfo.hostname,
+      port: hostKeyVerifyInfo.port,
+      algorithm: hostKeyVerifyInfo.algorithm,
+      fingerprint: hostKeyVerifyInfo.fingerprint,
+    });
+
+    const host = hostKeyVerifyHost;
+    const fromAuth = hostKeyVerifyFromAuth;
+    setHostKeyVerifyOpen(false);
+    setHostKeyVerifyInfo(null);
+    setHostKeyVerifyHost(null);
+    setHostKeyVerifyFromAuth(false);
+
+    // Retry the connection now that the key is trusted
+    if (fromAuth) {
+      // Re-open the auth modal to let the user retry with credentials
+      openSftpAuthModal(host);
+    } else {
+      // Retry the direct connect
+      if (!window.sshterm?.sftpConnect) return;
+      try {
+        const { sftpSessionId } = await window.sshterm.sftpConnect({
+          hostId: host.id,
+          skipHostKeyVerification: true,
+        });
+        openSftpTab(host, sftpSessionId);
+      } catch (retryError) {
+        const message = retryError instanceof Error ? retryError.message : String(retryError);
+        console.warn("[sftp] connect failed after trust, prompting for credentials:", message);
+        openSftpAuthModal(host, message);
+      }
+    }
+  }, [hostKeyVerifyInfo, hostKeyVerifyHost, hostKeyVerifyFromAuth, openSftpAuthModal, openSftpTab]);
+
+  const handleHostKeyReject = useCallback(() => {
+    setHostKeyVerifyOpen(false);
+    setHostKeyVerifyInfo(null);
+    setHostKeyVerifyHost(null);
+    setHostKeyVerifyFromAuth(false);
+  }, []);
+
   const openSftpHost = useCallback(
     async (host: HostRecord) => {
       if (!window.sshterm?.sftpConnect) {
@@ -538,13 +629,21 @@ function MainApp() {
         });
         openSftpTab(host, sftpSessionId);
       } catch (error) {
+        const verifyInfo = parseHostKeyVerificationError(error);
+        if (verifyInfo) {
+          setHostKeyVerifyInfo(verifyInfo);
+          setHostKeyVerifyHost(host);
+          setHostKeyVerifyFromAuth(false);
+          setHostKeyVerifyOpen(true);
+          return;
+        }
         const message =
           error instanceof Error ? error.message : String(error);
         console.warn("[sftp] connect failed, prompting for credentials:", message);
         openSftpAuthModal(host, message);
       }
     },
-    [openSftpAuthModal, openSftpTab]
+    [openSftpAuthModal, openSftpTab, parseHostKeyVerificationError]
   );
 
   const restoreLastWorkspace = useCallback(() => {
@@ -827,6 +926,13 @@ function MainApp() {
           </div>
         </form>
       </Modal>
+
+      <HostKeyVerificationDialog
+        open={hostKeyVerifyOpen}
+        info={hostKeyVerifyInfo}
+        onTrust={handleHostKeyTrust}
+        onReject={handleHostKeyReject}
+      />
 
       <Toaster
         position="bottom-right"

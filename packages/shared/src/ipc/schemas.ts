@@ -518,3 +518,40 @@ export type StartLoggingRequest = z.infer<typeof startLoggingRequestSchema>;
 export type StopLoggingRequest = z.infer<typeof stopLoggingRequestSchema>;
 export type GetLoggingStateRequest = z.infer<typeof getLoggingStateRequestSchema>;
 export type LoggingStateResponse = z.infer<typeof loggingStateResponseSchema>;
+
+// --- Host fingerprint schemas ---
+
+export const hostFingerprintRecordSchema = z.object({
+  id: z.string().min(1),
+  hostname: z.string().min(1),
+  port: z.number().int().positive(),
+  algorithm: z.string().min(1),
+  fingerprint: z.string().min(1),
+  isTrusted: z.boolean(),
+  firstSeen: z.string(),
+  lastSeen: z.string(),
+});
+
+export const hostFingerprintLookupRequestSchema = z.object({
+  hostname: z.string().min(1),
+  port: z.number().int().positive(),
+  algorithm: z.string().min(1),
+});
+
+export const hostFingerprintTrustRequestSchema = z.object({
+  id: z.string().min(1),
+  hostname: z.string().min(1),
+  port: z.number().int().positive(),
+  algorithm: z.string().min(1),
+  fingerprint: z.string().min(1),
+});
+
+export const hostFingerprintRemoveRequestSchema = z.object({
+  hostname: z.string().min(1),
+  port: z.number().int().positive(),
+});
+
+export type HostFingerprintRecord = z.infer<typeof hostFingerprintRecordSchema>;
+export type HostFingerprintLookupRequest = z.infer<typeof hostFingerprintLookupRequestSchema>;
+export type HostFingerprintTrustRequest = z.infer<typeof hostFingerprintTrustRequestSchema>;
+export type HostFingerprintRemoveRequest = z.infer<typeof hostFingerprintRemoveRequestSchema>;

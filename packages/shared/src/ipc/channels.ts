@@ -138,6 +138,12 @@ export const loggingChannels = {
   getState: "logging:get-state",
 } as const;
 
+export const hostFingerprintChannels = {
+  lookup: "host-fingerprint:lookup",
+  trust: "host-fingerprint:trust",
+  remove: "host-fingerprint:remove",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -157,4 +163,5 @@ export const ipcChannels = {
   editor: editorChannels,
   snippets: snippetChannels,
   logging: loggingChannels,
+  hostFingerprint: hostFingerprintChannels,
 } as const;

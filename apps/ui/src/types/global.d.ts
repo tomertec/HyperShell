@@ -85,6 +85,10 @@ import type {
   EditorOpenFile,
   EditorSessionClosed,
   ExportHostsRequest,
+  HostFingerprintRecord,
+  HostFingerprintLookupRequest,
+  HostFingerprintTrustRequest,
+  HostFingerprintRemoveRequest,
 } from "@sshterm/shared";
 
 declare global {
@@ -168,6 +172,9 @@ declare global {
       loggingStop?: (request: StopLoggingRequest) => Promise<void>;
       loggingGetState?: (request: GetLoggingStateRequest) => Promise<LoggingStateResponse>;
       exportHosts?: (request: ExportHostsRequest) => Promise<{ exported: number }>;
+      hostFingerprintLookup?: (request: HostFingerprintLookupRequest) => Promise<HostFingerprintRecord | null>;
+      hostFingerprintTrust?: (request: HostFingerprintTrustRequest) => Promise<HostFingerprintRecord>;
+      hostFingerprintRemove?: (request: HostFingerprintRemoveRequest) => Promise<void>;
     };
   }
 }

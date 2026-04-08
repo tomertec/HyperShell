@@ -147,6 +147,10 @@ import {
   getLoggingStateRequestSchema,
   loggingStateResponseSchema,
   exportHostsRequestSchema,
+  hostFingerprintRecordSchema,
+  hostFingerprintLookupRequestSchema,
+  hostFingerprintTrustRequestSchema,
+  hostFingerprintRemoveRequestSchema,
   type SnippetRecord,
   type UpsertSnippetRequest,
   type RemoveSnippetRequest,
@@ -155,6 +159,10 @@ import {
   type GetLoggingStateRequest,
   type LoggingStateResponse,
   type ExportHostsRequest,
+  type HostFingerprintRecord,
+  type HostFingerprintLookupRequest,
+  type HostFingerprintTrustRequest,
+  type HostFingerprintRemoveRequest,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -281,6 +289,10 @@ export interface DesktopApi {
   loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse>;
   // Host export
   exportHosts(request: ExportHostsRequest): Promise<{ exported: number }>;
+  // Host fingerprint verification
+  hostFingerprintLookup(request: HostFingerprintLookupRequest): Promise<HostFingerprintRecord | null>;
+  hostFingerprintTrust(request: HostFingerprintTrustRequest): Promise<HostFingerprintRecord>;
+  hostFingerprintRemove(request: HostFingerprintRemoveRequest): Promise<void>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -953,6 +965,19 @@ export function createDesktopApi(
     async exportHosts(request: ExportHostsRequest): Promise<{ exported: number }> {
       const raw = await ipcRenderer.invoke(ipcChannels.hosts.exportHosts, exportHostsRequestSchema.parse(request));
       return z.object({ exported: z.number() }).parse(raw);
+    },
+    // Host fingerprint verification
+    async hostFingerprintLookup(request: HostFingerprintLookupRequest): Promise<HostFingerprintRecord | null> {
+      const raw = await ipcRenderer.invoke(ipcChannels.hostFingerprint.lookup, hostFingerprintLookupRequestSchema.parse(request));
+      if (!raw) return null;
+      return hostFingerprintRecordSchema.parse(raw);
+    },
+    async hostFingerprintTrust(request: HostFingerprintTrustRequest): Promise<HostFingerprintRecord> {
+      const raw = await ipcRenderer.invoke(ipcChannels.hostFingerprint.trust, hostFingerprintTrustRequestSchema.parse(request));
+      return hostFingerprintRecordSchema.parse(raw);
+    },
+    async hostFingerprintRemove(request: HostFingerprintRemoveRequest): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.hostFingerprint.remove, hostFingerprintRemoveRequestSchema.parse(request));
     },
   };
 }

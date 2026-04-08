@@ -67,9 +67,18 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     try { db.exec(statement); } catch {}
   }
 
+  // Migration 007: host fingerprints table
+  const hostFingerprintsSql = readFileSync(
+    new URL("./migrations/007_host_fingerprints.sql", import.meta.url),
+    "utf8"
+  );
+  db.exec(hostFingerprintsSql);
+
   return db;
 }
 
 export * from "./repositories";
 export type { SnippetRecord, SnippetInput } from "./repositories/snippetsRepository";
 export { createSnippetsRepository, createSnippetsRepositoryFromDatabase } from "./repositories/snippetsRepository";
+export type { HostFingerprintRecord, HostFingerprintInput } from "./repositories/hostFingerprintRepository";
+export { createHostFingerprintRepository, createHostFingerprintRepositoryFromDatabase } from "./repositories/hostFingerprintRepository";

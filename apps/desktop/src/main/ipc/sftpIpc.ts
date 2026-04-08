@@ -1,4 +1,4 @@
-import { createHostsRepositoryFromDatabase, openDatabase, createSftpBookmarksRepository } from "@sshterm/db";
+import { createHostsRepositoryFromDatabase, openDatabase, createSftpBookmarksRepository, createHostFingerprintRepositoryFromDatabase } from "@sshterm/db";
 import {
   ipcChannels,
   sftpBookmarkListRequestSchema,
@@ -36,13 +36,55 @@ import {
   type SftpWriteFileRequest
 } from "@sshterm/shared";
 import type { SessionManager, SftpConnectionOptions } from "@sshterm/session-core";
-import { createSyncEngine } from "@sshterm/session-core";
+import { createSyncEngine, probeHostKey } from "@sshterm/session-core";
 import type { IpcMainInvokeEvent } from "electron";
 
 import type { IpcMainLike } from "./registerIpc";
 import { editorWindowManager } from "../windows/editorWindowManager";
 import { createSftpSessionManager, type SftpSessionManager } from "../sftp/sftpSessionManager";
 import { createTransferManager, type TransferManager } from "../sftp/transferManager";
+
+/**
+ * Error subclass thrown when host key verification fails.
+ * Contains the fingerprint details so the renderer can show the appropriate dialog.
+ */
+class HostKeyVerificationError extends Error {
+  public readonly hostname: string;
+  public readonly port: number;
+  public readonly algorithm: string;
+  public readonly fingerprint: string;
+  public readonly verificationStatus: "new_host" | "key_changed";
+  public readonly previousFingerprint?: string;
+
+  constructor(opts: {
+    hostname: string;
+    port: number;
+    algorithm: string;
+    fingerprint: string;
+    verificationStatus: "new_host" | "key_changed";
+    previousFingerprint?: string;
+  }) {
+    // Encode structured data in the error message so the renderer can parse it.
+    // Electron serializes errors across IPC as plain Error objects with only the message.
+    const payload = {
+      __hostKeyVerification: true,
+      hostname: opts.hostname,
+      port: opts.port,
+      algorithm: opts.algorithm,
+      fingerprint: opts.fingerprint,
+      verificationStatus: opts.verificationStatus,
+      previousFingerprint: opts.previousFingerprint,
+    };
+    super(JSON.stringify(payload));
+    this.name = "HostKeyVerificationError";
+    this.hostname = opts.hostname;
+    this.port = opts.port;
+    this.algorithm = opts.algorithm;
+    this.fingerprint = opts.fingerprint;
+    this.verificationStatus = opts.verificationStatus;
+    this.previousFingerprint = opts.previousFingerprint;
+  }
+}
 
 export interface RegisterSftpIpcOptions {
   sessionManager: SessionManager;
@@ -123,6 +165,7 @@ export function registerSftpIpc(
   const db = options.db ?? openDatabase();
   const hostsRepo = createHostsRepositoryFromDatabase(db);
   const bookmarksRepo = createSftpBookmarksRepository(db);
+  const fingerprintRepo = createHostFingerprintRepositoryFromDatabase(db);
 
   const handleConnect = async (
     _event: IpcMainInvokeEvent,
@@ -137,6 +180,65 @@ export function registerSftpIpc(
     const connectOptions = await options.resolveConnectionOptions(hostId, request);
     if (!connectOptions) {
       throw new Error(`Unable to resolve SFTP connection options for ${hostId}`);
+    }
+
+    // --- Host key verification ---
+    const hostname = connectOptions.hostname;
+    const port = connectOptions.port ?? 22;
+
+    // Check if user explicitly skipped verification for this request
+    const skipVerification = request.skipHostKeyVerification === true;
+
+    if (!skipVerification) {
+      try {
+        const { algorithm, fingerprint } = await probeHostKey(hostname, port);
+        const existing = fingerprintRepo.findByHostAndAlgorithm(hostname, port, algorithm);
+
+        if (!existing) {
+          // First time seeing this host — require user approval
+          throw new HostKeyVerificationError({
+            hostname,
+            port,
+            algorithm,
+            fingerprint,
+            verificationStatus: "new_host",
+          });
+        } else if (existing.fingerprint !== fingerprint) {
+          // Key has changed — possible MITM attack
+          throw new HostKeyVerificationError({
+            hostname,
+            port,
+            algorithm,
+            fingerprint,
+            verificationStatus: "key_changed",
+            previousFingerprint: existing.fingerprint,
+          });
+        } else if (!existing.isTrusted) {
+          // Key is known but not yet trusted
+          throw new HostKeyVerificationError({
+            hostname,
+            port,
+            algorithm,
+            fingerprint,
+            verificationStatus: "new_host",
+          });
+        }
+        // else: key matches trusted fingerprint — proceed
+        // Update last_seen
+        fingerprintRepo.upsert({
+          id: existing.id,
+          hostname,
+          port,
+          algorithm,
+          fingerprint,
+        });
+      } catch (error) {
+        if (error instanceof HostKeyVerificationError) {
+          throw error;
+        }
+        // If probe fails for network reasons, let the actual connect attempt handle it
+        console.warn("[sftp] Host key probe failed, proceeding with connect:", (error as Error).message);
+      }
     }
 
     ensureBookmarkHost(hostId, connectOptions, hostsRepo);

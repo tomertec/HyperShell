@@ -41,6 +41,7 @@ import { registerOpIpc } from "./opIpc";
 import { registerEditorIpc } from "./editorIpc";
 import { registerSnippetsIpc } from "./snippetsIpc";
 import { createSessionLogger, registerLoggingIpc } from "./loggingIpc";
+import { registerHostFingerprintIpc } from "./hostFingerprintIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
 import type {
@@ -136,6 +137,9 @@ const registeredChannels = [
   ipcChannels.logging.start,
   ipcChannels.logging.stop,
   ipcChannels.logging.getState,
+  ipcChannels.hostFingerprint.lookup,
+  ipcChannels.hostFingerprint.trust,
+  ipcChannels.hostFingerprint.remove,
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -981,6 +985,7 @@ export function registerIpc(
   const unregisterEditor = registerEditorIpc(ipcMain);
   registerSnippetsIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
   registerLoggingIpc(ipcMain, sessionLogger);
+  registerHostFingerprintIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created
