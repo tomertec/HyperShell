@@ -95,6 +95,11 @@ export interface RegisterSftpIpcOptions {
     hostId: string,
     request: SftpConnectRequest
   ) => Promise<SftpConnectionOptions | null>;
+  onConnected?: (payload: {
+    sftpSessionId: string;
+    hostId: string;
+    connectionOptions: SftpConnectionOptions;
+  }) => void;
   emitSftpEvent?: (event: SftpEvent) => void;
   emitSyncEvent?: (event: SftpSyncEvent) => void;
   emitKeyboardInteractive?: (request: KeyboardInteractiveRequest) => void;
@@ -277,6 +282,11 @@ export function registerSftpIpc(
 
     const sftpSessionId = await sftpSessionManager.connect(hostId, connectOptions, {
       onKeyboardInteractive: createKeyboardInteractiveCallback(),
+    });
+    options.onConnected?.({
+      sftpSessionId,
+      hostId,
+      connectionOptions: connectOptions,
     });
     return { sftpSessionId };
   };

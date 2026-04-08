@@ -6,6 +6,24 @@ import type {
   StopLoggingRequest,
   GetLoggingStateRequest,
   LoggingStateResponse,
+  StartRecordingRequest,
+  StopRecordingRequest,
+  GetRecordingStateRequest,
+  RecordingStateResponse,
+  SessionRecordingRecord,
+  DeleteRecordingRequest,
+  DeleteRecordingResponse,
+  GetRecordingFramesRequest,
+  RecordingFramesResponse,
+  ExportRecordingRequest,
+  ExportRecordingResponse,
+  ConnectionHistoryRecord,
+  ConnectionHistoryListByHostRequest,
+  ConnectionHistoryListRecentRequest,
+  SavedSessionRecord,
+  SessionSaveStateRequest,
+  SessionSaveStateResponse,
+  SessionClearSavedStateResponse,
   CloseSessionRequest,
   StartPortForwardRequest,
   StopPortForwardRequest,
@@ -15,6 +33,8 @@ import type {
   FsListResponse,
   GetSettingRequest,
   HostRecord,
+  HostStatusTargetsRequest,
+  HostStatusEvent,
   HostStatsRequest,
   HostStatsResponse,
   OpenSessionRequest,
@@ -55,6 +75,17 @@ import type {
   TransferJob,
   UpdateSettingRequest,
   UpsertHostRequest,
+  HostProfileRecord,
+  UpsertHostProfileRequest,
+  RemoveHostProfileRequest,
+  HostEnvVarRecord,
+  ListHostEnvVarsRequest,
+  ReplaceHostEnvVarsRequest,
+  TagRecord,
+  UpsertTagRequest,
+  RemoveTagRequest,
+  GetHostTagsRequest,
+  SetHostTagsRequest,
   UpsertSerialProfileRequest,
   WriteSessionRequest,
   SaveWorkspaceRequest,
@@ -111,15 +142,34 @@ declare global {
       resizeSession?: (request: ResizeSessionRequest) => Promise<void>;
       writeSession?: (request: WriteSessionRequest) => Promise<void>;
       closeSession?: (request: CloseSessionRequest) => Promise<void>;
+      sessionSaveState?: (
+        request: SessionSaveStateRequest
+      ) => Promise<SessionSaveStateResponse>;
+      sessionLoadSavedState?: () => Promise<SavedSessionRecord[]>;
+      sessionClearSavedState?: () => Promise<SessionClearSavedStateResponse>;
       onSessionEvent?: (listener: (event: SessionEvent) => void) => () => void;
       onQuickConnect?: (listener: () => void) => () => void;
       listHosts?: () => Promise<HostRecord[]>;
+      setHostStatusTargets?: (request: HostStatusTargetsRequest) => Promise<void>;
+      onHostStatus?: (listener: (event: HostStatusEvent) => void) => () => void;
       upsertHost?: (request: UpsertHostRequest) => Promise<HostRecord>;
       removeHost?: (request: RemoveHostRequest) => Promise<void>;
       reorderHosts?: (request: ReorderHostsRequest) => Promise<void>;
       getSetting?: (request: GetSettingRequest) => Promise<SettingRecord | null>;
       updateSetting?: (request: UpdateSettingRequest) => Promise<SettingRecord>;
       listSerialProfiles?: () => Promise<SerialProfileRecord[]>;
+      listTags?: () => Promise<TagRecord[]>;
+      upsertTag?: (request: UpsertTagRequest) => Promise<TagRecord>;
+      removeTag?: (request: RemoveTagRequest) => Promise<void>;
+      tagsGetHostTags?: (request: GetHostTagsRequest) => Promise<TagRecord[]>;
+      tagsSetHostTags?: (request: SetHostTagsRequest) => Promise<TagRecord[]>;
+      listHostProfiles?: () => Promise<HostProfileRecord[]>;
+      upsertHostProfile?: (request: UpsertHostProfileRequest) => Promise<HostProfileRecord>;
+      removeHostProfile?: (request: RemoveHostProfileRequest) => Promise<void>;
+      listHostEnvVars?: (request: ListHostEnvVarsRequest) => Promise<HostEnvVarRecord[]>;
+      replaceHostEnvVars?: (
+        request: ReplaceHostEnvVarsRequest
+      ) => Promise<HostEnvVarRecord[]>;
       upsertSerialProfile?: (request: UpsertSerialProfileRequest) => Promise<SerialProfileRecord>;
       removeSerialProfile?: (request: RemoveSerialProfileRequest) => Promise<void>;
       listSerialPorts?: () => Promise<SerialPortInfo[]>;
@@ -185,6 +235,19 @@ declare global {
       loggingStart?: (request: StartLoggingRequest) => Promise<void>;
       loggingStop?: (request: StopLoggingRequest) => Promise<void>;
       loggingGetState?: (request: GetLoggingStateRequest) => Promise<LoggingStateResponse>;
+      recordingStart?: (request: StartRecordingRequest) => Promise<SessionRecordingRecord>;
+      recordingStop?: (request: StopRecordingRequest) => Promise<SessionRecordingRecord | null>;
+      recordingGetState?: (request: GetRecordingStateRequest) => Promise<RecordingStateResponse>;
+      recordingList?: () => Promise<SessionRecordingRecord[]>;
+      recordingDelete?: (request: DeleteRecordingRequest) => Promise<DeleteRecordingResponse>;
+      recordingGetFrames?: (request: GetRecordingFramesRequest) => Promise<RecordingFramesResponse>;
+      recordingExport?: (request: ExportRecordingRequest) => Promise<ExportRecordingResponse>;
+      connectionHistoryListByHost?: (
+        request: ConnectionHistoryListByHostRequest
+      ) => Promise<ConnectionHistoryRecord[]>;
+      connectionHistoryListRecent?: (
+        request?: ConnectionHistoryListRecentRequest
+      ) => Promise<ConnectionHistoryRecord[]>;
       exportHosts?: (request: ExportHostsRequest) => Promise<{ exported: number }>;
       scanPuttySessions?: () => Promise<ScanPuttyResponse>;
       scanSshManager?: () => Promise<ScanSshManagerResponse>;

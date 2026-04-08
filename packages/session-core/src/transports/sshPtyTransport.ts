@@ -16,6 +16,7 @@ export interface SshConnectionProfile {
   keepAliveSeconds?: number;
   requestTty?: boolean;
   extraArgs?: string[];
+  envVars?: Record<string, string>;
 }
 
 export interface SshPtyCommand {
@@ -155,6 +156,26 @@ function toErrorMessage(error: unknown): string {
   return "Unknown PTY error";
 }
 
+const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function buildPtyEnv(
+  baseEnv: NodeJS.ProcessEnv,
+  envVars?: Record<string, string>
+): NodeJS.ProcessEnv {
+  if (!envVars || Object.keys(envVars).length === 0) {
+    return { ...baseEnv };
+  }
+
+  const merged: NodeJS.ProcessEnv = { ...baseEnv };
+  for (const [name, value] of Object.entries(envVars)) {
+    if (!ENV_VAR_NAME_REGEX.test(name)) {
+      continue;
+    }
+    merged[name] = String(value);
+  }
+  return merged;
+}
+
 function normalizePromptText(value: string): string {
   return value
     // CSI/OSC/escape sequences that can wrap prompts.
@@ -221,7 +242,7 @@ export function createSshPtyTransport(
       cols: request.cols,
       rows: request.rows,
       cwd: deps.cwd,
-      env: deps.env ?? process.env
+      env: buildPtyEnv(deps.env ?? process.env, profile.envVars)
     });
   } catch (error) {
     queueMicrotask(() => {

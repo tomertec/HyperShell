@@ -9,6 +9,7 @@ const fakeHost = {
   port: 22,
   username: "hermes",
   identityFile: null,
+  hostProfileId: null,
   authProfileId: "host-password-host-1",
   groupId: null,
   notes: null,

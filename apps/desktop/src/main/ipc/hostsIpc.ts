@@ -24,6 +24,12 @@ import sftpBookmarksSql from "@sshterm/db/src/migrations/002_sftp_bookmarks.sql"
 import hostAuthFieldsSql from "@sshterm/db/src/migrations/003_host_auth_fields.sql";
 import advancedSshSql from "@sshterm/db/src/migrations/006_advanced_ssh.sql";
 import hostFingerprintsSql from "@sshterm/db/src/migrations/007_host_fingerprints.sql";
+import sessionRecordingsSql from "@sshterm/db/src/migrations/008_session_recordings.sql";
+import connectionHistorySql from "@sshterm/db/src/migrations/009_connection_history.sql";
+import savedSessionsSql from "@sshterm/db/src/migrations/010_saved_sessions.sql";
+import hostProfilesSql from "@sshterm/db/src/migrations/011_host_profiles.sql";
+import hostEnvVarsSql from "@sshterm/db/src/migrations/012_host_env_vars.sql";
+import tagsColorSql from "@sshterm/db/src/migrations/013_tags_color.sql";
 import {
   protectSecretStrict,
   revealSecretStrict,
@@ -40,7 +46,18 @@ type HostsRepoLike = {
   updateSortOrders(items: Array<{ id: string; sortOrder: number; groupId: string | null }>): void;
 };
 
+type SettingsRecord = {
+  key: string;
+  value: string;
+};
+
+type SettingsRepoLike = {
+  get(key: string): SettingsRecord | undefined;
+  set(key: string, value: string): SettingsRecord;
+};
+
 let hostsRepo: HostsRepoLike | null = null;
+let settingsRepo: SettingsRepoLike | null = null;
 let sharedDb: unknown = null;
 
 type AuthProfileRow = {
@@ -48,6 +65,13 @@ type AuthProfileRow = {
   type: string;
   secret_ref: string | null;
   updated_at?: string | null;
+};
+
+type DbWithSettings = {
+  prepare(sql: string): {
+    get(...args: unknown[]): unknown;
+    run(...args: unknown[]): unknown;
+  };
 };
 
 function getDatabaseOrNull(): any | null {
@@ -242,6 +266,40 @@ export function getOrCreateDatabase(): unknown {
       }
       // Migration 007: host fingerprints table
       db.exec(hostFingerprintsSql);
+      // Migration 008: session recordings table
+      db.exec(sessionRecordingsSql);
+      // Migration 009: connection history table
+      db.exec(connectionHistorySql);
+      // Migration 010: saved session recovery table
+      db.exec(savedSessionsSql);
+      // Migration 011: host profiles + host_profile_id on hosts
+      for (const statement of hostProfilesSql
+        .split(";")
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0)) {
+        try { db.exec(statement); } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes("already exists") || msg.includes("duplicate column")) {
+            console.info("[sshterm] Migration 011: table/column already exists");
+          } else {
+            console.error("[sshterm] Migration 011 failed:", msg);
+          }
+        }
+      }
+      // Migration 012: host environment variables table
+      db.exec(hostEnvVarsSql);
+
+      // Migration 013: add color column for tags
+      try {
+        db.exec(tagsColorSql);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("already exists") || msg.includes("duplicate column")) {
+          console.info("[sshterm] Migration 013 (tags.color): column already exists");
+        } else {
+          console.error("[sshterm] Migration 013 (tags.color) failed:", msg);
+        }
+      }
 
       sharedDb = db;
       console.log("[sshterm] Database initialized successfully");
@@ -303,6 +361,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           username: item?.username == null ? null : String(item.username),
           identityFile:
             item?.identityFile == null ? null : String(item.identityFile),
+          hostProfileId:
+            item?.hostProfileId == null ? null : String(item.hostProfileId),
           authProfileId:
             item?.authProfileId == null ? null : String(item.authProfileId),
           groupId: item?.groupId == null ? null : String(item.groupId),
@@ -339,6 +399,7 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         port: input.port ?? 22,
         username: input.username ?? null,
         identityFile: input.identityFile ?? null,
+        hostProfileId: input.hostProfileId ?? null,
         authProfileId: input.authProfileId ?? null,
         groupId: input.groupId ?? null,
         notes: input.notes ?? null,
@@ -397,6 +458,47 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
   };
 }
 
+export function getOrCreateSettingsRepo(): SettingsRepoLike {
+  if (settingsRepo) {
+    return settingsRepo;
+  }
+
+  const db = getOrCreateDatabase() as DbWithSettings | null;
+  if (!db) {
+    const store = new Map<string, string>();
+    settingsRepo = {
+      get(key: string): SettingsRecord | undefined {
+        const value = store.get(key);
+        return value === undefined ? undefined : { key, value };
+      },
+      set(key: string, value: string): SettingsRecord {
+        store.set(key, value);
+        return { key, value };
+      }
+    };
+    return settingsRepo;
+  }
+
+  const getSetting = db.prepare("SELECT key, value FROM app_settings WHERE key = ?");
+  const upsertSetting = db.prepare(`
+    INSERT INTO app_settings (key, value) VALUES (@key, @value)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+  `);
+
+  settingsRepo = {
+    get(key: string): SettingsRecord | undefined {
+      const row = getSetting.get(key) as SettingsRecord | undefined;
+      return row ? { key: row.key, value: row.value } : undefined;
+    },
+    set(key: string, value: string): SettingsRecord {
+      upsertSetting.run({ key, value });
+      return { key, value };
+    }
+  };
+
+  return settingsRepo;
+}
+
 export function getOrCreateHostsRepo() {
   if (!hostsRepo) {
     const db = getOrCreateDatabase();
@@ -435,6 +537,7 @@ function importFallbackHosts(repo: HostsRepoLike): void {
         port: h.port ?? 22,
         username: h.username ?? null,
         identityFile: h.identityFile ?? null,
+        hostProfileId: h.hostProfileId ?? null,
         authProfileId: h.authProfileId ?? null,
         groupId: h.groupId ?? null,
         notes: h.notes ?? null,
@@ -456,32 +559,6 @@ function importFallbackHosts(repo: HostsRepoLike): void {
   } catch (err) {
     console.warn("[sshterm] Failed to import fallback hosts:", err);
   }
-}
-
-export function exportHostsToJson(hosts: HostRecord[]): string {
-  return JSON.stringify(hosts, null, 2);
-}
-
-const CSV_FIELDS = [
-  "name", "hostname", "port", "username", "identityFile",
-  "groupId", "notes", "authMethod", "agentKind",
-  "proxyJump", "keepAliveInterval", "autoReconnect",
-] as const;
-
-function escapeCsv(value: unknown): string {
-  const str = String(value ?? "");
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-}
-
-export function exportHostsToCsv(hosts: HostRecord[]): string {
-  const header = CSV_FIELDS.join(",");
-  const rows = hosts.map((host) =>
-    CSV_FIELDS.map((field) => escapeCsv(host[field as keyof HostRecord])).join(",")
-  );
-  return [header, ...rows].join("\n");
 }
 
 export const hostChannelList = [
@@ -547,6 +624,7 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       port: parsed.port,
       username: parsed.username ?? null,
       identityFile: parsed.identityFile ?? null,
+      hostProfileId: parsed.hostProfileId ?? null,
       authProfileId: nextAuthProfileId,
       notes: parsed.notes ?? null,
       authMethod: requestedAuthMethod,

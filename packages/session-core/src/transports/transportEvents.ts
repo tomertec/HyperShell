@@ -46,6 +46,7 @@ export interface SshConnectionOptions {
   password?: string;
   proxyJump?: string;
   keepAliveSeconds?: number;
+  envVars?: Record<string, string>;
 }
 
 export interface SerialConnectionOptions {

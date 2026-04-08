@@ -102,7 +102,8 @@ function createDefaultTransport(request: OpenSessionRequest): TransportHandle {
       identityFile: opts.identityFile,
       password: opts.password,
       proxyJump: opts.proxyJump,
-      keepAliveSeconds: opts.keepAliveSeconds
+      keepAliveSeconds: opts.keepAliveSeconds,
+      envVars: opts.envVars
     });
   }
 

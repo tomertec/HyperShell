@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exportHostsToJson, exportHostsToCsv } from "./hostsIpc";
+import { exportHostsToJson, exportHostsToCsv, exportHostsToSshConfig } from "./hostExport";
 
 const sampleHost = {
   id: "h1",
@@ -8,6 +8,7 @@ const sampleHost = {
   port: 22,
   username: "admin",
   identityFile: null,
+  hostProfileId: null,
   authProfileId: null,
   groupId: null,
   notes: "production server",
@@ -47,5 +48,21 @@ describe("host export", () => {
     const hostWithComma = { ...sampleHost, notes: "server, production" };
     const csv = exportHostsToCsv([hostWithComma]);
     expect(csv).toContain('"server, production"');
+  });
+
+  it("exports to SSH config format", () => {
+    const config = exportHostsToSshConfig([{
+      ...sampleHost,
+      identityFile: "~/.ssh/id_ed25519",
+      proxyJump: "bastion",
+      keepAliveInterval: 30,
+    }]);
+    expect(config).toContain("Host web-1");
+    expect(config).toContain("HostName 192.168.1.1");
+    expect(config).toContain("Port 22");
+    expect(config).toContain("User admin");
+    expect(config).toContain("IdentityFile ~/.ssh/id_ed25519");
+    expect(config).toContain("ProxyJump bastion");
+    expect(config).toContain("ServerAliveInterval 30");
   });
 });

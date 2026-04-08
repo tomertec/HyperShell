@@ -1,4 +1,4 @@
-import type { SerialProfileRecord } from "@sshterm/shared";
+import type { SerialProfileRecord, TagRecord } from "@sshterm/shared";
 import { useStore } from "zustand";
 import type { HostRecord } from "../hosts/HostsView";
 import { settingsStore } from "../settings/settingsStore";
@@ -8,10 +8,13 @@ import { SidebarSection } from "./SidebarSection";
 
 export interface SidebarProps {
   hosts: HostRecord[];
+  tags: TagRecord[];
   activeSessionHostIds: Set<string>;
   connectingHostIds: Set<string>;
+  lastConnectedAtByHostId: Record<string, string | null>;
   onConnectHost: (host: HostRecord) => void;
   onOpenSftpHost: (host: HostRecord) => void;
+  onOpenConnectionHistory: (host: HostRecord) => void;
   onEditHost: (host: HostRecord) => void;
   onNewHost: () => void;
   onImportSshConfig: () => void;
@@ -36,10 +39,13 @@ export interface SidebarProps {
 
 export function Sidebar({
   hosts,
+  tags,
   activeSessionHostIds,
   connectingHostIds,
+  lastConnectedAtByHostId,
   onConnectHost,
   onOpenSftpHost,
+  onOpenConnectionHistory,
   onEditHost,
   onNewHost,
   onImportSshConfig,
@@ -182,10 +188,13 @@ export function Sidebar({
       >
         <SidebarHostList
           hosts={hosts}
+          tags={tags}
           activeSessionHostIds={activeSessionHostIds}
           connectingHostIds={connectingHostIds}
+          lastConnectedAtByHostId={lastConnectedAtByHostId}
           onConnect={onConnectHost}
           onOpenSftp={onOpenSftpHost}
+          onOpenConnectionHistory={onOpenConnectionHistory}
           onEdit={onEditHost}
           onDuplicate={onDuplicateHost}
           onDelete={onDeleteHost}

@@ -22,8 +22,20 @@ const demoHosts: HostRecord[] = [
     hostname: "web-01.example.com",
     port: 22,
     username: "admin",
+    identityFile: "",
+    envVars: [],
     group: "Production",
     tags: "web,linux,prod",
+    tagIds: [],
+    authMethod: "default",
+    agentKind: "system",
+    opReference: "",
+    proxyJump: "",
+    proxyJumpHostIds: "",
+    keepAliveInterval: "",
+    autoReconnect: false,
+    reconnectMaxAttempts: 5,
+    reconnectBaseInterval: 1,
     notes: "Primary web server"
   },
   {
@@ -32,8 +44,20 @@ const demoHosts: HostRecord[] = [
     hostname: "bastion.example.com",
     port: 22,
     username: "ops",
+    identityFile: "",
+    envVars: [],
     group: "Infrastructure",
     tags: "jump,prod",
+    tagIds: [],
+    authMethod: "default",
+    agentKind: "system",
+    opReference: "",
+    proxyJump: "",
+    proxyJumpHostIds: "",
+    keepAliveInterval: "",
+    autoReconnect: false,
+    reconnectMaxAttempts: 5,
+    reconnectBaseInterval: 1,
     notes: "Use for multi-hop access"
   }
 ];
@@ -145,18 +169,31 @@ export function HostsView() {
       {isImportOpen ? (
         <SshConfigImportDialog
           onImport={(items: SshConfigImportItem[]) => {
-            setHosts((currentHosts) => [
-              ...currentHosts,
-              ...items.map((item, index) => ({
+            setHosts((currentHosts) => {
+              const importedHosts: HostRecord[] = items.map((item, index) => ({
                 id: `imported-${currentHosts.length + index + 1}`,
                 name: item.alias,
                 hostname: item.hostName ?? item.alias,
                 port: item.port ?? 22,
                 username: item.user ?? "",
+                identityFile: "",
+                envVars: [],
                 group: "Imported",
-                tags: "ssh-config"
-              }))
-            ]);
+                tags: "ssh-config",
+                tagIds: [],
+                authMethod: "default",
+                agentKind: "system",
+                opReference: "",
+                proxyJump: "",
+                proxyJumpHostIds: "",
+                keepAliveInterval: "",
+                autoReconnect: false,
+                reconnectMaxAttempts: 5,
+                reconnectBaseInterval: 1,
+              }));
+
+              return [...currentHosts, ...importedHosts];
+            });
             setIsImportOpen(false);
           }}
         />

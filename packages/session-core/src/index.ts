@@ -9,3 +9,15 @@ export { createSyncEngine, type SyncEngine, type SyncConfig, type SyncStatus, ty
 export { createNetworkMonitor, type NetworkMonitor, type NetworkMonitorOptions } from "./networkMonitor";
 export { createSsh2ConnectionPool, type Ssh2ConnectionPool, type Ssh2PoolTarget, type PooledConnection, type PoolStats, type ResolvedAuth } from "./ssh2ConnectionPool";
 export { probeHostKey, type HostKeyInfo } from "./hostKeyProbe";
+export {
+  AsciinemaWriter,
+  type AsciinemaHeader,
+  type AsciinemaFrame,
+  type AsciinemaWriterOptions,
+  type AsciinemaFinalizeResult
+} from "./recording/asciinemaWriter";
+export {
+  readAsciinemaCast,
+  parseAsciinemaCast,
+  type AsciinemaRecording
+} from "./recording/asciinemaReader";

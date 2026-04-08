@@ -1,74 +1,111 @@
-import { app, BrowserWindow, dialog, screen } from "electron";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { BrowserWindow, dialog, screen } from "electron";
 import path from "node:path";
+import { getOrCreateSettingsRepo } from "../ipc/hostsIpc";
 import { sessionManager } from "../ipc/registerIpc";
-import { getOrCreateDatabase } from "../ipc/hostsIpc";
 
 interface WindowState {
   x?: number;
   y?: number;
   width: number;
   height: number;
-  isMaximized?: boolean;
+  isMaximized: boolean;
 }
 
-const STATE_FILE = "window-state.json";
 const APP_SETTINGS_KEY = "app.settings";
+const WINDOW_X_KEY = "window.x";
+const WINDOW_Y_KEY = "window.y";
+const WINDOW_WIDTH_KEY = "window.width";
+const WINDOW_HEIGHT_KEY = "window.height";
+const WINDOW_MAXIMIZED_KEY = "window.maximized";
 
-type DbWithPrepare = {
-  prepare(sql: string): {
-    get(...args: unknown[]): unknown;
-  };
-};
+const DEFAULT_WIDTH = 1440;
+const DEFAULT_HEIGHT = 960;
+const MIN_WIDTH = 1024;
+const MIN_HEIGHT = 720;
+const WINDOW_STATE_SAVE_DEBOUNCE_MS = 200;
 
-function isConfirmOnCloseEnabled(): boolean {
-  try {
-    const db = getOrCreateDatabase() as DbWithPrepare | null;
-    if (!db) {
-      return true; // default to true if no DB
-    }
-    const row = db
-      .prepare("SELECT value FROM app_settings WHERE key = ?")
-      .get(APP_SETTINGS_KEY) as { value: string } | undefined;
-    if (!row?.value) {
-      return true; // default
-    }
-    const parsed = JSON.parse(row.value) as { general?: { confirmOnClose?: boolean } };
-    // If the setting is explicitly false, return false; otherwise default to true
-    return parsed.general?.confirmOnClose !== false;
-  } catch {
-    return true; // default to true on error
+function parseIntegerSetting(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
   }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    return undefined;
+  }
+  return parsed;
 }
 
-function getStatePath(): string {
-  return path.join(app.getPath("userData"), STATE_FILE);
+function readWindowStateNumber(key: string): number | undefined {
+  const value = getOrCreateSettingsRepo().get(key)?.value;
+  return parseIntegerSetting(value);
+}
+
+function readWindowStateBoolean(key: string, fallback: boolean): boolean {
+  const value = getOrCreateSettingsRepo().get(key)?.value;
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return fallback;
 }
 
 function loadWindowState(): WindowState {
-  const defaults: WindowState = { width: 1440, height: 960 };
-  try {
-    const raw = readFileSync(getStatePath(), "utf8");
-    const parsed = JSON.parse(raw) as Partial<WindowState>;
-    return {
-      x: typeof parsed.x === "number" ? parsed.x : undefined,
-      y: typeof parsed.y === "number" ? parsed.y : undefined,
-      width: typeof parsed.width === "number" && parsed.width >= 1024 ? parsed.width : defaults.width,
-      height: typeof parsed.height === "number" && parsed.height >= 720 ? parsed.height : defaults.height,
-      isMaximized: typeof parsed.isMaximized === "boolean" ? parsed.isMaximized : false
-    };
-  } catch {
-    return defaults;
-  }
+  const width = readWindowStateNumber(WINDOW_WIDTH_KEY);
+  const height = readWindowStateNumber(WINDOW_HEIGHT_KEY);
+  const x = readWindowStateNumber(WINDOW_X_KEY);
+  const y = readWindowStateNumber(WINDOW_Y_KEY);
+
+  return {
+    x,
+    y,
+    width: typeof width === "number" && width >= MIN_WIDTH ? width : DEFAULT_WIDTH,
+    height: typeof height === "number" && height >= MIN_HEIGHT ? height : DEFAULT_HEIGHT,
+    isMaximized: readWindowStateBoolean(WINDOW_MAXIMIZED_KEY, false)
+  };
 }
 
-function isVisibleOnAnyDisplay(x: number, y: number, width: number, height: number): boolean {
-  const displays = screen.getAllDisplays();
-  return displays.some((display) => {
-    const { x: dx, y: dy, width: dw, height: dh } = display.bounds;
-    // At least 100px of the window must overlap with the display
-    return x + width > dx + 100 && x < dx + dw - 100 && y + height > dy + 100 && y < dy + dh - 100;
-  });
+function hasPositiveOverlap(outer: Electron.Rectangle, inner: Electron.Rectangle): boolean {
+  const left = Math.max(outer.x, inner.x);
+  const top = Math.max(outer.y, inner.y);
+  const right = Math.min(outer.x + outer.width, inner.x + inner.width);
+  const bottom = Math.min(outer.y + outer.height, inner.y + inner.height);
+  return right > left && bottom > top;
+}
+
+function isVisibleOnDisplay(bounds: Electron.Rectangle): boolean {
+  const matchingDisplay = screen.getDisplayMatching(bounds);
+  return hasPositiveOverlap(bounds, matchingDisplay.workArea);
+}
+
+function saveWindowState(bounds: Electron.Rectangle, isMaximized: boolean): void {
+  const settings = getOrCreateSettingsRepo();
+  settings.set(WINDOW_X_KEY, String(bounds.x));
+  settings.set(WINDOW_Y_KEY, String(bounds.y));
+  settings.set(WINDOW_WIDTH_KEY, String(bounds.width));
+  settings.set(WINDOW_HEIGHT_KEY, String(bounds.height));
+  settings.set(WINDOW_MAXIMIZED_KEY, String(isMaximized));
+}
+
+function persistWindowState(win: BrowserWindow): void {
+  const isMaximized = win.isMaximized();
+  const bounds = isMaximized ? win.getNormalBounds() : win.getBounds();
+  saveWindowState(bounds, isMaximized);
+}
+
+function isConfirmOnCloseEnabled(): boolean {
+  try {
+    const row = getOrCreateSettingsRepo().get(APP_SETTINGS_KEY);
+    if (!row?.value) {
+      return true;
+    }
+    const parsed = JSON.parse(row.value) as { general?: { confirmOnClose?: boolean } };
+    return parsed.general?.confirmOnClose !== false;
+  } catch {
+    return true;
+  }
 }
 
 export function createMainWindow(): BrowserWindow {
@@ -76,10 +113,10 @@ export function createMainWindow(): BrowserWindow {
   const state = loadWindowState();
 
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
-    width: state.width,
-    height: state.height,
-    minWidth: 1024,
-    minHeight: 720,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
+    minWidth: MIN_WIDTH,
+    minHeight: MIN_HEIGHT,
     title: "HyperShell",
     backgroundColor: "#07111f",
     titleBarStyle: "hidden",
@@ -95,10 +132,19 @@ export function createMainWindow(): BrowserWindow {
     }
   };
 
-  if (state.x !== undefined && state.y !== undefined &&
-      isVisibleOnAnyDisplay(state.x, state.y, state.width, state.height)) {
-    windowOptions.x = state.x;
-    windowOptions.y = state.y;
+  if (state.x !== undefined && state.y !== undefined) {
+    const bounds: Electron.Rectangle = {
+      x: state.x,
+      y: state.y,
+      width: state.width,
+      height: state.height
+    };
+    if (isVisibleOnDisplay(bounds)) {
+      windowOptions.width = state.width;
+      windowOptions.height = state.height;
+      windowOptions.x = state.x;
+      windowOptions.y = state.y;
+    }
   }
 
   const win = new BrowserWindow(windowOptions);
@@ -107,40 +153,42 @@ export function createMainWindow(): BrowserWindow {
     win.maximize();
   }
 
-  // Track normal bounds so we can save them even when maximized
-  let normalBounds = win.getBounds();
-  win.on("resize", () => {
-    if (!win.isMaximized()) {
-      normalBounds = win.getBounds();
+  let saveTimer: NodeJS.Timeout | null = null;
+  const queueWindowStateSave = (): void => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
     }
-  });
-  win.on("move", () => {
-    if (!win.isMaximized()) {
-      normalBounds = win.getBounds();
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      persistWindowState(win);
+    }, WINDOW_STATE_SAVE_DEBOUNCE_MS);
+  };
+  const flushWindowStateSave = (): void => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    persistWindowState(win);
+  };
+
+  win.on("resize", queueWindowStateSave);
+  win.on("move", queueWindowStateSave);
+  win.on("maximize", queueWindowStateSave);
+  win.on("unmaximize", queueWindowStateSave);
+  win.on("closed", () => {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
     }
   });
 
   let closeConfirmed = false;
 
   win.on("close", (event) => {
-    // Save window state regardless of confirmation outcome
-    const isMaximized = win.isMaximized();
-    const bounds = isMaximized ? normalBounds : win.getBounds();
-    const windowState: WindowState = {
-      x: bounds.x,
-      y: bounds.y,
-      width: bounds.width,
-      height: bounds.height,
-      isMaximized
-    };
-    try {
-      mkdirSync(path.dirname(getStatePath()), { recursive: true });
-      writeFileSync(getStatePath(), JSON.stringify(windowState));
-    } catch {
-      // non-fatal
-    }
+    // Save window state regardless of confirmation outcome.
+    flushWindowStateSave();
 
-    // Skip confirmation if already confirmed or no active sessions
+    // Skip confirmation if already confirmed or no active sessions.
     if (closeConfirmed) {
       return;
     }
@@ -151,12 +199,10 @@ export function createMainWindow(): BrowserWindow {
       return;
     }
 
-    // Check the confirmOnClose setting from the database
     if (!isConfirmOnCloseEnabled()) {
       return;
     }
 
-    // Prevent the close and show confirmation dialog
     event.preventDefault();
 
     void dialog
@@ -166,7 +212,7 @@ export function createMainWindow(): BrowserWindow {
         defaultId: 1,
         cancelId: 1,
         title: "Active Sessions",
-        message: `You have ${count} active session${count > 1 ? "s" : ""}. Close anyway?`,
+        message: `You have ${count} active session${count > 1 ? "s" : ""}. Close anyway?`
       })
       .then(({ response }) => {
         if (response === 0) {

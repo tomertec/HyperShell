@@ -8,6 +8,7 @@ export type HostRecord = {
   port: number;
   username: string | null;
   identityFile: string | null;
+  hostProfileId: string | null;
   authProfileId: string | null;
   groupId: string | null;
   notes: string | null;
@@ -32,6 +33,7 @@ export type HostInput = {
   port?: number;
   username?: string | null;
   identityFile?: string | null;
+  hostProfileId?: string | null;
   authProfileId?: string | null;
   groupId?: string | null;
   notes?: string | null;
@@ -56,6 +58,7 @@ type HostRow = {
   port: number;
   username: string | null;
   identity_file: string | null;
+  host_profile_id: string | null;
   auth_profile_id: string | null;
   group_id: string | null;
   notes: string | null;
@@ -81,6 +84,7 @@ function mapRow(row: HostRow): HostRecord {
     port: row.port,
     username: row.username,
     identityFile: row.identity_file,
+    hostProfileId: row.host_profile_id,
     authProfileId: row.auth_profile_id,
     groupId: row.group_id,
     notes: row.notes,
@@ -114,13 +118,13 @@ export function createHostsRepository(databasePath = ":memory:") {
 export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
   const insertHost = db.prepare(`
     INSERT INTO hosts (
-      id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
+      id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
       auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
       proxy_jump, proxy_jump_host_ids, keep_alive_interval,
       auto_reconnect, reconnect_max_attempts, reconnect_base_interval
     )
     VALUES (
-      @id, @name, @hostname, @port, @username, @identityFile, @authProfileId, @groupId, @notes,
+      @id, @name, @hostname, @port, @username, @identityFile, @hostProfileId, @authProfileId, @groupId, @notes,
       @authMethod, @agentKind, @opReference, @isFavorite, @sortOrder, @color,
       @proxyJump, @proxyJumpHostIds, @keepAliveInterval,
       @autoReconnect, @reconnectMaxAttempts, @reconnectBaseInterval
@@ -131,6 +135,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       port = excluded.port,
       username = excluded.username,
       identity_file = excluded.identity_file,
+      host_profile_id = excluded.host_profile_id,
       auth_profile_id = excluded.auth_profile_id,
       group_id = excluded.group_id,
       notes = excluded.notes,
@@ -151,7 +156,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
 
   const listHosts = db.prepare(`
     SELECT
-      id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
+      id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
       auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
       proxy_jump, proxy_jump_host_ids, keep_alive_interval,
       auto_reconnect, reconnect_max_attempts, reconnect_base_interval
@@ -161,7 +166,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
   const getHostById = db.prepare(
     `
       SELECT
-        id, name, hostname, port, username, identity_file, auth_profile_id, group_id, notes,
+        id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
         auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
         proxy_jump, proxy_jump_host_ids, keep_alive_interval,
         auto_reconnect, reconnect_max_attempts, reconnect_base_interval
@@ -183,6 +188,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         port: input.port ?? 22,
         username: input.username ?? null,
         identityFile: input.identityFile ?? null,
+        hostProfileId: input.hostProfileId ?? null,
         authProfileId: input.authProfileId ?? null,
         groupId: input.groupId ?? null,
         notes: input.notes ?? null,
@@ -243,6 +249,7 @@ function createInMemoryHostsRepository() {
         port: input.port ?? 22,
         username: input.username ?? null,
         identityFile: input.identityFile ?? null,
+        hostProfileId: input.hostProfileId ?? null,
         authProfileId: input.authProfileId ?? null,
         groupId: input.groupId ?? null,
         notes: input.notes ?? null,

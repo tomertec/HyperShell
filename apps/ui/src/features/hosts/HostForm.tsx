@@ -1,7 +1,10 @@
 import { useEffect, useId, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
+import type { HostEnvVarRecord, HostProfileRecord, TagRecord } from "@sshterm/shared";
 import { HostPortForwardList } from "./HostPortForwardList";
 import { OpPickerModal } from "./OpPickerModal";
+import { HostProfileManagerDialog } from "./HostProfileManagerDialog";
+import { TagManager } from "./TagManager";
 import { inputClasses } from "../../lib/formStyles";
 
 // --- Validation helpers ---
@@ -13,6 +16,7 @@ const ipv4Regex =
   /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
 
 const ipv6Regex = /^\[?[0-9a-fA-F:]+\]?$/;
+export const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function isValidHostname(value: string): boolean {
   if (!value.trim()) return false;
@@ -37,14 +41,42 @@ function isIdentityFilePathSuspicious(path: string): string | null {
   return null;
 }
 
+function createEnvVarId(): string {
+  return `env-${crypto.randomUUID()}`;
+}
+
+export type HostEnvVarFormValue = {
+  id: string;
+  name: string;
+  value: string;
+  isEnabled: boolean;
+  sortOrder: number;
+};
+
+function mapHostEnvVarRecordToFormValue(
+  value: Pick<HostEnvVarRecord, "id" | "name" | "value" | "isEnabled" | "sortOrder">,
+  fallbackSortOrder: number
+): HostEnvVarFormValue {
+  return {
+    id: value.id || createEnvVarId(),
+    name: value.name ?? "",
+    value: value.value ?? "",
+    isEnabled: value.isEnabled ?? true,
+    sortOrder: value.sortOrder ?? fallbackSortOrder,
+  };
+}
+
 export type HostFormValue = {
   name: string;
   hostname: string;
   port: number;
   username: string;
   identityFile: string;
+  hostProfileId?: string;
+  envVars: HostEnvVarFormValue[];
   group: string;
   tags: string;
+  tagIds: string[];
   authMethod: "default" | "password" | "keyfile" | "agent" | "op-reference";
   agentKind: "system" | "pageant" | "1password";
   opReference: string;
@@ -66,6 +98,7 @@ export interface HostFormProps {
   hostId?: string;  // set when editing existing host
   initialValue?: Partial<HostFormValue>;
   submitLabel?: string;
+  onTagsChanged?: (tags: TagRecord[]) => void;
   onSubmit: (value: HostFormValue) => void;
 }
 
@@ -75,8 +108,11 @@ const defaultValue: HostFormValue = {
   port: 22,
   username: "",
   identityFile: "",
+  hostProfileId: "",
+  envVars: [],
   group: "",
   tags: "",
+  tagIds: [],
   authMethod: "default",
   agentKind: "system",
   opReference: "",
@@ -95,9 +131,19 @@ const defaultValue: HostFormValue = {
 
 function buildInitialValue(initialValue?: Partial<HostFormValue>): HostFormValue {
   const hasSavedPassword = Boolean(initialValue?.hasSavedPassword);
+  const initialTagIds = Array.isArray(initialValue?.tagIds)
+    ? Array.from(new Set(initialValue.tagIds))
+    : [];
+  const initialEnvVars = Array.isArray(initialValue?.envVars)
+    ? initialValue.envVars.map((item, index) =>
+        mapHostEnvVarRecordToFormValue(item, index)
+      )
+    : [];
   return {
     ...defaultValue,
     ...initialValue,
+    tagIds: initialTagIds,
+    envVars: initialEnvVars,
     // Never prefill password input from persisted state.
     password: "",
     savePassword:
@@ -109,10 +155,34 @@ function buildInitialValue(initialValue?: Partial<HostFormValue>): HostFormValue
   };
 }
 
+function applyAuthMethodSelection(
+  previous: HostFormValue,
+  nextMethod: HostFormValue["authMethod"]
+): HostFormValue {
+  if (nextMethod === "password") {
+    return {
+      ...previous,
+      authMethod: nextMethod,
+      savePassword: !previous.hasSavedPassword,
+      clearSavedPassword: false,
+      password: ""
+    };
+  }
+
+  return {
+    ...previous,
+    authMethod: nextMethod,
+    savePassword: false,
+    clearSavedPassword: false,
+    password: ""
+  };
+}
+
 export function HostForm({
   hostId,
   initialValue,
   submitLabel = "Save host",
+  onTagsChanged,
   onSubmit
 }: HostFormProps) {
   const formId = useId();
@@ -121,11 +191,118 @@ export function HostForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [opPickerOpen, setOpPickerOpen] = useState(false);
   const [ppkConverting, setPpkConverting] = useState(false);
+  const [hostProfiles, setHostProfiles] = useState<HostProfileRecord[]>([]);
+  const [profileManagerOpen, setProfileManagerOpen] = useState(false);
+  const [tags, setTags] = useState<TagRecord[]>([]);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
 
   const isPpkSelected = useMemo(
     () => value.identityFile.toLowerCase().endsWith(".ppk"),
     [value.identityFile]
   );
+
+  const selectedHostProfile = useMemo(
+    () =>
+      hostProfiles.find((profile) => profile.id === (value.hostProfileId ?? "")) ??
+      null,
+    [hostProfiles, value.hostProfileId]
+  );
+
+  const selectedTags = useMemo(() => {
+    const selectedIdSet = new Set(value.tagIds);
+    return tags.filter((tag) => selectedIdSet.has(tag.id));
+  }, [tags, value.tagIds]);
+
+  const selectedTagSummary = useMemo(
+    () => selectedTags.map((tag) => tag.name).join(", "),
+    [selectedTags]
+  );
+
+  const applyHostProfile = useCallback(
+    (profileId: string) => {
+      const profile =
+        hostProfiles.find((candidate) => candidate.id === profileId) ?? null;
+
+      setValue((previous) => {
+        if (!profile) {
+          return { ...previous, hostProfileId: "" };
+        }
+
+        const withAuthMethod = applyAuthMethodSelection(
+          { ...previous, hostProfileId: profile.id },
+          profile.authMethod
+        );
+
+        return {
+          ...withAuthMethod,
+          port: profile.defaultPort,
+          username: profile.defaultUsername ?? "",
+          identityFile: profile.identityFile ?? "",
+          proxyJump: profile.proxyJump ?? "",
+          keepAliveInterval:
+            profile.keepAliveInterval == null
+              ? withAuthMethod.keepAliveInterval
+              : String(profile.keepAliveInterval),
+        };
+      });
+    },
+    [hostProfiles]
+  );
+
+  const addEnvVar = useCallback(() => {
+    setValue((previous) => ({
+      ...previous,
+      envVars: [
+        ...previous.envVars,
+        {
+          id: createEnvVarId(),
+          name: "",
+          value: "",
+          isEnabled: true,
+          sortOrder: previous.envVars.length,
+        },
+      ],
+    }));
+  }, []);
+
+  const updateEnvVar = useCallback(
+    (id: string, updates: Partial<HostEnvVarFormValue>) => {
+      setValue((previous) => ({
+        ...previous,
+        envVars: previous.envVars.map((item, index) =>
+          item.id === id
+            ? { ...item, ...updates, sortOrder: index }
+            : { ...item, sortOrder: index }
+        ),
+      }));
+    },
+    []
+  );
+
+  const removeEnvVar = useCallback((id: string) => {
+    setValue((previous) => ({
+      ...previous,
+      envVars: previous.envVars
+        .filter((item) => item.id !== id)
+        .map((item, index) => ({ ...item, sortOrder: index })),
+    }));
+  }, []);
+
+  const toggleTag = useCallback((tagId: string) => {
+    setValue((previous) => {
+      const selected = new Set(previous.tagIds);
+      if (selected.has(tagId)) {
+        selected.delete(tagId);
+      } else {
+        selected.add(tagId);
+      }
+
+      return {
+        ...previous,
+        tagIds: Array.from(selected),
+      };
+    });
+  }, []);
 
   const handleConvertPpk = useCallback(async () => {
     if (!value.identityFile) return;
@@ -168,12 +345,28 @@ export function HostForm({
     return e;
   }, [value.authMethod, value.hostname, value.password, value.port, value.savePassword]);
 
+  const envVarNameErrors = useMemo(
+    () =>
+      value.envVars.map((item) => {
+        const trimmedName = item.name.trim();
+        if (trimmedName.length === 0) {
+          return "Variable name is required.";
+        }
+        if (!ENV_VAR_NAME_REGEX.test(trimmedName)) {
+          return "Use A-Z, 0-9, and _. First character must be a letter or _.";
+        }
+        return null;
+      }),
+    [value.envVars]
+  );
+
   const identityWarning = useMemo(
     () => isIdentityFilePathSuspicious(value.identityFile),
     [value.identityFile]
   );
 
-  const hasErrors = Object.values(errors).some(Boolean);
+  const hasErrors =
+    Object.values(errors).some(Boolean) || envVarNameErrors.some(Boolean);
   const passwordSavedLabel = useMemo(() => {
     if (!value.passwordSavedAt) {
       return null;
@@ -202,14 +395,196 @@ export function HostForm({
     void loadKeys();
   }, []);
 
+  useEffect(() => {
+    async function loadHostProfiles() {
+      try {
+        const profiles = await window.sshterm?.listHostProfiles?.();
+        setHostProfiles(profiles ?? []);
+      } catch {
+        setHostProfiles([]);
+      }
+    }
+    void loadHostProfiles();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadTags() {
+      if (!window.sshterm?.listTags) {
+        if (!cancelled) {
+          setTags([]);
+          onTagsChanged?.([]);
+        }
+        return;
+      }
+
+      try {
+        const loadedTags = await window.sshterm.listTags();
+        if (cancelled) {
+          return;
+        }
+        setTags(loadedTags);
+        onTagsChanged?.(loadedTags);
+        setValue((previous) => ({
+          ...previous,
+          tagIds: previous.tagIds.filter((tagId) =>
+            loadedTags.some((tag) => tag.id === tagId)
+          ),
+        }));
+      } catch {
+        if (!cancelled) {
+          setTags([]);
+        }
+      }
+    }
+    void loadTags();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onTagsChanged]);
+
+  useEffect(() => {
+    const currentHostId = hostId;
+    if (!currentHostId || !window.sshterm?.tagsGetHostTags) {
+      return;
+    }
+    let cancelled = false;
+    async function loadHostTags() {
+      try {
+        const hostTags = await window.sshterm?.tagsGetHostTags?.({
+          hostId: currentHostId,
+        });
+        if (cancelled || !hostTags) {
+          return;
+        }
+        setValue((previous) => ({
+          ...previous,
+          tagIds: hostTags.map((tag) => tag.id),
+          tags: hostTags.map((tag) => tag.name).join(", "),
+        }));
+      } catch {
+        // Ignore tag load failures in the host form.
+      }
+    }
+    void loadHostTags();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hostId]);
+
+  useEffect(() => {
+    if (value.tagIds.length > 0 || tags.length === 0) {
+      return;
+    }
+    const rawTags = value.tags.trim();
+    if (!rawTags) {
+      return;
+    }
+
+    const requestedNames = rawTags
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter((item) => item.length > 0);
+    if (requestedNames.length === 0) {
+      return;
+    }
+
+    const requestedNameSet = new Set(requestedNames);
+    const matchingTagIds = tags
+      .filter((tag) => requestedNameSet.has(tag.name.toLowerCase()))
+      .map((tag) => tag.id);
+
+    if (matchingTagIds.length === 0) {
+      return;
+    }
+
+    setValue((previous) => ({
+      ...previous,
+      tagIds: Array.from(new Set(matchingTagIds)),
+    }));
+  }, [tags, value.tagIds.length, value.tags]);
+
+  useEffect(() => {
+    const currentHostId = hostId;
+    if (!currentHostId || !window.sshterm?.listHostEnvVars) {
+      return;
+    }
+    let cancelled = false;
+    async function loadHostEnvVars() {
+      try {
+        const envVars = await window.sshterm?.listHostEnvVars?.({ hostId: currentHostId });
+        if (cancelled || !envVars) {
+          return;
+        }
+        setValue((previous) => ({
+          ...previous,
+          envVars: envVars.map((item, index) =>
+            mapHostEnvVarRecordToFormValue(item, index)
+          ),
+        }));
+      } catch {
+        // Ignore env var load failures in the host form.
+      }
+    }
+    void loadHostEnvVars();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hostId]);
+
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit(value);
-      }}
-      className="grid gap-5"
-    >
+    <>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const normalizedTagIds = Array.from(new Set(value.tagIds));
+          onSubmit({
+            ...value,
+            tags: selectedTagSummary || value.tags,
+            tagIds: normalizedTagIds,
+            envVars: value.envVars.map((item, index) => ({
+              ...item,
+              name: item.name.trim(),
+              sortOrder: index,
+            })),
+          });
+        }}
+        className="grid gap-5"
+      >
+        <label htmlFor={`${formId}-hostProfile`} className="grid gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-text-secondary">Profile</span>
+            <button
+              type="button"
+              onClick={() => setProfileManagerOpen(true)}
+              className="rounded-md border border-border bg-base-800 px-2 py-1 text-[11px] text-text-primary transition-colors hover:bg-base-700"
+            >
+              Manage Profiles
+            </button>
+          </div>
+          <select
+            id={`${formId}-hostProfile`}
+            value={value.hostProfileId ?? ""}
+            onChange={(event) => applyHostProfile(event.target.value)}
+            className={inputClasses}
+          >
+            <option value="">No profile</option>
+            {hostProfiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>
+                {profile.name}
+              </option>
+            ))}
+          </select>
+          {selectedHostProfile && (
+            <span className="text-xs text-text-muted/70">
+              Applying profile defaults from "{selectedHostProfile.name}". You can still override any field below.
+            </span>
+          )}
+        </label>
+
       <label htmlFor={`${formId}-name`} className="grid gap-1.5">
         <span className="text-xs font-medium text-text-secondary">Name</span>
         <input
@@ -316,24 +691,7 @@ export function HostForm({
             value={value.authMethod}
             onChange={(e) => {
               const nextMethod = e.target.value as HostFormValue["authMethod"];
-              if (nextMethod === "password") {
-                setValue({
-                  ...value,
-                  authMethod: nextMethod,
-                  savePassword: value.hasSavedPassword ? false : true,
-                  clearSavedPassword: false,
-                  password: ""
-                });
-                return;
-              }
-
-              setValue({
-                ...value,
-                authMethod: nextMethod,
-                savePassword: false,
-                clearSavedPassword: false,
-                password: ""
-              });
+              setValue((previous) => applyAuthMethodSelection(previous, nextMethod));
             }}
             className={inputClasses}
           >
@@ -479,16 +837,139 @@ export function HostForm({
         />
       </label>
 
-      <label htmlFor={`${formId}-tags`} className="grid gap-1.5">
-        <span className="text-xs font-medium text-text-secondary">Tags</span>
-        <input
-          id={`${formId}-tags`}
-          value={value.tags}
-          onChange={(e) => setValue({ ...value, tags: e.target.value })}
-          placeholder="prod, linux, db"
-          className={inputClasses}
-        />
-      </label>
+      <div className="grid gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-text-secondary">Tags</span>
+          <button
+            type="button"
+            onClick={() => setTagManagerOpen(true)}
+            className="rounded-md border border-border bg-base-800 px-2 py-1 text-[11px] text-text-primary transition-colors hover:bg-base-700"
+          >
+            Manage Tags
+          </button>
+        </div>
+
+        {tags.length === 0 ? (
+          <p className="rounded-md border border-border/60 bg-base-900/40 px-3 py-2 text-xs text-text-muted/80">
+            No tags defined yet. Use "Manage Tags" to create reusable labels.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {tags.map((tag) => {
+              const selected = value.tagIds.includes(tag.id);
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => toggleTag(tag.id)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                    selected
+                      ? "border-accent/50 bg-accent/15 text-text-primary"
+                      : "border-border bg-base-800/70 text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: tag.color ?? "#64748b" }}
+                  />
+                  {tag.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <span className="text-xs text-text-muted/70">
+          {selectedTags.length > 0
+            ? `Selected: ${selectedTagSummary}`
+            : "No tags selected."}
+        </span>
+      </div>
+
+      <div className="grid gap-3 pt-2 border-t border-border/40">
+        <details open className="grid gap-3">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            Environment Variables
+          </summary>
+          <span className="text-xs text-text-muted/70">
+            Variables are applied when opening SSH terminal sessions for this host.
+          </span>
+
+          {value.envVars.length === 0 ? (
+            <p className="text-xs text-text-muted/70">
+              No variables configured.
+            </p>
+          ) : (
+            <div className="grid gap-2">
+              {value.envVars.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="grid gap-2 rounded-lg border border-border/60 bg-surface/30 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                      Variable {index + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeEnvVar(item.id)}
+                      className="rounded border border-border px-2 py-1 text-[11px] text-text-muted transition-colors hover:text-text-primary"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                    <input
+                      value={item.name}
+                      onChange={(event) =>
+                        updateEnvVar(item.id, { name: event.target.value })
+                      }
+                      placeholder="NAME"
+                      className={inputClasses}
+                    />
+                    <input
+                      value={item.value}
+                      onChange={(event) =>
+                        updateEnvVar(item.id, { value: event.target.value })
+                      }
+                      placeholder="value"
+                      className={inputClasses}
+                    />
+                    <label className="flex items-center gap-2 px-1 text-xs text-text-secondary">
+                      <input
+                        type="checkbox"
+                        checked={item.isEnabled}
+                        onChange={(event) =>
+                          updateEnvVar(item.id, { isEnabled: event.target.checked })
+                        }
+                        className="rounded border-border accent-accent"
+                      />
+                      Enabled
+                    </label>
+                  </div>
+
+                  {envVarNameErrors[index] && (
+                    <span className="text-xs text-red-400">
+                      {envVarNameErrors[index]}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div>
+            <button
+              type="button"
+              onClick={addEnvVar}
+              className="rounded-md border border-border bg-base-800 px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-base-700"
+            >
+              Add Variable
+            </button>
+          </div>
+        </details>
+      </div>
 
       {/* --- Connection --- */}
       <div className="grid gap-3 pt-2 border-t border-border/40">
@@ -590,6 +1071,37 @@ export function HostForm({
       >
         {submitLabel}
       </button>
-    </form>
+      </form>
+
+      <HostProfileManagerDialog
+        open={profileManagerOpen}
+        onClose={() => setProfileManagerOpen(false)}
+        onProfilesChanged={(profiles) => {
+          setHostProfiles(profiles);
+          setValue((previous) => {
+            if (!previous.hostProfileId) {
+              return previous;
+            }
+            const exists = profiles.some((item) => item.id === previous.hostProfileId);
+            return exists ? previous : { ...previous, hostProfileId: "" };
+          });
+        }}
+      />
+
+      <TagManager
+        open={tagManagerOpen}
+        onClose={() => setTagManagerOpen(false)}
+        onTagsChanged={(updatedTags) => {
+          setTags(updatedTags);
+          onTagsChanged?.(updatedTags);
+          setValue((previous) => ({
+            ...previous,
+            tagIds: previous.tagIds.filter((tagId) =>
+              updatedTags.some((tag) => tag.id === tagId)
+            ),
+          }));
+        }}
+      />
+    </>
   );
 }

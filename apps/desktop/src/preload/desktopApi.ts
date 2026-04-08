@@ -10,11 +10,16 @@ import {
   fsListRequestSchema,
   fsListResponseSchema,
   closeSessionRequestSchema,
+  savedSessionRecordSchema,
   ipcChannels,
   openSessionRequestSchema,
   openSessionResponseSchema,
   resizeSessionRequestSchema,
+  sessionClearSavedStateResponseSchema,
   sessionEventSchema,
+  sessionLoadSavedStateResponseSchema,
+  sessionSaveStateRequestSchema,
+  sessionSaveStateResponseSchema,
   upsertHostRequestSchema,
   removeHostRequestSchema,
   reorderHostsRequestSchema,
@@ -23,6 +28,14 @@ import {
   updateSettingRequestSchema,
   upsertGroupRequestSchema,
   removeGroupRequestSchema,
+  upsertTagRequestSchema,
+  removeTagRequestSchema,
+  getHostTagsRequestSchema,
+  setHostTagsRequestSchema,
+  upsertHostProfileRequestSchema,
+  removeHostProfileRequestSchema,
+  listHostEnvVarsRequestSchema,
+  replaceHostEnvVarsRequestSchema,
   upsertSerialProfileRequestSchema,
   removeSerialProfileRequestSchema,
   sftpBookmarkListRequestSchema,
@@ -53,6 +66,10 @@ import {
   hostStatsRequestSchema,
   hostStatsResponseSchema,
   hostRecordSchema,
+  hostStatusTargetsRequestSchema,
+  hostStatusEventSchema,
+  hostProfileRecordSchema,
+  hostEnvVarRecordSchema,
   hostPortForwardRecordSchema,
   importSshConfigResponseSchema,
   scanPuttyResponseSchema,
@@ -65,7 +82,10 @@ import {
   type ImportSshManagerResponse,
   type HostStatsRequest,
   type HostStatsResponse,
+  type HostStatusTargetsRequest,
+  type HostStatusEvent,
   type CloseSessionRequest,
+  type SessionClearSavedStateResponse,
   type FsEntry,
   type FsGetDrivesResponse,
   type FsListRequest,
@@ -77,6 +97,9 @@ import {
   type RemoveHostRequest,
   type ResizeSessionRequest,
   type SessionEvent,
+  type SessionSaveStateRequest,
+  type SessionSaveStateResponse,
+  type SavedSessionRecord,
   type UpsertHostRequest,
   type WriteSessionRequest,
   type GetSettingRequest,
@@ -84,6 +107,17 @@ import {
   type SettingRecord,
   type UpsertGroupRequest,
   type RemoveGroupRequest,
+  type TagRecord,
+  type UpsertTagRequest,
+  type RemoveTagRequest,
+  type GetHostTagsRequest,
+  type SetHostTagsRequest,
+  type HostProfileRecord,
+  type UpsertHostProfileRequest,
+  type RemoveHostProfileRequest,
+  type HostEnvVarRecord,
+  type ListHostEnvVarsRequest,
+  type ReplaceHostEnvVarsRequest,
   type SerialProfileRecord,
   type UpsertSerialProfileRequest,
   type RemoveSerialProfileRequest,
@@ -121,6 +155,7 @@ import {
   serialProfileRecordSchema,
   settingRecordSchema,
   groupRecordSchema,
+  tagRecordSchema,
   transferJobSchema,
   workspaceLayoutSchema,
   workspaceRecordSchema,
@@ -161,6 +196,20 @@ import {
   stopLoggingRequestSchema,
   getLoggingStateRequestSchema,
   loggingStateResponseSchema,
+  startRecordingRequestSchema,
+  stopRecordingRequestSchema,
+  getRecordingStateRequestSchema,
+  recordingStateResponseSchema,
+  deleteRecordingRequestSchema,
+  deleteRecordingResponseSchema,
+  getRecordingFramesRequestSchema,
+  recordingFramesResponseSchema,
+  exportRecordingRequestSchema,
+  exportRecordingResponseSchema,
+  sessionRecordingRecordSchema,
+  connectionHistoryRecordSchema,
+  connectionHistoryListByHostRequestSchema,
+  connectionHistoryListRecentRequestSchema,
   exportHostsRequestSchema,
   hostFingerprintRecordSchema,
   hostFingerprintLookupRequestSchema,
@@ -173,6 +222,20 @@ import {
   type StopLoggingRequest,
   type GetLoggingStateRequest,
   type LoggingStateResponse,
+  type StartRecordingRequest,
+  type StopRecordingRequest,
+  type GetRecordingStateRequest,
+  type RecordingStateResponse,
+  type SessionRecordingRecord,
+  type DeleteRecordingRequest,
+  type DeleteRecordingResponse,
+  type GetRecordingFramesRequest,
+  type RecordingFramesResponse,
+  type ExportRecordingRequest,
+  type ExportRecordingResponse,
+  type ConnectionHistoryRecord,
+  type ConnectionHistoryListByHostRequest,
+  type ConnectionHistoryListRecentRequest,
   type ExportHostsRequest,
   type HostFingerprintRecord,
   type HostFingerprintLookupRequest,
@@ -233,9 +296,16 @@ export interface DesktopApi {
   resizeSession(request: ResizeSessionRequest): Promise<void>;
   writeSession(request: WriteSessionRequest): Promise<void>;
   closeSession(request: CloseSessionRequest): Promise<void>;
+  sessionSaveState(
+    request: SessionSaveStateRequest
+  ): Promise<SessionSaveStateResponse>;
+  sessionLoadSavedState(): Promise<SavedSessionRecord[]>;
+  sessionClearSavedState(): Promise<SessionClearSavedStateResponse>;
   onSessionEvent(listener: (event: SessionEvent) => void): () => void;
   onQuickConnect(listener: () => void): () => void;
   listHosts(): Promise<HostRecord[]>;
+  setHostStatusTargets(request: HostStatusTargetsRequest): Promise<void>;
+  onHostStatus(listener: (event: HostStatusEvent) => void): () => void;
   upsertHost(request: UpsertHostRequest): Promise<HostRecord>;
   removeHost(request: RemoveHostRequest): Promise<void>;
   reorderHosts(request: ReorderHostsRequest): Promise<{ success: boolean }>;
@@ -248,6 +318,18 @@ export interface DesktopApi {
   listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>>;
   upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }>;
   removeGroup(request: RemoveGroupRequest): Promise<void>;
+  listTags(): Promise<TagRecord[]>;
+  upsertTag(request: UpsertTagRequest): Promise<TagRecord>;
+  removeTag(request: RemoveTagRequest): Promise<void>;
+  tagsGetHostTags(request: GetHostTagsRequest): Promise<TagRecord[]>;
+  tagsSetHostTags(request: SetHostTagsRequest): Promise<TagRecord[]>;
+  listHostProfiles(): Promise<HostProfileRecord[]>;
+  upsertHostProfile(request: UpsertHostProfileRequest): Promise<HostProfileRecord>;
+  removeHostProfile(request: RemoveHostProfileRequest): Promise<void>;
+  listHostEnvVars(request: ListHostEnvVarsRequest): Promise<HostEnvVarRecord[]>;
+  replaceHostEnvVars(
+    request: ReplaceHostEnvVarsRequest
+  ): Promise<HostEnvVarRecord[]>;
   listSerialProfiles(): Promise<SerialProfileRecord[]>;
   upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord>;
   removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void>;
@@ -317,6 +399,19 @@ export interface DesktopApi {
   loggingStart(request: StartLoggingRequest): Promise<void>;
   loggingStop(request: StopLoggingRequest): Promise<void>;
   loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse>;
+  recordingStart(request: StartRecordingRequest): Promise<SessionRecordingRecord>;
+  recordingStop(request: StopRecordingRequest): Promise<SessionRecordingRecord | null>;
+  recordingGetState(request: GetRecordingStateRequest): Promise<RecordingStateResponse>;
+  recordingList(): Promise<SessionRecordingRecord[]>;
+  recordingDelete(request: DeleteRecordingRequest): Promise<DeleteRecordingResponse>;
+  recordingGetFrames(request: GetRecordingFramesRequest): Promise<RecordingFramesResponse>;
+  recordingExport(request: ExportRecordingRequest): Promise<ExportRecordingResponse>;
+  connectionHistoryListByHost(
+    request: ConnectionHistoryListByHostRequest
+  ): Promise<ConnectionHistoryRecord[]>;
+  connectionHistoryListRecent(
+    request?: ConnectionHistoryListRecentRequest
+  ): Promise<ConnectionHistoryRecord[]>;
   // Host export
   exportHosts(request: ExportHostsRequest): Promise<{ exported: number }>;
   // Host fingerprint verification
@@ -484,6 +579,9 @@ function normalizeSftpListResponseShape(value: unknown): SftpListResponse | null
 const hostRecordArraySchema = z.array(hostRecordSchema);
 const reorderHostsResponseSchema = z.object({ success: z.boolean() });
 const groupRecordArraySchema = z.array(groupRecordSchema);
+const tagRecordArraySchema = z.array(tagRecordSchema);
+const hostProfileRecordArraySchema = z.array(hostProfileRecordSchema);
+const hostEnvVarRecordArraySchema = z.array(hostEnvVarRecordSchema);
 const serialProfileRecordArraySchema = z.array(serialProfileRecordSchema);
 const serialPortInfoArraySchema = z.array(serialPortInfoSchema);
 const transferJobArraySchema = z.array(transferJobSchema);
@@ -500,6 +598,8 @@ const sftpSyncStartResponseSchema = z.object({ syncId: z.string() });
 const sftpSyncListResponseSchema = z.object({ syncs: z.array(sftpSyncStatusSchema) });
 const hostPortForwardRecordArraySchema = z.array(hostPortForwardRecordSchema);
 const connectionPoolStatsArraySchema = z.array(connectionPoolStatsSchema);
+const connectionHistoryRecordArraySchema = z.array(connectionHistoryRecordSchema);
+const savedSessionRecordArraySchema = z.array(savedSessionRecordSchema);
 const booleanResponseSchema = z.boolean();
 
 export function createDesktopApi(
@@ -526,6 +626,25 @@ export function createDesktopApi(
     async closeSession(request: CloseSessionRequest): Promise<void> {
       const parsedRequest = closeSessionRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.session.close, parsedRequest);
+    },
+    async sessionSaveState(
+      request: SessionSaveStateRequest
+    ): Promise<SessionSaveStateResponse> {
+      const parsedRequest = sessionSaveStateRequestSchema.parse(request);
+      const raw = await ipcRenderer.invoke(
+        ipcChannels.session.saveState,
+        parsedRequest
+      );
+      return sessionSaveStateResponseSchema.parse(raw);
+    },
+    async sessionLoadSavedState(): Promise<SavedSessionRecord[]> {
+      const raw = await ipcRenderer.invoke(ipcChannels.session.loadSavedState);
+      const parsed = sessionLoadSavedStateResponseSchema.parse(raw);
+      return savedSessionRecordArraySchema.parse(parsed.sessions);
+    },
+    async sessionClearSavedState(): Promise<SessionClearSavedStateResponse> {
+      const raw = await ipcRenderer.invoke(ipcChannels.session.clearSavedState);
+      return sessionClearSavedStateResponseSchema.parse(raw);
     },
     onSessionEvent(listener: (event: SessionEvent) => void): () => void {
       assertListener(listener, "onSessionEvent");
@@ -573,6 +692,33 @@ export function createDesktopApi(
     async listHosts(): Promise<HostRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.hosts.list);
       return hostRecordArraySchema.parse(result);
+    },
+    async setHostStatusTargets(request: HostStatusTargetsRequest): Promise<void> {
+      const parsed = hostStatusTargetsRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.hosts.setStatusTargets, parsed);
+    },
+    onHostStatus(listener: (event: HostStatusEvent) => void): () => void {
+      assertListener(listener, "onHostStatus");
+
+      const wrappedListener = (_event: unknown, payload: unknown) => {
+        const parsed = hostStatusEventSchema.safeParse(payload);
+        if (!parsed.success) {
+          logger.warn?.("Ignored invalid host status payload from IPC", parsed.error);
+          return;
+        }
+
+        try {
+          listener(parsed.data);
+        } catch (error) {
+          logger.error?.("Host status listener threw", error);
+        }
+      };
+
+      ipcRenderer.on(ipcChannels.hosts.status, wrappedListener);
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.hosts.status, wrappedListener);
+      };
     },
     async upsertHost(request: UpsertHostRequest): Promise<HostRecord> {
       const parsed = upsertHostRequestSchema.parse(request);
@@ -627,6 +773,54 @@ export function createDesktopApi(
     async removeGroup(request: RemoveGroupRequest): Promise<void> {
       const parsed = removeGroupRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.groups.remove, parsed);
+    },
+    async listTags(): Promise<TagRecord[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.tags.list);
+      return tagRecordArraySchema.parse(result);
+    },
+    async upsertTag(request: UpsertTagRequest): Promise<TagRecord> {
+      const parsed = upsertTagRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.tags.upsert, parsed);
+      return tagRecordSchema.parse(result);
+    },
+    async removeTag(request: RemoveTagRequest): Promise<void> {
+      const parsed = removeTagRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.tags.remove, parsed);
+    },
+    async tagsGetHostTags(request: GetHostTagsRequest): Promise<TagRecord[]> {
+      const parsed = getHostTagsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.tags.getHostTags, parsed);
+      return tagRecordArraySchema.parse(result);
+    },
+    async tagsSetHostTags(request: SetHostTagsRequest): Promise<TagRecord[]> {
+      const parsed = setHostTagsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.tags.setHostTags, parsed);
+      return tagRecordArraySchema.parse(result);
+    },
+    async listHostProfiles(): Promise<HostProfileRecord[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.hostProfiles.list);
+      return hostProfileRecordArraySchema.parse(result);
+    },
+    async upsertHostProfile(request: UpsertHostProfileRequest): Promise<HostProfileRecord> {
+      const parsed = upsertHostProfileRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hostProfiles.upsert, parsed);
+      return hostProfileRecordSchema.parse(result);
+    },
+    async removeHostProfile(request: RemoveHostProfileRequest): Promise<void> {
+      const parsed = removeHostProfileRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.hostProfiles.remove, parsed);
+    },
+    async listHostEnvVars(request: ListHostEnvVarsRequest): Promise<HostEnvVarRecord[]> {
+      const parsed = listHostEnvVarsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hostEnvVars.list, parsed);
+      return hostEnvVarRecordArraySchema.parse(result);
+    },
+    async replaceHostEnvVars(
+      request: ReplaceHostEnvVarsRequest
+    ): Promise<HostEnvVarRecord[]> {
+      const parsed = replaceHostEnvVarsRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hostEnvVars.replace, parsed);
+      return hostEnvVarRecordArraySchema.parse(result);
     },
     async listSerialProfiles(): Promise<SerialProfileRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.list);
@@ -1016,6 +1210,56 @@ export function createDesktopApi(
     async loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse> {
       const raw = await ipcRenderer.invoke(ipcChannels.logging.getState, getLoggingStateRequestSchema.parse(request));
       return loggingStateResponseSchema.parse(raw);
+    },
+    // Session recording
+    async recordingStart(request: StartRecordingRequest): Promise<SessionRecordingRecord> {
+      const raw = await ipcRenderer.invoke(ipcChannels.recording.start, startRecordingRequestSchema.parse(request));
+      return sessionRecordingRecordSchema.parse(raw);
+    },
+    async recordingStop(request: StopRecordingRequest): Promise<SessionRecordingRecord | null> {
+      const raw = await ipcRenderer.invoke(ipcChannels.recording.stop, stopRecordingRequestSchema.parse(request));
+      if (raw === null || raw === undefined) {
+        return null;
+      }
+      return sessionRecordingRecordSchema.parse(raw);
+    },
+    async recordingGetState(request: GetRecordingStateRequest): Promise<RecordingStateResponse> {
+      const raw = await ipcRenderer.invoke(ipcChannels.recording.getState, getRecordingStateRequestSchema.parse(request));
+      return recordingStateResponseSchema.parse(raw);
+    },
+    async recordingList(): Promise<SessionRecordingRecord[]> {
+      const raw = await ipcRenderer.invoke(ipcChannels.recording.list);
+      return z.array(sessionRecordingRecordSchema).parse(raw);
+    },
+    async recordingDelete(request: DeleteRecordingRequest): Promise<DeleteRecordingResponse> {
+      const raw = await ipcRenderer.invoke(ipcChannels.recording.delete, deleteRecordingRequestSchema.parse(request));
+      return deleteRecordingResponseSchema.parse(raw);
+    },
+    async recordingGetFrames(request: GetRecordingFramesRequest): Promise<RecordingFramesResponse> {
+      const raw = await ipcRenderer.invoke(ipcChannels.recording.getFrames, getRecordingFramesRequestSchema.parse(request));
+      return recordingFramesResponseSchema.parse(raw);
+    },
+    async recordingExport(request: ExportRecordingRequest): Promise<ExportRecordingResponse> {
+      const raw = await ipcRenderer.invoke(ipcChannels.recording.export, exportRecordingRequestSchema.parse(request));
+      return exportRecordingResponseSchema.parse(raw);
+    },
+    async connectionHistoryListByHost(
+      request: ConnectionHistoryListByHostRequest
+    ): Promise<ConnectionHistoryRecord[]> {
+      const raw = await ipcRenderer.invoke(
+        ipcChannels.connectionHistory.listByHost,
+        connectionHistoryListByHostRequestSchema.parse(request)
+      );
+      return connectionHistoryRecordArraySchema.parse(raw);
+    },
+    async connectionHistoryListRecent(
+      request?: ConnectionHistoryListRecentRequest
+    ): Promise<ConnectionHistoryRecord[]> {
+      const raw = await ipcRenderer.invoke(
+        ipcChannels.connectionHistory.listRecent,
+        connectionHistoryListRecentRequestSchema.parse(request ?? {})
+      );
+      return connectionHistoryRecordArraySchema.parse(raw);
     },
     // Host export
     async exportHosts(request: ExportHostsRequest): Promise<{ exported: number }> {

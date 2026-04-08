@@ -41,6 +41,41 @@ export const closeSessionRequestSchema = z.object({
   sessionId: z.string().min(1)
 });
 
+export const savedSessionRecordSchema = z.object({
+  id: z.string().min(1),
+  hostId: z.string().nullable(),
+  hostName: z.string().nullable(),
+  transport: transportSchema,
+  profileId: z.string().min(1),
+  title: z.string().min(1),
+  wasGraceful: z.boolean(),
+  savedAt: z.string(),
+});
+
+export const sessionSaveStateEntrySchema = z.object({
+  id: z.string().min(1),
+  hostId: z.string().nullable().optional(),
+  transport: transportSchema,
+  profileId: z.string().min(1),
+  title: z.string().min(1),
+});
+
+export const sessionSaveStateRequestSchema = z.object({
+  sessions: z.array(sessionSaveStateEntrySchema),
+});
+
+export const sessionSaveStateResponseSchema = z.object({
+  saved: z.number().int().min(0),
+});
+
+export const sessionLoadSavedStateResponseSchema = z.object({
+  sessions: z.array(savedSessionRecordSchema),
+});
+
+export const sessionClearSavedStateResponseSchema = z.object({
+  cleared: z.number().int().min(0),
+});
+
 export const sessionEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("data"),
@@ -69,6 +104,16 @@ export type OpenSessionResponse = z.infer<typeof openSessionResponseSchema>;
 export type ResizeSessionRequest = z.infer<typeof resizeSessionRequestSchema>;
 export type WriteSessionRequest = z.infer<typeof writeSessionRequestSchema>;
 export type CloseSessionRequest = z.infer<typeof closeSessionRequestSchema>;
+export type SavedSessionRecord = z.infer<typeof savedSessionRecordSchema>;
+export type SessionSaveStateEntry = z.infer<typeof sessionSaveStateEntrySchema>;
+export type SessionSaveStateRequest = z.infer<typeof sessionSaveStateRequestSchema>;
+export type SessionSaveStateResponse = z.infer<typeof sessionSaveStateResponseSchema>;
+export type SessionLoadSavedStateResponse = z.infer<
+  typeof sessionLoadSavedStateResponseSchema
+>;
+export type SessionClearSavedStateResponse = z.infer<
+  typeof sessionClearSavedStateResponseSchema
+>;
 export type SessionEvent = z.infer<typeof sessionEventSchema>;
 export type SessionState = z.infer<typeof sessionStateSchema>;
 
@@ -81,6 +126,7 @@ export const hostRecordSchema = z.object({
   port: z.number().int().positive(),
   username: z.string().nullable(),
   identityFile: z.string().nullable(),
+  hostProfileId: z.string().nullable().optional(),
   authProfileId: z.string().nullable(),
   groupId: z.string().nullable(),
   notes: z.string().nullable(),
@@ -105,6 +151,7 @@ export const upsertHostRequestSchema = z.object({
   port: z.number().int().positive().optional(),
   username: z.string().nullable().optional(),
   identityFile: z.string().nullable().optional(),
+  hostProfileId: z.string().nullable().optional(),
   group: z.string().optional(),
   tags: z.string().optional(),
   notes: z.string().nullable().optional(),
@@ -144,8 +191,19 @@ export const importSshConfigResponseSchema = z.object({
 });
 
 export const exportHostsRequestSchema = z.object({
-  format: z.enum(["json", "csv"]),
+  format: z.enum(["json", "csv", "ssh-config"]),
   filePath: z.string().min(1),
+});
+
+export const hostStatusTargetsRequestSchema = z.object({
+  hostIds: z.array(z.string().min(1)).max(500),
+});
+
+export const hostStatusEventSchema = z.object({
+  hostId: z.string().min(1),
+  online: z.boolean(),
+  latencyMs: z.number().int().nonnegative().nullable(),
+  checkedAt: z.string(),
 });
 
 export type HostRecord = z.infer<typeof hostRecordSchema>;
@@ -153,6 +211,8 @@ export type UpsertHostRequest = z.infer<typeof upsertHostRequestSchema>;
 export type RemoveHostRequest = z.infer<typeof removeHostRequestSchema>;
 export type ImportSshConfigResponse = z.infer<typeof importSshConfigResponseSchema>;
 export type ExportHostsRequest = z.infer<typeof exportHostsRequestSchema>;
+export type HostStatusTargetsRequest = z.infer<typeof hostStatusTargetsRequestSchema>;
+export type HostStatusEvent = z.infer<typeof hostStatusEventSchema>;
 
 // --- PuTTY import schemas ---
 
@@ -353,6 +413,119 @@ export const removeGroupRequestSchema = z.object({
 export type GroupRecord = z.infer<typeof groupRecordSchema>;
 export type UpsertGroupRequest = z.infer<typeof upsertGroupRequestSchema>;
 export type RemoveGroupRequest = z.infer<typeof removeGroupRequestSchema>;
+
+// --- Tag schemas ---
+
+export const tagColorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .nullable();
+
+export const tagRecordSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  color: tagColorSchema,
+});
+
+export const upsertTagRequestSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  color: tagColorSchema.optional(),
+});
+
+export const removeTagRequestSchema = z.object({
+  id: z.string().min(1),
+});
+
+export const getHostTagsRequestSchema = z.object({
+  hostId: z.string().min(1),
+});
+
+export const setHostTagsRequestSchema = z.object({
+  hostId: z.string().min(1),
+  tagIds: z.array(z.string().min(1)),
+});
+
+export type TagRecord = z.infer<typeof tagRecordSchema>;
+export type UpsertTagRequest = z.infer<typeof upsertTagRequestSchema>;
+export type RemoveTagRequest = z.infer<typeof removeTagRequestSchema>;
+export type GetHostTagsRequest = z.infer<typeof getHostTagsRequestSchema>;
+export type SetHostTagsRequest = z.infer<typeof setHostTagsRequestSchema>;
+
+// --- Host profile schemas ---
+
+export const hostProfileRecordSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  defaultPort: z.number().int().positive(),
+  defaultUsername: z.string().nullable(),
+  authMethod: z.enum(["default", "password", "keyfile", "agent", "op-reference"]),
+  identityFile: z.string().nullable(),
+  proxyJump: z.string().nullable(),
+  keepAliveInterval: z.number().int().min(0).nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const upsertHostProfileRequestSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().nullable().optional(),
+  defaultPort: z.number().int().positive().optional(),
+  defaultUsername: z.string().nullable().optional(),
+  authMethod: z.enum(["default", "password", "keyfile", "agent", "op-reference"]).optional(),
+  identityFile: z.string().nullable().optional(),
+  proxyJump: z.string().nullable().optional(),
+  keepAliveInterval: z.number().int().min(0).nullable().optional(),
+});
+
+export const removeHostProfileRequestSchema = z.object({
+  id: z.string().min(1),
+});
+
+export type HostProfileRecord = z.infer<typeof hostProfileRecordSchema>;
+export type UpsertHostProfileRequest = z.infer<typeof upsertHostProfileRequestSchema>;
+export type RemoveHostProfileRequest = z.infer<typeof removeHostProfileRequestSchema>;
+
+// --- Host environment variable schemas ---
+
+export const envVarNameSchema = z
+  .string()
+  .min(1)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/);
+
+export const hostEnvVarRecordSchema = z.object({
+  id: z.string().min(1),
+  hostId: z.string().min(1),
+  name: envVarNameSchema,
+  value: z.string(),
+  isEnabled: z.boolean(),
+  sortOrder: z.number().int(),
+  createdAt: z.string(),
+});
+
+export const hostEnvVarInputSchema = z.object({
+  id: z.string().min(1).optional(),
+  name: envVarNameSchema,
+  value: z.string(),
+  isEnabled: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+export const listHostEnvVarsRequestSchema = z.object({
+  hostId: z.string().min(1),
+});
+
+export const replaceHostEnvVarsRequestSchema = z.object({
+  hostId: z.string().min(1),
+  envVars: z.array(hostEnvVarInputSchema),
+});
+
+export type HostEnvVarRecord = z.infer<typeof hostEnvVarRecordSchema>;
+export type HostEnvVarInput = z.infer<typeof hostEnvVarInputSchema>;
+export type ListHostEnvVarsRequest = z.infer<typeof listHostEnvVarsRequestSchema>;
+export type ReplaceHostEnvVarsRequest = z.infer<typeof replaceHostEnvVarsRequestSchema>;
 
 // --- Serial profile schemas ---
 
@@ -607,6 +780,130 @@ export type StartLoggingRequest = z.infer<typeof startLoggingRequestSchema>;
 export type StopLoggingRequest = z.infer<typeof stopLoggingRequestSchema>;
 export type GetLoggingStateRequest = z.infer<typeof getLoggingStateRequestSchema>;
 export type LoggingStateResponse = z.infer<typeof loggingStateResponseSchema>;
+
+// --- Session recording schemas ---
+
+export const recordingHeaderSchema = z.object({
+  version: z.literal(2),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  timestamp: z.number().int().nonnegative(),
+  title: z.string().optional(),
+});
+
+export const recordingFrameSchema = z.tuple([
+  z.number().nonnegative(),
+  z.literal("o"),
+  z.string(),
+]);
+
+export const sessionRecordingRecordSchema = z.object({
+  id: z.string().min(1),
+  hostId: z.string().nullable(),
+  title: z.string().min(1),
+  fileName: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  startedAt: z.string(),
+  endedAt: z.string().nullable(),
+  durationMs: z.number().int().nullable(),
+  fileSizeBytes: z.number().int().nullable(),
+  eventCount: z.number().int().nullable(),
+  createdAt: z.string(),
+});
+
+export const startRecordingRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  hostId: z.string().nullable().optional(),
+  title: z.string().min(1).optional(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+export const stopRecordingRequestSchema = z.object({
+  sessionId: z.string().min(1),
+});
+
+export const getRecordingStateRequestSchema = z.object({
+  sessionId: z.string().min(1),
+});
+
+export const recordingStateResponseSchema = z.object({
+  active: z.boolean(),
+  recording: sessionRecordingRecordSchema.nullable(),
+});
+
+export const deleteRecordingRequestSchema = z.object({
+  id: z.string().min(1),
+});
+
+export const getRecordingFramesRequestSchema = z.object({
+  id: z.string().min(1),
+});
+
+export const exportRecordingRequestSchema = z.object({
+  id: z.string().min(1),
+  filePath: z.string().min(1),
+});
+
+export const deleteRecordingResponseSchema = z.object({
+  deleted: z.boolean(),
+});
+
+export const exportRecordingResponseSchema = z.object({
+  filePath: z.string().min(1),
+});
+
+export const recordingFramesResponseSchema = z.object({
+  recording: sessionRecordingRecordSchema,
+  header: recordingHeaderSchema,
+  frames: z.array(recordingFrameSchema),
+});
+
+export type RecordingHeader = z.infer<typeof recordingHeaderSchema>;
+export type RecordingFrame = z.infer<typeof recordingFrameSchema>;
+export type SessionRecordingRecord = z.infer<typeof sessionRecordingRecordSchema>;
+export type StartRecordingRequest = z.infer<typeof startRecordingRequestSchema>;
+export type StopRecordingRequest = z.infer<typeof stopRecordingRequestSchema>;
+export type GetRecordingStateRequest = z.infer<typeof getRecordingStateRequestSchema>;
+export type RecordingStateResponse = z.infer<typeof recordingStateResponseSchema>;
+export type DeleteRecordingRequest = z.infer<typeof deleteRecordingRequestSchema>;
+export type GetRecordingFramesRequest = z.infer<typeof getRecordingFramesRequestSchema>;
+export type ExportRecordingRequest = z.infer<typeof exportRecordingRequestSchema>;
+export type DeleteRecordingResponse = z.infer<typeof deleteRecordingResponseSchema>;
+export type ExportRecordingResponse = z.infer<typeof exportRecordingResponseSchema>;
+export type RecordingFramesResponse = z.infer<typeof recordingFramesResponseSchema>;
+
+// --- Connection history schemas ---
+
+export const connectionHistoryRecordSchema = z.object({
+  id: z.string().min(1),
+  hostId: z.string().nullable(),
+  hostName: z.string().nullable(),
+  connectedAt: z.string(),
+  disconnectedAt: z.string().nullable(),
+  wasSuccessful: z.boolean(),
+  errorMessage: z.string().nullable(),
+});
+
+export const connectionHistoryListByHostRequestSchema = z.object({
+  hostId: z.string().min(1),
+  limit: z.number().int().min(1).max(1000).optional(),
+});
+
+export const connectionHistoryListRecentRequestSchema = z
+  .object({
+    limit: z.number().int().min(1).max(1000).optional(),
+  })
+  .default({});
+
+export type ConnectionHistoryRecord = z.infer<typeof connectionHistoryRecordSchema>;
+export type ConnectionHistoryListByHostRequest = z.infer<
+  typeof connectionHistoryListByHostRequestSchema
+>;
+export type ConnectionHistoryListRecentRequest = z.infer<
+  typeof connectionHistoryListRecentRequestSchema
+>;
 
 // --- Host fingerprint schemas ---
 

@@ -37,6 +37,11 @@ describe("settingsStore custom themes", () => {
           showRecordingButton: true,
           showRestoreBanner: true,
           showSerialInSidebar: true,
+          confirmOnClose: true,
+        },
+        security: {
+          credentialCacheEnabled: true,
+          credentialCacheTtlMinutes: 15,
         },
         customThemes: {},
       },
@@ -81,5 +86,27 @@ describe("settingsStore custom themes", () => {
     expect(mockSshterm.updateSetting).toHaveBeenCalledTimes(1);
     const savedValue = JSON.parse(mockSshterm.updateSetting.mock.calls[0][0].value);
     expect(savedValue.general.showSerialInSidebar).toBe(false);
+  });
+
+  it("credential cache settings default to enabled with 15 minute timeout", () => {
+    const state = settingsStore.getState().settings.security;
+    expect(state.credentialCacheEnabled).toBe(true);
+    expect(state.credentialCacheTtlMinutes).toBe(15);
+  });
+
+  it("updateSecurity persists credential cache settings", async () => {
+    await settingsStore.getState().updateSecurity({
+      credentialCacheEnabled: false,
+      credentialCacheTtlMinutes: 42,
+    });
+
+    const state = settingsStore.getState().settings.security;
+    expect(state.credentialCacheEnabled).toBe(false);
+    expect(state.credentialCacheTtlMinutes).toBe(42);
+
+    expect(mockSshterm.updateSetting).toHaveBeenCalledTimes(1);
+    const savedValue = JSON.parse(mockSshterm.updateSetting.mock.calls[0][0].value);
+    expect(savedValue.security.credentialCacheEnabled).toBe(false);
+    expect(savedValue.security.credentialCacheTtlMinutes).toBe(42);
   });
 });

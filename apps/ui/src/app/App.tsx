@@ -5,7 +5,7 @@ import { toast, Toaster } from "sonner";
 import { broadcastStore } from "../features/broadcast/broadcastStore";
 import { useSnippetStore } from "../features/snippets/snippetStore";
 import type { HostFormValue } from "../features/hosts/HostForm";
-import { HostForm } from "../features/hosts/HostForm";
+import { HostForm, ENV_VAR_NAME_REGEX } from "../features/hosts/HostForm";
 import type { HostRecord } from "../features/hosts/HostsView";
 import {
   SshConfigImportDialog,
@@ -13,6 +13,7 @@ import {
 } from "../features/hosts/SshConfigImportDialog";
 import { PuttyImportDialog } from "../features/hosts/PuttyImportDialog";
 import { SshManagerImportDialog } from "../features/hosts/SshManagerImportDialog";
+import { ConnectionHistoryDialog } from "../features/hosts/ConnectionHistoryDialog";
 import { AppShell } from "../features/layout/AppShell";
 import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
@@ -22,11 +23,18 @@ import { QuickConnectDialog } from "../features/quick-connect/QuickConnectDialog
 import type { QuickConnectProfile } from "../features/quick-connect/searchIndex";
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
 import { sessionRecoveryStore } from "../features/sessions/sessionRecoveryStore";
+import { SessionRecoveryDialog } from "../features/sessions/SessionRecoveryDialog";
 import { Sidebar } from "../features/sidebar/Sidebar";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
-import type { PuttySession, SerialProfileRecord } from "@sshterm/shared";
+import type {
+  ConnectionHistoryRecord,
+  SavedSessionRecord,
+  PuttySession,
+  SerialProfileRecord,
+  TagRecord,
+} from "@sshterm/shared";
 import { EditorApp } from "../features/editor/EditorApp";
 import {
   HostKeyVerificationDialog,
@@ -34,6 +42,25 @@ import {
 } from "../features/hosts/HostKeyVerificationDialog";
 import { KeyboardInteractiveDialog } from "../features/hosts/KeyboardInteractiveDialog";
 import type { KeyboardInteractiveRequest } from "@sshterm/shared";
+
+
+function normalizeHostEnvVars(
+  envVars: HostFormValue["envVars"] | undefined
+): HostFormValue["envVars"] {
+  if (!Array.isArray(envVars)) {
+    return [];
+  }
+
+  return envVars
+    .map((item, index) => ({
+      id: item.id,
+      name: item.name.trim(),
+      value: item.value ?? "",
+      isEnabled: item.isEnabled ?? true,
+      sortOrder: index,
+    }))
+    .filter((item) => item.name.length > 0 && ENV_VAR_NAME_REGEX.test(item.name));
+}
 
 function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
   return {
@@ -43,8 +70,11 @@ function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
     port: Number(h.port ?? 22),
     username: h.username == null ? "" : String(h.username),
     identityFile: h.identityFile == null ? "" : String(h.identityFile),
+    hostProfileId: h.hostProfileId == null ? "" : String(h.hostProfileId),
+    envVars: [],
     group: "",
     tags: "",
+    tagIds: [],
     authMethod: (h.authMethod as HostRecord["authMethod"]) ?? "default",
     agentKind: (h.agentKind as HostRecord["agentKind"]) ?? "system",
     opReference: h.opReference == null ? "" : String(h.opReference),
@@ -99,6 +129,63 @@ async function loadSerialProfiles(): Promise<SerialProfileRecord[]> {
   }
 }
 
+async function loadTags(): Promise<TagRecord[]> {
+  if (!window.sshterm?.listTags) {
+    return [];
+  }
+  try {
+    return await window.sshterm.listTags();
+  } catch (err) {
+    console.error("[sshterm] failed to load tags:", err);
+    return [];
+  }
+}
+
+async function attachHostTags(hosts: HostRecord[]): Promise<HostRecord[]> {
+  if (!window.sshterm?.tagsGetHostTags) {
+    return hosts.map((host) => ({
+      ...host,
+      tagIds: host.tagIds ?? [],
+      tags: host.tags ?? "",
+    }));
+  }
+
+  const hostTagsById = await Promise.all(
+    hosts.map(async (host) => {
+      try {
+        const hostTags = await window.sshterm?.tagsGetHostTags?.({
+          hostId: host.id,
+        });
+        const safeHostTags = hostTags ?? [];
+        return {
+          hostId: host.id,
+          tagIds: safeHostTags.map((tag) => tag.id),
+          tags: safeHostTags.map((tag) => tag.name).join(", "),
+        };
+      } catch {
+        return {
+          hostId: host.id,
+          tagIds: [] as string[],
+          tags: "",
+        };
+      }
+    })
+  );
+
+  const map = new Map(
+    hostTagsById.map((item) => [item.hostId, { tagIds: item.tagIds, tags: item.tags }])
+  );
+
+  return hosts.map((host) => {
+    const hostTags = map.get(host.id);
+    return {
+      ...host,
+      tagIds: hostTags?.tagIds ?? [],
+      tags: hostTags?.tags ?? "",
+    };
+  });
+}
+
 async function persistSerialProfile(profile: SerialProfileRecord): Promise<void> {
   if (!window.sshterm?.upsertSerialProfile) return;
   try {
@@ -111,7 +198,7 @@ async function persistSerialProfile(profile: SerialProfileRecord): Promise<void>
 async function persistHost(host: HostRecord): Promise<HostRecord | null> {
   if (!window.sshterm?.upsertHost) {
     console.warn("[sshterm] upsertHost not available");
-    return;
+    return null;
   }
   try {
     const authMethod = host.authMethod ?? "default";
@@ -144,6 +231,7 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
       port: host.port,
       username: host.username || null,
       identityFile: host.identityFile || null,
+      hostProfileId: host.hostProfileId || null,
       group: host.group,
       tags: host.tags,
       notes: host.notes || null,
@@ -212,6 +300,7 @@ function serializeCurrentLayout() {
 
 function MainApp() {
   const [hosts, setHosts] = useState<HostRecord[]>([]);
+  const [tags, setTags] = useState<TagRecord[]>([]);
   const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
   const [hostModalOpen, setHostModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -230,6 +319,8 @@ function MainApp() {
   const [sftpAuthError, setSftpAuthError] = useState<string | null>(null);
   const [sftpAuthSubmitting, setSftpAuthSubmitting] = useState(false);
   const [connectingHostIds, setConnectingHostIds] = useState<Set<string>>(new Set());
+  const [lastConnectedAtByHostId, setLastConnectedAtByHostId] = useState<Record<string, string | null>>({});
+  const [connectionHistoryHost, setConnectionHistoryHost] = useState<HostRecord | null>(null);
   const [hostKeyVerifyOpen, setHostKeyVerifyOpen] = useState(false);
   const [hostKeyVerifyInfo, setHostKeyVerifyInfo] = useState<HostKeyVerificationInfo | null>(null);
   const [hostKeyVerifyHost, setHostKeyVerifyHost] = useState<HostRecord | null>(null);
@@ -243,6 +334,8 @@ function MainApp() {
     type?: string;
     hostId?: string;
   }>>([]);
+  const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
+  const [savedRecoverySessions, setSavedRecoverySessions] = useState<SavedSessionRecord[]>([]);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
   const tabs = useStore(layoutStore, (s) => s.tabs);
@@ -256,8 +349,18 @@ function MainApp() {
   const rememberSession = useStore(sessionRecoveryStore, (s) => s.remember);
 
   useEffect(() => {
-    void Promise.all([loadHosts(), loadSerialProfiles()]).then(
-      ([h, sp]) => { setHosts(h); setSerialProfiles(sp); }
+    let cancelled = false;
+
+    void Promise.all([loadHosts(), loadSerialProfiles(), loadTags()]).then(
+      async ([h, sp, loadedTags]) => {
+        const hostsWithTags = await attachHostTags(h);
+        if (cancelled) {
+          return;
+        }
+        setHosts(hostsWithTags);
+        setSerialProfiles(sp);
+        setTags(loadedTags);
+      }
     );
     // Load settings, then check for last workspace to restore
     void settingsStore.getState().load().then(() => {
@@ -269,7 +372,86 @@ function MainApp() {
         }
       });
     }).catch(() => {});
+
+    if (window.sshterm?.sessionLoadSavedState) {
+      void window.sshterm
+        .sessionLoadSavedState()
+        .then((sessions) => {
+          if (sessions.length === 0) {
+            return;
+          }
+          setSavedRecoverySessions(sessions);
+          setSessionRecoveryOpen(true);
+        })
+        .catch((error) => {
+          console.warn("[sshterm] failed loading saved session recovery state:", error);
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  const refreshConnectionHistorySummary = useCallback(async () => {
+    if (!window.sshterm?.connectionHistoryListRecent) {
+      return;
+    }
+
+    try {
+      const recent: ConnectionHistoryRecord[] =
+        await window.sshterm.connectionHistoryListRecent({ limit: 1000 });
+      const next: Record<string, string | null> = {};
+      for (const host of hosts) {
+        next[host.id] = null;
+      }
+      for (const item of recent) {
+        if (!item.hostId || !item.wasSuccessful) {
+          continue;
+        }
+        const current = next[item.hostId];
+        if (!current || Date.parse(item.connectedAt) > Date.parse(current)) {
+          next[item.hostId] = item.connectedAt;
+        }
+      }
+      setLastConnectedAtByHostId(next);
+    } catch (err) {
+      console.warn("[sshterm] failed to load connection history summary:", err);
+    }
+  }, [hosts]);
+
+  useEffect(() => {
+    void refreshConnectionHistorySummary();
+  }, [refreshConnectionHistorySummary]);
+
+  useEffect(() => {
+    if (!window.sshterm?.onSessionEvent) {
+      return;
+    }
+
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = window.sshterm.onSessionEvent((event) => {
+      const shouldRefresh =
+        (event.type === "status" && event.state === "connected") ||
+        event.type === "error" ||
+        event.type === "exit";
+      if (!shouldRefresh) {
+        return;
+      }
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      refreshTimer = setTimeout(() => {
+        void refreshConnectionHistorySummary();
+      }, 250);
+    });
+
+    return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+      unsubscribe?.();
+    };
+  }, [refreshConnectionHistorySummary]);
 
   // Auto-save workspace on window close
   useEffect(() => {
@@ -558,11 +740,24 @@ function MainApp() {
   const duplicateHost = useCallback((host: HostRecord) => {
     const newHost: HostRecord = { ...host, id: `host-${Date.now()}`, name: `${host.name} (copy)` };
     setHosts((prev) => [...prev, newHost]);
-    void persistHost(newHost);
+    void persistHost(newHost).then(async () => {
+      if (!window.sshterm?.tagsSetHostTags) {
+        return;
+      }
+      try {
+        await window.sshterm.tagsSetHostTags({
+          hostId: newHost.id,
+          tagIds: newHost.tagIds ?? [],
+        });
+      } catch (error) {
+        console.warn("[sshterm] failed to copy host tags:", error);
+      }
+    });
   }, []);
 
   const deleteHost = useCallback(async (host: HostRecord) => {
     setHosts((prev) => prev.filter((h) => h.id !== host.id));
+    setConnectionHistoryHost((current) => (current?.id === host.id ? null : current));
     await window.sshterm?.removeHost?.({ id: host.id });
   }, []);
 
@@ -677,6 +872,46 @@ function MainApp() {
     [openSftpAuthModal, openSftpTab, parseHostKeyVerificationError]
   );
 
+  const clearSavedSessionRecoveryState = useCallback(async () => {
+    if (!window.sshterm?.sessionClearSavedState) {
+      return;
+    }
+    try {
+      await window.sshterm.sessionClearSavedState();
+    } catch (error) {
+      console.warn("[sshterm] failed clearing saved session recovery state:", error);
+    }
+  }, []);
+
+  const restoreSavedSessions = useCallback(async () => {
+    for (let index = 0; index < savedRecoverySessions.length; index += 1) {
+      const session = savedRecoverySessions[index];
+      if (session.transport === "sftp") {
+        continue;
+      }
+
+      const sessionId = `recovery-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`;
+      openTab({
+        tabKey: sessionId,
+        sessionId,
+        title: session.title,
+        transport: session.transport === "serial" ? "serial" : "ssh",
+        profileId: session.profileId,
+        hostId: session.hostId ?? undefined,
+        preopened: false,
+      });
+    }
+    setSessionRecoveryOpen(false);
+    setSavedRecoverySessions([]);
+    await clearSavedSessionRecoveryState();
+  }, [clearSavedSessionRecoveryState, openTab, savedRecoverySessions]);
+
+  const dismissSavedSessionRecovery = useCallback(async () => {
+    setSessionRecoveryOpen(false);
+    setSavedRecoverySessions([]);
+    await clearSavedSessionRecoveryState();
+  }, [clearSavedSessionRecoveryState]);
+
   const restoreLastWorkspace = useCallback(() => {
     for (const tab of lastWorkspaceTabs) {
       layoutStore.getState().openTab({
@@ -722,10 +957,13 @@ function MainApp() {
         sidebar={
           <Sidebar
             hosts={hosts}
+            tags={tags}
             activeSessionHostIds={activeSessionHostIds}
             connectingHostIds={connectingHostIds}
+            lastConnectedAtByHostId={lastConnectedAtByHostId}
             onConnectHost={connectHost}
             onOpenSftpHost={openSftpHost}
+            onOpenConnectionHistory={(host) => setConnectionHistoryHost(host)}
             onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
             onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
             onImportSshConfig={() => setImportModalOpen(true)}
@@ -780,8 +1018,11 @@ function MainApp() {
           key={editingHost?.id ?? "new"}
           initialValue={editingHost ?? undefined}
           submitLabel={editingHost ? "Update host" : "Add host"}
+          onTagsChanged={(updatedTags) => setTags(updatedTags)}
           onSubmit={(value: HostFormValue) => {
             const id = editingHost?.id ?? `host-${Date.now()}`;
+            const normalizedEnvVars = normalizeHostEnvVars(value.envVars);
+            const normalizedTagIds = Array.from(new Set(value.tagIds ?? []));
             const isDuplicate = !editingHost && hosts.some(
               (h) => h.name === value.name || (h.hostname === value.hostname && h.port === value.port)
             );
@@ -789,7 +1030,12 @@ function MainApp() {
               setHostModalOpen(false);
               return;
             }
-            const record: HostRecord = { id, ...value };
+            const record: HostRecord = {
+              id,
+              ...value,
+              tagIds: normalizedTagIds,
+              envVars: normalizedEnvVars,
+            };
             const nowIso = new Date().toISOString();
             const sanitizedRecord: HostRecord = {
               ...record,
@@ -820,11 +1066,62 @@ function MainApp() {
             } else {
               setHosts((prev) => [...prev, sanitizedRecord]);
             }
-            void persistHost(record).then((persisted) => {
+            void persistHost(record).then(async (persisted) => {
               if (!persisted) {
                 return;
               }
-              setHosts((prev) => prev.map((h) => (h.id === id ? persisted : h)));
+              if (window.sshterm?.replaceHostEnvVars) {
+                try {
+                  await window.sshterm.replaceHostEnvVars({
+                    hostId: id,
+                    envVars: normalizedEnvVars.map((item) => ({
+                      id: item.id,
+                      name: item.name,
+                      value: item.value,
+                      isEnabled: item.isEnabled,
+                      sortOrder: item.sortOrder,
+                    })),
+                  });
+                } catch (error) {
+                  console.warn("[sshterm] failed to persist host env vars:", error);
+                }
+              }
+
+              let persistedHostTags: TagRecord[] = [];
+              if (window.sshterm?.tagsSetHostTags) {
+                try {
+                  persistedHostTags = await window.sshterm.tagsSetHostTags({
+                    hostId: id,
+                    tagIds: normalizedTagIds,
+                  });
+                } catch (error) {
+                  console.warn("[sshterm] failed to persist host tags:", error);
+                }
+              }
+
+              const persistedTagIds = persistedHostTags.map((tag) => tag.id);
+              const persistedTagText = persistedHostTags
+                .map((tag) => tag.name)
+                .join(", ");
+
+              setHosts((prev) =>
+                prev.map((h) =>
+                  h.id === id
+                    ? {
+                        ...persisted,
+                        envVars: normalizedEnvVars,
+                        tagIds:
+                          persistedTagIds.length > 0
+                            ? persistedTagIds
+                            : normalizedTagIds,
+                        tags:
+                          persistedTagText.length > 0
+                            ? persistedTagText
+                            : value.tags,
+                      }
+                    : h
+                )
+              );
             });
             setHostModalOpen(false);
           }}
@@ -844,8 +1141,20 @@ function MainApp() {
               hostname: item.hostName ?? item.alias,
               port: item.port ?? 22,
               username: item.user ?? "",
+              identityFile: "",
+              envVars: [],
               group: "Imported",
-              tags: "ssh-config"
+              tags: "ssh-config",
+              tagIds: [],
+              authMethod: "default" as const,
+              agentKind: "system" as const,
+              opReference: "",
+              proxyJump: "",
+              proxyJumpHostIds: "",
+              keepAliveInterval: "",
+              autoReconnect: false,
+              reconnectMaxAttempts: 5,
+              reconnectBaseInterval: 1,
             }));
             setHosts((prev) => [...prev, ...newHosts]);
             for (const host of newHosts) {
@@ -870,9 +1179,20 @@ function MainApp() {
               hostname: session.hostname,
               port: session.port,
               username: session.username || "",
-              identityFile: session.keyFile || undefined,
+              identityFile: session.keyFile || "",
+              envVars: [],
               group: "PuTTY Import",
               tags: "putty",
+              tagIds: [],
+              authMethod: "default" as const,
+              agentKind: "system" as const,
+              opReference: "",
+              proxyJump: "",
+              proxyJumpHostIds: "",
+              keepAliveInterval: "",
+              autoReconnect: false,
+              reconnectMaxAttempts: 5,
+              reconnectBaseInterval: 1,
             }));
             setHosts((prev) => [...prev, ...newHosts]);
             for (const host of newHosts) {
@@ -893,7 +1213,13 @@ function MainApp() {
           onClose={() => setSshManagerImportOpen(false)}
           onImported={() => {
             setSshManagerImportOpen(false);
-            void loadHosts().then(setHosts);
+            void Promise.all([loadHosts(), loadTags()]).then(
+              async ([loadedHosts, loadedTags]) => {
+                const hostsWithTags = await attachHostTags(loadedHosts);
+                setHosts(hostsWithTags);
+                setTags(loadedTags);
+              }
+            );
           }}
         />
       </Modal>
@@ -936,6 +1262,12 @@ function MainApp() {
       >
         <SettingsPanel />
       </Modal>
+
+      <ConnectionHistoryDialog
+        open={connectionHistoryHost !== null}
+        host={connectionHistoryHost}
+        onClose={() => setConnectionHistoryHost(null)}
+      />
 
       <Modal
         open={sftpAuthModalOpen}
@@ -1013,6 +1345,13 @@ function MainApp() {
         request={kbdInteractiveRequest}
         onSubmit={handleKbdInteractiveSubmit}
         onCancel={handleKbdInteractiveCancel}
+      />
+
+      <SessionRecoveryDialog
+        open={sessionRecoveryOpen}
+        sessions={savedRecoverySessions}
+        onRestore={restoreSavedSessions}
+        onDismiss={dismissSavedSessionRecovery}
       />
 
       <Toaster

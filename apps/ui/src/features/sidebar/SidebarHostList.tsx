@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -17,16 +17,21 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { toast } from "sonner";
+import type { TagRecord } from "@sshterm/shared";
 import { ContextMenu } from "../../components/ContextMenu";
 import type { ContextMenuAction } from "../../components/ContextMenu";
 import type { HostRecord } from "../hosts/HostsView";
 
 export interface SidebarHostListProps {
   hosts: HostRecord[];
+  tags: TagRecord[];
   activeSessionHostIds: Set<string>;
   connectingHostIds: Set<string>;
+  lastConnectedAtByHostId: Record<string, string | null>;
   onConnect: (host: HostRecord) => void;
   onOpenSftp: (host: HostRecord) => void;
+  onOpenConnectionHistory: (host: HostRecord) => void;
   onEdit: (host: HostRecord) => void;
   onDuplicate: (host: HostRecord) => void;
   onDelete: (host: HostRecord) => void;
@@ -38,11 +43,36 @@ export interface SidebarHostListProps {
 }
 
 const HOST_COLORS = ["red", "orange", "yellow", "green", "blue", "cyan", "purple", "pink"] as const;
+type HostExportFormat = "json" | "csv" | "ssh-config";
+type HostReachability = "online" | "offline" | "unknown";
 
-function StatusDot({ hostId, activeSessionHostIds, connectingHostIds }: {
+const HOST_EXPORT_OPTIONS: Array<{
+  value: HostExportFormat;
+  label: string;
+  extension: string;
+  filterName: string;
+}> = [
+  { value: "json", label: "JSON", extension: "json", filterName: "JSON" },
+  { value: "csv", label: "CSV", extension: "csv", filterName: "CSV" },
+  { value: "ssh-config", label: "SSH Config", extension: "conf", filterName: "SSH Config" },
+];
+
+function formatLastConnected(value: string | null | undefined): string {
+  if (!value) {
+    return "Never";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
+
+function StatusDot({ hostId, activeSessionHostIds, connectingHostIds, hostReachabilityById }: {
   hostId: string;
   activeSessionHostIds: Set<string>;
   connectingHostIds: Set<string>;
+  hostReachabilityById: Record<string, HostReachability>;
 }) {
   if (connectingHostIds.has(hostId)) {
     return <span className="host-status-connecting shrink-0" />;
@@ -52,6 +82,21 @@ function StatusDot({ hostId, activeSessionHostIds, connectingHostIds }: {
       <span className="relative flex shrink-0 items-center justify-center">
         <span className="h-2 w-2 rounded-full bg-success" />
         <span className="absolute inset-0 h-2 w-2 rounded-full bg-success/30 blur-[3px]" />
+      </span>
+    );
+  }
+  const reachability = hostReachabilityById[hostId] ?? "unknown";
+  if (reachability === "online") {
+    return (
+      <span className="relative flex shrink-0 items-center justify-center">
+        <span className="h-2 w-2 rounded-full bg-success" />
+      </span>
+    );
+  }
+  if (reachability === "offline") {
+    return (
+      <span className="relative flex shrink-0 items-center justify-center">
+        <span className="h-2 w-2 rounded-full bg-danger" />
       </span>
     );
   }
@@ -66,6 +111,7 @@ function SortableHostItem({
   host,
   activeSessionHostIds,
   connectingHostIds,
+  hostReachabilityById,
   onConnect,
   showDivider,
   onContextMenu,
@@ -73,6 +119,7 @@ function SortableHostItem({
   host: HostRecord;
   activeSessionHostIds: Set<string>;
   connectingHostIds: Set<string>;
+  hostReachabilityById: Record<string, HostReachability>;
   onConnect: (host: HostRecord) => void;
   showDivider: boolean;
   onContextMenu: (e: React.MouseEvent, host: HostRecord) => void;
@@ -111,6 +158,7 @@ function SortableHostItem({
           hostId={host.id}
           activeSessionHostIds={activeSessionHostIds}
           connectingHostIds={connectingHostIds}
+          hostReachabilityById={hostReachabilityById}
         />
 
         <div className="min-w-0 flex-1">
@@ -139,10 +187,13 @@ function SortableHostItem({
 
 export function SidebarHostList({
   hosts,
+  tags,
   activeSessionHostIds,
   connectingHostIds,
+  lastConnectedAtByHostId,
   onConnect,
   onOpenSftp,
+  onOpenConnectionHistory,
   onEdit,
   onDuplicate,
   onDelete,
@@ -155,6 +206,11 @@ export function SidebarHostList({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; host: HostRecord } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [exportFormat, setExportFormat] = useState<HostExportFormat>("json");
+  const [hostReachabilityById, setHostReachabilityById] = useState<
+    Record<string, HostReachability>
+  >({});
   const filterInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
@@ -163,18 +219,47 @@ export function SidebarHostList({
   );
 
   const filteredHosts = useMemo(() => {
-    if (!filterQuery.trim()) return hosts;
-    const q = filterQuery.toLowerCase();
+    const query = filterQuery.trim().toLowerCase();
+    const selectedIdSet = new Set(selectedTagIds);
+
     return hosts.filter((host) => {
-      return (
-        host.name.toLowerCase().includes(q) ||
-        host.hostname.toLowerCase().includes(q) ||
-        (host.group && host.group.toLowerCase().includes(q)) ||
-        (host.tags && host.tags.toLowerCase().includes(q)) ||
-        host.username.toLowerCase().includes(q)
-      );
+      const matchesQuery =
+        query.length === 0 ||
+        host.name.toLowerCase().includes(query) ||
+        host.hostname.toLowerCase().includes(query) ||
+        (host.group && host.group.toLowerCase().includes(query)) ||
+        (host.tags && host.tags.toLowerCase().includes(query)) ||
+        host.username.toLowerCase().includes(query);
+
+      if (!matchesQuery) {
+        return false;
+      }
+
+      if (selectedIdSet.size === 0) {
+        return true;
+      }
+
+      const hostTagIds = host.tagIds ?? [];
+      return hostTagIds.some((tagId) => selectedIdSet.has(tagId));
     });
-  }, [hosts, filterQuery]);
+  }, [filterQuery, hosts, selectedTagIds]);
+
+  const tagHostCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const host of hosts) {
+      for (const tagId of host.tagIds ?? []) {
+        counts.set(tagId, (counts.get(tagId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [hosts]);
+
+  useEffect(() => {
+    const knownIds = new Set(tags.map((tag) => tag.id));
+    setSelectedTagIds((previous) =>
+      previous.filter((tagId) => knownIds.has(tagId))
+    );
+  }, [tags]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, HostRecord[]>();
@@ -199,6 +284,42 @@ export function SidebarHostList({
 
   const allHostIds = useMemo(() => filteredHosts.map((h) => h.id), [filteredHosts]);
   const activeHost = activeId ? hosts.find((h) => h.id === activeId) : null;
+
+  const setStatusTargets = useCallback((hostIds: string[]) => {
+    if (!window.sshterm?.setHostStatusTargets) {
+      return;
+    }
+    void window.sshterm.setHostStatusTargets({ hostIds });
+  }, []);
+
+  useEffect(() => {
+    if (!window.sshterm?.onHostStatus) {
+      return;
+    }
+
+    return window.sshterm.onHostStatus((event) => {
+      setHostReachabilityById((prev) => {
+        const next = event.online ? "online" : "offline";
+        if (prev[event.hostId] === next) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [event.hostId]: next,
+        };
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    setStatusTargets(filteredHosts.map((host) => host.id));
+  }, [filteredHosts, setStatusTargets]);
+
+  useEffect(() => {
+    return () => {
+      setStatusTargets([]);
+    };
+  }, [setStatusTargets]);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
@@ -238,7 +359,56 @@ export function SidebarHostList({
     onReorder(items);
   }
 
+  const handleExportHosts = useCallback(async () => {
+    const option = HOST_EXPORT_OPTIONS.find((item) => item.value === exportFormat);
+    if (!option) {
+      toast.error("Unsupported export format selected.");
+      return;
+    }
+
+    if (!window.sshterm?.fsShowSaveDialog || !window.sshterm?.exportHosts) {
+      toast.error("Host export is unavailable in this environment.");
+      return;
+    }
+
+    const filePath = await window.sshterm.fsShowSaveDialog({
+      defaultPath: `hosts.${option.extension}`,
+      filters: [{ name: option.filterName, extensions: [option.extension] }],
+    });
+    if (!filePath) {
+      return;
+    }
+
+    try {
+      const result = await window.sshterm.exportHosts({ format: exportFormat, filePath });
+      toast.success(`Exported ${result.exported} host${result.exported === 1 ? "" : "s"} to ${filePath}`);
+    } catch (error) {
+      toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }, [exportFormat]);
+
+  const toggleTagFilter = useCallback((tagId: string) => {
+    setSelectedTagIds((previous) => {
+      if (previous.includes(tagId)) {
+        return previous.filter((id) => id !== tagId);
+      }
+      return [...previous, tagId];
+    });
+  }, []);
+
   const buildContextMenuActions = (host: HostRecord): ContextMenuAction[] => [
+    {
+      label: `Last connected: ${formatLastConnected(lastConnectedAtByHostId[host.id])}`,
+      action: () => {},
+      disabled: true,
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M8 4.8V8L10.2 9.3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    { label: "", action: () => {}, separator: true },
     {
       label: "Connect",
       action: () => onConnect(host),
@@ -358,6 +528,16 @@ export function SidebarHostList({
         </svg>
       ),
     },
+    {
+      label: "Connection History",
+      action: () => onOpenConnectionHistory(host),
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M3.5 8A4.5 4.5 0 118 12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M3.5 5.5V8H6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
     { label: "", action: () => {}, separator: true },
     {
       label: "Delete",
@@ -381,42 +561,102 @@ export function SidebarHostList({
       onDragEnd={handleDragEnd}
     >
       <div className="space-y-0.5 px-1">
-        {/* Filter input */}
-        <div className="relative px-1 pb-1">
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 16 16"
-            fill="none"
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/60"
-          >
-            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <input
-            ref={filterInputRef}
-            type="text"
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            placeholder="Filter hosts..."
-            className="w-full rounded-md border border-transparent bg-base-750/40 py-1 pl-7 pr-6 text-xs text-text-primary placeholder:text-text-muted/50 focus:border-accent/30 focus:bg-base-750/60 focus:outline-none transition-colors duration-150"
-          />
-          {filterQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setFilterQuery("");
-                filterInputRef.current?.focus();
-              }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-sm text-text-muted/60 hover:text-text-primary transition-colors duration-150"
-              title="Clear filter"
+        {/* Filter + export */}
+        <div className="flex items-center gap-1 px-1 pb-1">
+          <div className="relative min-w-0 flex-1">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/60"
             >
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
-                <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
-          )}
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <input
+              ref={filterInputRef}
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Filter hosts..."
+              className="w-full rounded-md border border-transparent bg-base-750/40 py-1 pl-7 pr-6 text-xs text-text-primary placeholder:text-text-muted/50 focus:border-accent/30 focus:bg-base-750/60 focus:outline-none transition-colors duration-150"
+            />
+            {filterQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterQuery("");
+                  filterInputRef.current?.focus();
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-sm text-text-muted/60 hover:text-text-primary transition-colors duration-150"
+                title="Clear filter"
+              >
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <select
+            value={exportFormat}
+            onChange={(event) => setExportFormat(event.target.value as HostExportFormat)}
+            className="h-7 rounded-md border border-border bg-base-750/70 px-2 text-[11px] text-text-secondary focus:border-accent/40 focus:outline-none"
+            title="Export format"
+          >
+            {HOST_EXPORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => { void handleExportHosts(); }}
+            className="h-7 rounded-md border border-border bg-base-750/70 px-2 text-[11px] text-text-secondary hover:border-accent/35 hover:text-text-primary transition-colors"
+            title="Export hosts"
+          >
+            Export
+          </button>
         </div>
+
+        {tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1 px-1 pb-1.5">
+            {tags.map((tag) => {
+              const selected = selectedTagIds.includes(tag.id);
+              const hostCount = tagHostCounts.get(tag.id) ?? 0;
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => toggleTagFilter(tag.id)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                    selected
+                      ? "border-accent/45 bg-accent/15 text-text-primary"
+                      : "border-border bg-base-800/65 text-text-secondary hover:text-text-primary"
+                  }`}
+                  title={`${tag.name} (${hostCount})`}
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: tag.color ?? "#64748b" }}
+                  />
+                  <span>{tag.name}</span>
+                  <span className="text-[10px] text-text-muted/80">{hostCount}</span>
+                </button>
+              );
+            })}
+            {selectedTagIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedTagIds([])}
+                className="ml-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-text-muted transition-colors hover:text-text-primary"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
 
         <SortableContext items={allHostIds} strategy={verticalListSortingStrategy}>
           {[...grouped.entries()].map(([group, groupHosts]) => (
@@ -431,6 +671,7 @@ export function SidebarHostList({
                   host={host}
                   activeSessionHostIds={activeSessionHostIds}
                   connectingHostIds={connectingHostIds}
+                  hostReachabilityById={hostReachabilityById}
                   onConnect={onConnect}
                   showDivider={index < groupHosts.length - 1}
                   onContextMenu={(e, h) => setContextMenu({ x: e.clientX, y: e.clientY, host: h })}
@@ -465,6 +706,7 @@ export function SidebarHostList({
               hostId={activeHost.id}
               activeSessionHostIds={activeSessionHostIds}
               connectingHostIds={connectingHostIds}
+              hostReachabilityById={hostReachabilityById}
             />
             <span className="text-[13px] font-medium text-text-primary">{activeHost.name}</span>
           </div>

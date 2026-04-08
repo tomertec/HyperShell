@@ -92,7 +92,13 @@ export function TerminalPane({
         />
         {showRecordingButton && session.sessionId && session.state === "connected" && (
           <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-base-800/80 rounded px-1.5 py-0.5 backdrop-blur-sm border border-border/30">
-            <LoggingButton sessionId={session.sessionId} />
+            <LoggingButton
+              sessionId={session.sessionId}
+              hostId={transport === "ssh" ? profileId : null}
+              title={`${transport.toUpperCase()} ${profileId}`}
+              width={session.terminal?.cols}
+              height={session.terminal?.rows}
+            />
           </div>
         )}
       </div>

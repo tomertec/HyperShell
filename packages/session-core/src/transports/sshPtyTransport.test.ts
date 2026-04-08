@@ -101,6 +101,46 @@ describe("buildSshArgs", () => {
     expect(command.args).toEqual(["-tt", "router.local"]);
   });
 
+  it("merges per-host env vars into PTY spawn env", () => {
+    const fakePty = createFakePty();
+    let capturedEnv: NodeJS.ProcessEnv | undefined;
+
+    createSshPtyTransport(
+      {
+        sessionId: "s-env",
+        transport: "ssh",
+        profileId: "host-env",
+        cols: 80,
+        rows: 24
+      },
+      {
+        hostname: "env-host",
+        envVars: {
+          TERM: "xterm-256color",
+          LANG: "en_US.UTF-8",
+          "BAD-NAME": "ignored"
+        }
+      },
+      {
+        env: {
+          PATH: "/usr/bin",
+          TERM: "xterm"
+        },
+        spawnPty: (_file, _args, options) => {
+          capturedEnv = options.env;
+          return fakePty.process;
+        }
+      }
+    );
+
+    expect(capturedEnv).toMatchObject({
+      PATH: "/usr/bin",
+      TERM: "xterm-256color",
+      LANG: "en_US.UTF-8"
+    });
+    expect(capturedEnv?.["BAD-NAME"]).toBeUndefined();
+  });
+
   it("forwards PTY lifecycle events and io", async () => {
     const fakePty = createFakePty();
     const events: SessionTransportEvent[] = [];

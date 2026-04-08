@@ -6,7 +6,10 @@ export const sessionChannels = {
   list: "session:list",
   event: "session:event",
   setSignals: "session:set-signals",
-  hostStats: "session:host-stats"
+  hostStats: "session:host-stats",
+  saveState: "session:save-state",
+  loadSavedState: "session:load-saved-state",
+  clearSavedState: "session:clear-saved-state"
 } as const;
 
 export const hostChannels = {
@@ -19,6 +22,8 @@ export const hostChannels = {
   scanPutty: "hosts:scan-putty",
   scanSshManager: "hosts:scan-ssh-manager",
   importSshManager: "hosts:import-ssh-manager",
+  setStatusTargets: "hosts:set-status-targets",
+  status: "hosts:status",
 } as const;
 
 export const settingsChannels = {
@@ -44,11 +49,30 @@ export const groupChannels = {
   remove: "groups:remove"
 } as const;
 
+export const tagChannels = {
+  list: "tags:list",
+  upsert: "tags:upsert",
+  remove: "tags:remove",
+  getHostTags: "tags:get-host-tags",
+  setHostTags: "tags:set-host-tags",
+} as const;
+
 export const serialProfileChannels = {
   list: "serial-profiles:list",
   upsert: "serial-profiles:upsert",
   remove: "serial-profiles:remove",
   listPorts: "serial-profiles:list-ports"
+} as const;
+
+export const hostProfileChannels = {
+  list: "host-profiles:list",
+  upsert: "host-profiles:upsert",
+  remove: "host-profiles:remove",
+} as const;
+
+export const hostEnvVarChannels = {
+  list: "host-env-vars:list",
+  replace: "host-env-vars:replace",
 } as const;
 
 export const sftpChannels = {
@@ -144,6 +168,21 @@ export const loggingChannels = {
   getState: "logging:get-state",
 } as const;
 
+export const recordingChannels = {
+  start: "recording:start",
+  stop: "recording:stop",
+  getState: "recording:get-state",
+  list: "recording:list",
+  delete: "recording:delete",
+  getFrames: "recording:get-frames",
+  export: "recording:export",
+} as const;
+
+export const connectionHistoryChannels = {
+  listByHost: "connection-history:list-by-host",
+  listRecent: "connection-history:list-recent",
+} as const;
+
 export const hostFingerprintChannels = {
   lookup: "host-fingerprint:lookup",
   trust: "host-fingerprint:trust",
@@ -164,7 +203,10 @@ export const ipcChannels = {
   tray: trayChannels,
   portForward: portForwardChannels,
   groups: groupChannels,
+  tags: tagChannels,
   serialProfiles: serialProfileChannels,
+  hostProfiles: hostProfileChannels,
+  hostEnvVars: hostEnvVarChannels,
   sftp: sftpChannels,
   workspace: workspaceChannels,
   fs: fsChannels,
@@ -176,6 +218,8 @@ export const ipcChannels = {
   editor: editorChannels,
   snippets: snippetChannels,
   logging: loggingChannels,
+  recording: recordingChannels,
+  connectionHistory: connectionHistoryChannels,
   hostFingerprint: hostFingerprintChannels,
   backup: backupChannels,
 } as const;

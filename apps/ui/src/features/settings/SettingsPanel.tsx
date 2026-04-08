@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useStore } from "zustand";
 import {
+  MAX_CREDENTIAL_CACHE_TTL_MINUTES,
   MAX_TERMINAL_LETTER_SPACING,
   MAX_TERMINAL_LINE_HEIGHT,
   MAX_TERMINAL_FONT_SIZE,
+  MIN_CREDENTIAL_CACHE_TTL_MINUTES,
   MIN_TERMINAL_LETTER_SPACING,
   MIN_TERMINAL_LINE_HEIGHT,
   MIN_TERMINAL_FONT_SIZE,
@@ -45,7 +47,7 @@ function formatThemeName(key: string): string {
     .trim();
 }
 
-type SettingsCategory = "general" | "terminal" | "appearance" | "ssh-keys" | "backup";
+type SettingsCategory = "general" | "security" | "terminal" | "appearance" | "ssh-keys" | "backup";
 
 const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }[] = [
   {
@@ -55,6 +57,23 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
         <path d="M8 1.5a1.5 1.5 0 0 1 1.5 1.5v.34a5.5 5.5 0 0 1 1.3.75l.29-.17a1.5 1.5 0 0 1 2.05.55l.01.01a1.5 1.5 0 0 1-.55 2.05l-.3.17a5.5 5.5 0 0 1 0 1.5l.3.17a1.5 1.5 0 0 1 .54 2.06 1.5 1.5 0 0 1-2.05.55l-.3-.17a5.5 5.5 0 0 1-1.29.75V12a1.5 1.5 0 0 1-3 0v-.34a5.5 5.5 0 0 1-1.3-.75l-.29.17a1.5 1.5 0 0 1-2.05-.55l-.01-.01a1.5 1.5 0 0 1 .55-2.05l.3-.17a5.5 5.5 0 0 1 0-1.5l-.3-.17a1.5 1.5 0 0 1-.54-2.06 1.5 1.5 0 0 1 2.05-.55l.3.17a5.5 5.5 0 0 1 1.29-.75V3A1.5 1.5 0 0 1 8 1.5Z" stroke="currentColor" strokeWidth="1.3" />
         <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    ),
+  },
+  {
+    id: "security",
+    label: "Security",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M8 1.5 13 3.5v3.6c0 3.2-2.2 5.9-5 7.4-2.8-1.5-5-4.2-5-7.4V3.5l5-2Z"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M8 6.4v2.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <circle cx="8" cy="11.2" r="0.7" fill="currentColor" />
       </svg>
     ),
   },
@@ -186,6 +205,59 @@ function GeneralSection() {
               onChange={() => void updateGeneral({ confirmOnClose: !confirmOnClose })}
             />
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SecuritySection() {
+  const settings = useStore(settingsStore, (s) => s.settings);
+  const updateSecurity = useStore(settingsStore, (s) => s.updateSecurity);
+  const { credentialCacheEnabled, credentialCacheTtlMinutes } = settings.security;
+
+  return (
+    <div className="grid gap-6">
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Authentication</h3>
+        <div className="grid gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Credential Cache</div>
+              <div className="text-xs text-text-muted">
+                Cache SSH passwords in main-process memory for reconnects (never written to disk)
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={credentialCacheEnabled}
+              onChange={() =>
+                void updateSecurity({ credentialCacheEnabled: !credentialCacheEnabled })
+              }
+            />
+          </div>
+
+          <label className="grid gap-1.5">
+            <span className="text-sm text-text-primary">Cache Timeout (minutes)</span>
+            <span className="text-xs text-text-muted">
+              Cached credentials expire after this inactivity window
+            </span>
+            <input
+              type="number"
+              min={MIN_CREDENTIAL_CACHE_TTL_MINUTES}
+              max={MAX_CREDENTIAL_CACHE_TTL_MINUTES}
+              step={1}
+              disabled={!credentialCacheEnabled}
+              value={credentialCacheTtlMinutes}
+              onChange={(e) => {
+                const parsed = Number.parseInt(e.target.value, 10);
+                if (!Number.isFinite(parsed)) {
+                  return;
+                }
+                void updateSecurity({ credentialCacheTtlMinutes: parsed });
+              }}
+              className={inputClasses}
+            />
+          </label>
         </div>
       </div>
     </div>
@@ -484,6 +556,7 @@ export function SettingsPanel() {
       {/* Content area */}
       <div className="flex-1 overflow-y-auto min-h-0 pr-1">
         {activeCategory === "general" && <GeneralSection />}
+        {activeCategory === "security" && <SecuritySection />}
         {activeCategory === "terminal" && <TerminalSection />}
         {activeCategory === "appearance" && <AppearanceSection />}
         {activeCategory === "ssh-keys" && <SshKeyManager />}

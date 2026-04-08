@@ -24,10 +24,16 @@ export interface GeneralSettings {
   confirmOnClose: boolean;
 }
 
+export interface SecuritySettings {
+  credentialCacheEnabled: boolean;
+  credentialCacheTtlMinutes: number;
+}
+
 export interface AppSettings {
   terminal: TerminalSettings;
   debug: DebugSettings;
   general: GeneralSettings;
+  security: SecuritySettings;
   customThemes: Record<string, TerminalTheme>;
 }
 
@@ -38,6 +44,9 @@ export const MIN_TERMINAL_LINE_HEIGHT = 1.0;
 export const MAX_TERMINAL_LINE_HEIGHT = 2.0;
 export const MIN_TERMINAL_LETTER_SPACING = -2;
 export const MAX_TERMINAL_LETTER_SPACING = 4;
+export const DEFAULT_CREDENTIAL_CACHE_TTL_MINUTES = 15;
+export const MIN_CREDENTIAL_CACHE_TTL_MINUTES = 1;
+export const MAX_CREDENTIAL_CACHE_TTL_MINUTES = 24 * 60;
 
 function clampTerminalFontSize(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -72,6 +81,17 @@ function clampTerminalLetterSpacing(value: unknown): number {
   );
 }
 
+function clampCredentialCacheTtlMinutes(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_CREDENTIAL_CACHE_TTL_MINUTES;
+  }
+  return Math.min(
+    MAX_CREDENTIAL_CACHE_TTL_MINUTES,
+    Math.max(MIN_CREDENTIAL_CACHE_TTL_MINUTES, Math.round(parsed))
+  );
+}
+
 const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
   fontFamily:
     '"Cascadia Mono", "Cascadia Code", Consolas, "IBM Plex Mono", "Liberation Mono", monospace',
@@ -90,12 +110,18 @@ const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   confirmOnClose: true,
 };
 
+const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
+  credentialCacheEnabled: true,
+  credentialCacheTtlMinutes: DEFAULT_CREDENTIAL_CACHE_TTL_MINUTES,
+};
+
 const DEFAULT_APP_SETTINGS: AppSettings = {
   terminal: DEFAULT_TERMINAL_SETTINGS,
   debug: {
     authTracing: false
   },
   general: DEFAULT_GENERAL_SETTINGS,
+  security: DEFAULT_SECURITY_SETTINGS,
   customThemes: {}
 };
 
@@ -108,6 +134,7 @@ interface SettingsState {
   updateTerminal: (partial: Partial<TerminalSettings>) => Promise<void>;
   updateDebug: (partial: Partial<DebugSettings>) => Promise<void>;
   updateGeneral: (partial: Partial<GeneralSettings>) => Promise<void>;
+  updateSecurity: (partial: Partial<SecuritySettings>) => Promise<void>;
   setTerminalFontSize: (fontSize: number) => Promise<void>;
   changeTerminalFontSize: (delta: number) => Promise<number>;
   resetTerminalFontSize: () => Promise<void>;
@@ -138,12 +165,19 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
               ...DEFAULT_GENERAL_SETTINGS,
               ...(parsed.general ?? {})
             },
+            security: {
+              ...DEFAULT_SECURITY_SETTINGS,
+              ...(parsed.security ?? {})
+            },
             customThemes: parsed.customThemes ?? {}
           };
           merged.terminal.fontSize = clampTerminalFontSize(merged.terminal.fontSize);
           merged.terminal.lineHeight = clampTerminalLineHeight(merged.terminal.lineHeight);
           merged.terminal.letterSpacing = clampTerminalLetterSpacing(
             merged.terminal.letterSpacing
+          );
+          merged.security.credentialCacheTtlMinutes = clampCredentialCacheTtlMinutes(
+            merged.security.credentialCacheTtlMinutes
           );
           set({ settings: merged, loaded: true });
           return;
@@ -206,6 +240,28 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
         ...current.general,
         ...partial
       }
+    };
+    set({ settings: next });
+    try {
+      await window.sshterm?.updateSetting({
+        key: SETTINGS_KEY,
+        value: JSON.stringify(next)
+      });
+    } catch {}
+  },
+
+  updateSecurity: async (partial) => {
+    const current = get().settings;
+    const nextSecurity: SecuritySettings = {
+      ...current.security,
+      ...partial
+    };
+    nextSecurity.credentialCacheTtlMinutes = clampCredentialCacheTtlMinutes(
+      nextSecurity.credentialCacheTtlMinutes
+    );
+    const next: AppSettings = {
+      ...current,
+      security: nextSecurity
     };
     set({ settings: next });
     try {
