@@ -131,6 +131,12 @@ import {
   type OpListItemsResponse,
   type OpGetItemFieldsRequest,
   type OpGetItemFieldsResponse,
+  editorOpenRequestSchema,
+  editorOpenFileSchema,
+  editorSessionClosedSchema,
+  type EditorOpenRequest,
+  type EditorOpenFile,
+  type EditorSessionClosed,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -241,6 +247,10 @@ export interface DesktopApi {
   opListVaults(): Promise<OpListVaultsResponse>;
   opListItems(request: OpListItemsRequest): Promise<OpListItemsResponse>;
   opGetItemFields(request: OpGetItemFieldsRequest): Promise<OpGetItemFieldsResponse>;
+  // Editor window
+  editorOpen(request: EditorOpenRequest): Promise<void>;
+  onEditorOpenFile(listener: (event: EditorOpenFile) => void): () => void;
+  onEditorSessionClosed(listener: (event: EditorSessionClosed) => void): () => void;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -838,6 +848,45 @@ export function createDesktopApi(
       const parsed = opGetItemFieldsRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.op.getItemFields, parsed);
       return opGetItemFieldsResponseSchema.parse(result);
+    },
+    // Editor window
+    async editorOpen(request: EditorOpenRequest): Promise<void> {
+      const parsed = editorOpenRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.editor.openEditor, parsed);
+    },
+    onEditorOpenFile(listener: (event: EditorOpenFile) => void): () => void {
+      assertListener(listener, "onEditorOpenFile");
+      const wrappedListener = (_event: unknown, payload: unknown) => {
+        const parsed = editorOpenFileSchema.safeParse(payload);
+        if (!parsed.success) {
+          logger.warn?.("Ignored invalid editor open-file payload from IPC", parsed.error);
+          return;
+        }
+        try {
+          listener(parsed.data);
+        } catch (error) {
+          logger.error?.("Editor open-file listener threw", error);
+        }
+      };
+      ipcRenderer.on(ipcChannels.editor.openFile, wrappedListener);
+      return () => { ipcRenderer.removeListener(ipcChannels.editor.openFile, wrappedListener); };
+    },
+    onEditorSessionClosed(listener: (event: EditorSessionClosed) => void): () => void {
+      assertListener(listener, "onEditorSessionClosed");
+      const wrappedListener = (_event: unknown, payload: unknown) => {
+        const parsed = editorSessionClosedSchema.safeParse(payload);
+        if (!parsed.success) {
+          logger.warn?.("Ignored invalid editor session-closed payload from IPC", parsed.error);
+          return;
+        }
+        try {
+          listener(parsed.data);
+        } catch (error) {
+          logger.error?.("Editor session-closed listener threw", error);
+        }
+      };
+      ipcRenderer.on(ipcChannels.editor.sessionClosed, wrappedListener);
+      return () => { ipcRenderer.removeListener(ipcChannels.editor.sessionClosed, wrappedListener); };
     },
   };
 }

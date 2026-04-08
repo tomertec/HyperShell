@@ -35,6 +35,7 @@ import { registerWorkspaceIpc } from "./workspaceIpc";
 import { registerSshKeysIpc } from "./sshKeysIpc";
 import { registerHostPortForwardIpc } from "./hostPortForwardIpc";
 import { registerOpIpc } from "./opIpc";
+import { registerEditorIpc } from "./editorIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
 import type {
@@ -121,6 +122,7 @@ const registeredChannels = [
   ipcChannels.op.listVaults,
   ipcChannels.op.listItems,
   ipcChannels.op.getItemFields,
+  ipcChannels.editor.openEditor,
 ] as const;
 
 const sessionManager = createSessionManager();
@@ -935,6 +937,7 @@ export function registerIpc(
   registerSshKeysIpc(ipcMain);
   registerHostPortForwardIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
   registerOpIpc(ipcMain);
+  const unregisterEditor = registerEditorIpc(ipcMain);
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created
@@ -947,6 +950,7 @@ export function registerIpc(
     unsubscribeSessionEvents();
     cleanupSftp();
     cleanupFs();
+    unregisterEditor();
     for (const channel of registeredChannels) {
       ipcMain.removeHandler?.(channel);
     }

@@ -69,6 +69,9 @@ import type {
   OpListItemsResponse,
   OpGetItemFieldsRequest,
   OpGetItemFieldsResponse,
+  EditorOpenRequest,
+  EditorOpenFile,
+  EditorSessionClosed,
 } from "@sshterm/shared";
 
 declare global {
@@ -137,6 +140,9 @@ declare global {
       opListVaults?: () => Promise<OpListVaultsResponse>;
       opListItems?: (request: OpListItemsRequest) => Promise<OpListItemsResponse>;
       opGetItemFields?: (request: OpGetItemFieldsRequest) => Promise<OpGetItemFieldsResponse>;
+      editorOpen?: (request: EditorOpenRequest) => Promise<void>;
+      onEditorOpenFile?: (listener: (event: EditorOpenFile) => void) => () => void;
+      onEditorSessionClosed?: (listener: (event: EditorSessionClosed) => void) => () => void;
     };
   }
 }

@@ -6,7 +6,6 @@ import { getSftpStore, disposeSftpStore } from "./sftpStore";
 import { transferStore } from "./transferStore";
 import { getParentPath, joinRemotePath } from "./utils/fileUtils";
 import { SftpDualPane } from "./components/SftpDualPane";
-import { RemoteEditor } from "./components/RemoteEditor";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { TransferPanel } from "./components/TransferPanel";
 import { SyncPanel } from "./components/SyncPanel";
@@ -60,7 +59,6 @@ function extractSftpEntries(response: unknown): SftpEntry[] {
 
 export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   const store = useMemo(() => getSftpStore(sftpSessionId), [sftpSessionId]);
-  const [editingFile, setEditingFile] = useState<string | null>(null);
   const [showSyncPanel, setShowSyncPanel] = useState(false);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const remotePath = useStore(store, (state) => state.remotePath);
@@ -358,7 +356,9 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         store={store}
         onUpload={handleUpload}
         onDownload={handleDownload}
-        onEdit={setEditingFile}
+        onEdit={(remotePath: string) => {
+          void window.sshterm?.editorOpen?.({ sftpSessionId, remotePath });
+        }}
         onRename={handleRename}
         onDelete={handleDelete}
         onMkdir={handleMkdir}
@@ -378,13 +378,6 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
       <TransferPanel />
 
-      {editingFile && (
-        <RemoteEditor
-          sftpSessionId={sftpSessionId}
-          remotePath={editingFile}
-          onClose={() => setEditingFile(null)}
-        />
-      )}
     </div>
   );
 }

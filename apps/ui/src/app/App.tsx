@@ -22,6 +22,7 @@ import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import type { SerialProfileRecord } from "@sshterm/shared";
+import { EditorApp } from "../features/editor/EditorApp";
 
 function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
   return {
@@ -198,7 +199,7 @@ function serializeCurrentLayout() {
   };
 }
 
-export function App() {
+function MainApp() {
   const [hosts, setHosts] = useState<HostRecord[]>([]);
   const [isQuickConnectOpen, setIsQuickConnectOpen] = useState(false);
   const [hostModalOpen, setHostModalOpen] = useState(false);
@@ -586,10 +587,7 @@ export function App() {
             onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
             onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
             onImportSshConfig={() => setImportModalOpen(true)}
-            serialProfiles={serialProfiles}
-            onConnectSerial={connectSerial}
-            onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
-            onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); refreshPorts(); }}
+
             onDuplicateHost={duplicateHost}
             onDeleteHost={(host) => { void deleteHost(host); }}
             onToggleFavoriteHost={toggleFavoriteHost}
@@ -815,4 +813,16 @@ export function App() {
       </Modal>
     </>
   );
+}
+
+export function App() {
+  const params = new URLSearchParams(window.location.search);
+  const windowType = params.get("window");
+  const sftpSessionId = params.get("sftpSessionId");
+
+  if (windowType === "editor" && sftpSessionId) {
+    return <EditorApp sftpSessionId={sftpSessionId} />;
+  }
+
+  return <MainApp />;
 }

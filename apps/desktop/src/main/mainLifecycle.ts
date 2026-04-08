@@ -3,6 +3,7 @@ import type {
   IpcMainLike,
   RegisterIpcOptions
 } from "./ipc/registerIpc";
+import { editorWindowManager } from "./windows/editorWindowManager";
 import type { TrayWindowLike } from "./tray/createTray";
 
 interface ElectronAppLike {
@@ -68,6 +69,7 @@ export function createMainProcessLifecycle(
     hostMonitor = null;
     mainTray?.destroy();
     mainTray = null;
+    editorWindowManager.closeAll();
     mainWindow = null;
     isBootstrapped = false;
   }
@@ -115,6 +117,8 @@ export function createMainProcessLifecycle(
     hostMonitor = deps.createHostMonitor();
 
     const window = createAndLoadMainWindow();
+    editorWindowManager.setParentWindow(window as unknown as import("electron").BrowserWindow);
+    editorWindowManager.setRendererUrl(deps.getRendererUrl());
     mainTray = deps.createTray(window);
     hostMonitor.start();
     isBootstrapped = true;

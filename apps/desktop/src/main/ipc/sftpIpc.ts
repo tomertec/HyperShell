@@ -39,6 +39,7 @@ import { createSyncEngine } from "@sshterm/session-core";
 import type { IpcMainInvokeEvent } from "electron";
 
 import type { IpcMainLike } from "./registerIpc";
+import { editorWindowManager } from "../windows/editorWindowManager";
 import { createSftpSessionManager, type SftpSessionManager } from "../sftp/sftpSessionManager";
 import { createTransferManager, type TransferManager } from "../sftp/transferManager";
 
@@ -148,6 +149,7 @@ export function registerSftpIpc(
     rawRequest: unknown
   ) => {
     const request = sftpDisconnectRequestSchema.parse(rawRequest);
+    editorWindowManager.notifySessionClosed(request.sftpSessionId);
     sftpSessionManager.disconnect(request.sftpSessionId);
   };
 

@@ -175,6 +175,12 @@ export function getParentPath(path: string): string {
   return normalized.slice(0, lastSeparator);
 }
 
+export function decodeBase64Utf8(value: string): string {
+  const binary = atob(value);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
 export function joinRemotePath(base: string, name: string): string {
   const normalizedBase = base.replace(/\\/g, "/").replace(/\/+$/, "");
   if (!normalizedBase) {

@@ -289,3 +289,20 @@ export type SftpSyncStartRequest = z.infer<typeof sftpSyncStartRequestSchema>;
 export type SftpSyncStopRequest = z.infer<typeof sftpSyncStopRequestSchema>;
 export type SftpSyncStatus = z.infer<typeof sftpSyncStatusSchema>;
 export type SftpSyncEvent = z.infer<typeof sftpSyncEventSchema>;
+
+// -- Editor window schemas --
+
+export const editorOpenRequestSchema = z.object({
+  sftpSessionId: z.string(),
+  remotePath: z.string(),
+});
+export type EditorOpenRequest = z.infer<typeof editorOpenRequestSchema>;
+
+// Same shape as editorOpenRequestSchema — reuse to avoid drift
+export const editorOpenFileSchema = editorOpenRequestSchema;
+export type EditorOpenFile = EditorOpenRequest;
+
+export const editorSessionClosedSchema = z.object({
+  sftpSessionId: z.string(),
+});
+export type EditorSessionClosed = z.infer<typeof editorSessionClosedSchema>;

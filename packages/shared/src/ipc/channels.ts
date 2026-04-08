@@ -117,6 +117,12 @@ export const opChannels = {
   getItemFields: "op:get-item-fields",
 } as const;
 
+export const editorChannels = {
+  openEditor: "editor:open",
+  openFile: "editor:open-file",
+  sessionClosed: "editor:session-closed",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -133,4 +139,5 @@ export const ipcChannels = {
   connectionPool: connectionPoolChannels,
   network: networkChannels,
   op: opChannels,
+  editor: editorChannels,
 } as const;
