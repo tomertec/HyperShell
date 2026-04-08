@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useRef, useState } from "react";
 import { useStore } from "zustand";
 
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { WelcomeScreen } from "../welcome";
 import { BroadcastBar, BroadcastButton } from "../broadcast/BroadcastBar";
 import { SftpTab } from "../sftp";
@@ -257,13 +258,15 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
                 }}
                 className="h-full min-h-0 min-w-0 relative"
               >
-                <PaneView
-                  pane={pane}
-                  isActive={pane.paneId === activePaneId}
-                  activeSessionId={activeSessionId}
-                  onActivate={() => activatePane(pane.paneId)}
-                  onCloseTab={closeTab}
-                />
+                <ErrorBoundary>
+                  <PaneView
+                    pane={pane}
+                    isActive={pane.paneId === activePaneId}
+                    activeSessionId={activeSessionId}
+                    onActivate={() => activatePane(pane.paneId)}
+                    onCloseTab={closeTab}
+                  />
+                </ErrorBoundary>
               </div>
             </Fragment>
           ))}

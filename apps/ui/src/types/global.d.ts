@@ -13,17 +13,20 @@ import type {
   FsGetDrivesResponse,
   FsListRequest,
   FsListResponse,
+  GetSettingRequest,
   HostRecord,
   HostStatsRequest,
   HostStatsResponse,
   OpenSessionRequest,
   OpenSessionResponse,
+  ReorderHostsRequest,
   RemoveHostRequest,
   ResizeSessionRequest,
   SerialPortInfo,
   SerialProfileRecord,
   RemoveSerialProfileRequest,
   SessionEvent,
+  SettingRecord,
   SetSignalsRequest,
   SftpBookmark,
   SftpBookmarkListRequest,
@@ -50,6 +53,7 @@ import type {
   SftpTransferStartRequest,
   SftpWriteFileRequest,
   TransferJob,
+  UpdateSettingRequest,
   UpsertHostRequest,
   UpsertSerialProfileRequest,
   WriteSessionRequest,
@@ -95,6 +99,9 @@ declare global {
       listHosts?: () => Promise<HostRecord[]>;
       upsertHost?: (request: UpsertHostRequest) => Promise<HostRecord>;
       removeHost?: (request: RemoveHostRequest) => Promise<void>;
+      reorderHosts?: (request: ReorderHostsRequest) => Promise<void>;
+      getSetting?: (request: GetSettingRequest) => Promise<SettingRecord | null>;
+      updateSetting?: (request: UpdateSettingRequest) => Promise<SettingRecord>;
       listSerialProfiles?: () => Promise<SerialProfileRecord[]>;
       upsertSerialProfile?: (request: UpsertSerialProfileRequest) => Promise<SerialProfileRecord>;
       removeSerialProfile?: (request: RemoveSerialProfileRequest) => Promise<void>;

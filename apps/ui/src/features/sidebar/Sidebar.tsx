@@ -92,14 +92,14 @@ export function Sidebar({
               <path
                 d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <path
                 d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -218,7 +218,7 @@ export function Sidebar({
         </div>
       )}
 
-      <div className={`${restoreCount ? "" : "mt-auto "}border-t border-border px-3 py-2 flex items-center justify-between`}>
+      <div className={`${restoreCount ? "" : "mt-auto "}border-t border-border px-3 pt-3 pb-2 flex items-end justify-between`}>
         <button
           onClick={onOpenSettings}
           className="flex items-center gap-2 px-1 py-0.5 rounded text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"
@@ -228,19 +228,19 @@ export function Sidebar({
             <path
               d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             <path
               d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
-          <span className="text-xs tracking-wide">Settings</span>
+          <span className="text-xs font-bold tracking-wide">Settings</span>
         </button>
         <div className="text-[10px] text-text-muted/60 tracking-wide select-none">HyperShell v0.1.0</div>
       </div>

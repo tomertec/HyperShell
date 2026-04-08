@@ -53,7 +53,10 @@ export function createSyncEngine(): SyncEngine {
   }
 
   function shouldExclude(filePath: string, patterns: string[]): boolean {
-    return patterns.some((pattern) => filePath.includes(pattern));
+    const segments = filePath.replace(/\\/g, "/").split("/");
+    return patterns.some((pattern) =>
+      segments.some((seg) => seg === pattern || seg.startsWith(pattern + "."))
+    );
   }
 
   async function ensureRemoteDirExists(

@@ -295,7 +295,7 @@ async function openSessionHandler(
               });
             }
           } catch (err) {
-            console.error("[auth] failed to resolve saved host password:", err);
+            console.error("[auth] failed to resolve saved host password:", err instanceof Error ? err.message : "unknown error");
           }
         }
 
@@ -311,7 +311,7 @@ async function openSessionHandler(
               });
             }
           } catch (err) {
-            console.error("[1password] failed to resolve reference:", err);
+            console.error("[1password] failed to resolve reference:", err instanceof Error ? err.message : "unknown error");
           }
         }
       }
@@ -677,7 +677,7 @@ async function resolveSftpConnectionOptions(
         });
       }
     } catch (err) {
-      console.error("[auth] failed to resolve saved host password for SFTP:", err);
+      console.error("[auth] failed to resolve saved host password for SFTP:", err instanceof Error ? err.message : "unknown error");
     }
   }
   if (!requestedPassword && resolvedHost?.authMethod === "op-reference" && resolvedHost.opReference) {
@@ -691,7 +691,7 @@ async function resolveSftpConnectionOptions(
         });
       }
     } catch (err) {
-      console.error("[1password] failed to resolve reference for SFTP:", err);
+      console.error("[1password] failed to resolve reference for SFTP:", err instanceof Error ? err.message : "unknown error");
     }
   }
 
@@ -936,12 +936,25 @@ export function registerIpc(
   registerHostIpc(ipcMain);
   ipcMain.handle(ipcChannels.hosts.exportHosts, async (_event: unknown, request: unknown) => {
     const parsed = exportHostsRequestSchema.parse(request);
+    // Validate export path is absolute and within a safe directory
+    const resolved = path.resolve(parsed.filePath);
+    if (!path.isAbsolute(parsed.filePath)) {
+      throw new Error("Absolute path is required for host export");
+    }
+    if (process.platform === "win32" && resolved.toLowerCase().startsWith("\\\\.")) {
+      throw new Error("Blocked device path");
+    }
+    const { tmpdir } = await import("node:os");
+    const allowedRoots = [homedir(), tmpdir()].map((r) => path.resolve(r).toLowerCase());
+    if (!allowedRoots.some((root) => resolved.toLowerCase().startsWith(root))) {
+      throw new Error("Export path must be within the user home or temp directory");
+    }
     const repo = getOrCreateHostsRepo();
     const hosts = repo.list();
     const content = parsed.format === "json"
       ? exportHostsToJson(hosts)
       : exportHostsToCsv(hosts);
-    writeFileSync(parsed.filePath, content, "utf-8");
+    writeFileSync(resolved, content, "utf-8");
     return { exported: hosts.length };
   });
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());

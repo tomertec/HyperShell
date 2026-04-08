@@ -48,9 +48,15 @@ export function createWorkspaceRepositoryFromDatabase(db: SqliteDatabase): Works
         | { name: string; layout_json: string; updated_at: string }
         | undefined;
       if (!row) return undefined;
+      let layout: WorkspaceLayout;
+      try {
+        layout = JSON.parse(row.layout_json);
+      } catch {
+        return undefined;
+      }
       return {
         name: row.name,
-        layout: JSON.parse(row.layout_json),
+        layout,
         updatedAt: row.updated_at,
       };
     },
@@ -61,11 +67,18 @@ export function createWorkspaceRepositoryFromDatabase(db: SqliteDatabase): Works
         layout_json: string;
         updated_at: string;
       }>;
-      return rows.map((row) => ({
-        name: row.name,
-        layout: JSON.parse(row.layout_json),
-        updatedAt: row.updated_at,
-      }));
+      return rows.reduce<WorkspaceRecord[]>((acc, row) => {
+        try {
+          acc.push({
+            name: row.name,
+            layout: JSON.parse(row.layout_json),
+            updatedAt: row.updated_at,
+          });
+        } catch {
+          // Skip rows with corrupt JSON
+        }
+        return acc;
+      }, []);
     },
 
     remove(name) {

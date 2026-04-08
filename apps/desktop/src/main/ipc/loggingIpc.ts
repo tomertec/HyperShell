@@ -1,6 +1,28 @@
 import { createWriteStream, mkdirSync } from "node:fs";
 import type { WriteStream } from "node:fs";
 import path from "node:path";
+import os from "node:os";
+
+function assertSafeLogPath(filePath: string): string {
+  if (!path.isAbsolute(filePath)) {
+    throw new Error("Absolute path is required for logging");
+  }
+  const resolved = path.resolve(filePath);
+  if (process.platform === "win32") {
+    if (resolved.toLowerCase().startsWith("\\\\.")) {
+      throw new Error("Blocked device path");
+    }
+  }
+  // Allow paths within user home or OS temp directory
+  const lower = resolved.toLowerCase();
+  const allowedRoots = [os.homedir(), os.tmpdir()].map((r) =>
+    path.resolve(r).toLowerCase()
+  );
+  if (!allowedRoots.some((root) => lower.startsWith(root))) {
+    throw new Error("Log path must be within the user home or temp directory");
+  }
+  return resolved;
+}
 import {
   ipcChannels,
   startLoggingRequestSchema,
@@ -22,12 +44,13 @@ export function createSessionLogger() {
 
   return {
     start(sessionId: string, filePath: string) {
+      const safePath = assertSafeLogPath(filePath);
       const existing = sessions.get(sessionId);
       if (existing) {
         existing.stream.end();
       }
-      mkdirSync(path.dirname(filePath), { recursive: true });
-      const stream = createWriteStream(filePath, { flags: "a", encoding: "utf-8" });
+      mkdirSync(path.dirname(safePath), { recursive: true });
+      const stream = createWriteStream(safePath, { flags: "a", encoding: "utf-8" });
       sessions.set(sessionId, { stream, filePath, bytesWritten: 0 });
     },
 

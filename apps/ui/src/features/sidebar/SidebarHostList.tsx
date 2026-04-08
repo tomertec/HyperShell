@@ -114,7 +114,7 @@ function SortableHostItem({
         />
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 truncate text-[13px] font-medium leading-tight text-text-primary">
+          <div className="flex items-center gap-1 truncate font-mono text-[12.5px] font-semibold leading-tight tracking-tight text-text-primary">
             {host.isFavorite && (
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="text-warning shrink-0">
                 <path d="M8 1.5L9.8 5.7L14.4 6.2L11 9.3L11.9 14L8 11.6L4.1 14L5 9.3L1.6 6.2L6.2 5.7L8 1.5Z" />

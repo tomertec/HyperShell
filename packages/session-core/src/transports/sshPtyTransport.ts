@@ -76,6 +76,9 @@ export function buildSshArgs(profile: SshConnectionProfile): string[] {
   }
 
   if (profile.proxyJump) {
+    if (!/^[\w.@:,[\]\-]+$/.test(profile.proxyJump)) {
+      throw new Error("Invalid proxyJump format");
+    }
     args.push("-J", profile.proxyJump);
   }
 
@@ -246,6 +249,8 @@ export function createSshPtyTransport(
           } catch {
             // Ignore write failures and let normal SSH auth continue.
           }
+          // Clear password from memory after transmission
+          profile.password = undefined;
         }
       }
 

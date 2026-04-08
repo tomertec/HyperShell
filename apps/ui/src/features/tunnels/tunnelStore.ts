@@ -32,7 +32,7 @@ export const useTunnelStore = create<TunnelState>((set) => ({
       const result = await window.sshterm?.listPortForwards?.();
       if (result) {
         set({
-          activeForwards: result.map((f: any) => ({
+          activeForwards: result.map((f: { id: string; hostname?: string; protocol?: string; localPort?: number; remoteHost?: string; remotePort?: number }) => ({
             id: f.id,
             status: "active" as const,
             ...f,

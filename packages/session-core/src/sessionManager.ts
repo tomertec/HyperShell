@@ -367,7 +367,13 @@ export function createSessionManager(
     },
 
     getSessionInput(sessionId: string): OpenSessionInput | undefined {
-      return sessions.get(sessionId)?.input;
+      const session = sessions.get(sessionId);
+      if (!session) return undefined;
+      // Return a copy with credentials stripped
+      const { sshOptions, ...rest } = session.input;
+      if (!sshOptions) return rest;
+      const { password: _pw, ...safeSshOptions } = sshOptions;
+      return { ...rest, sshOptions: safeSshOptions };
     }
   };
 }

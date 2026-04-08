@@ -17,8 +17,8 @@ export const openSessionRequestSchema = z.object({
   cols: z.number().int().positive(),
   rows: z.number().int().positive(),
   autoReconnect: z.boolean().optional(),
-  reconnectMaxAttempts: z.number().int().min(1).optional(),
-  reconnectBaseInterval: z.number().int().min(1).optional(),
+  reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
+  reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
 });
 
 export const openSessionResponseSchema = z.object({
@@ -93,8 +93,8 @@ export const hostRecordSchema = z.object({
   proxyJumpHostIds: z.string().nullable().optional(),
   keepAliveInterval: z.number().int().nullable().optional(),
   autoReconnect: z.boolean().optional(),
-  reconnectMaxAttempts: z.number().int().optional(),
-  reconnectBaseInterval: z.number().int().optional(),
+  reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
+  reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
   passwordSavedAt: z.string().nullable().optional(),
 });
 
