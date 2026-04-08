@@ -287,19 +287,32 @@ export function SidebarHostList({
       ),
     },
     { label: "", action: () => {}, separator: true },
-    ...HOST_COLORS.map((color) => ({
-      label: color.charAt(0).toUpperCase() + color.slice(1),
-      action: () => onSetColor(host, color),
-      icon: <span className={`color-swatch color-swatch-${color}`} />,
-    })),
     {
-      label: "Clear Color",
-      action: () => onSetColor(host, null),
-      icon: (
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M5 5L11 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
+      label: "color-picker",
+      action: () => {},
+      customContent: (
+        <div className="flex items-center gap-1.5 px-3 py-1.5">
+          {HOST_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              onClick={() => { onSetColor(host, color); setContextMenu(null); }}
+              className={`color-swatch color-swatch-${color} h-4 w-4 rounded-full transition-transform hover:scale-125 ${host.color === color ? "ring-2 ring-white/70 ring-offset-1 ring-offset-base-800" : ""}`}
+              title={color.charAt(0).toUpperCase() + color.slice(1)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => { onSetColor(host, null); setContextMenu(null); }}
+            className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-text-muted hover:text-text-primary transition-colors"
+            title="Clear Color"
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M5 5L11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       ),
     },
     { label: "", action: () => {}, separator: true },

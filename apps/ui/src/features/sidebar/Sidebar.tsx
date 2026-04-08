@@ -1,8 +1,6 @@
-import type { SerialProfileRecord } from "@sshterm/shared";
 import type { HostRecord } from "../hosts/HostsView";
 import { SidebarHostList } from "./SidebarHostList";
 import { SidebarSection } from "./SidebarSection";
-import { SidebarSerialList } from "./SidebarSerialList";
 
 export interface SidebarProps {
   hosts: HostRecord[];
@@ -13,10 +11,7 @@ export interface SidebarProps {
   onEditHost: (host: HostRecord) => void;
   onNewHost: () => void;
   onImportSshConfig: () => void;
-  serialProfiles: SerialProfileRecord[];
-  onConnectSerial: (profile: SerialProfileRecord) => void;
-  onEditSerial: (profile: SerialProfileRecord) => void;
-  onNewSerial: () => void;
+
   onDuplicateHost: (host: HostRecord) => void;
   onDeleteHost: (host: HostRecord) => void;
   onToggleFavoriteHost: (host: HostRecord) => void;
@@ -38,10 +33,7 @@ export function Sidebar({
   onEditHost,
   onNewHost,
   onImportSshConfig,
-  serialProfiles,
-  onConnectSerial,
-  onEditSerial,
-  onNewSerial,
+
   onDuplicateHost,
   onDeleteHost,
   onToggleFavoriteHost,
@@ -162,26 +154,6 @@ export function Sidebar({
         />
       </SidebarSection>
 
-      <SidebarSection
-        title="Serial"
-        actions={
-          <button
-            onClick={onNewSerial}
-            className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-            title="New serial profile"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        }
-      >
-        <SidebarSerialList
-          profiles={serialProfiles}
-          onConnect={onConnectSerial}
-          onEdit={onEditSerial}
-        />
-      </SidebarSection>
 
       {restoreCount != null && restoreCount > 0 && onRestore && onDismissRestore && (
         <div className="mt-auto border-t border-border px-3 py-2.5 flex flex-col gap-2">

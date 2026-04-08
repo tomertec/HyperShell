@@ -8,6 +8,8 @@ export interface ContextMenuAction {
   icon?: React.ReactNode;
   shortcut?: string;
   danger?: boolean;
+  /** Render custom content instead of the default button layout */
+  customContent?: React.ReactNode;
 }
 
 export interface ContextMenuProps {
@@ -64,6 +66,10 @@ export function ContextMenu({ x, y, actions, onClose }: ContextMenuProps) {
       {actions.map((item, index) =>
         item.separator ? (
           <div key={`separator-${index}`} className="my-1 border-t border-border/70" />
+        ) : item.customContent ? (
+          <div key={`${item.label}-${index}`} role="menuitem">
+            {item.customContent}
+          </div>
         ) : (
           <button
             key={`${item.label}-${index}`}
