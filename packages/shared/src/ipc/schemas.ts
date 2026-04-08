@@ -585,3 +585,41 @@ export type HostFingerprintRecord = z.infer<typeof hostFingerprintRecordSchema>;
 export type HostFingerprintLookupRequest = z.infer<typeof hostFingerprintLookupRequestSchema>;
 export type HostFingerprintTrustRequest = z.infer<typeof hostFingerprintTrustRequestSchema>;
 export type HostFingerprintRemoveRequest = z.infer<typeof hostFingerprintRemoveRequestSchema>;
+
+// --- Backup schemas ---
+
+export const createBackupRequestSchema = z.object({
+  filePath: z.string().min(1),
+});
+
+export const createBackupResponseSchema = z.object({
+  filePath: z.string(),
+  size: z.number().int(),
+  createdAt: z.string(),
+});
+
+export const restoreBackupRequestSchema = z.object({
+  filePath: z.string().min(1),
+});
+
+export const restoreBackupResponseSchema = z.object({
+  requiresRestart: z.boolean(),
+});
+
+export const backupInfoSchema = z.object({
+  filePath: z.string(),
+  fileName: z.string(),
+  size: z.number().int(),
+  createdAt: z.string(),
+});
+
+export const listBackupsResponseSchema = z.object({
+  backups: z.array(backupInfoSchema),
+});
+
+export type CreateBackupRequest = z.infer<typeof createBackupRequestSchema>;
+export type CreateBackupResponse = z.infer<typeof createBackupResponseSchema>;
+export type RestoreBackupRequest = z.infer<typeof restoreBackupRequestSchema>;
+export type RestoreBackupResponse = z.infer<typeof restoreBackupResponseSchema>;
+export type BackupInfo = z.infer<typeof backupInfoSchema>;
+export type ListBackupsResponse = z.infer<typeof listBackupsResponseSchema>;

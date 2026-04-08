@@ -94,6 +94,11 @@ import type {
   KeyboardInteractiveRequest,
   KeyboardInteractiveResponse,
   ScanPuttyResponse,
+  CreateBackupRequest,
+  CreateBackupResponse,
+  RestoreBackupRequest,
+  RestoreBackupResponse,
+  ListBackupsResponse,
 } from "@sshterm/shared";
 
 declare global {
@@ -184,6 +189,10 @@ declare global {
       hostFingerprintRemove?: (request: HostFingerprintRemoveRequest) => Promise<void>;
       onKeyboardInteractive?: (listener: (request: KeyboardInteractiveRequest) => void) => () => void;
       keyboardInteractiveRespond?: (response: KeyboardInteractiveResponse) => Promise<void>;
+      backupCreate?: (request: CreateBackupRequest) => Promise<CreateBackupResponse>;
+      backupRestore?: (request: RestoreBackupRequest) => Promise<RestoreBackupResponse>;
+      backupList?: () => Promise<ListBackupsResponse>;
+      backupShowOpenDialog?: () => Promise<string | null>;
     };
   }
 }

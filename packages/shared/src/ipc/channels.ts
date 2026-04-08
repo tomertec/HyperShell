@@ -148,6 +148,13 @@ export const hostFingerprintChannels = {
   remove: "host-fingerprint:remove",
 } as const;
 
+export const backupChannels = {
+  create: "backup:create",
+  restore: "backup:restore",
+  list: "backup:list",
+  showOpenDialog: "backup:show-open-dialog",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -168,4 +175,5 @@ export const ipcChannels = {
   snippets: snippetChannels,
   logging: loggingChannels,
   hostFingerprint: hostFingerprintChannels,
+  backup: backupChannels,
 } as const;

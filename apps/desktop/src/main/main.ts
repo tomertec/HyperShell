@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 
 import { createHostMonitor } from "./monitoring/hostMonitor";
 import { registerIpc } from "./ipc/registerIpc";
+import { performAutoBackup } from "./ipc/backupIpc";
 import { createAppMenu } from "./menu/createAppMenu";
 import { createTray } from "./tray/createTray";
 import { createMainWindow } from "./windows/createMainWindow";
@@ -41,6 +42,7 @@ const mainProcessLifecycle = createMainProcessLifecycle({
 
 async function bootstrap(): Promise<void> {
   createAppMenu();
+  performAutoBackup();
   await mainProcessLifecycle.bootstrap();
 }
 

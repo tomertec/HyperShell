@@ -12,6 +12,7 @@ import {
 import { terminalThemes } from "../terminal/terminalTheme";
 import { ThemeEditor } from "./ThemeEditor";
 import { SshKeyManager } from "../ssh-keys/SshKeyManager";
+import { BackupRestorePanel } from "./BackupRestorePanel";
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright";
@@ -44,7 +45,7 @@ function formatThemeName(key: string): string {
     .trim();
 }
 
-type SettingsCategory = "general" | "terminal" | "appearance" | "ssh-keys";
+type SettingsCategory = "general" | "terminal" | "appearance" | "ssh-keys" | "backup";
 
 const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }[] = [
   {
@@ -85,6 +86,21 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
         <path
           d="M10 1a3 3 0 0 0-2.83 4L2 10.17V14h3.83L7 12.83V12h1v-1h1V9.83l.17-.17A3 3 0 0 0 10 1Zm1 3a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    id: "backup",
+    label: "Backup",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M4 13V3a1 1 0 011-1h6a1 1 0 011 1v10l-4-2.5L4 13Z"
           stroke="currentColor"
           strokeWidth="1.3"
           strokeLinecap="round"
@@ -460,6 +476,7 @@ export function SettingsPanel() {
         {activeCategory === "terminal" && <TerminalSection />}
         {activeCategory === "appearance" && <AppearanceSection />}
         {activeCategory === "ssh-keys" && <SshKeyManager />}
+        {activeCategory === "backup" && <BackupRestorePanel />}
       </div>
     </div>
   );

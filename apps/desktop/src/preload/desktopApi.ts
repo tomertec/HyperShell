@@ -1,5 +1,10 @@
 import {
   connectionPoolStatsSchema,
+  createBackupRequestSchema,
+  createBackupResponseSchema,
+  restoreBackupRequestSchema,
+  restoreBackupResponseSchema,
+  listBackupsResponseSchema,
   fsEntrySchema,
   fsGetDrivesResponseSchema,
   fsListRequestSchema,
@@ -192,6 +197,11 @@ import {
   type RemoveHostPortForwardRequest,
   type ReorderHostPortForwardsRequest,
   type ConnectionPoolStats,
+  type CreateBackupRequest,
+  type CreateBackupResponse,
+  type RestoreBackupRequest,
+  type RestoreBackupResponse,
+  type ListBackupsResponse,
 } from "@sshterm/shared";
 import { z } from "zod";
 
@@ -308,6 +318,11 @@ export interface DesktopApi {
   // Keyboard-interactive auth (2FA)
   onKeyboardInteractive(listener: (request: KeyboardInteractiveRequest) => void): () => void;
   keyboardInteractiveRespond(response: KeyboardInteractiveResponse): Promise<void>;
+  // Database backup & restore
+  backupCreate(request: CreateBackupRequest): Promise<CreateBackupResponse>;
+  backupRestore(request: RestoreBackupRequest): Promise<RestoreBackupResponse>;
+  backupList(): Promise<ListBackupsResponse>;
+  backupShowOpenDialog(): Promise<string | null>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -1029,6 +1044,26 @@ export function createDesktopApi(
     async keyboardInteractiveRespond(response: KeyboardInteractiveResponse): Promise<void> {
       const parsed = keyboardInteractiveResponseSchema.parse(response);
       await ipcRenderer.invoke(ipcChannels.sftp.keyboardInteractiveResponse, parsed);
+    },
+    // Database backup & restore
+    async backupCreate(request: CreateBackupRequest): Promise<CreateBackupResponse> {
+      const parsed = createBackupRequestSchema.parse(request);
+      const raw = await ipcRenderer.invoke(ipcChannels.backup.create, parsed);
+      return createBackupResponseSchema.parse(raw);
+    },
+    async backupRestore(request: RestoreBackupRequest): Promise<RestoreBackupResponse> {
+      const parsed = restoreBackupRequestSchema.parse(request);
+      const raw = await ipcRenderer.invoke(ipcChannels.backup.restore, parsed);
+      return restoreBackupResponseSchema.parse(raw);
+    },
+    async backupList(): Promise<ListBackupsResponse> {
+      const raw = await ipcRenderer.invoke(ipcChannels.backup.list);
+      return listBackupsResponseSchema.parse(raw);
+    },
+    async backupShowOpenDialog(): Promise<string | null> {
+      const raw = await ipcRenderer.invoke(ipcChannels.backup.showOpenDialog);
+      if (raw === null || raw === undefined) return null;
+      return z.string().parse(raw);
     },
   };
 }
