@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useTerminalSession } from "./useTerminalSession";
 import { TerminalReconnectOverlay } from "./TerminalReconnectOverlay";
+import { TerminalSearchBar } from "./TerminalSearchBar";
 
 export interface TerminalPaneProps {
   transport: "ssh" | "serial";
@@ -74,6 +75,13 @@ export function TerminalPane({
           ref={session.containerRef}
           className="absolute inset-0"
         />
+        {session.searchVisible && (
+          <TerminalSearchBar
+            searchAddon={session.searchAddon}
+            onClose={() => session.setSearchVisible(false)}
+            onFocusTerminal={session.focusTerminal}
+          />
+        )}
         <TerminalReconnectOverlay
           state={session.state}
           onRetry={() => session.connect()}

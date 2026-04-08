@@ -593,6 +593,10 @@ function MainApp() {
             onToggleFavoriteHost={toggleFavoriteHost}
             onSetHostColor={setHostColor}
             onReorderHosts={reorderHosts}
+            serialProfiles={serialProfiles}
+            onConnectSerial={connectSerial}
+            onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
+            onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); }}
             onOpenSettings={() => setSettingsOpen(true)}
             restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}
             onRestore={restoreLastWorkspace}

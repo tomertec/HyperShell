@@ -83,6 +83,7 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarPro
             )}
             <button
               onClick={() => onActivate(tab.sessionId)}
+              onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(tab.sessionId); } }}
               onMouseEnter={() => handleMouseEnter(tab.sessionId)}
               onMouseLeave={handleMouseLeave}
               className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-all duration-150 max-w-[200px] ${

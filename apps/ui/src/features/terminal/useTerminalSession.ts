@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { useStore } from "zustand";
 import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
+import type { SearchAddon } from "@xterm/addon-search";
 import type { SessionEvent } from "@sshterm/shared";
 
 import { broadcastStore } from "../broadcast/broadcastStore";
@@ -29,6 +30,9 @@ export interface UseTerminalSessionInput {
 export interface UseTerminalSessionResult {
   containerRef: RefObject<HTMLDivElement | null>;
   terminal: Terminal | null;
+  searchAddon: SearchAddon | null;
+  searchVisible: boolean;
+  setSearchVisible: (visible: boolean) => void;
   sessionId: string | null;
   state: TerminalSessionState;
   fontSize: number;
@@ -40,6 +44,7 @@ export interface UseTerminalSessionResult {
   disconnect: () => Promise<void>;
   write: (data: string) => void;
   fit: () => void;
+  focusTerminal: () => void;
 }
 
 function toErrorMessage(error: unknown): string {
@@ -64,6 +69,9 @@ export function useTerminalSession(
   const containerRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
+  const [searchVisible, setSearchVisible] = useState(false);
   const terminalSettings = useStore(settingsStore, (s) => s.settings.terminal);
   const customThemes = useStore(settingsStore, (s) => s.settings.customThemes);
   const broadcastEnabled = useStore(broadcastStore, (store) => store.enabled);
@@ -285,9 +293,10 @@ export function useTerminalSession(
     let removeFocusListeners: (() => void) | null = null;
 
     void (async () => {
-      const [{ Terminal: XTerm }, { FitAddon: FitAddonClass }] = await Promise.all([
+      const [{ Terminal: XTerm }, { FitAddon: FitAddonClass }, { SearchAddon: SearchAddonClass }] = await Promise.all([
         import("@xterm/xterm"),
-        import("@xterm/addon-fit")
+        import("@xterm/addon-fit"),
+        import("@xterm/addon-search")
       ]);
       if (disposed) {
         return;
@@ -296,10 +305,14 @@ export function useTerminalSession(
       const opts = getTerminalOptions({ ...terminalSettings, customThemes });
       instance = new XTerm(opts);
       const addon = new FitAddonClass();
+      const search = new SearchAddonClass();
       instance.loadAddon(addon);
+      instance.loadAddon(search);
       fitAddonRef.current = addon;
+      searchAddonRef.current = search;
       terminalRef.current = instance;
       setTerminal(instance);
+      setSearchAddon(search);
 
       container = containerRef.current;
       if (container) {
@@ -324,6 +337,14 @@ export function useTerminalSession(
       instance.attachCustomKeyEventHandler((event) => {
         if (event.type !== "keydown") {
           return true;
+        }
+
+        // Ctrl+Shift+F (or Cmd+Shift+F on Mac) — toggle terminal search
+        const searchMod = isMacLike ? event.metaKey : event.ctrlKey;
+        if (searchMod && event.shiftKey && event.key.toLowerCase() === "f") {
+          event.preventDefault();
+          setSearchVisible((v) => !v);
+          return false;
         }
 
         const fontSizeAction = getTerminalFontSizeAction({
@@ -397,7 +418,9 @@ export function useTerminalSession(
       instance?.dispose();
       terminalRef.current = null;
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
       setTerminal(null);
+      setSearchAddon(null);
     };
   }, [
     applyTerminalBackground,
@@ -625,9 +648,16 @@ export function useTerminalSession(
     };
   }, [fit]);
 
+  const focusTerminal = useCallback((): void => {
+    terminalRef.current?.focus();
+  }, []);
+
   return {
     containerRef,
     terminal,
+    searchAddon,
+    searchVisible,
+    setSearchVisible,
     sessionId: sessionIdRef.current,
     state,
     fontSize: terminalSettings.fontSize,
@@ -638,6 +668,7 @@ export function useTerminalSession(
     connect,
     disconnect,
     write,
-    fit
+    fit,
+    focusTerminal
   };
 }

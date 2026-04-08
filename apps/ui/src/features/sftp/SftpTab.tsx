@@ -9,6 +9,8 @@ import { SftpDualPane } from "./components/SftpDualPane";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { TransferPanel } from "./components/TransferPanel";
 import { SyncPanel } from "./components/SyncPanel";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { PromptDialog } from "../../components/PromptDialog";
 
 export interface SftpTabProps {
   sftpSessionId: string;
@@ -75,6 +77,29 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   const filterMatchCount = filterText
     ? activeEntries.filter((e) => e.name.toLowerCase().includes(filterText.toLowerCase())).length
     : filterTotalCount;
+
+  // Dialog state for rename
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; path: string; oldName: string }>({
+    open: false,
+    path: "",
+    oldName: "",
+  });
+
+  // Dialog state for delete confirmation
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; paths: string[] }>({
+    open: false,
+    paths: [],
+  });
+
+  // Dialog state for mkdir
+  const [mkdirDialog, setMkdirDialog] = useState(false);
+
+  // Dialog state for bookmark
+  const [bookmarkDialog, setBookmarkDialog] = useState<{ open: boolean; path: string; defaultName: string }>({
+    open: false,
+    path: "",
+    defaultName: "",
+  });
 
   const refreshTransfers = useCallback(async () => {
     try {
@@ -230,12 +255,19 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   );
 
   const handleRename = useCallback(
-    async (path: string) => {
+    (path: string) => {
       const oldName = path.split("/").pop() ?? "";
-      const newName = window.prompt("Rename to:", oldName);
-      if (!newName || newName === oldName) {
-        return;
-      }
+      setRenameDialog({ open: true, path, oldName });
+    },
+    []
+  );
+
+  const handleRenameConfirm = useCallback(
+    async (newName: string) => {
+      const { path, oldName } = renameDialog;
+      setRenameDialog({ open: false, path: "", oldName: "" });
+
+      if (newName === oldName) return;
 
       const parentPath = getParentPath(path);
       const newPath = joinRemotePath(parentPath, newName);
@@ -248,56 +280,62 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
       await refreshRemoteDirectory();
     },
-    [refreshRemoteDirectory, sftpSessionId]
+    [renameDialog, refreshRemoteDirectory, sftpSessionId]
   );
 
   const handleDelete = useCallback(
-    async (paths: string[]) => {
-      if (paths.length === 0) {
-        return;
-      }
+    (paths: string[]) => {
+      if (paths.length === 0) return;
+      setDeleteDialog({ open: true, paths });
+    },
+    []
+  );
 
-      if (!window.confirm(`Delete ${paths.length} item(s)?`)) {
-        return;
-      }
+  const handleDeleteConfirm = useCallback(async () => {
+    const { paths } = deleteDialog;
+    setDeleteDialog({ open: false, paths: [] });
 
-      await Promise.all(
-        paths.map((path) =>
-          window.sshterm?.sftpDelete?.({ sftpSessionId, path, recursive: true })
-        )
-      );
+    await Promise.all(
+      paths.map((path) =>
+        window.sshterm?.sftpDelete?.({ sftpSessionId, path, recursive: true })
+      )
+    );
+
+    await refreshRemoteDirectory();
+  }, [deleteDialog, refreshRemoteDirectory, sftpSessionId]);
+
+  const handleMkdir = useCallback(() => {
+    setMkdirDialog(true);
+  }, []);
+
+  const handleMkdirConfirm = useCallback(
+    async (name: string) => {
+      setMkdirDialog(false);
+
+      const nextPath = joinRemotePath(remotePath, name);
+      await window.sshterm?.sftpMkdir?.({
+        sftpSessionId,
+        path: nextPath
+      });
 
       await refreshRemoteDirectory();
     },
-    [refreshRemoteDirectory, sftpSessionId]
+    [refreshRemoteDirectory, remotePath, sftpSessionId]
   );
 
-  const handleMkdir = useCallback(async () => {
-    const name = window.prompt("New folder name:");
-    if (!name) {
-      return;
-    }
-
-    const nextPath = joinRemotePath(remotePath, name);
-    await window.sshterm?.sftpMkdir?.({
-      sftpSessionId,
-      path: nextPath
-    });
-
-    await refreshRemoteDirectory();
-  }, [refreshRemoteDirectory, remotePath, sftpSessionId]);
-
   const handleBookmark = useCallback(
-    async (path: string) => {
-      if (!hostId) {
-        return;
-      }
-
+    (path: string) => {
+      if (!hostId) return;
       const defaultName = path.split("/").pop() || path;
-      const name = window.prompt("Bookmark name:", defaultName);
-      if (!name) {
-        return;
-      }
+      setBookmarkDialog({ open: true, path, defaultName });
+    },
+    [hostId]
+  );
+
+  const handleBookmarkConfirm = useCallback(
+    async (name: string) => {
+      const { path } = bookmarkDialog;
+      setBookmarkDialog({ open: false, path: "", defaultName: "" });
 
       await window.sshterm?.sftpBookmarksUpsert?.({
         hostId,
@@ -305,7 +343,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         remotePath: path
       });
     },
-    [hostId]
+    [bookmarkDialog, hostId]
   );
 
   const handleFilterChange = useCallback(
@@ -378,6 +416,45 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
       <TransferPanel />
 
+      <PromptDialog
+        open={renameDialog.open}
+        title="Rename"
+        label="Enter a new name:"
+        defaultValue={renameDialog.oldName}
+        confirmLabel="Rename"
+        onConfirm={handleRenameConfirm}
+        onCancel={() => setRenameDialog({ open: false, path: "", oldName: "" })}
+      />
+
+      <ConfirmDialog
+        open={deleteDialog.open}
+        title="Delete"
+        message={`Delete ${deleteDialog.paths.length} item(s)? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialog({ open: false, paths: [] })}
+      />
+
+      <PromptDialog
+        open={mkdirDialog}
+        title="New Folder"
+        label="Folder name:"
+        placeholder="my-folder"
+        confirmLabel="Create"
+        onConfirm={handleMkdirConfirm}
+        onCancel={() => setMkdirDialog(false)}
+      />
+
+      <PromptDialog
+        open={bookmarkDialog.open}
+        title="Bookmark"
+        label="Bookmark name:"
+        defaultValue={bookmarkDialog.defaultName}
+        confirmLabel="Save"
+        onConfirm={handleBookmarkConfirm}
+        onCancel={() => setBookmarkDialog({ open: false, path: "", defaultName: "" })}
+      />
     </div>
   );
 }

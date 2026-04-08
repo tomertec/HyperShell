@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -154,15 +154,31 @@ export function SidebarHostList({
 }: SidebarHostListProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; host: HostRecord } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
+  const filterInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  const filteredHosts = useMemo(() => {
+    if (!filterQuery.trim()) return hosts;
+    const q = filterQuery.toLowerCase();
+    return hosts.filter((host) => {
+      return (
+        host.name.toLowerCase().includes(q) ||
+        host.hostname.toLowerCase().includes(q) ||
+        (host.group && host.group.toLowerCase().includes(q)) ||
+        (host.tags && host.tags.toLowerCase().includes(q)) ||
+        host.username.toLowerCase().includes(q)
+      );
+    });
+  }, [hosts, filterQuery]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, HostRecord[]>();
-    for (const host of hosts) {
+    for (const host of filteredHosts) {
       const group = host.group || "Ungrouped";
       const list = map.get(group) ?? [];
       list.push(host);
@@ -179,9 +195,9 @@ export function SidebarHostList({
       });
     }
     return map;
-  }, [hosts]);
+  }, [filteredHosts]);
 
-  const allHostIds = useMemo(() => hosts.map((h) => h.id), [hosts]);
+  const allHostIds = useMemo(() => filteredHosts.map((h) => h.id), [filteredHosts]);
   const activeHost = activeId ? hosts.find((h) => h.id === activeId) : null;
 
   function handleDragStart(event: DragStartEvent) {
@@ -277,6 +293,23 @@ export function SidebarHostList({
       ),
     },
     {
+      label: "Copy SSH Command",
+      action: () => {
+        const parts = ["ssh"];
+        if (host.port && host.port !== 22) parts.push(`-p ${host.port}`);
+        if (host.identityFile) parts.push(`-i "${host.identityFile}"`);
+        if (host.proxyJump) parts.push(`-J ${host.proxyJump}`);
+        parts.push(host.username ? `${host.username}@${host.hostname}` : host.hostname);
+        void navigator.clipboard.writeText(parts.join(" "));
+      },
+      icon: (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M2 4L6 8L2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M8 13H14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
       label: "Duplicate",
       action: () => onDuplicate(host),
       icon: (
@@ -348,6 +381,43 @@ export function SidebarHostList({
       onDragEnd={handleDragEnd}
     >
       <div className="space-y-0.5 px-1">
+        {/* Filter input */}
+        <div className="relative px-1 pb-1">
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 16 16"
+            fill="none"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/60"
+          >
+            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <input
+            ref={filterInputRef}
+            type="text"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            placeholder="Filter hosts..."
+            className="w-full rounded-md border border-transparent bg-base-750/40 py-1 pl-7 pr-6 text-xs text-text-primary placeholder:text-text-muted/50 focus:border-accent/30 focus:bg-base-750/60 focus:outline-none transition-colors duration-150"
+          />
+          {filterQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setFilterQuery("");
+                filterInputRef.current?.focus();
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-sm text-text-muted/60 hover:text-text-primary transition-colors duration-150"
+              title="Clear filter"
+            >
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+        </div>
+
         <SortableContext items={allHostIds} strategy={verticalListSortingStrategy}>
           {[...grouped.entries()].map(([group, groupHosts]) => (
             <div key={group}>
@@ -372,6 +442,10 @@ export function SidebarHostList({
 
         {hosts.length === 0 && (
           <div className="px-2 py-6 text-center text-xs text-text-muted">No hosts yet</div>
+        )}
+
+        {hosts.length > 0 && filteredHosts.length === 0 && (
+          <div className="px-2 py-4 text-center text-xs text-text-muted">No matching hosts</div>
         )}
 
         {contextMenu && (
