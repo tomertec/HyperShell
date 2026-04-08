@@ -136,7 +136,7 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 function GeneralSection() {
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateGeneral = useStore(settingsStore, (s) => s.updateGeneral);
-  const { showRecordingButton, showRestoreBanner, showSerialInSidebar } = settings.general;
+  const { showRecordingButton, showRestoreBanner, showSerialInSidebar, confirmOnClose } = settings.general;
 
   return (
     <div className="grid gap-6">
@@ -173,6 +173,17 @@ function GeneralSection() {
             <ToggleSwitch
               checked={showSerialInSidebar}
               onChange={() => void updateGeneral({ showSerialInSidebar: !showSerialInSidebar })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Confirm on Close</div>
+              <div className="text-xs text-text-muted">Ask for confirmation before closing with active sessions</div>
+            </div>
+            <ToggleSwitch
+              checked={confirmOnClose}
+              onChange={() => void updateGeneral({ confirmOnClose: !confirmOnClose })}
             />
           </div>
         </div>

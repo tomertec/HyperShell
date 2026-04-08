@@ -149,7 +149,7 @@ const registeredChannels = [
   ipcChannels.backup.showOpenDialog,
 ] as const;
 
-const sessionManager = createSessionManager();
+export const sessionManager = createSessionManager();
 const sessionLogger = createSessionLogger();
 
 const groupsRepo = createGroupsRepository();

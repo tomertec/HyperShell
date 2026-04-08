@@ -21,6 +21,7 @@ export interface GeneralSettings {
   showRecordingButton: boolean;
   showRestoreBanner: boolean;
   showSerialInSidebar: boolean;
+  confirmOnClose: boolean;
 }
 
 export interface AppSettings {
@@ -86,6 +87,7 @@ const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   showRecordingButton: true,
   showRestoreBanner: true,
   showSerialInSidebar: true,
+  confirmOnClose: true,
 };
 
 const DEFAULT_APP_SETTINGS: AppSettings = {

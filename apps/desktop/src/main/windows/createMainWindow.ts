@@ -1,6 +1,8 @@
-import { app, BrowserWindow, screen } from "electron";
+import { app, BrowserWindow, dialog, screen } from "electron";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import { sessionManager } from "../ipc/registerIpc";
+import { getOrCreateDatabase } from "../ipc/hostsIpc";
 
 interface WindowState {
   x?: number;
@@ -11,6 +13,33 @@ interface WindowState {
 }
 
 const STATE_FILE = "window-state.json";
+const APP_SETTINGS_KEY = "app.settings";
+
+type DbWithPrepare = {
+  prepare(sql: string): {
+    get(...args: unknown[]): unknown;
+  };
+};
+
+function isConfirmOnCloseEnabled(): boolean {
+  try {
+    const db = getOrCreateDatabase() as DbWithPrepare | null;
+    if (!db) {
+      return true; // default to true if no DB
+    }
+    const row = db
+      .prepare("SELECT value FROM app_settings WHERE key = ?")
+      .get(APP_SETTINGS_KEY) as { value: string } | undefined;
+    if (!row?.value) {
+      return true; // default
+    }
+    const parsed = JSON.parse(row.value) as { general?: { confirmOnClose?: boolean } };
+    // If the setting is explicitly false, return false; otherwise default to true
+    return parsed.general?.confirmOnClose !== false;
+  } catch {
+    return true; // default to true on error
+  }
+}
 
 function getStatePath(): string {
   return path.join(app.getPath("userData"), STATE_FILE);
@@ -91,7 +120,10 @@ export function createMainWindow(): BrowserWindow {
     }
   });
 
-  win.on("close", () => {
+  let closeConfirmed = false;
+
+  win.on("close", (event) => {
+    // Save window state regardless of confirmation outcome
     const isMaximized = win.isMaximized();
     const bounds = isMaximized ? normalBounds : win.getBounds();
     const windowState: WindowState = {
@@ -107,6 +139,41 @@ export function createMainWindow(): BrowserWindow {
     } catch {
       // non-fatal
     }
+
+    // Skip confirmation if already confirmed or no active sessions
+    if (closeConfirmed) {
+      return;
+    }
+
+    const activeSessions = sessionManager.listSessions();
+    const count = activeSessions.length;
+    if (count === 0) {
+      return;
+    }
+
+    // Check the confirmOnClose setting from the database
+    if (!isConfirmOnCloseEnabled()) {
+      return;
+    }
+
+    // Prevent the close and show confirmation dialog
+    event.preventDefault();
+
+    void dialog
+      .showMessageBox(win, {
+        type: "question",
+        buttons: ["Close", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+        title: "Active Sessions",
+        message: `You have ${count} active session${count > 1 ? "s" : ""}. Close anyway?`,
+      })
+      .then(({ response }) => {
+        if (response === 0) {
+          closeConfirmed = true;
+          win.close();
+        }
+      });
   });
 
   return win;
