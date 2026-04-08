@@ -12,6 +12,7 @@ import {
   type SshConfigImportItem
 } from "../features/hosts/SshConfigImportDialog";
 import { PuttyImportDialog } from "../features/hosts/PuttyImportDialog";
+import { SshManagerImportDialog } from "../features/hosts/SshManagerImportDialog";
 import { AppShell } from "../features/layout/AppShell";
 import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
@@ -216,6 +217,7 @@ function MainApp() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [puttyImportOpen, setPuttyImportOpen] = useState(false);
+  const [sshManagerImportOpen, setSshManagerImportOpen] = useState(false);
   const [editingHost, setEditingHost] = useState<HostRecord | null>(null);
   const [serialProfiles, setSerialProfiles] = useState<SerialProfileRecord[]>([]);
   const [serialModalOpen, setSerialModalOpen] = useState(false);
@@ -728,6 +730,7 @@ function MainApp() {
             onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
             onImportSshConfig={() => setImportModalOpen(true)}
             onImportPutty={() => setPuttyImportOpen(true)}
+            onImportSshManager={() => setSshManagerImportOpen(true)}
 
             onDuplicateHost={duplicateHost}
             onDeleteHost={(host) => { void deleteHost(host); }}
@@ -877,6 +880,20 @@ function MainApp() {
             }
             setPuttyImportOpen(false);
             toast.success(`Imported ${newHosts.length} PuTTY session${newHosts.length === 1 ? "" : "s"}`);
+          }}
+        />
+      </Modal>
+
+      <Modal
+        open={sshManagerImportOpen}
+        onClose={() => setSshManagerImportOpen(false)}
+        title="Import from SshManager"
+      >
+        <SshManagerImportDialog
+          onClose={() => setSshManagerImportOpen(false)}
+          onImported={() => {
+            setSshManagerImportOpen(false);
+            void loadHosts().then(setHosts);
           }}
         />
       </Modal>

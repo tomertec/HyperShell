@@ -171,6 +171,65 @@ export const scanPuttyResponseSchema = z.object({
 export type PuttySession = z.infer<typeof puttySessionSchema>;
 export type ScanPuttyResponse = z.infer<typeof scanPuttyResponseSchema>;
 
+// --- SshManager import schemas ---
+
+export const sshManagerHostSchema = z.object({
+  id: z.string(),
+  displayName: z.string(),
+  hostname: z.string(),
+  port: z.number().int(),
+  username: z.string().nullable(),
+  authType: z.number().int(),
+  privateKeyPath: z.string().nullable(),
+  opReference: z.string().nullable(),
+  groupId: z.string().nullable(),
+  notes: z.string().nullable(),
+  isFavorite: z.boolean(),
+  sortOrder: z.number().int(),
+  keepAliveIntervalSeconds: z.number().int().nullable(),
+});
+
+export const sshManagerGroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+});
+
+export const sshManagerSnippetSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  command: z.string(),
+  category: z.string().nullable(),
+  sortOrder: z.number().int(),
+});
+
+export const scanSshManagerResponseSchema = z.object({
+  dbPath: z.string(),
+  hosts: z.array(sshManagerHostSchema),
+  groups: z.array(sshManagerGroupSchema),
+  snippets: z.array(sshManagerSnippetSchema),
+});
+
+export const importSshManagerRequestSchema = z.object({
+  hostIds: z.array(z.string()),
+  groupIds: z.array(z.string()),
+  snippetIds: z.array(z.string()),
+});
+
+export const importSshManagerResponseSchema = z.object({
+  importedHosts: z.number().int().min(0),
+  importedGroups: z.number().int().min(0),
+  importedSnippets: z.number().int().min(0),
+  skippedDuplicates: z.number().int().min(0),
+});
+
+export type SshManagerHost = z.infer<typeof sshManagerHostSchema>;
+export type SshManagerGroup = z.infer<typeof sshManagerGroupSchema>;
+export type SshManagerSnippet = z.infer<typeof sshManagerSnippetSchema>;
+export type ScanSshManagerResponse = z.infer<typeof scanSshManagerResponseSchema>;
+export type ImportSshManagerRequest = z.infer<typeof importSshManagerRequestSchema>;
+export type ImportSshManagerResponse = z.infer<typeof importSshManagerResponseSchema>;
+
 // --- Settings schemas ---
 
 export const getSettingRequestSchema = z.object({

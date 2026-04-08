@@ -56,7 +56,13 @@ import {
   hostPortForwardRecordSchema,
   importSshConfigResponseSchema,
   scanPuttyResponseSchema,
+  scanSshManagerResponseSchema,
+  importSshManagerRequestSchema,
+  importSshManagerResponseSchema,
   type ScanPuttyResponse,
+  type ScanSshManagerResponse,
+  type ImportSshManagerRequest,
+  type ImportSshManagerResponse,
   type HostStatsRequest,
   type HostStatsResponse,
   type CloseSessionRequest,
@@ -237,6 +243,8 @@ export interface DesktopApi {
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
   importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }>;
   scanPuttySessions(): Promise<ScanPuttyResponse>;
+  scanSshManager(): Promise<ScanSshManagerResponse>;
+  importSshManager(request: ImportSshManagerRequest): Promise<ImportSshManagerResponse>;
   listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>>;
   upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }>;
   removeGroup(request: RemoveGroupRequest): Promise<void>;
@@ -597,6 +605,15 @@ export function createDesktopApi(
     async scanPuttySessions(): Promise<ScanPuttyResponse> {
       const result = await ipcRenderer.invoke(ipcChannels.hosts.scanPutty);
       return scanPuttyResponseSchema.parse(result);
+    },
+    async scanSshManager(): Promise<ScanSshManagerResponse> {
+      const result = await ipcRenderer.invoke(ipcChannels.hosts.scanSshManager);
+      return scanSshManagerResponseSchema.parse(result);
+    },
+    async importSshManager(request: ImportSshManagerRequest): Promise<ImportSshManagerResponse> {
+      const parsed = importSshManagerRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.hosts.importSshManager, parsed);
+      return importSshManagerResponseSchema.parse(result);
     },
     async listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>> {
       const result = await ipcRenderer.invoke(ipcChannels.groups.list);

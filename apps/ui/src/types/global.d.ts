@@ -87,6 +87,9 @@ import type {
   ConvertPpkRequest,
   ConvertPpkResponse,
   ExportHostsRequest,
+  ScanSshManagerResponse,
+  ImportSshManagerRequest,
+  ImportSshManagerResponse,
   HostFingerprintRecord,
   HostFingerprintLookupRequest,
   HostFingerprintTrustRequest,
@@ -184,6 +187,8 @@ declare global {
       loggingGetState?: (request: GetLoggingStateRequest) => Promise<LoggingStateResponse>;
       exportHosts?: (request: ExportHostsRequest) => Promise<{ exported: number }>;
       scanPuttySessions?: () => Promise<ScanPuttyResponse>;
+      scanSshManager?: () => Promise<ScanSshManagerResponse>;
+      importSshManager?: (request: ImportSshManagerRequest) => Promise<ImportSshManagerResponse>;
       hostFingerprintLookup?: (request: HostFingerprintLookupRequest) => Promise<HostFingerprintRecord | null>;
       hostFingerprintTrust?: (request: HostFingerprintTrustRequest) => Promise<HostFingerprintRecord>;
       hostFingerprintRemove?: (request: HostFingerprintRemoveRequest) => Promise<void>;

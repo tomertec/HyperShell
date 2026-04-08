@@ -43,6 +43,7 @@ import { registerSnippetsIpc } from "./snippetsIpc";
 import { createSessionLogger, registerLoggingIpc } from "./loggingIpc";
 import { registerHostFingerprintIpc } from "./hostFingerprintIpc";
 import { registerPuttyImportIpc } from "./puttyImportIpc";
+import { registerSshManagerImportIpc } from "./sshManagerImportIpc";
 import { registerBackupIpc } from "./backupIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
@@ -73,6 +74,8 @@ const registeredChannels = [
   ipcChannels.hosts.importSshConfig,
   ipcChannels.hosts.exportHosts,
   ipcChannels.hosts.scanPutty,
+  ipcChannels.hosts.scanSshManager,
+  ipcChannels.hosts.importSshManager,
   ipcChannels.settings.get,
   ipcChannels.settings.update,
   ipcChannels.portForward.start,
@@ -971,6 +974,15 @@ export function registerIpc(
   });
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
   registerPuttyImportIpc(ipcMain);
+  registerSshManagerImportIpc(
+    ipcMain,
+    () => getOrCreateHostsRepo(),
+    () => groupsRepo,
+    () => {
+      const { createSnippetsRepositoryFromDatabase } = require("@sshterm/db");
+      return createSnippetsRepositoryFromDatabase(getOrCreateDatabase() as SqliteDatabase);
+    }
+  );
   registerSettingsIpc(ipcMain, () => getOrCreateDatabase());
   registerPortForwardIpc(ipcMain);
   registerGroupsIpc(ipcMain, () => groupsRepo);

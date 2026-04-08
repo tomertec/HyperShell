@@ -17,6 +17,8 @@ export const hostChannels = {
   reorder: "hosts:reorder",
   exportHosts: "hosts:export",
   scanPutty: "hosts:scan-putty",
+  scanSshManager: "hosts:scan-ssh-manager",
+  importSshManager: "hosts:import-ssh-manager",
 } as const;
 
 export const settingsChannels = {

@@ -16,6 +16,7 @@ export interface SidebarProps {
   onNewHost: () => void;
   onImportSshConfig: () => void;
   onImportPutty: () => void;
+  onImportSshManager: () => void;
 
   onDuplicateHost: (host: HostRecord) => void;
   onDeleteHost: (host: HostRecord) => void;
@@ -43,6 +44,7 @@ export function Sidebar({
   onNewHost,
   onImportSshConfig,
   onImportPutty,
+  onImportSshManager,
 
   onDuplicateHost,
   onDeleteHost,
@@ -152,6 +154,18 @@ export function Sidebar({
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3" />
                 <path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </button>
+            <button
+              onClick={onImportSshManager}
+              className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
+              title="Import from SshManager"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M2 6h12" stroke="currentColor" strokeWidth="1.2" />
+                <circle cx="4.5" cy="9.5" r="1" fill="currentColor" />
+                <circle cx="4.5" cy="9.5" r="1" fill="currentColor" />
               </svg>
             </button>
             <button
