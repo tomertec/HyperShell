@@ -238,6 +238,7 @@ export interface DesktopApi {
   fsGetHome(): Promise<{ path: string }>;
   fsGetDrives(): Promise<FsGetDrivesResponse>;
   fsListSshKeys(): Promise<string[]>;
+  fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
   workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }>;
   workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null>;
   workspaceList(): Promise<WorkspaceRecord[]>;
@@ -754,6 +755,10 @@ export function createDesktopApi(
     async fsListSshKeys(): Promise<string[]> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.listSshKeys);
       return fsListSshKeysResponseSchema.parse(result);
+    },
+    async fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
+      const result = await ipcRenderer.invoke(ipcChannels.fs.showSaveDialog, options);
+      return result as string | null;
     },
     async workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }> {
       const parsed = saveWorkspaceRequestSchema.parse(request);

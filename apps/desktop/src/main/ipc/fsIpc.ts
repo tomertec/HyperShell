@@ -1,5 +1,6 @@
 import { ipcChannels, fsListRequestSchema } from "@sshterm/shared";
 import type { FsEntry } from "@sshterm/shared";
+import { dialog } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { readdir, stat, access } from "node:fs/promises";
 import path from "node:path";
@@ -214,6 +215,18 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
     } catch {
       return [];
     }
+  });
+
+  ipcMain.handle(ipcChannels.fs.showSaveDialog, async (_event: IpcMainInvokeEvent, request: unknown) => {
+    const { defaultPath, filters } = (request ?? {}) as {
+      defaultPath?: string;
+      filters?: Array<{ name: string; extensions: string[] }>;
+    };
+    const result = await dialog.showSaveDialog({
+      defaultPath,
+      filters,
+    });
+    return result.canceled ? null : result.filePath;
   });
 
   return () => {

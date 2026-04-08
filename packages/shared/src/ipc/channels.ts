@@ -94,7 +94,8 @@ export const fsChannels = {
   stat: "fs:stat",
   getHome: "fs:get-home",
   getDrives: "fs:get-drives",
-  listSshKeys: "fs:list-ssh-keys"
+  listSshKeys: "fs:list-ssh-keys",
+  showSaveDialog: "fs:show-save-dialog",
 } as const;
 
 export const hostPortForwardChannels = {

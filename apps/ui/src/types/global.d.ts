@@ -123,6 +123,7 @@ declare global {
       fsGetHome?: () => Promise<{ path: string }>;
       fsGetDrives?: () => Promise<FsGetDrivesResponse>;
       fsListSshKeys?: () => Promise<string[]>;
+      fsShowSaveDialog?: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
       workspaceSave?: (request: SaveWorkspaceRequest) => Promise<{ success: boolean }>;
       workspaceLoad?: (request: LoadWorkspaceRequest) => Promise<WorkspaceRecord | null>;
       workspaceList?: () => Promise<WorkspaceRecord[]>;

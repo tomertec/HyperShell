@@ -18,7 +18,10 @@ export function LoggingButton({ sessionId }: { sessionId: string }) {
         toast.success("Session logging stopped");
       } else {
         const defaultName = `session-${new Date().toISOString().replace(/[:.]/g, "-")}.log`;
-        const filePath = prompt("Log file path:", defaultName);
+        const filePath = await window.sshterm?.fsShowSaveDialog?.({
+          defaultPath: defaultName,
+          filters: [{ name: "Log Files", extensions: ["log", "txt"] }],
+        });
         if (!filePath) return;
         await window.sshterm?.loggingStart?.({ sessionId, filePath });
         setActive(true);
