@@ -15,6 +15,7 @@ import { AppShell } from "../features/layout/AppShell";
 import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
 import { layoutStore } from "../features/layout/layoutStore";
+import { handlePaneShortcut } from "../features/layout/paneShortcuts";
 import { QuickConnectDialog } from "../features/quick-connect/QuickConnectDialog";
 import type { QuickConnectProfile } from "../features/quick-connect/searchIndex";
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
@@ -301,6 +302,10 @@ function MainApp() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (handlePaneShortcut(layoutStore, e)) {
+        e.preventDefault();
+        return;
+      }
       if (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         setIsQuickConnectOpen(true);
