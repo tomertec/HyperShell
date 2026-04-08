@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 
 interface SshKeyInfo {
   path: string;
@@ -35,6 +36,7 @@ export function SshKeyManager() {
   const [genPassphrase, setGenPassphrase] = useState("");
   const [genComment, setGenComment] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [converting, setConverting] = useState(false);
 
   const refresh = async () => {
     const result = await window.sshterm?.sshKeysList?.();
@@ -72,6 +74,42 @@ export function SshKeyManager() {
     await refresh();
   };
 
+  const handleImportPpk = useCallback(async () => {
+    // Use a hidden file input to pick a .ppk file
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".ppk";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      // Electron file inputs expose .path
+      const ppkPath = (file as File & { path?: string }).path;
+      if (!ppkPath) {
+        toast.error("Could not determine file path.");
+        return;
+      }
+      setConverting(true);
+      try {
+        const result = await window.sshterm?.sshKeysConvertPpk?.({ ppkPath });
+        if (!result) {
+          toast.error("PPK conversion not available.");
+          return;
+        }
+        if (result.success) {
+          toast.success(`Converted to OpenSSH format: ${result.outputPath}`);
+          await refresh();
+        } else {
+          toast.error(result.error ?? "Conversion failed.");
+        }
+      } catch (err) {
+        toast.error(`Conversion failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setConverting(false);
+      }
+    };
+    input.click();
+  }, []);
+
   return (
     <div className="grid gap-6">
       {/* Header with generate button */}
@@ -81,17 +119,26 @@ export function SshKeyManager() {
             Manage SSH keys stored in ~/.ssh
           </div>
         </div>
-        <button
-          onClick={() => setShowGenerate(!showGenerate)}
-          className={[
-            "text-xs px-2.5 py-1.5 rounded-lg transition-colors",
-            showGenerate
-              ? "text-text-muted hover:text-text-primary"
-              : "bg-accent/10 text-accent hover:bg-accent/20",
-          ].join(" ")}
-        >
-          {showGenerate ? "Cancel" : "+ Generate Key"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void handleImportPpk()}
+            disabled={converting}
+            className="text-xs px-2.5 py-1.5 rounded-lg transition-colors bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {converting ? "Converting..." : "Import PPK"}
+          </button>
+          <button
+            onClick={() => setShowGenerate(!showGenerate)}
+            className={[
+              "text-xs px-2.5 py-1.5 rounded-lg transition-colors",
+              showGenerate
+                ? "text-text-muted hover:text-text-primary"
+                : "bg-accent/10 text-accent hover:bg-accent/20",
+            ].join(" ")}
+          >
+            {showGenerate ? "Cancel" : "+ Generate Key"}
+          </button>
+        </div>
       </div>
 
       {/* Generate form */}

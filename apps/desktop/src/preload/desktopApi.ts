@@ -117,6 +117,8 @@ import {
   generateSshKeyRequestSchema,
   removeSshKeyRequestSchema,
   getFingerprintRequestSchema,
+  convertPpkRequestSchema,
+  convertPpkResponseSchema,
   sftpSyncStatusSchema,
   sftpSyncStartRequestSchema,
   sftpSyncStopRequestSchema,
@@ -178,6 +180,8 @@ import {
   type GenerateSshKeyRequest,
   type RemoveSshKeyRequest,
   type GetFingerprintRequest,
+  type ConvertPpkRequest,
+  type ConvertPpkResponse,
   type SftpSyncStartRequest,
   type SftpSyncStopRequest,
   type SftpSyncStatus,
@@ -267,6 +271,7 @@ export interface DesktopApi {
   sshKeysGenerate(request: GenerateSshKeyRequest): Promise<{ path: string }>;
   sshKeysGetFingerprint(request: GetFingerprintRequest): Promise<{ fingerprint: string | null }>;
   sshKeysRemove(request: RemoveSshKeyRequest): Promise<void>;
+  sshKeysConvertPpk(request: ConvertPpkRequest): Promise<ConvertPpkResponse>;
   sftpSyncStart(request: SftpSyncStartRequest): Promise<{ syncId: string }>;
   sftpSyncStop(request: SftpSyncStopRequest): Promise<void>;
   sftpSyncList(): Promise<{ syncs: SftpSyncStatus[] }>;
@@ -836,6 +841,11 @@ export function createDesktopApi(
     async sshKeysRemove(request: RemoveSshKeyRequest): Promise<void> {
       const parsed = removeSshKeyRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.sshKeys.remove, parsed);
+    },
+    async sshKeysConvertPpk(request: ConvertPpkRequest): Promise<ConvertPpkResponse> {
+      const parsed = convertPpkRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.convertPpk, parsed);
+      return convertPpkResponseSchema.parse(result);
     },
     async sftpSyncStart(request: SftpSyncStartRequest): Promise<{ syncId: string }> {
       const parsed = sftpSyncStartRequestSchema.parse(request);

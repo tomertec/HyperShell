@@ -91,6 +91,7 @@ export const sshKeyChannels = {
   generate: "ssh-keys:generate",
   getFingerprint: "ssh-keys:get-fingerprint",
   remove: "ssh-keys:remove",
+  convertPpk: "ssh-keys:convert-ppk",
 } as const;
 
 export const fsChannels = {

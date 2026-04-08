@@ -84,6 +84,8 @@ import type {
   EditorOpenRequest,
   EditorOpenFile,
   EditorSessionClosed,
+  ConvertPpkRequest,
+  ConvertPpkResponse,
   ExportHostsRequest,
   HostFingerprintRecord,
   HostFingerprintLookupRequest,
@@ -150,6 +152,7 @@ declare global {
       sshKeysGenerate?: (request: GenerateSshKeyRequest) => Promise<{ path: string }>;
       sshKeysGetFingerprint?: (request: GetFingerprintRequest) => Promise<{ fingerprint: string | null }>;
       sshKeysRemove?: (request: RemoveSshKeyRequest) => Promise<void>;
+      sshKeysConvertPpk?: (request: ConvertPpkRequest) => Promise<ConvertPpkResponse>;
       sftpSyncStart?: (request: SftpSyncStartRequest) => Promise<{ syncId: string }>;
       sftpSyncStop?: (request: SftpSyncStopRequest) => Promise<void>;
       sftpSyncList?: () => Promise<{ syncs: SftpSyncStatus[] }>;

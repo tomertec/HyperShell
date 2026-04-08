@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState, useCallback } from "react";
+import { toast } from "sonner";
 import { HostPortForwardList } from "./HostPortForwardList";
 import { OpPickerModal } from "./OpPickerModal";
 import { inputClasses } from "../../lib/formStyles";
@@ -119,6 +120,34 @@ export function HostForm({
   const [sshKeys, setSshKeys] = useState<string[]>([]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [opPickerOpen, setOpPickerOpen] = useState(false);
+  const [ppkConverting, setPpkConverting] = useState(false);
+
+  const isPpkSelected = useMemo(
+    () => value.identityFile.toLowerCase().endsWith(".ppk"),
+    [value.identityFile]
+  );
+
+  const handleConvertPpk = useCallback(async () => {
+    if (!value.identityFile) return;
+    setPpkConverting(true);
+    try {
+      const result = await window.sshterm?.sshKeysConvertPpk?.({ ppkPath: value.identityFile });
+      if (!result) {
+        toast.error("PPK conversion not available.");
+        return;
+      }
+      if (result.success && result.outputPath) {
+        toast.success("PPK key converted to OpenSSH format.");
+        setValue({ ...value, identityFile: result.outputPath });
+      } else {
+        toast.error(result.error ?? "Conversion failed.");
+      }
+    } catch (err) {
+      toast.error(`Conversion failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPpkConverting(false);
+    }
+  }, [value]);
 
   const errors = useMemo(() => {
     const e: Record<string, string | null> = {};
@@ -256,6 +285,24 @@ export function HostForm({
         </select>
         {identityWarning && (
           <span className="text-xs text-amber-400">{identityWarning}</span>
+        )}
+        {isPpkSelected && (
+          <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="shrink-0 text-amber-400">
+              <path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM8 5v3.5M8 10.5h.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-xs text-amber-300 flex-1">
+              This is a PuTTY PPK key. It must be converted to OpenSSH format before use.
+            </span>
+            <button
+              type="button"
+              disabled={ppkConverting}
+              onClick={() => void handleConvertPpk()}
+              className="text-xs px-2 py-1 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {ppkConverting ? "Converting..." : "Convert"}
+            </button>
+          </div>
         )}
       </label>
 

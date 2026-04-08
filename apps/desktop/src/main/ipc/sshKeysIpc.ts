@@ -3,8 +3,11 @@ import {
   generateSshKeyRequestSchema,
   removeSshKeyRequestSchema,
   getFingerprintRequestSchema,
+  convertPpkRequestSchema,
   type SshKeyInfo,
+  type ConvertPpkResponse,
 } from "@sshterm/shared";
+import { convertPpkToOpenSsh } from "@sshterm/session-core";
 import { execFile } from "node:child_process";
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
@@ -143,6 +146,14 @@ export function registerSshKeysIpc(ipcMain: IpcMainLike): void {
         // .pub may not exist
       }
       return { success: true };
+    }
+  );
+
+  ipcMain.handle(
+    ipcChannels.sshKeys.convertPpk,
+    async (_event: IpcMainInvokeEvent, request: unknown): Promise<ConvertPpkResponse> => {
+      const parsed = convertPpkRequestSchema.parse(request);
+      return convertPpkToOpenSsh(parsed.ppkPath);
     }
   );
 }

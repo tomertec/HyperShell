@@ -441,10 +441,23 @@ export const getFingerprintRequestSchema = z.object({
   path: z.string().min(1),
 });
 
+export const convertPpkRequestSchema = z.object({
+  ppkPath: z.string().min(1),
+});
+
+export const convertPpkResponseSchema = z.object({
+  success: z.boolean(),
+  outputPath: z.string().optional(),
+  error: z.string().optional(),
+  tool: z.enum(["ssh-keygen", "puttygen", "none"]).optional(),
+});
+
 export type SshKeyInfo = z.infer<typeof sshKeyInfoSchema>;
 export type GenerateSshKeyRequest = z.infer<typeof generateSshKeyRequestSchema>;
 export type RemoveSshKeyRequest = z.infer<typeof removeSshKeyRequestSchema>;
 export type GetFingerprintRequest = z.infer<typeof getFingerprintRequestSchema>;
+export type ConvertPpkRequest = z.infer<typeof convertPpkRequestSchema>;
+export type ConvertPpkResponse = z.infer<typeof convertPpkResponseSchema>;
 
 // 1Password vault picker
 export const opVaultSchema = z.object({
