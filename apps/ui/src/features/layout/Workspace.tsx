@@ -180,7 +180,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="relative flex flex-col flex-1 min-h-0">
       <BroadcastBar />
       <div className="flex items-end bg-base-800 border-b border-border">
         <div className="flex-1 min-w-0">
@@ -235,50 +235,48 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
         </div>
       </div>
 
-      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
-        {tabs.length > 0 ? (
-          <div
-            ref={containerRef}
-            className={`flex-1 min-h-0 flex ${
-              splitDirection === "horizontal" ? "flex-row" : "flex-col"
-            }`}
-          >
-            {panes.map((pane, i) => (
-              <Fragment key={pane.paneId}>
-                {i > 0 && (
-                  <PaneResizeHandle
-                    direction={splitDirection}
-                    onResize={(delta) => handleResize(i - 1, delta)}
-                    onResizeEnd={() => {}}
-                  />
-                )}
-                <div
-                  style={{
-                    [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
-                  }}
-                  className="h-full min-h-0 min-w-0 relative"
-                >
-                  <PaneView
-                    pane={pane}
-                    isActive={pane.paneId === activePaneId}
-                    activeSessionId={activeSessionId}
-                    onActivate={() => activatePane(pane.paneId)}
-                    onCloseTab={closeTab}
-                  />
-                </div>
-              </Fragment>
-            ))}
-          </div>
-        ) : (
-          <WelcomeScreen
-            availablePorts={availablePorts}
-            onRefreshPorts={onRefreshPorts}
-            onConnectSsh={onConnectSsh}
-            onConnectSerial={onConnectSerial}
-          />
-        )}
-        <SnippetsPanel />
-      </div>
+      {tabs.length > 0 ? (
+        <div
+          ref={containerRef}
+          className={`flex-1 min-h-0 flex ${
+            splitDirection === "horizontal" ? "flex-row" : "flex-col"
+          }`}
+        >
+          {panes.map((pane, i) => (
+            <Fragment key={pane.paneId}>
+              {i > 0 && (
+                <PaneResizeHandle
+                  direction={splitDirection}
+                  onResize={(delta) => handleResize(i - 1, delta)}
+                  onResizeEnd={() => {}}
+                />
+              )}
+              <div
+                style={{
+                  [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
+                }}
+                className="h-full min-h-0 min-w-0 relative"
+              >
+                <PaneView
+                  pane={pane}
+                  isActive={pane.paneId === activePaneId}
+                  activeSessionId={activeSessionId}
+                  onActivate={() => activatePane(pane.paneId)}
+                  onCloseTab={closeTab}
+                />
+              </div>
+            </Fragment>
+          ))}
+        </div>
+      ) : (
+        <WelcomeScreen
+          availablePorts={availablePorts}
+          onRefreshPorts={onRefreshPorts}
+          onConnectSsh={onConnectSsh}
+          onConnectSerial={onConnectSerial}
+        />
+      )}
+      <SnippetsPanel />
     </div>
   );
 }
