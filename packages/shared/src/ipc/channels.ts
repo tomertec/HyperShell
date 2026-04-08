@@ -123,6 +123,12 @@ export const editorChannels = {
   sessionClosed: "editor:session-closed",
 } as const;
 
+export const snippetChannels = {
+  list: "snippets:list",
+  upsert: "snippets:upsert",
+  remove: "snippets:remove",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -140,4 +146,5 @@ export const ipcChannels = {
   network: networkChannels,
   op: opChannels,
   editor: editorChannels,
+  snippets: snippetChannels,
 } as const;

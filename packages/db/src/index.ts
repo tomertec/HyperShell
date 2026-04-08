@@ -71,3 +71,5 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
 }
 
 export * from "./repositories";
+export type { SnippetRecord, SnippetInput } from "./repositories/snippetsRepository";
+export { createSnippetsRepository, createSnippetsRepositoryFromDatabase } from "./repositories/snippetsRepository";

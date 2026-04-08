@@ -462,3 +462,27 @@ export type OpGetItemFieldsRequest = z.infer<typeof opGetItemFieldsRequestSchema
 
 export const opGetItemFieldsResponseSchema = z.array(opFieldSchema);
 export type OpGetItemFieldsResponse = z.infer<typeof opGetItemFieldsResponseSchema>;
+
+// --- Snippet schemas ---
+
+export const snippetRecordSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  body: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const upsertSnippetRequestSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  body: z.string(),
+});
+
+export const removeSnippetRequestSchema = z.object({
+  id: z.string().min(1),
+});
+
+export type SnippetRecord = z.infer<typeof snippetRecordSchema>;
+export type UpsertSnippetRequest = z.infer<typeof upsertSnippetRequestSchema>;
+export type RemoveSnippetRequest = z.infer<typeof removeSnippetRequestSchema>;
