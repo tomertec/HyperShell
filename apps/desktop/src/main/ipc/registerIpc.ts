@@ -1,5 +1,6 @@
 import {
   closeSessionRequestSchema,
+  exportHostsRequestSchema,
   hostStatsRequestSchema,
   ipcChannels,
   openSessionRequestSchema,
@@ -22,7 +23,9 @@ import {
   registerHostIpc,
   getOrCreateHostsRepo,
   getOrCreateDatabase,
-  resolveStoredHostPassword
+  resolveStoredHostPassword,
+  exportHostsToJson,
+  exportHostsToCsv
 } from "./hostsIpc";
 import { registerSettingsIpc } from "./settingsIpc";
 import { registerSshConfigIpc } from "./sshConfigIpc";
@@ -49,7 +52,7 @@ import type {
   SftpConnectionOptions
 } from "@sshterm/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { spawnSync, execFile } from "node:child_process";
@@ -65,6 +68,7 @@ const registeredChannels = [
   ipcChannels.hosts.remove,
   ipcChannels.hosts.reorder,
   ipcChannels.hosts.importSshConfig,
+  ipcChannels.hosts.exportHosts,
   ipcChannels.settings.get,
   ipcChannels.settings.update,
   ipcChannels.portForward.start,
@@ -929,6 +933,16 @@ export function registerIpc(
   );
 
   registerHostIpc(ipcMain);
+  ipcMain.handle(ipcChannels.hosts.exportHosts, async (_event: unknown, request: unknown) => {
+    const parsed = exportHostsRequestSchema.parse(request);
+    const repo = getOrCreateHostsRepo();
+    const hosts = repo.list();
+    const content = parsed.format === "json"
+      ? exportHostsToJson(hosts)
+      : exportHostsToCsv(hosts);
+    writeFileSync(parsed.filePath, content, "utf-8");
+    return { exported: hosts.length };
+  });
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
   registerSettingsIpc(ipcMain, () => getOrCreateDatabase());
   registerPortForwardIpc(ipcMain);

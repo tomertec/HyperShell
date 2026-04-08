@@ -143,10 +143,16 @@ export const importSshConfigResponseSchema = z.object({
   hosts: z.array(hostRecordSchema)
 });
 
+export const exportHostsRequestSchema = z.object({
+  format: z.enum(["json", "csv"]),
+  filePath: z.string().min(1),
+});
+
 export type HostRecord = z.infer<typeof hostRecordSchema>;
 export type UpsertHostRequest = z.infer<typeof upsertHostRequestSchema>;
 export type RemoveHostRequest = z.infer<typeof removeHostRequestSchema>;
 export type ImportSshConfigResponse = z.infer<typeof importSshConfigResponseSchema>;
+export type ExportHostsRequest = z.infer<typeof exportHostsRequestSchema>;
 
 // --- Settings schemas ---
 

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { HostForm, type HostFormValue } from "./HostForm";
 import {
@@ -41,6 +42,20 @@ export function HostsView() {
   const [hosts, setHosts] = useState<HostRecord[]>(demoHosts);
   const [selectedId, setSelectedId] = useState<string>(demoHosts[0]?.id ?? "");
   const [isImportOpen, setIsImportOpen] = useState(false);
+
+  const handleExport = async (format: "json" | "csv") => {
+    const ext = format === "json" ? "json" : "csv";
+    const filePath = prompt(`Export file path:`, `hosts.${ext}`);
+    if (!filePath) return;
+    try {
+      const result = await window.sshterm?.exportHosts?.({ format, filePath });
+      if (result) {
+        toast.success(`Exported ${result.exported} hosts to ${filePath}`);
+      }
+    } catch (err) {
+      toast.error(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
 
   const selectedHost = useMemo(
     () => hosts.find((host) => host.id === selectedId) ?? null,
@@ -91,6 +106,36 @@ export function HostsView() {
           }}
         >
           Import SSH Config
+        </button>
+        <button
+          onClick={() => handleExport("json")}
+          style={{
+            marginTop: 12,
+            marginLeft: 8,
+            borderRadius: 10,
+            border: "1px solid rgba(148, 163, 184, 0.25)",
+            background: "rgba(30, 41, 59, 0.72)",
+            color: "#cbd5e1",
+            padding: "8px 12px",
+            cursor: "pointer"
+          }}
+        >
+          Export JSON
+        </button>
+        <button
+          onClick={() => handleExport("csv")}
+          style={{
+            marginTop: 12,
+            marginLeft: 8,
+            borderRadius: 10,
+            border: "1px solid rgba(148, 163, 184, 0.25)",
+            background: "rgba(30, 41, 59, 0.72)",
+            color: "#cbd5e1",
+            padding: "8px 12px",
+            cursor: "pointer"
+          }}
+        >
+          Export CSV
         </button>
       </header>
 

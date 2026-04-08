@@ -79,6 +79,7 @@ import type {
   EditorOpenRequest,
   EditorOpenFile,
   EditorSessionClosed,
+  ExportHostsRequest,
 } from "@sshterm/shared";
 
 declare global {
@@ -156,6 +157,7 @@ declare global {
       loggingStart?: (request: StartLoggingRequest) => Promise<void>;
       loggingStop?: (request: StopLoggingRequest) => Promise<void>;
       loggingGetState?: (request: GetLoggingStateRequest) => Promise<LoggingStateResponse>;
+      exportHosts?: (request: ExportHostsRequest) => Promise<{ exported: number }>;
     };
   }
 }

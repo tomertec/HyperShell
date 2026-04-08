@@ -144,6 +144,7 @@ import {
   stopLoggingRequestSchema,
   getLoggingStateRequestSchema,
   loggingStateResponseSchema,
+  exportHostsRequestSchema,
   type SnippetRecord,
   type UpsertSnippetRequest,
   type RemoveSnippetRequest,
@@ -151,6 +152,7 @@ import {
   type StopLoggingRequest,
   type GetLoggingStateRequest,
   type LoggingStateResponse,
+  type ExportHostsRequest,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -273,6 +275,8 @@ export interface DesktopApi {
   loggingStart(request: StartLoggingRequest): Promise<void>;
   loggingStop(request: StopLoggingRequest): Promise<void>;
   loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse>;
+  // Host export
+  exportHosts(request: ExportHostsRequest): Promise<{ exported: number }>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -932,6 +936,11 @@ export function createDesktopApi(
     async loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse> {
       const raw = await ipcRenderer.invoke(ipcChannels.logging.getState, getLoggingStateRequestSchema.parse(request));
       return loggingStateResponseSchema.parse(raw);
+    },
+    // Host export
+    async exportHosts(request: ExportHostsRequest): Promise<{ exported: number }> {
+      const raw = await ipcRenderer.invoke(ipcChannels.hosts.exportHosts, exportHostsRequestSchema.parse(request));
+      return z.object({ exported: z.number() }).parse(raw);
     },
   };
 }

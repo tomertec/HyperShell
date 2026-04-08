@@ -454,6 +454,32 @@ function importFallbackHosts(repo: HostsRepoLike): void {
   }
 }
 
+export function exportHostsToJson(hosts: HostRecord[]): string {
+  return JSON.stringify(hosts, null, 2);
+}
+
+const CSV_FIELDS = [
+  "name", "hostname", "port", "username", "identityFile",
+  "groupId", "notes", "authMethod", "agentKind",
+  "proxyJump", "keepAliveInterval", "autoReconnect",
+] as const;
+
+function escapeCsv(value: unknown): string {
+  const str = String(value ?? "");
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function exportHostsToCsv(hosts: HostRecord[]): string {
+  const header = CSV_FIELDS.join(",");
+  const rows = hosts.map((host) =>
+    CSV_FIELDS.map((field) => escapeCsv(host[field as keyof HostRecord])).join(",")
+  );
+  return [header, ...rows].join("\n");
+}
+
 export const hostChannelList = [
   ipcChannels.hosts.list,
   ipcChannels.hosts.upsert,
