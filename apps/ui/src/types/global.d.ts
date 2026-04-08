@@ -1,4 +1,7 @@
 import type {
+  SnippetRecord,
+  UpsertSnippetRequest,
+  RemoveSnippetRequest,
   CloseSessionRequest,
   StartPortForwardRequest,
   StopPortForwardRequest,
@@ -143,6 +146,9 @@ declare global {
       editorOpen?: (request: EditorOpenRequest) => Promise<void>;
       onEditorOpenFile?: (listener: (event: EditorOpenFile) => void) => () => void;
       onEditorSessionClosed?: (listener: (event: EditorSessionClosed) => void) => () => void;
+      snippetsList?: () => Promise<SnippetRecord[]>;
+      snippetsUpsert?: (request: UpsertSnippetRequest) => Promise<SnippetRecord>;
+      snippetsRemove?: (request: RemoveSnippetRequest) => Promise<void>;
     };
   }
 }

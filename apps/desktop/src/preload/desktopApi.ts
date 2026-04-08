@@ -137,6 +137,12 @@ import {
   type EditorOpenRequest,
   type EditorOpenFile,
   type EditorSessionClosed,
+  snippetRecordSchema,
+  upsertSnippetRequestSchema,
+  removeSnippetRequestSchema,
+  type SnippetRecord,
+  type UpsertSnippetRequest,
+  type RemoveSnippetRequest,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -251,6 +257,10 @@ export interface DesktopApi {
   editorOpen(request: EditorOpenRequest): Promise<void>;
   onEditorOpenFile(listener: (event: EditorOpenFile) => void): () => void;
   onEditorSessionClosed(listener: (event: EditorSessionClosed) => void): () => void;
+  // Snippets
+  snippetsList(): Promise<SnippetRecord[]>;
+  snippetsUpsert(request: UpsertSnippetRequest): Promise<SnippetRecord>;
+  snippetsRemove(request: RemoveSnippetRequest): Promise<void>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -887,6 +897,18 @@ export function createDesktopApi(
       };
       ipcRenderer.on(ipcChannels.editor.sessionClosed, wrappedListener);
       return () => { ipcRenderer.removeListener(ipcChannels.editor.sessionClosed, wrappedListener); };
+    },
+    // Snippets
+    async snippetsList(): Promise<SnippetRecord[]> {
+      const raw = await ipcRenderer.invoke(ipcChannels.snippets.list);
+      return z.array(snippetRecordSchema).parse(raw);
+    },
+    async snippetsUpsert(request: UpsertSnippetRequest): Promise<SnippetRecord> {
+      const raw = await ipcRenderer.invoke(ipcChannels.snippets.upsert, upsertSnippetRequestSchema.parse(request));
+      return snippetRecordSchema.parse(raw);
+    },
+    async snippetsRemove(request: RemoveSnippetRequest): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.snippets.remove, removeSnippetRequestSchema.parse(request));
     },
   };
 }
