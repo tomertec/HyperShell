@@ -18,13 +18,11 @@ export const sftpConnectRequestSchema = z.union([
     hostId: z.string(),
     username: z.string().min(1).optional(),
     password: z.string().min(1).optional(),
-    skipHostKeyVerification: z.boolean().optional()
   }),
   z.object({
     sessionId: z.string(),
     username: z.string().min(1).optional(),
     password: z.string().min(1).optional(),
-    skipHostKeyVerification: z.boolean().optional()
   })
 ]);
 export type SftpConnectRequest = z.infer<typeof sftpConnectRequestSchema>;

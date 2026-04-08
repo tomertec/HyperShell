@@ -444,6 +444,29 @@ function MainApp() {
     setSftpAuthSubmitting(false);
   }, []);
 
+  const parseHostKeyVerificationError = useCallback(
+    (error: unknown): HostKeyVerificationInfo | null => {
+      const message = error instanceof Error ? error.message : String(error);
+      try {
+        const parsed = JSON.parse(message);
+        if (parsed && parsed.__hostKeyVerification) {
+          return {
+            hostname: parsed.hostname,
+            port: parsed.port,
+            algorithm: parsed.algorithm,
+            fingerprint: parsed.fingerprint,
+            verificationStatus: parsed.verificationStatus,
+            previousFingerprint: parsed.previousFingerprint,
+          };
+        }
+      } catch {
+        // Not a host key verification error
+      }
+      return null;
+    },
+    []
+  );
+
   const openSftpAuthModal = useCallback(
     (host: HostRecord, errorMessage?: string) => {
       setSftpAuthHost(host);
@@ -544,29 +567,6 @@ function MainApp() {
     });
   }, []);
 
-  const parseHostKeyVerificationError = useCallback(
-    (error: unknown): HostKeyVerificationInfo | null => {
-      const message = error instanceof Error ? error.message : String(error);
-      try {
-        const parsed = JSON.parse(message);
-        if (parsed && parsed.__hostKeyVerification) {
-          return {
-            hostname: parsed.hostname,
-            port: parsed.port,
-            algorithm: parsed.algorithm,
-            fingerprint: parsed.fingerprint,
-            verificationStatus: parsed.verificationStatus,
-            previousFingerprint: parsed.previousFingerprint,
-          };
-        }
-      } catch {
-        // Not a host key verification error
-      }
-      return null;
-    },
-    []
-  );
-
   const handleHostKeyTrust = useCallback(async () => {
     if (!hostKeyVerifyInfo || !hostKeyVerifyHost || !window.sshterm?.hostFingerprintTrust) {
       setHostKeyVerifyOpen(false);
@@ -599,7 +599,6 @@ function MainApp() {
       try {
         const { sftpSessionId } = await window.sshterm.sftpConnect({
           hostId: host.id,
-          skipHostKeyVerification: true,
         });
         openSftpTab(host, sftpSessionId);
       } catch (retryError) {

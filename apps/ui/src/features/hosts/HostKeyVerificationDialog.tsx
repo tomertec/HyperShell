@@ -13,7 +13,7 @@ export interface HostKeyVerificationInfo {
 interface HostKeyVerificationDialogProps {
   open: boolean;
   info: HostKeyVerificationInfo | null;
-  onTrust: () => void;
+  onTrust: () => void | Promise<void>;
   onReject: () => void;
 }
 
@@ -26,10 +26,13 @@ export function HostKeyVerificationDialog({
   const [confirming, setConfirming] = useState(false);
   const isKeyChanged = info?.verificationStatus === "key_changed";
 
-  const handleTrust = () => {
+  const handleTrust = async () => {
     setConfirming(true);
-    onTrust();
-    setConfirming(false);
+    try {
+      await onTrust();
+    } finally {
+      setConfirming(false);
+    }
   };
 
   if (!info) return null;

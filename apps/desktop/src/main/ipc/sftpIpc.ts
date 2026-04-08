@@ -37,6 +37,7 @@ import {
 } from "@sshterm/shared";
 import type { SessionManager, SftpConnectionOptions } from "@sshterm/session-core";
 import { createSyncEngine, probeHostKey } from "@sshterm/session-core";
+import { timingSafeEqual } from "node:crypto";
 import type { IpcMainInvokeEvent } from "electron";
 
 import type { IpcMainLike } from "./registerIpc";
@@ -186,15 +187,11 @@ export function registerSftpIpc(
     const hostname = connectOptions.hostname;
     const port = connectOptions.port ?? 22;
 
-    // Check if user explicitly skipped verification for this request
-    const skipVerification = request.skipHostKeyVerification === true;
+    try {
+      const { algorithm, fingerprint } = await probeHostKey(hostname, port);
+      const existing = fingerprintRepo.findByHostAndAlgorithm(hostname, port, algorithm);
 
-    if (!skipVerification) {
-      try {
-        const { algorithm, fingerprint } = await probeHostKey(hostname, port);
-        const existing = fingerprintRepo.findByHostAndAlgorithm(hostname, port, algorithm);
-
-        if (!existing) {
+      if (!existing) {
           // First time seeing this host — require user approval
           throw new HostKeyVerificationError({
             hostname,
@@ -203,7 +200,10 @@ export function registerSftpIpc(
             fingerprint,
             verificationStatus: "new_host",
           });
-        } else if (existing.fingerprint !== fingerprint) {
+        } else if (
+          existing.fingerprint.length !== fingerprint.length ||
+          !timingSafeEqual(Buffer.from(existing.fingerprint), Buffer.from(fingerprint))
+        ) {
           // Key has changed — possible MITM attack
           throw new HostKeyVerificationError({
             hostname,
@@ -238,7 +238,6 @@ export function registerSftpIpc(
         }
         // If probe fails for network reasons, let the actual connect attempt handle it
         console.warn("[sftp] Host key probe failed, proceeding with connect:", (error as Error).message);
-      }
     }
 
     ensureBookmarkHost(hostId, connectOptions, hostsRepo);
