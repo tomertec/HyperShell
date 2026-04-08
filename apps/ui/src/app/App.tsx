@@ -966,10 +966,6 @@ function MainApp() {
             onOpenConnectionHistory={(host) => setConnectionHistoryHost(host)}
             onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
             onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
-            onImportSshConfig={() => setImportModalOpen(true)}
-            onImportPutty={() => setPuttyImportOpen(true)}
-            onImportSshManager={() => setSshManagerImportOpen(true)}
-
             onDuplicateHost={duplicateHost}
             onDeleteHost={(host) => { void deleteHost(host); }}
             onToggleFavoriteHost={toggleFavoriteHost}
@@ -1260,7 +1256,11 @@ function MainApp() {
         onClose={() => setSettingsOpen(false)}
         title="Settings"
       >
-        <SettingsPanel />
+        <SettingsPanel
+          onImportSshConfig={() => setImportModalOpen(true)}
+          onImportPutty={() => setPuttyImportOpen(true)}
+          onImportSshManager={() => setSshManagerImportOpen(true)}
+        />
       </Modal>
 
       <ConnectionHistoryDialog

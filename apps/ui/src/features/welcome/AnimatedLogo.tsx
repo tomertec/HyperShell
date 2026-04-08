@@ -23,27 +23,27 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
   const [phase, setPhase] = useState<"typing" | "idle">("typing");
   const [visibleChars, setVisibleChars] = useState(0);
   const text = "HyperShell";
-  const prompt = ">_ ";
+  const prompt = ">_";
 
   // Stable glitch indices per mount
   const glitchIndices = useMemo(() => pickGlitchIndices(text.length), []);
 
-  // Typing effect
+  // Typing effect: text first, then prompt suffix
   useEffect(() => {
-    const fullLength = prompt.length + text.length;
+    const fullLength = text.length + prompt.length;
     if (visibleChars >= fullLength) {
       const timeout = setTimeout(() => setPhase("idle"), 300);
       return () => clearTimeout(timeout);
     }
-    const delay = visibleChars < prompt.length ? 80 : 60 + Math.random() * 40;
+    const delay = visibleChars < text.length ? 60 + Math.random() * 40 : 80;
     const timeout = setTimeout(() => setVisibleChars((c) => c + 1), delay);
     return () => clearTimeout(timeout);
   }, [visibleChars]);
 
-  const displayedPrompt = prompt.slice(0, Math.min(visibleChars, prompt.length));
-  const displayedText = text.slice(
+  const displayedText = text.slice(0, Math.min(visibleChars, text.length));
+  const displayedPrompt = prompt.slice(
     0,
-    Math.max(0, visibleChars - prompt.length)
+    Math.max(0, visibleChars - text.length)
   );
 
   // Render text characters individually for glitch effect in idle mode
@@ -113,7 +113,10 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
         className="relative flex items-baseline gap-0"
         style={{ fontSize: compact ? "1.5rem" : "2.5rem" }}
       >
-        {/* Prompt with breathing animation */}
+        {/* Text with shimmer + glitch */}
+        {renderText()}
+
+        {/* Prompt suffix with breathing animation */}
         <span
           className={`font-light ${phase === "idle" ? "logo-prompt-breathe" : ""}`}
           style={{
@@ -124,9 +127,6 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
         >
           {displayedPrompt}
         </span>
-
-        {/* Text with shimmer + glitch */}
-        {renderText()}
 
         {/* Blinking cursor */}
         <motion.span

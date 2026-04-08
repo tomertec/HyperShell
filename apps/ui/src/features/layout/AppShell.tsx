@@ -45,16 +45,16 @@ export function AppShell({ sidebar, children }: AppShellProps) {
             {sidebarOpen && (
               <span className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
                 <span
-                  className="text-accent/75 text-sm font-light"
-                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                >
-                  {">_"}
-                </span>
-                <span
                   className="text-sm font-semibold text-text-primary tracking-tight"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
                   HyperShell
+                </span>
+                <span
+                  className="text-accent/75 text-sm font-light"
+                  style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                >
+                  {">_"}
                 </span>
                 <motion.span
                   className="inline-block w-[2px] h-[14px] bg-accent ml-0.5 rounded-full"

@@ -28,6 +28,8 @@ export interface SidebarHostListProps {
   tags: TagRecord[];
   activeSessionHostIds: Set<string>;
   connectingHostIds: Set<string>;
+  showFilter?: boolean;
+  onCloseFilter?: () => void;
   lastConnectedAtByHostId: Record<string, string | null>;
   onConnect: (host: HostRecord) => void;
   onOpenSftp: (host: HostRecord) => void;
@@ -202,6 +204,8 @@ export function SidebarHostList({
   onCopyAddress,
   onSetColor,
   onReorder,
+  showFilter = false,
+  onCloseFilter,
 }: SidebarHostListProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; host: HostRecord } | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -260,6 +264,14 @@ export function SidebarHostList({
       previous.filter((tagId) => knownIds.has(tagId))
     );
   }, [tags]);
+
+  useEffect(() => {
+    if (showFilter) {
+      filterInputRef.current?.focus();
+    } else {
+      setFilterQuery("");
+    }
+  }, [showFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, HostRecord[]>();
@@ -560,44 +572,54 @@ export function SidebarHostList({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="space-y-0.5 px-1">
-        {/* Filter + export */}
-        <div className="flex items-center gap-1 px-1 pb-1">
-          <div className="relative min-w-0 flex-1">
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 16 16"
-              fill="none"
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/60"
-            >
-              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <input
-              ref={filterInputRef}
-              type="text"
-              value={filterQuery}
-              onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Filter hosts..."
-              className="w-full rounded-md border border-transparent bg-base-750/40 py-1 pl-7 pr-6 text-xs text-text-primary placeholder:text-text-muted/50 focus:border-accent/30 focus:bg-base-750/60 focus:outline-none transition-colors duration-150"
-            />
-            {filterQuery && (
+      <div className="flex flex-col min-h-0 flex-1 px-1">
+        {/* Filter (toggled from Quick Connect magnifier) */}
+        {showFilter && (
+          <div className="flex items-center gap-1 px-1 pb-1 shrink-0">
+            <div className="relative min-w-0 flex-1">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 16 16"
+                fill="none"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted/60"
+              >
+                <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <input
+                ref={filterInputRef}
+                type="text"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setFilterQuery("");
+                    onCloseFilter?.();
+                  }
+                }}
+                placeholder="Filter hosts..."
+                className="w-full rounded-md border border-transparent bg-base-750/40 py-1 pl-7 pr-6 text-xs text-text-primary placeholder:text-text-muted/50 focus:border-accent/30 focus:bg-base-750/60 focus:outline-none transition-colors duration-150"
+              />
               <button
                 type="button"
                 onClick={() => {
                   setFilterQuery("");
-                  filterInputRef.current?.focus();
+                  onCloseFilter?.();
                 }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-sm text-text-muted/60 hover:text-text-primary transition-colors duration-150"
-                title="Clear filter"
+                title="Close filter"
               >
                 <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
                   <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
-            )}
+            </div>
           </div>
+        )}
+
+        {/* Export */}
+        <div className="flex items-center gap-1 px-1 pb-1 shrink-0">
           <select
             value={exportFormat}
             onChange={(event) => setExportFormat(event.target.value as HostExportFormat)}
@@ -621,7 +643,7 @@ export function SidebarHostList({
         </div>
 
         {tags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1 px-1 pb-1.5">
+          <div className="flex flex-wrap items-center gap-1 px-1 pb-1.5 shrink-0">
             {tags.map((tag) => {
               const selected = selectedTagIds.includes(tag.id);
               const hostCount = tagHostCounts.get(tag.id) ?? 0;
@@ -658,36 +680,39 @@ export function SidebarHostList({
           </div>
         )}
 
-        <SortableContext items={allHostIds} strategy={verticalListSortingStrategy}>
-          {[...grouped.entries()].map(([group, groupHosts]) => (
-            <div key={group}>
-              <div className="select-none px-2 py-1.5 text-[10px] font-medium uppercase tracking-widest text-text-muted/70">
-                {group}
+        {/* Scrollable host cards */}
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-0.5">
+          <SortableContext items={allHostIds} strategy={verticalListSortingStrategy}>
+            {[...grouped.entries()].map(([group, groupHosts]) => (
+              <div key={group}>
+                <div className="select-none px-2 py-1.5 text-[10px] font-medium uppercase tracking-widest text-text-muted/70">
+                  {group}
+                </div>
+
+                {groupHosts.map((host, index) => (
+                  <SortableHostItem
+                    key={host.id}
+                    host={host}
+                    activeSessionHostIds={activeSessionHostIds}
+                    connectingHostIds={connectingHostIds}
+                    hostReachabilityById={hostReachabilityById}
+                    onConnect={onConnect}
+                    showDivider={index < groupHosts.length - 1}
+                    onContextMenu={(e, h) => setContextMenu({ x: e.clientX, y: e.clientY, host: h })}
+                  />
+                ))}
               </div>
+            ))}
+          </SortableContext>
 
-              {groupHosts.map((host, index) => (
-                <SortableHostItem
-                  key={host.id}
-                  host={host}
-                  activeSessionHostIds={activeSessionHostIds}
-                  connectingHostIds={connectingHostIds}
-                  hostReachabilityById={hostReachabilityById}
-                  onConnect={onConnect}
-                  showDivider={index < groupHosts.length - 1}
-                  onContextMenu={(e, h) => setContextMenu({ x: e.clientX, y: e.clientY, host: h })}
-                />
-              ))}
-            </div>
-          ))}
-        </SortableContext>
+          {hosts.length === 0 && (
+            <div className="px-2 py-6 text-center text-xs text-text-muted">No hosts yet</div>
+          )}
 
-        {hosts.length === 0 && (
-          <div className="px-2 py-6 text-center text-xs text-text-muted">No hosts yet</div>
-        )}
-
-        {hosts.length > 0 && filteredHosts.length === 0 && (
-          <div className="px-2 py-4 text-center text-xs text-text-muted">No matching hosts</div>
-        )}
+          {hosts.length > 0 && filteredHosts.length === 0 && (
+            <div className="px-2 py-4 text-center text-xs text-text-muted">No matching hosts</div>
+          )}
+        </div>
 
         {contextMenu && (
           <ContextMenu

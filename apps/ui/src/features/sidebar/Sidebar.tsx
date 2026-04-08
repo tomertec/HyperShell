@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { SerialProfileRecord, TagRecord } from "@sshterm/shared";
 import { useStore } from "zustand";
 import type { HostRecord } from "../hosts/HostsView";
@@ -17,10 +18,6 @@ export interface SidebarProps {
   onOpenConnectionHistory: (host: HostRecord) => void;
   onEditHost: (host: HostRecord) => void;
   onNewHost: () => void;
-  onImportSshConfig: () => void;
-  onImportPutty: () => void;
-  onImportSshManager: () => void;
-
   onDuplicateHost: (host: HostRecord) => void;
   onDeleteHost: (host: HostRecord) => void;
   onToggleFavoriteHost: (host: HostRecord) => void;
@@ -48,9 +45,6 @@ export function Sidebar({
   onOpenConnectionHistory,
   onEditHost,
   onNewHost,
-  onImportSshConfig,
-  onImportPutty,
-  onImportSshManager,
 
   onDuplicateHost,
   onDeleteHost,
@@ -67,6 +61,7 @@ export function Sidebar({
   onRestore,
   onDismissRestore,
 }: SidebarProps) {
+  const [showHostFilter, setShowHostFilter] = useState(false);
   const showSerialInSidebar = useStore(
     settingsStore,
     (s) => s.settings.general.showSerialInSidebar
@@ -122,58 +117,39 @@ export function Sidebar({
 
   return (
     <div className="flex flex-col h-full">
-      <button
-        onClick={() => {
-          window.dispatchEvent(
-            new KeyboardEvent("keydown", { key: "k", ctrlKey: true })
-          );
-        }}
-        className="group mx-3 mt-2 mb-3 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-base-750/40 text-xs text-text-secondary hover:text-text-primary hover:border-accent/30 hover:bg-accent/[0.04] transition-all duration-150"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-text-muted group-hover:text-accent/70 transition-colors duration-150">
-          <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-        <span className="flex-1 text-left">Quick Connect</span>
-        <kbd className="text-[10px] text-text-muted bg-base-700/80 px-1.5 py-0.5 rounded border border-border/50">Ctrl+K</kbd>
-      </button>
+      <div className="group mx-3 mt-2 mb-3 flex items-center rounded-lg border border-border bg-base-750/40 text-xs text-text-secondary hover:border-accent/30 hover:bg-accent/[0.04] transition-all duration-150">
+        <button
+          onClick={() => setShowHostFilter((v) => !v)}
+          className={`flex items-center justify-center px-2.5 py-2 rounded-l-lg transition-colors duration-150 ${
+            showHostFilter
+              ? "text-accent bg-accent/10"
+              : "text-text-muted hover:text-accent/70"
+          }`}
+          title="Filter hosts"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+        <button
+          onClick={() => {
+            window.dispatchEvent(
+              new KeyboardEvent("keydown", { key: "k", ctrlKey: true })
+            );
+          }}
+          className="flex-1 flex items-center gap-2 px-2 py-2 rounded-r-lg hover:text-text-primary transition-colors duration-150"
+        >
+          <span className="flex-1 text-left">Quick Connect</span>
+          <kbd className="text-[10px] text-text-muted bg-base-700/80 px-1.5 py-0.5 rounded border border-border/50">Ctrl+K</kbd>
+        </button>
+      </div>
 
       <SidebarSection
         title="Hosts"
+        className="flex-1 min-h-0"
         actions={
           <div className="flex gap-0.5">
-            <button
-              onClick={onImportSshConfig}
-              className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-              title="Import SSH config"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M3 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              onClick={onImportPutty}
-              className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-              title="Import from PuTTY"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-            </button>
-            <button
-              onClick={onImportSshManager}
-              className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-              title="Import from SshManager"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-                <path d="M2 6h12" stroke="currentColor" strokeWidth="1.2" />
-                <circle cx="4.5" cy="9.5" r="1" fill="currentColor" />
-                <circle cx="4.5" cy="9.5" r="1" fill="currentColor" />
-              </svg>
-            </button>
             <button
               onClick={onNewHost}
               className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
@@ -203,6 +179,8 @@ export function Sidebar({
           onCopyAddress={(host) => void navigator.clipboard.writeText(host.hostname)}
           onSetColor={onSetHostColor}
           onReorder={onReorderHosts}
+          showFilter={showHostFilter}
+          onCloseFilter={() => setShowHostFilter(false)}
         />
       </SidebarSection>
 
@@ -277,7 +255,7 @@ export function Sidebar({
           </svg>
           <span className="text-xs font-bold tracking-wide">Settings</span>
         </button>
-        <div className="text-[10px] text-text-muted/60 tracking-wide select-none">HyperShell v0.1.0</div>
+        <div className="text-[10px] text-text-muted/60 tracking-wide select-none" style={{ fontFamily: "'JetBrains Mono', monospace" }}>HyperShell<span className="text-accent/50">&gt;_</span> v0.1.0</div>
       </div>
     </div>
   );

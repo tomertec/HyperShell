@@ -5,21 +5,23 @@ export interface SidebarSectionProps {
   actions?: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  className?: string;
 }
 
 export function SidebarSection({
   title,
   actions,
   children,
-  defaultOpen = true
+  defaultOpen = true,
+  className = "",
 }: SidebarSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="px-2">
+    <div className={`px-2 flex flex-col min-h-0 ${className}`}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors"
+        className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors shrink-0"
       >
         <span className="flex items-center gap-1.5">
           <svg
@@ -35,7 +37,7 @@ export function SidebarSection({
         </span>
         {actions && <span onClick={(e) => e.stopPropagation()}>{actions}</span>}
       </button>
-      {open && <div className="mt-0.5">{children}</div>}
+      {open && <div className="mt-0.5 flex flex-col min-h-0 flex-1">{children}</div>}
     </div>
   );
 }

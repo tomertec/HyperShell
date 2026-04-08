@@ -47,7 +47,7 @@ function formatThemeName(key: string): string {
     .trim();
 }
 
-type SettingsCategory = "general" | "security" | "terminal" | "appearance" | "ssh-keys" | "backup";
+type SettingsCategory = "general" | "security" | "terminal" | "appearance" | "ssh-keys" | "backup" | "import";
 
 const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }[] = [
   {
@@ -125,6 +125,16 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+      </svg>
+    ),
+  },
+  {
+    id: "import",
+    label: "Import",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M3 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -527,7 +537,65 @@ function AppearanceSection() {
   );
 }
 
-export function SettingsPanel() {
+const importButtonClasses =
+  "flex items-center gap-3 w-full rounded-lg border border-border bg-surface/60 px-4 py-3 text-left transition-all duration-150 hover:border-border-bright hover:bg-surface/80";
+
+function ImportSection({ onImportSshConfig, onImportPutty, onImportSshManager }: {
+  onImportSshConfig: () => void;
+  onImportPutty: () => void;
+  onImportSshManager: () => void;
+}) {
+  return (
+    <div className="grid gap-6">
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Import Hosts</h3>
+        <div className="grid gap-3">
+          <button type="button" onClick={onImportSshConfig} className={importButtonClasses}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
+              <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M3 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            <div>
+              <div className="text-sm text-text-primary">Import SSH Config</div>
+              <div className="text-xs text-text-muted">Import hosts from ~/.ssh/config</div>
+            </div>
+          </button>
+
+          <button type="button" onClick={onImportPutty} className={importButtonClasses}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
+              <rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            <div>
+              <div className="text-sm text-text-primary">Import from PuTTY</div>
+              <div className="text-xs text-text-muted">Import saved sessions from PuTTY registry</div>
+            </div>
+          </button>
+
+          <button type="button" onClick={onImportSshManager} className={importButtonClasses}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
+              <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M2 6h12" stroke="currentColor" strokeWidth="1.2" />
+              <circle cx="4.5" cy="9.5" r="1" fill="currentColor" />
+            </svg>
+            <div>
+              <div className="text-sm text-text-primary">Import from SshManager</div>
+              <div className="text-xs text-text-muted">Import hosts, groups, and snippets from SshManager database</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface SettingsPanelProps {
+  onImportSshConfig: () => void;
+  onImportPutty: () => void;
+  onImportSshManager: () => void;
+}
+
+export function SettingsPanel({ onImportSshConfig, onImportPutty, onImportSshManager }: SettingsPanelProps) {
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("general");
 
   return (
@@ -561,6 +629,7 @@ export function SettingsPanel() {
         {activeCategory === "appearance" && <AppearanceSection />}
         {activeCategory === "ssh-keys" && <SshKeyManager />}
         {activeCategory === "backup" && <BackupRestorePanel />}
+        {activeCategory === "import" && <ImportSection onImportSshConfig={onImportSshConfig} onImportPutty={onImportPutty} onImportSshManager={onImportSshManager} />}
       </div>
     </div>
   );
