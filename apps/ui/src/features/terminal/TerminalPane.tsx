@@ -88,7 +88,7 @@ export function TerminalPane({
           onRetry={() => session.connect()}
         />
         {session.sessionId && session.state === "connected" && (
-          <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 bg-base-800/80 rounded px-1.5 py-0.5 backdrop-blur-sm border border-border/30">
+          <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-base-800/80 rounded px-1.5 py-0.5 backdrop-blur-sm border border-border/30">
             <LoggingButton sessionId={session.sessionId} />
           </div>
         )}
