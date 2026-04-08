@@ -15,6 +15,7 @@ export interface SidebarProps {
   onEditHost: (host: HostRecord) => void;
   onNewHost: () => void;
   onImportSshConfig: () => void;
+  onImportPutty: () => void;
 
   onDuplicateHost: (host: HostRecord) => void;
   onDeleteHost: (host: HostRecord) => void;
@@ -41,6 +42,7 @@ export function Sidebar({
   onEditHost,
   onNewHost,
   onImportSshConfig,
+  onImportPutty,
 
   onDuplicateHost,
   onDeleteHost,
@@ -140,6 +142,16 @@ export function Sidebar({
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M3 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            <button
+              onClick={onImportPutty}
+              className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
+              title="Import from PuTTY"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
             </button>
             <button

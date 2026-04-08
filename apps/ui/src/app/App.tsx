@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
-import { Toaster } from "sonner";
+import { toast, Toaster } from "sonner";
 
 import { broadcastStore } from "../features/broadcast/broadcastStore";
 import { useSnippetStore } from "../features/snippets/snippetStore";
@@ -11,6 +11,7 @@ import {
   SshConfigImportDialog,
   type SshConfigImportItem
 } from "../features/hosts/SshConfigImportDialog";
+import { PuttyImportDialog } from "../features/hosts/PuttyImportDialog";
 import { AppShell } from "../features/layout/AppShell";
 import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
@@ -24,7 +25,7 @@ import { Sidebar } from "../features/sidebar/Sidebar";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
-import type { SerialProfileRecord } from "@sshterm/shared";
+import type { PuttySession, SerialProfileRecord } from "@sshterm/shared";
 import { EditorApp } from "../features/editor/EditorApp";
 import {
   HostKeyVerificationDialog,
@@ -214,6 +215,7 @@ function MainApp() {
   const [hostModalOpen, setHostModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [puttyImportOpen, setPuttyImportOpen] = useState(false);
   const [editingHost, setEditingHost] = useState<HostRecord | null>(null);
   const [serialProfiles, setSerialProfiles] = useState<SerialProfileRecord[]>([]);
   const [serialModalOpen, setSerialModalOpen] = useState(false);
@@ -725,6 +727,7 @@ function MainApp() {
             onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
             onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
             onImportSshConfig={() => setImportModalOpen(true)}
+            onImportPutty={() => setPuttyImportOpen(true)}
 
             onDuplicateHost={duplicateHost}
             onDeleteHost={(host) => { void deleteHost(host); }}
@@ -846,6 +849,34 @@ function MainApp() {
               void persistHost(host);
             }
             setImportModalOpen(false);
+          }}
+        />
+      </Modal>
+
+      <Modal
+        open={puttyImportOpen}
+        onClose={() => setPuttyImportOpen(false)}
+        title="Import from PuTTY"
+      >
+        <PuttyImportDialog
+          onClose={() => setPuttyImportOpen(false)}
+          onImport={(sessions: PuttySession[]) => {
+            const newHosts = sessions.map((session, i) => ({
+              id: `putty-${Date.now()}-${i}`,
+              name: session.name,
+              hostname: session.hostname,
+              port: session.port,
+              username: session.username || "",
+              identityFile: session.keyFile || undefined,
+              group: "PuTTY Import",
+              tags: "putty",
+            }));
+            setHosts((prev) => [...prev, ...newHosts]);
+            for (const host of newHosts) {
+              void persistHost(host);
+            }
+            setPuttyImportOpen(false);
+            toast.success(`Imported ${newHosts.length} PuTTY session${newHosts.length === 1 ? "" : "s"}`);
           }}
         />
       </Modal>

@@ -154,6 +154,23 @@ export type RemoveHostRequest = z.infer<typeof removeHostRequestSchema>;
 export type ImportSshConfigResponse = z.infer<typeof importSshConfigResponseSchema>;
 export type ExportHostsRequest = z.infer<typeof exportHostsRequestSchema>;
 
+// --- PuTTY import schemas ---
+
+export const puttySessionSchema = z.object({
+  name: z.string().min(1),
+  hostname: z.string().min(1),
+  port: z.number().int().positive(),
+  username: z.string(),
+  keyFile: z.string(),
+});
+
+export const scanPuttyResponseSchema = z.object({
+  sessions: z.array(puttySessionSchema),
+});
+
+export type PuttySession = z.infer<typeof puttySessionSchema>;
+export type ScanPuttyResponse = z.infer<typeof scanPuttyResponseSchema>;
+
 // --- Settings schemas ---
 
 export const getSettingRequestSchema = z.object({

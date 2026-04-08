@@ -42,6 +42,7 @@ import { registerEditorIpc } from "./editorIpc";
 import { registerSnippetsIpc } from "./snippetsIpc";
 import { createSessionLogger, registerLoggingIpc } from "./loggingIpc";
 import { registerHostFingerprintIpc } from "./hostFingerprintIpc";
+import { registerPuttyImportIpc } from "./puttyImportIpc";
 import { createGroupsRepository, createSerialProfilesRepository } from "@sshterm/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
 import type {
@@ -70,6 +71,7 @@ const registeredChannels = [
   ipcChannels.hosts.reorder,
   ipcChannels.hosts.importSshConfig,
   ipcChannels.hosts.exportHosts,
+  ipcChannels.hosts.scanPutty,
   ipcChannels.settings.get,
   ipcChannels.settings.update,
   ipcChannels.portForward.start,
@@ -963,6 +965,7 @@ export function registerIpc(
     return { exported: hosts.length };
   });
   registerSshConfigIpc(ipcMain, () => getOrCreateHostsRepo());
+  registerPuttyImportIpc(ipcMain);
   registerSettingsIpc(ipcMain, () => getOrCreateDatabase());
   registerPortForwardIpc(ipcMain);
   registerGroupsIpc(ipcMain, () => groupsRepo);

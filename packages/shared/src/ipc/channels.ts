@@ -16,6 +16,7 @@ export const hostChannels = {
   importSshConfig: "hosts:import-ssh-config",
   reorder: "hosts:reorder",
   exportHosts: "hosts:export",
+  scanPutty: "hosts:scan-putty",
 } as const;
 
 export const settingsChannels = {
