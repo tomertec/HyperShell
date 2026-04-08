@@ -153,6 +153,7 @@ Both sides validate. The preload validates outgoing requests AND incoming respon
 | `sftpStore` (per session) | `ui/features/sftp/` | SFTP pane state, entries, selection, sort |
 | `transferStore` | `ui/features/sftp/` | Active transfer jobs and progress |
 | `tunnelStore` | `ui/features/tunnels/` | Tunnel Manager panel state, active forwards |
+| `snippetStore` | `ui/features/snippets/` | Snippets panel state, CRUD, send-to-terminal |
 
 ## Key Design Decisions
 

@@ -69,7 +69,13 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 
 **Network-aware auto-reconnect:** `SessionManager` integrates with a `NetworkMonitor` that probes DNS every 10s. On disconnect, if the network is down, sessions enter `waiting_for_network` state (no reconnect attempts burned). When connectivity returns, attempts reset and reconnection starts immediately. Per-host config: `autoReconnect`, `reconnectMaxAttempts`, `reconnectBaseInterval`.
 
-**State management:** UI uses Zustand stores — `layoutStore` (tabs/panes), `settingsStore`, `sessionRecoveryStore`, `broadcastStore`, `sftpStore` (per SFTP session), `transferStore`, `tunnelStore` (port forward manager).
+**State management:** UI uses Zustand stores — `layoutStore` (tabs/panes, drag-and-drop reorder), `settingsStore`, `sessionRecoveryStore`, `broadcastStore`, `sftpStore` (per SFTP session), `transferStore`, `tunnelStore` (port forward manager), `snippetStore` (snippets panel).
+
+**Session logging:** `loggingIpc.ts` provides a `createSessionLogger()` that intercepts terminal data events in `registerIpc.ts`, strips ANSI escape sequences, and writes to user-chosen files. Controlled per-session via recording button in TerminalPane (visibility controlled by `general.showRecordingButton` setting).
+
+**Toast notifications:** Uses `sonner` library. `<Toaster>` is mounted in App.tsx. Import `toast` from `sonner` to show notifications.
+
+**Keyboard shortcuts:** Global shortcuts registered in App.tsx keydown handler: `Ctrl+Shift+S` (snippets panel), `Ctrl+Shift+D` (split horizontal), `Ctrl+Shift+E` (split vertical), `Ctrl+Shift+W` (close pane), `Ctrl+Shift+[/]` (navigate panes). Handler logic in `paneShortcuts.ts`.
 
 **Database:** SQLite with foreign keys enabled. 6 migrations in `packages/db/src/migrations/`. Repositories pattern for data access. See [`docs/data-model.md`](docs/data-model.md).
 

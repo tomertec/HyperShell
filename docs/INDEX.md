@@ -97,6 +97,13 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 | Host status monitoring | Complete | `desktop/main/monitoring/hostMonitor.ts` |
 | 1Password references | Complete | `desktop/main/security/opResolver.ts` |
 | Status bar | Complete | `ui/features/statusbar/` |
+| Snippets manager | Complete | `ui/features/snippets/`, `db/repositories/snippetsRepository.ts` |
+| Session logging | Complete | `desktop/ipc/loggingIpc.ts`, `ui/features/terminal/LoggingButton.tsx` |
+| Tab drag-and-drop reorder | Complete | `ui/features/layout/TabBar.tsx` (dnd-kit) |
+| Split pane shortcuts | Complete | `ui/features/layout/paneShortcuts.ts` |
+| Host export (JSON/CSV) | Complete | `desktop/ipc/hostsIpc.ts` (exportHostsToJson/Csv) |
+| Toast notifications | Complete | sonner `<Toaster>` in App.tsx |
+| General settings panel | Complete | `ui/features/settings/SettingsPanel.tsx` (General section) |
 | SSH key manager | Partial | `ui/features/ssh-keys/` (UI only) |
 
 ## Tech Stack
@@ -114,6 +121,7 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 | State management | Zustand | 5.0.8 |
 | Schema validation | Zod | 3.24.1 |
 | Styling | Tailwind CSS | 4.2.2 |
+| Toast notifications | sonner | 2.x |
 | Animations | Framer Motion | 12.23.24 |
 | Code editor | CodeMirror | 6.0.2 |
 | Drag-and-drop | dnd-kit | 6.3.1 |

@@ -92,6 +92,17 @@ Primary host records for SSH connections.
 | created_at | TEXT | ISO timestamp |
 | updated_at | TEXT | ISO timestamp |
 
+### snippets
+User-defined command snippets that can be sent to active terminal sessions.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT PK | UUID |
+| name | TEXT NOT NULL | Snippet display name (unique) |
+| body | TEXT NOT NULL | Snippet content (sent to terminal) |
+| created_at | TEXT | ISO timestamp |
+| updated_at | TEXT | ISO timestamp |
+
 ### app_settings
 Key-value store for user preferences.
 
@@ -154,3 +165,4 @@ All repositories are in `packages/db/src/repositories/`. They follow a consisten
 | `sftpBookmarksRepository` | sftp_bookmarks | `create`, `list` (by host), `update`, `remove`, `reorder` |
 | `workspaceRepository` | workspace_layouts | `save`, `load`, `list`, `remove` |
 | `hostPortForwardsRepository` | host_port_forwards | `create`, `update`, `listForHost`, `remove`, `updateSortOrders` |
+| `snippetsRepository` | snippets | `create`, `list`, `get`, `remove` |

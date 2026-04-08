@@ -47,6 +47,20 @@ User preferences are stored in the `app_settings` SQLite table as JSON key-value
 | `window.maximized` | boolean | `false` | Whether window is maximized |
 | `window.sidebarWidth` | number | `240` | Sidebar width in pixels |
 
+### General Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `general.showRecordingButton` | boolean | `true` | Show session recording button in terminal panes |
+| `general.showRestoreBanner` | boolean | `true` | Show "Restore sessions from last session" prompt on startup |
+| `general.showSerialInSidebar` | boolean | `true` | Show serial profiles section in the hosts sidebar |
+
+### Debug Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `debug.authTracing` | boolean | `false` | Log credential resolution (never logs secrets) |
+
 ## Terminal Themes
 
 The default terminal theme uses the custom color palette defined in `apps/ui/src/index.css`:

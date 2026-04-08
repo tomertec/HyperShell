@@ -25,6 +25,7 @@ Session states: `connecting`, `connected`, `reconnecting`, `waiting_for_network`
 | `hosts:remove` | `{ id }` | void | `hostsIpc.ts` |
 | `hosts:import-ssh-config` | `{ entries }` | `{ imported }` | `sshConfigIpc.ts` |
 | `hosts:reorder` | `{ hostOrders, groupOrders }` | void | `hostsIpc.ts` |
+| `hosts:export` | `{ format: "json"\|"csv", filePath }` | `{ exported: number }` | `hostsIpc.ts` / `registerIpc.ts` |
 
 ## Group Channels
 
@@ -78,6 +79,25 @@ Session states: `connecting`, `connected`, `reconnecting`, `waiting_for_network`
 | `fs:get-home` | — | `{ path }` | `fsIpc.ts` |
 | `fs:get-drives` | — | `{ drives: string[] }` | `fsIpc.ts` |
 | `fs:list-ssh-keys` | — | `string[]` | `fsIpc.ts` |
+| `fs:show-save-dialog` | `{ defaultPath?, filters? }` | `string \| null` | `fsIpc.ts` |
+
+## Snippet Channels
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `snippets:list` | — | `SnippetRecord[]` | `snippetsIpc.ts` |
+| `snippets:upsert` | `{ id, name, body }` | `SnippetRecord` | `snippetsIpc.ts` |
+| `snippets:remove` | `{ id }` | void | `snippetsIpc.ts` |
+
+## Session Logging Channels
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `logging:start` | `{ sessionId, filePath }` | void | `loggingIpc.ts` |
+| `logging:stop` | `{ sessionId }` | void | `loggingIpc.ts` |
+| `logging:get-state` | `{ sessionId }` | `{ active, filePath, bytesWritten }` | `loggingIpc.ts` |
+
+Session logging intercepts terminal `data` events in `registerIpc.ts` and writes to file with ANSI escape sequences stripped. The logger hooks into `manager.onEvent()` and only processes sessions with active logging.
 
 ## Settings Channels
 

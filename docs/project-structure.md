@@ -22,7 +22,10 @@ sshterm/
 │   │   │   │   │   ├── hostPortForwardIpc.ts # Host-linked port forward CRUD
 │   │   │   │   │   ├── sshConfigIpc.ts      # ~/.ssh/config parsing
 │   │   │   │   │   ├── sshKeysIpc.ts        # SSH key management
-│   │   │   │   │   └── workspaceIpc.ts      # Workspace save/restore
+│   │   │   │   │   ├── workspaceIpc.ts      # Workspace save/restore
+│   │   │   │   │   ├── snippetsIpc.ts       # Snippet CRUD
+│   │   │   │   │   ├── loggingIpc.ts        # Session logging (ANSI-stripped file write)
+│   │   │   │   │   └── editorIpc.ts         # SFTP file editor windows
 │   │   │   │   ├── sftp/
 │   │   │   │   │   ├── sftpSessionManager.ts  # SFTP session pool
 │   │   │   │   │   └── transferManager.ts     # Transfer queue (3 concurrent/session)
@@ -55,7 +58,7 @@ sshterm/
 │       │   │   └── ContextMenu.tsx          # Reusable context menu
 │       │   └── features/
 │       │       ├── layout/                  # AppShell, Workspace, TabBar, Panes
-│       │       ├── terminal/                # TerminalPane, useTerminalSession, reconnect overlay
+│       │       ├── terminal/                # TerminalPane, useTerminalSession, reconnect overlay, LoggingButton
 │       │       ├── tunnels/                 # Tunnel Manager (topology, list, form, store)
 │       │       ├── sftp/                    # Dual-pane browser, transfers, editor
 │       │       │   ├── components/          # FileList, RemotePane, LocalPane, etc.
@@ -73,6 +76,7 @@ sshterm/
 │       │       ├── welcome/                 # AnimatedLogo, QuickConnectForm, WelcomeScreen
 │       │       ├── workspace/               # WorkspaceMenu (save/restore)
 │       │       ├── port-forwarding/         # PortForwardProfileForm
+│       │       ├── snippets/                # SnippetsPanel, snippetStore (Ctrl+Shift+S)
 │       │       ├── ssh-keys/                # SshKeyManager
 │       │       └── statusbar/               # StatusBar, useSessionStats
 │       ├── tests/                           # Playwright E2E tests
