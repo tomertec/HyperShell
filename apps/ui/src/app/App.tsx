@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "zustand";
+import { Toaster } from "sonner";
 
 import { broadcastStore } from "../features/broadcast/broadcastStore";
 import type { HostFormValue } from "../features/hosts/HostForm";
@@ -815,6 +816,13 @@ function MainApp() {
           </div>
         </form>
       </Modal>
+
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          className: "!bg-base-700 !border !border-border !text-text-primary !text-sm",
+        }}
+      />
     </>
   );
 }
