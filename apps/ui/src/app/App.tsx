@@ -244,14 +244,15 @@ function MainApp() {
     void Promise.all([loadHosts(), loadSerialProfiles()]).then(
       ([h, sp]) => { setHosts(h); setSerialProfiles(sp); }
     );
-    void settingsStore.getState().load();
-
-    // Check for last workspace to restore
-    void window.sshterm?.workspaceLoadLast?.().then((last) => {
-      if (last?.layout?.tabs && last.layout.tabs.length > 0) {
-        setLastWorkspaceTabs(last.layout.tabs);
-        setRestoreBannerVisible(true);
-      }
+    // Load settings, then check for last workspace to restore
+    void settingsStore.getState().load().then(() => {
+      if (!settingsStore.getState().settings.general.showRestoreBanner) return;
+      return window.sshterm?.workspaceLoadLast?.().then((last) => {
+        if (last?.layout?.tabs && last.layout.tabs.length > 0) {
+          setLastWorkspaceTabs(last.layout.tabs);
+          setRestoreBannerVisible(true);
+        }
+      });
     }).catch(() => {});
   }, []);
 

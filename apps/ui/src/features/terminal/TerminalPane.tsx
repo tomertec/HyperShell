@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useStore } from "zustand";
 
 import { useTerminalSession } from "./useTerminalSession";
 import { TerminalReconnectOverlay } from "./TerminalReconnectOverlay";
 import { TerminalSearchBar } from "./TerminalSearchBar";
 import { LoggingButton } from "./LoggingButton";
+import { settingsStore } from "../settings/settingsStore";
 
 export interface TerminalPaneProps {
   transport: "ssh" | "serial";
@@ -22,6 +24,7 @@ export function TerminalPane({
 }: TerminalPaneProps) {
   const [dtr, setDtr] = useState(true);
   const [rts, setRts] = useState(true);
+  const showRecordingButton = useStore(settingsStore, (s) => s.settings.general.showRecordingButton);
 
   const session = useTerminalSession({
     transport,
@@ -87,7 +90,7 @@ export function TerminalPane({
           state={session.state}
           onRetry={() => session.connect()}
         />
-        {session.sessionId && session.state === "connected" && (
+        {showRecordingButton && session.sessionId && session.state === "connected" && (
           <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-base-800/80 rounded px-1.5 py-0.5 backdrop-blur-sm border border-border/30">
             <LoggingButton sessionId={session.sessionId} />
           </div>

@@ -17,9 +17,15 @@ export interface DebugSettings {
   authTracing: boolean;
 }
 
+export interface GeneralSettings {
+  showRecordingButton: boolean;
+  showRestoreBanner: boolean;
+}
+
 export interface AppSettings {
   terminal: TerminalSettings;
   debug: DebugSettings;
+  general: GeneralSettings;
   customThemes: Record<string, TerminalTheme>;
 }
 
@@ -75,11 +81,17 @@ const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
   theme: "default"
 };
 
+const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+  showRecordingButton: true,
+  showRestoreBanner: true,
+};
+
 const DEFAULT_APP_SETTINGS: AppSettings = {
   terminal: DEFAULT_TERMINAL_SETTINGS,
   debug: {
     authTracing: false
   },
+  general: DEFAULT_GENERAL_SETTINGS,
   customThemes: {}
 };
 
@@ -91,6 +103,7 @@ interface SettingsState {
   load: () => Promise<void>;
   updateTerminal: (partial: Partial<TerminalSettings>) => Promise<void>;
   updateDebug: (partial: Partial<DebugSettings>) => Promise<void>;
+  updateGeneral: (partial: Partial<GeneralSettings>) => Promise<void>;
   setTerminalFontSize: (fontSize: number) => Promise<void>;
   changeTerminalFontSize: (delta: number) => Promise<number>;
   resetTerminalFontSize: () => Promise<void>;
@@ -116,6 +129,10 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
             debug: {
               ...DEFAULT_APP_SETTINGS.debug,
               ...(parsed.debug ?? {})
+            },
+            general: {
+              ...DEFAULT_GENERAL_SETTINGS,
+              ...(parsed.general ?? {})
             },
             customThemes: parsed.customThemes ?? {}
           };
@@ -175,6 +192,24 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     } catch {
       // persist failure is non-fatal; in-memory state is already updated
     }
+  },
+
+  updateGeneral: async (partial) => {
+    const current = get().settings;
+    const next: AppSettings = {
+      ...current,
+      general: {
+        ...current.general,
+        ...partial
+      }
+    };
+    set({ settings: next });
+    try {
+      await window.sshterm?.updateSetting({
+        key: SETTINGS_KEY,
+        value: JSON.stringify(next)
+      });
+    } catch {}
   },
 
   setTerminalFontSize: async (fontSize) => {

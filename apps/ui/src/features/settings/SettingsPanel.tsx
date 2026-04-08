@@ -44,9 +44,19 @@ function formatThemeName(key: string): string {
     .trim();
 }
 
-type SettingsCategory = "terminal" | "appearance" | "ssh-keys";
+type SettingsCategory = "general" | "terminal" | "appearance" | "ssh-keys";
 
 const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }[] = [
+  {
+    id: "general",
+    label: "General",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1.5a1.5 1.5 0 0 1 1.5 1.5v.34a5.5 5.5 0 0 1 1.3.75l.29-.17a1.5 1.5 0 0 1 2.05.55l.01.01a1.5 1.5 0 0 1-.55 2.05l-.3.17a5.5 5.5 0 0 1 0 1.5l.3.17a1.5 1.5 0 0 1 .54 2.06 1.5 1.5 0 0 1-2.05.55l-.3-.17a5.5 5.5 0 0 1-1.29.75V12a1.5 1.5 0 0 1-3 0v-.34a5.5 5.5 0 0 1-1.3-.75l-.29.17a1.5 1.5 0 0 1-2.05-.55l-.01-.01a1.5 1.5 0 0 1 .55-2.05l.3-.17a5.5 5.5 0 0 1 0-1.5l-.3-.17a1.5 1.5 0 0 1-.54-2.06 1.5 1.5 0 0 1 2.05-.55l.3.17a5.5 5.5 0 0 1 1.29-.75V3A1.5 1.5 0 0 1 8 1.5Z" stroke="currentColor" strokeWidth="1.3" />
+        <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    ),
+  },
   {
     id: "terminal",
     label: "Terminal",
@@ -84,6 +94,65 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }
     ),
   },
 ];
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className={[
+        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 focus:ring-offset-base-900",
+        checked ? "bg-accent" : "bg-base-600",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out",
+          checked ? "translate-x-4" : "translate-x-0.5",
+        ].join(" ")}
+      />
+    </button>
+  );
+}
+
+function GeneralSection() {
+  const settings = useStore(settingsStore, (s) => s.settings);
+  const updateGeneral = useStore(settingsStore, (s) => s.updateGeneral);
+  const { showRecordingButton, showRestoreBanner } = settings.general;
+
+  return (
+    <div className="grid gap-6">
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Session</h3>
+        <div className="grid gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Session Recording Button</div>
+              <div className="text-xs text-text-muted">Show the recording button in terminal panes</div>
+            </div>
+            <ToggleSwitch
+              checked={showRecordingButton}
+              onChange={() => void updateGeneral({ showRecordingButton: !showRecordingButton })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Session Restore Prompt</div>
+              <div className="text-xs text-text-muted">Show "Restore sessions from last session" on startup</div>
+            </div>
+            <ToggleSwitch
+              checked={showRestoreBanner}
+              onChange={() => void updateGeneral({ showRestoreBanner: !showRestoreBanner })}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TerminalSection() {
   const settings = useStore(settingsStore, (s) => s.settings);
@@ -349,7 +418,7 @@ function AppearanceSection() {
 }
 
 export function SettingsPanel() {
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>("terminal");
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>("general");
 
   return (
     <div className="flex h-[520px]">
@@ -376,6 +445,7 @@ export function SettingsPanel() {
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+        {activeCategory === "general" && <GeneralSection />}
         {activeCategory === "terminal" && <TerminalSection />}
         {activeCategory === "appearance" && <AppearanceSection />}
         {activeCategory === "ssh-keys" && <SshKeyManager />}
