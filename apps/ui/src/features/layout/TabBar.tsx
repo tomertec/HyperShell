@@ -147,6 +147,7 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
+  const tabIds = useMemo(() => tabs.map((t) => t.tabKey ?? t.sessionId), [tabs]);
 
   if (tabs.length === 0) return null;
 
@@ -170,8 +171,6 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }
       onReorder(oldIndex, newIndex);
     }
   };
-
-  const tabIds = useMemo(() => tabs.map((t) => t.tabKey ?? t.sessionId), [tabs]);
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
