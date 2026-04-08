@@ -112,7 +112,10 @@ export function createMainProcessLifecycle(
       },
       emitSftpEvent: (event: unknown) => {
         mainWindow?.webContents.send(ipcChannels.sftp.event, event);
-      }
+      },
+      emitKeyboardInteractive: (event: unknown) => {
+        mainWindow?.webContents.send(ipcChannels.sftp.keyboardInteractive, event);
+      },
     });
     hostMonitor = deps.createHostMonitor();
 

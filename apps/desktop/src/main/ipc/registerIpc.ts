@@ -154,6 +154,7 @@ export interface RegisterIpcOptions {
   emitSessionEvent?: (event: unknown) => void;
   emitSftpEvent?: (event: unknown) => void;
   emitSyncEvent?: (event: unknown) => void;
+  emitKeyboardInteractive?: (event: unknown) => void;
   sessionManager?: SessionManager;
   resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; password?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
   resolveSerialProfile?: (profileId: string) => SerialProfileRecord | undefined;
@@ -976,7 +977,10 @@ export function registerIpc(
     },
     emitSyncEvent: (event) => {
       options.emitSyncEvent?.(event);
-    }
+    },
+    emitKeyboardInteractive: (event) => {
+      options.emitKeyboardInteractive?.(event);
+    },
   });
   registerWorkspaceIpc(ipcMain, () => getOrCreateDatabase());
   registerSshKeysIpc(ipcMain);

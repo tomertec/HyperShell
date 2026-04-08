@@ -89,6 +89,8 @@ import type {
   HostFingerprintLookupRequest,
   HostFingerprintTrustRequest,
   HostFingerprintRemoveRequest,
+  KeyboardInteractiveRequest,
+  KeyboardInteractiveResponse,
 } from "@sshterm/shared";
 
 declare global {
@@ -175,6 +177,8 @@ declare global {
       hostFingerprintLookup?: (request: HostFingerprintLookupRequest) => Promise<HostFingerprintRecord | null>;
       hostFingerprintTrust?: (request: HostFingerprintTrustRequest) => Promise<HostFingerprintRecord>;
       hostFingerprintRemove?: (request: HostFingerprintRemoveRequest) => Promise<void>;
+      onKeyboardInteractive?: (listener: (request: KeyboardInteractiveRequest) => void) => () => void;
+      keyboardInteractiveRespond?: (response: KeyboardInteractiveResponse) => Promise<void>;
     };
   }
 }

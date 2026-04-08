@@ -30,6 +30,8 @@ import {
   HostKeyVerificationDialog,
   type HostKeyVerificationInfo,
 } from "../features/hosts/HostKeyVerificationDialog";
+import { KeyboardInteractiveDialog } from "../features/hosts/KeyboardInteractiveDialog";
+import type { KeyboardInteractiveRequest } from "@sshterm/shared";
 
 function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
   return {
@@ -228,6 +230,7 @@ function MainApp() {
   const [hostKeyVerifyInfo, setHostKeyVerifyInfo] = useState<HostKeyVerificationInfo | null>(null);
   const [hostKeyVerifyHost, setHostKeyVerifyHost] = useState<HostRecord | null>(null);
   const [hostKeyVerifyFromAuth, setHostKeyVerifyFromAuth] = useState(false);
+  const [kbdInteractiveRequest, setKbdInteractiveRequest] = useState<KeyboardInteractiveRequest | null>(null);
   const [restoreBannerVisible, setRestoreBannerVisible] = useState(false);
   const [lastWorkspaceTabs, setLastWorkspaceTabs] = useState<Array<{
     transport: string;
@@ -341,6 +344,29 @@ function MainApp() {
       setIsQuickConnectOpen(true);
     });
   }, []);
+
+  // Keyboard-interactive auth (2FA) relay
+  useEffect(() => {
+    return window.sshterm?.onKeyboardInteractive?.((request) => {
+      setKbdInteractiveRequest(request);
+    });
+  }, []);
+
+  const handleKbdInteractiveSubmit = useCallback(
+    (requestId: string, responses: string[]) => {
+      void window.sshterm?.keyboardInteractiveRespond?.({ requestId, responses });
+      setKbdInteractiveRequest(null);
+    },
+    []
+  );
+
+  const handleKbdInteractiveCancel = useCallback(
+    (requestId: string) => {
+      void window.sshterm?.keyboardInteractiveRespond?.({ requestId, responses: [] });
+      setKbdInteractiveRequest(null);
+    },
+    []
+  );
 
   useEffect(() => {
     const terminalBg = resolveTerminalTheme(terminalThemeName, customThemes).background;
@@ -931,6 +957,12 @@ function MainApp() {
         info={hostKeyVerifyInfo}
         onTrust={handleHostKeyTrust}
         onReject={handleHostKeyReject}
+      />
+
+      <KeyboardInteractiveDialog
+        request={kbdInteractiveRequest}
+        onSubmit={handleKbdInteractiveSubmit}
+        onCancel={handleKbdInteractiveCancel}
       />
 
       <Toaster

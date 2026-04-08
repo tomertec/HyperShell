@@ -1,4 +1,4 @@
-import { createSftpTransport, type SftpConnectionOptions, type SftpTransportHandle } from "@sshterm/session-core";
+import { createSftpTransport, type SftpConnectionOptions, type SftpTransportHandle, type SftpTransportOptions } from "@sshterm/session-core";
 import type { SessionTransportEvent } from "@sshterm/session-core";
 import { randomUUID } from "node:crypto";
 
@@ -11,7 +11,7 @@ export interface SftpSession {
 export type SftpSessionEvent = { sftpSessionId: string } & SessionTransportEvent;
 
 export interface SftpSessionManager {
-  connect(hostId: string, options: SftpConnectionOptions): Promise<string>;
+  connect(hostId: string, options: SftpConnectionOptions, transportOptions?: SftpTransportOptions): Promise<string>;
   disconnect(sftpSessionId: string): void;
   getSession(sftpSessionId: string): SftpSession | undefined;
   getTransport(sftpSessionId: string): SftpTransportHandle;
@@ -30,9 +30,9 @@ export function createSftpSessionManager(): SftpSessionManager {
     }
   }
 
-  async function connect(hostId: string, options: SftpConnectionOptions): Promise<string> {
+  async function connect(hostId: string, options: SftpConnectionOptions, transportOptions?: SftpTransportOptions): Promise<string> {
     const sftpSessionId = `sftp-${randomUUID().replace(/-/g, "")}`;
-    const transport = createSftpTransport(sftpSessionId, options);
+    const transport = createSftpTransport(sftpSessionId, options, transportOptions);
 
     transport.onEvent((event) => {
       emit(sftpSessionId, event);

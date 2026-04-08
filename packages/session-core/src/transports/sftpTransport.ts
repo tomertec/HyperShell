@@ -11,8 +11,20 @@ import type { Ssh2ConnectionPool, Ssh2PoolTarget, ResolvedAuth } from "../ssh2Co
 
 export type { SftpConnectionOptions } from "./transportEvents";
 
+export interface KeyboardInteractivePrompt {
+  prompt: string;
+  echo: boolean;
+}
+
+export type KeyboardInteractiveCallback = (
+  name: string,
+  instructions: string,
+  prompts: KeyboardInteractivePrompt[]
+) => Promise<string[]>;
+
 export interface SftpTransportOptions {
   pool?: Ssh2ConnectionPool;
+  onKeyboardInteractive?: KeyboardInteractiveCallback;
 }
 
 export interface SftpEntry {
@@ -89,6 +101,9 @@ function buildConnectConfig(options: SftpConnectionOptions, keyPath?: string): C
   if (options.password) {
     config.password = options.password;
   }
+
+  // Enable keyboard-interactive auth to support 2FA/MFA prompts
+  config.tryKeyboard = true;
 
   return config;
 }
@@ -212,6 +227,26 @@ export function createSftpTransport(
       });
 
       conn.on("error", fail);
+
+      // Handle keyboard-interactive auth (2FA, TOTP, etc.)
+      const onKbdInteractive = transportOptions?.onKeyboardInteractive;
+      if (onKbdInteractive) {
+        conn.on("keyboard-interactive", (name, instructions, _instructionsLang, prompts, finish) => {
+          const mappedPrompts = prompts.map((p) => ({
+            prompt: p.prompt,
+            echo: p.echo ?? false,
+          }));
+          onKbdInteractive(name, instructions, mappedPrompts)
+            .then((responses) => {
+              finish(responses);
+            })
+            .catch(() => {
+              // User cancelled or error — send empty responses so server rejects
+              finish(prompts.map(() => ""));
+            });
+        });
+      }
+
       conn.connect(connectConfig);
     });
   }

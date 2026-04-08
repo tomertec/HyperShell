@@ -163,6 +163,10 @@ import {
   type HostFingerprintLookupRequest,
   type HostFingerprintTrustRequest,
   type HostFingerprintRemoveRequest,
+  keyboardInteractiveRequestSchema,
+  keyboardInteractiveResponseSchema,
+  type KeyboardInteractiveRequest,
+  type KeyboardInteractiveResponse,
   type SaveWorkspaceRequest,
   type LoadWorkspaceRequest,
   type RemoveWorkspaceRequest,
@@ -293,6 +297,9 @@ export interface DesktopApi {
   hostFingerprintLookup(request: HostFingerprintLookupRequest): Promise<HostFingerprintRecord | null>;
   hostFingerprintTrust(request: HostFingerprintTrustRequest): Promise<HostFingerprintRecord>;
   hostFingerprintRemove(request: HostFingerprintRemoveRequest): Promise<void>;
+  // Keyboard-interactive auth (2FA)
+  onKeyboardInteractive(listener: (request: KeyboardInteractiveRequest) => void): () => void;
+  keyboardInteractiveRespond(response: KeyboardInteractiveResponse): Promise<void>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -978,6 +985,33 @@ export function createDesktopApi(
     },
     async hostFingerprintRemove(request: HostFingerprintRemoveRequest): Promise<void> {
       await ipcRenderer.invoke(ipcChannels.hostFingerprint.remove, hostFingerprintRemoveRequestSchema.parse(request));
+    },
+    onKeyboardInteractive(listener: (request: KeyboardInteractiveRequest) => void): () => void {
+      assertListener(listener, "onKeyboardInteractive");
+
+      const wrappedListener = (_event: unknown, payload: unknown) => {
+        const parsed = keyboardInteractiveRequestSchema.safeParse(payload);
+        if (!parsed.success) {
+          logger.warn?.("Ignored invalid keyboard-interactive payload from IPC", parsed.error);
+          return;
+        }
+
+        try {
+          listener(parsed.data);
+        } catch (error) {
+          logger.error?.("Keyboard-interactive listener threw", error);
+        }
+      };
+
+      ipcRenderer.on(ipcChannels.sftp.keyboardInteractive, wrappedListener);
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.sftp.keyboardInteractive, wrappedListener);
+      };
+    },
+    async keyboardInteractiveRespond(response: KeyboardInteractiveResponse): Promise<void> {
+      const parsed = keyboardInteractiveResponseSchema.parse(response);
+      await ipcRenderer.invoke(ipcChannels.sftp.keyboardInteractiveResponse, parsed);
     },
   };
 }

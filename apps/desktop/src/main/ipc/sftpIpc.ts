@@ -20,6 +20,7 @@ import {
   sftpWriteFileRequestSchema,
   sftpSyncStartRequestSchema,
   sftpSyncStopRequestSchema,
+  keyboardInteractiveResponseSchema,
   type SftpEvent,
   type SftpSyncEvent,
   type SftpDeleteRequest,
@@ -33,9 +34,10 @@ import {
   type SftpTransferCancelRequest,
   type SftpTransferResolveConflictRequest,
   type SftpTransferStartRequest,
-  type SftpWriteFileRequest
+  type SftpWriteFileRequest,
+  type KeyboardInteractiveRequest,
 } from "@sshterm/shared";
-import type { SessionManager, SftpConnectionOptions } from "@sshterm/session-core";
+import type { SessionManager, SftpConnectionOptions, KeyboardInteractiveCallback } from "@sshterm/session-core";
 import { createSyncEngine, probeHostKey } from "@sshterm/session-core";
 import { timingSafeEqual } from "node:crypto";
 import type { IpcMainInvokeEvent } from "electron";
@@ -95,6 +97,7 @@ export interface RegisterSftpIpcOptions {
   ) => Promise<SftpConnectionOptions | null>;
   emitSftpEvent?: (event: SftpEvent) => void;
   emitSyncEvent?: (event: SftpSyncEvent) => void;
+  emitKeyboardInteractive?: (request: KeyboardInteractiveRequest) => void;
   db?: ReturnType<typeof openDatabase>;
 }
 
@@ -167,6 +170,36 @@ export function registerSftpIpc(
   const hostsRepo = createHostsRepositoryFromDatabase(db);
   const bookmarksRepo = createSftpBookmarksRepository(db);
   const fingerprintRepo = createHostFingerprintRepositoryFromDatabase(db);
+
+  // Keyboard-interactive auth relay: pending requests keyed by requestId
+  const pendingKbdInteractive = new Map<string, {
+    resolve: (responses: string[]) => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }>();
+
+  const KEYBOARD_INTERACTIVE_TIMEOUT_MS = 60_000;
+
+  function createKeyboardInteractiveCallback(): KeyboardInteractiveCallback {
+    return (name, instructions, prompts) => {
+      return new Promise<string[]>((resolve, reject) => {
+        const requestId = `kbd-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const timer = setTimeout(() => {
+          pendingKbdInteractive.delete(requestId);
+          reject(new Error("Keyboard-interactive authentication timed out"));
+        }, KEYBOARD_INTERACTIVE_TIMEOUT_MS);
+
+        pendingKbdInteractive.set(requestId, { resolve, reject, timer });
+
+        options.emitKeyboardInteractive?.({
+          requestId,
+          name: name ?? "",
+          instructions: instructions ?? "",
+          prompts,
+        });
+      });
+    };
+  }
 
   const handleConnect = async (
     _event: IpcMainInvokeEvent,
@@ -242,7 +275,9 @@ export function registerSftpIpc(
 
     ensureBookmarkHost(hostId, connectOptions, hostsRepo);
 
-    const sftpSessionId = await sftpSessionManager.connect(hostId, connectOptions);
+    const sftpSessionId = await sftpSessionManager.connect(hostId, connectOptions, {
+      onKeyboardInteractive: createKeyboardInteractiveCallback(),
+    });
     return { sftpSessionId };
   };
 
@@ -379,6 +414,23 @@ export function registerSftpIpc(
     return { syncs: syncEngine.list() };
   };
 
+  const handleKeyboardInteractiveResponse = async (
+    _event: IpcMainInvokeEvent,
+    rawRequest: unknown
+  ) => {
+    const request = keyboardInteractiveResponseSchema.parse(rawRequest);
+    const pending = pendingKbdInteractive.get(request.requestId);
+    if (!pending) {
+      console.warn("[sftp] Received keyboard-interactive response for unknown request:", request.requestId);
+      return;
+    }
+
+    clearTimeout(pending.timer);
+    pendingKbdInteractive.delete(request.requestId);
+    pending.resolve(request.responses);
+  };
+
+  ipcMain.handle(ipcChannels.sftp.keyboardInteractiveResponse, handleKeyboardInteractiveResponse);
   ipcMain.handle(ipcChannels.sftp.connect, handleConnect);
   ipcMain.handle(ipcChannels.sftp.disconnect, handleDisconnect);
   ipcMain.handle(ipcChannels.sftp.list, handleList);
@@ -468,6 +520,12 @@ export function registerSftpIpc(
     unsubscribeSftpSessionEvents();
     unsubscribeTransferEvents();
     unsubscribeSyncEvents();
+    // Clean up any pending keyboard-interactive requests
+    for (const [, pending] of pendingKbdInteractive) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error("SFTP IPC shutdown"));
+    }
+    pendingKbdInteractive.clear();
     sftpSessionManager.disconnectAll();
     for (const channel of Object.values(ipcChannels.sftp)) {
       ipcMain.removeHandler?.(channel);

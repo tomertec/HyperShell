@@ -297,6 +297,28 @@ export type SftpSyncStopRequest = z.infer<typeof sftpSyncStopRequestSchema>;
 export type SftpSyncStatus = z.infer<typeof sftpSyncStatusSchema>;
 export type SftpSyncEvent = z.infer<typeof sftpSyncEventSchema>;
 
+// -- Keyboard-interactive auth schemas --
+
+export const keyboardInteractivePromptSchema = z.object({
+  prompt: z.string(),
+  echo: z.boolean(),
+});
+export type KeyboardInteractivePrompt = z.infer<typeof keyboardInteractivePromptSchema>;
+
+export const keyboardInteractiveRequestSchema = z.object({
+  requestId: z.string(),
+  name: z.string(),
+  instructions: z.string(),
+  prompts: z.array(keyboardInteractivePromptSchema),
+});
+export type KeyboardInteractiveRequest = z.infer<typeof keyboardInteractiveRequestSchema>;
+
+export const keyboardInteractiveResponseSchema = z.object({
+  requestId: z.string(),
+  responses: z.array(z.string()),
+});
+export type KeyboardInteractiveResponse = z.infer<typeof keyboardInteractiveResponseSchema>;
+
 // -- Editor window schemas --
 
 export const editorOpenRequestSchema = z.object({

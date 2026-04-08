@@ -64,6 +64,8 @@ export const sftpChannels = {
   transferList: "sftp:transfer:list",
   transferResolveConflict: "sftp:transfer:resolve-conflict",
   event: "sftp:event",
+  keyboardInteractive: "sftp:keyboard-interactive",
+  keyboardInteractiveResponse: "sftp:keyboard-interactive-response",
   bookmarksList: "sftp:bookmarks:list",
   bookmarksUpsert: "sftp:bookmarks:upsert",
   bookmarksRemove: "sftp:bookmarks:remove",
