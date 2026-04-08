@@ -31,6 +31,7 @@ export type LayoutState = {
   closePane: (paneId: string) => void;
   activatePane: (paneId: string) => void;
   setPaneSizes: (sizes: number[]) => void;
+  moveTab: (fromIndex: number, toIndex: number) => void;
 };
 
 export function createLayoutStore() {
@@ -151,7 +152,16 @@ export function createLayoutStore() {
     activatePane: (paneId) =>
       set({ activePaneId: paneId }),
 
-    setPaneSizes: (sizes) => set({ paneSizes: sizes })
+    setPaneSizes: (sizes) => set({ paneSizes: sizes }),
+
+    moveTab: (fromIndex, toIndex) =>
+      set((state) => {
+        if (fromIndex === toIndex) return state;
+        const tabs = [...state.tabs];
+        const [moved] = tabs.splice(fromIndex, 1);
+        tabs.splice(toIndex, 0, moved);
+        return { tabs };
+      }),
   }));
 }
 

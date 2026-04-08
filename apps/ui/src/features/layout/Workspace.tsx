@@ -189,6 +189,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
             activeSessionId={activeSessionId}
             onActivate={activateTab}
             onClose={closeTab}
+            onReorder={(from, to) => layoutStore.getState().moveTab(from, to)}
           />
         </div>
         <div className="relative flex items-center gap-0.5 px-2 pb-1.5 pt-2">

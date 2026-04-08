@@ -1,5 +1,19 @@
 import { useRef, useState } from "react";
 import { useStore } from "zustand";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { LayoutTab } from "./layoutStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 
@@ -26,6 +40,7 @@ export interface TabBarProps {
   activeSessionId: string | null;
   onActivate: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
+  onReorder: (fromIndex: number, toIndex: number) => void;
 }
 
 function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: string | undefined }) {
@@ -52,10 +67,86 @@ function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: strin
   );
 }
 
-export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarProps) {
+function SortableTab({
+  tab,
+  isActive,
+  sessionState,
+  onActivate,
+  onClose,
+  hoveredTab,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  tab: LayoutTab;
+  isActive: boolean;
+  sessionState: string | undefined;
+  onActivate: () => void;
+  onClose: () => void;
+  hoveredTab: string | null;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tab.tabKey ?? tab.sessionId,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="flex items-end">
+      <button
+        onClick={onActivate}
+        onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(); } }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-all duration-150 max-w-[200px] ${
+          isActive
+            ? "bg-base-900 text-text-primary"
+            : "text-text-secondary hover:text-text-primary hover:bg-base-700/40"
+        }`}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabStateColors[sessionState ?? ""] ?? "bg-gray-400"}`} />
+        <span className="truncate">{tab.title}</span>
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="ml-1 p-0.5 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-base-600/80 transition-all duration-100 text-text-muted hover:text-text-primary"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M2.5 2.5L7.5 7.5M7.5 2.5L2.5 7.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+        </span>
+        {/* Active indicator — accent line at top */}
+        {isActive && (
+          <span className="absolute top-0 left-2 right-2 h-[2px] bg-accent rounded-b-full" />
+        )}
+        {/* Bottom edge blend for active tab */}
+        {isActive && (
+          <span className="absolute -bottom-px left-0 right-0 h-px bg-base-900" />
+        )}
+        {/* Hover tooltip */}
+        {hoveredTab === tab.sessionId && (
+          <TabTooltip tab={tab} sessionState={sessionState} />
+        )}
+      </button>
+    </div>
+  );
+}
+
+export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }: TabBarProps) {
   const sessionStates = useStore(sessionStateStore, (s) => s.sessions);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   if (tabs.length === 0) return null;
 
@@ -70,57 +161,41 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose }: TabBarPro
     setHoveredTab(null);
   };
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = tabs.findIndex((t) => (t.tabKey ?? t.sessionId) === active.id);
+    const newIndex = tabs.findIndex((t) => (t.tabKey ?? t.sessionId) === over.id);
+    if (oldIndex !== -1 && newIndex !== -1) {
+      onReorder(oldIndex, newIndex);
+    }
+  };
+
+  const tabIds = tabs.map((t) => t.tabKey ?? t.sessionId);
+
   return (
-    <div className="flex items-end bg-base-800 px-1 pt-2 overflow-x-auto">
-      {tabs.map((tab, index) => {
-        const isActive = tab.sessionId === activeSessionId;
-        const sessionState = sessionStates[tab.sessionId]?.state;
-        return (
-          <div key={tab.tabKey ?? tab.sessionId} className="flex items-end">
-            {/* Tab separator */}
-            {index > 0 && !isActive && tabs[index - 1]?.sessionId !== activeSessionId && (
-              <div className="w-px h-4 bg-border self-center -mx-px" />
-            )}
-            <button
-              onClick={() => onActivate(tab.sessionId)}
-              onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(tab.sessionId); } }}
-              onMouseEnter={() => handleMouseEnter(tab.sessionId)}
-              onMouseLeave={handleMouseLeave}
-              className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-all duration-150 max-w-[200px] ${
-                isActive
-                  ? "bg-base-900 text-text-primary"
-                  : "text-text-secondary hover:text-text-primary hover:bg-base-700/40"
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabStateColors[sessionState ?? ""] ?? "bg-gray-400"}`} />
-              <span className="truncate">{tab.title}</span>
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose(tab.sessionId);
-                }}
-                className="ml-1 p-0.5 rounded-sm opacity-0 group-hover:opacity-100 hover:bg-base-600/80 transition-all duration-100 text-text-muted hover:text-text-primary"
-              >
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M2.5 2.5L7.5 7.5M7.5 2.5L2.5 7.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                </svg>
-              </span>
-              {/* Active indicator — accent line at top */}
-              {isActive && (
-                <span className="absolute top-0 left-2 right-2 h-[2px] bg-accent rounded-b-full" />
-              )}
-              {/* Bottom edge blend for active tab */}
-              {isActive && (
-                <span className="absolute -bottom-px left-0 right-0 h-px bg-base-900" />
-              )}
-              {/* Hover tooltip */}
-              {hoveredTab === tab.sessionId && (
-                <TabTooltip tab={tab} sessionState={sessionState} />
-              )}
-            </button>
-          </div>
-        );
-      })}
-    </div>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+        <div className="flex items-end bg-base-800 px-1 pt-2 overflow-x-auto">
+          {tabs.map((tab) => {
+            const isActive = tab.sessionId === activeSessionId;
+            const sessionState = sessionStates[tab.sessionId]?.state;
+            return (
+              <SortableTab
+                key={tab.tabKey ?? tab.sessionId}
+                tab={tab}
+                isActive={isActive}
+                sessionState={sessionState}
+                onActivate={() => onActivate(tab.sessionId)}
+                onClose={() => onClose(tab.sessionId)}
+                hoveredTab={hoveredTab}
+                onMouseEnter={() => handleMouseEnter(tab.sessionId)}
+                onMouseLeave={handleMouseLeave}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
+    </DndContext>
   );
 }
