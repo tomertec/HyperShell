@@ -18,6 +18,7 @@ import type {
   SftpBookmarkUpsertRequest,
   SftpConnectRequest,
   SftpConnectResponse,
+  SftpChmodRequest,
   SftpDeleteRequest,
   SftpDisconnectRequest,
   SftpEvent,
@@ -59,6 +60,7 @@ export interface SftpIpcClient {
   disconnect(request: SftpDisconnectRequest): Promise<void>;
   list(request: SftpListRequest): Promise<SftpListResponse>;
   stat(request: SftpStatRequest): Promise<SftpEntry>;
+  chmod(request: SftpChmodRequest): Promise<void>;
   mkdir(request: SftpMkdirRequest): Promise<void>;
   rename(request: SftpRenameRequest): Promise<void>;
   delete(request: SftpDeleteRequest): Promise<void>;
@@ -84,6 +86,7 @@ export interface SftpIpcHandlers {
   ) => Promise<void>;
   [ipcChannels.sftp.list]: (request: SftpListRequest) => Promise<SftpListResponse>;
   [ipcChannels.sftp.stat]: (request: SftpStatRequest) => Promise<SftpEntry>;
+  [ipcChannels.sftp.chmod]: (request: SftpChmodRequest) => Promise<void>;
   [ipcChannels.sftp.mkdir]: (request: SftpMkdirRequest) => Promise<void>;
   [ipcChannels.sftp.rename]: (request: SftpRenameRequest) => Promise<void>;
   [ipcChannels.sftp.delete]: (request: SftpDeleteRequest) => Promise<void>;

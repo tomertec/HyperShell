@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @sshterm/ui add @xterm/addon-search)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm --filter @sshterm/ui build)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm --filter @sshterm/ui test)",
+      "Bash(pnpm test:*)"
+    ]
+  }
+}

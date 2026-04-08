@@ -1,5 +1,7 @@
 import type { SerialProfileRecord } from "@sshterm/shared";
+import { useStore } from "zustand";
 import type { HostRecord } from "../hosts/HostsView";
+import { settingsStore } from "../settings/settingsStore";
 import { SidebarHostList } from "./SidebarHostList";
 import { SidebarSerialList } from "./SidebarSerialList";
 import { SidebarSection } from "./SidebarSection";
@@ -55,6 +57,11 @@ export function Sidebar({
   onRestore,
   onDismissRestore,
 }: SidebarProps) {
+  const showSerialInSidebar = useStore(
+    settingsStore,
+    (s) => s.settings.general.showSerialInSidebar
+  );
+
   if (collapsed) {
     return (
       <div className="flex h-full flex-col">
@@ -164,28 +171,30 @@ export function Sidebar({
         />
       </SidebarSection>
 
-      <SidebarSection
-        title="Serial"
-        actions={
-          <div className="flex gap-0.5">
-            <button
-              onClick={onNewSerial}
-              className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-              title="New serial profile"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-        }
-      >
-        <SidebarSerialList
-          profiles={serialProfiles}
-          onConnect={onConnectSerial}
-          onEdit={onEditSerial}
-        />
-      </SidebarSection>
+      {showSerialInSidebar && (
+        <SidebarSection
+          title="Serial"
+          actions={
+            <div className="flex gap-0.5">
+              <button
+                onClick={onNewSerial}
+                className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
+                title="New serial profile"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          }
+        >
+          <SidebarSerialList
+            profiles={serialProfiles}
+            onConnect={onConnectSerial}
+            onEdit={onEditSerial}
+          />
+        </SidebarSection>
+      )}
 
       {restoreCount != null && restoreCount > 0 && onRestore && onDismissRestore && (
         <div className="mt-auto border-t border-border px-3 py-2.5 flex flex-col gap-2">

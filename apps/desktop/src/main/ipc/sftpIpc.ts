@@ -6,6 +6,7 @@ import {
   sftpBookmarkReorderRequestSchema,
   sftpBookmarkUpsertRequestSchema,
   sftpConnectRequestSchema,
+  sftpChmodRequestSchema,
   sftpDeleteRequestSchema,
   sftpDisconnectRequestSchema,
   sftpListRequestSchema,
@@ -164,6 +165,13 @@ export function registerSftpIpc(
     return sftpSessionManager.getTransport(request.sftpSessionId).stat(request.path);
   };
 
+  const handleChmod = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = sftpChmodRequestSchema.parse(rawRequest);
+    await sftpSessionManager
+      .getTransport(request.sftpSessionId)
+      .chmod(request.path, request.permissions);
+  };
+
   const handleMkdir = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpMkdirRequestSchema.parse(rawRequest);
     await sftpSessionManager.getTransport(request.sftpSessionId).mkdir(request.path);
@@ -274,6 +282,7 @@ export function registerSftpIpc(
   ipcMain.handle(ipcChannels.sftp.disconnect, handleDisconnect);
   ipcMain.handle(ipcChannels.sftp.list, handleList);
   ipcMain.handle(ipcChannels.sftp.stat, handleStat);
+  ipcMain.handle(ipcChannels.sftp.chmod, handleChmod);
   ipcMain.handle(ipcChannels.sftp.mkdir, handleMkdir);
   ipcMain.handle(ipcChannels.sftp.rename, handleRename);
   ipcMain.handle(ipcChannels.sftp.delete, handleDelete);

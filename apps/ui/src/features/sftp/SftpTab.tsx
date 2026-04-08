@@ -9,6 +9,7 @@ import { SftpDualPane } from "./components/SftpDualPane";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { TransferPanel } from "./components/TransferPanel";
 import { SyncPanel } from "./components/SyncPanel";
+import { SftpPropertiesDialog } from "./components/SftpPropertiesDialog";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { PromptDialog } from "../../components/PromptDialog";
 
@@ -61,6 +62,7 @@ function extractSftpEntries(response: unknown): SftpEntry[] {
 
 export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   const store = useMemo(() => getSftpStore(sftpSessionId), [sftpSessionId]);
+  const propertiesRequestIdRef = useRef(0);
   const [showSyncPanel, setShowSyncPanel] = useState(false);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const remotePath = useStore(store, (state) => state.remotePath);
@@ -99,6 +101,21 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     open: false,
     path: "",
     defaultName: "",
+  });
+
+  // Dialog state for properties
+  const [propertiesDialog, setPropertiesDialog] = useState<{
+    open: boolean;
+    path: string;
+    entry: SftpEntry | null;
+    isLoading: boolean;
+    error: string | null;
+  }>({
+    open: false,
+    path: "",
+    entry: null,
+    isLoading: false,
+    error: null
   });
 
   const refreshTransfers = useCallback(async () => {
@@ -346,6 +363,111 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     [bookmarkDialog, hostId]
   );
 
+  const closePropertiesDialog = useCallback(() => {
+    propertiesRequestIdRef.current += 1;
+    setPropertiesDialog({
+      open: false,
+      path: "",
+      entry: null,
+      isLoading: false,
+      error: null
+    });
+  }, []);
+
+  const handleProperties = useCallback(
+    async (path: string) => {
+      const requestId = propertiesRequestIdRef.current + 1;
+      propertiesRequestIdRef.current = requestId;
+
+      setPropertiesDialog({
+        open: true,
+        path,
+        entry: null,
+        isLoading: true,
+        error: null
+      });
+
+      try {
+        const sftpStat = window.sshterm?.sftpStat;
+        if (!sftpStat) {
+          throw new Error("SFTP stat API is unavailable in preload bridge");
+        }
+
+        const entry = await sftpStat({ sftpSessionId, path });
+        if (!entry) {
+          throw new Error("File details are unavailable");
+        }
+        if (propertiesRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        setPropertiesDialog({
+          open: true,
+          path,
+          entry,
+          isLoading: false,
+          error: null
+        });
+      } catch (statError) {
+        if (propertiesRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const message =
+          statError instanceof Error ? statError.message : "Failed to load file details";
+        setPropertiesDialog({
+          open: true,
+          path,
+          entry: null,
+          isLoading: false,
+          error: message
+        });
+      }
+    },
+    [sftpSessionId]
+  );
+
+  const handleApplyPermissions = useCallback(
+    async (permissions: number) => {
+      const path = propertiesDialog.path;
+      if (!path) {
+        throw new Error("No file selected");
+      }
+
+      const sftpChmod = window.sshterm?.sftpChmod;
+      const sftpStat = window.sshterm?.sftpStat;
+      if (!sftpChmod || !sftpStat) {
+        throw new Error("SFTP chmod/stat APIs are unavailable in preload bridge");
+      }
+
+      await sftpChmod({
+        sftpSessionId,
+        path,
+        permissions
+      });
+
+      const refreshed = await sftpStat({ sftpSessionId, path });
+      if (!refreshed) {
+        throw new Error("Failed to refresh file details after permission update");
+      }
+
+      setPropertiesDialog((previous) => {
+        if (!previous.open || previous.path !== path) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          entry: refreshed,
+          error: null
+        };
+      });
+
+      await refreshRemoteDirectory();
+    },
+    [propertiesDialog.path, refreshRemoteDirectory, sftpSessionId]
+  );
+
   const handleFilterChange = useCallback(
     (text: string) => {
       setFilterText(activePane, text);
@@ -397,6 +519,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         onEdit={(remotePath: string) => {
           void window.sshterm?.editorOpen?.({ sftpSessionId, remotePath });
         }}
+        onProperties={handleProperties}
         onRename={handleRename}
         onDelete={handleDelete}
         onMkdir={handleMkdir}
@@ -415,6 +538,16 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       )}
 
       <TransferPanel />
+
+      <SftpPropertiesDialog
+        open={propertiesDialog.open}
+        path={propertiesDialog.path}
+        entry={propertiesDialog.entry}
+        isLoading={propertiesDialog.isLoading}
+        error={propertiesDialog.error}
+        onApplyPermissions={handleApplyPermissions}
+        onClose={closePropertiesDialog}
+      />
 
       <PromptDialog
         open={renameDialog.open}

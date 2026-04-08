@@ -23,9 +23,34 @@ const sampleTheme: TerminalTheme = {
 };
 
 describe("settingsStore custom themes", () => {
+  beforeEach(() => {
+    mockSshterm.getSetting.mockReset();
+    mockSshterm.getSetting.mockResolvedValue(null);
+    mockSshterm.updateSetting.mockReset();
+    mockSshterm.updateSetting.mockResolvedValue({ key: "app.settings", value: "{}" });
+    settingsStore.setState((state) => ({
+      loaded: false,
+      settings: {
+        ...state.settings,
+        debug: { authTracing: false },
+        general: {
+          showRecordingButton: true,
+          showRestoreBanner: true,
+          showSerialInSidebar: true,
+        },
+        customThemes: {},
+      },
+    }));
+  });
+
   it("has empty customThemes by default", () => {
     const state = settingsStore.getState();
     expect(state.settings.customThemes).toEqual({});
+  });
+
+  it("shows serial profiles in sidebar by default", () => {
+    const state = settingsStore.getState();
+    expect(state.settings.general.showSerialInSidebar).toBe(true);
   });
 
   it("saveCustomTheme adds a theme", async () => {
@@ -48,5 +73,13 @@ describe("settingsStore custom themes", () => {
     expect(mockSshterm.updateSetting).toHaveBeenCalledTimes(1);
     const savedValue = JSON.parse(mockSshterm.updateSetting.mock.calls[0][0].value);
     expect(savedValue.customThemes["persisted"]).toEqual(sampleTheme);
+  });
+
+  it("updateGeneral persists serial sidebar visibility", async () => {
+    await settingsStore.getState().updateGeneral({ showSerialInSidebar: false });
+    expect(settingsStore.getState().settings.general.showSerialInSidebar).toBe(false);
+    expect(mockSshterm.updateSetting).toHaveBeenCalledTimes(1);
+    const savedValue = JSON.parse(mockSshterm.updateSetting.mock.calls[0][0].value);
+    expect(savedValue.general.showSerialInSidebar).toBe(false);
   });
 });

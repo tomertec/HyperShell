@@ -120,7 +120,7 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 function GeneralSection() {
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateGeneral = useStore(settingsStore, (s) => s.updateGeneral);
-  const { showRecordingButton, showRestoreBanner } = settings.general;
+  const { showRecordingButton, showRestoreBanner, showSerialInSidebar } = settings.general;
 
   return (
     <div className="grid gap-6">
@@ -146,6 +146,17 @@ function GeneralSection() {
             <ToggleSwitch
               checked={showRestoreBanner}
               onChange={() => void updateGeneral({ showRestoreBanner: !showRestoreBanner })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Serial Section in Sidebar</div>
+              <div className="text-xs text-text-muted">Show serial profiles in the hosts sidebar list</div>
+            </div>
+            <ToggleSwitch
+              checked={showSerialInSidebar}
+              onChange={() => void updateGeneral({ showSerialInSidebar: !showSerialInSidebar })}
             />
           </div>
         </div>

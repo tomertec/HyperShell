@@ -19,6 +19,7 @@ export interface RemotePaneProps {
   store: StoreApi<SftpStoreState>;
   onTransfer: (remotePaths: string[], localPath: string) => void;
   onEdit: (remotePath: string) => void;
+  onProperties: (remotePath: string) => void;
   onRename: (remotePath: string) => void;
   onDelete: (paths: string[]) => void;
   onMkdir: () => void;
@@ -60,6 +61,7 @@ export function RemotePane({
   store,
   onTransfer,
   onEdit,
+  onProperties,
   onRename,
   onDelete,
   onMkdir,
@@ -219,6 +221,7 @@ export function RemotePane({
             void navigator.clipboard?.writeText(contextMenu.entry!.path);
           }
         },
+        { label: "Properties", action: () => onProperties(contextMenu.entry!.path) },
         {
           label: "Bookmark This Folder",
           action: () =>
@@ -246,6 +249,7 @@ export function RemotePane({
     onDelete,
     onEdit,
     onMkdir,
+    onProperties,
     onRename,
     onTransfer,
     remotePath,

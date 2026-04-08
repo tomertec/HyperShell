@@ -283,4 +283,21 @@ describe("createDesktopApi", () => {
       size: 2048
     });
   });
+
+  it("validates chmod request and routes through invoke", async () => {
+    const fake = createFakeIpcRenderer();
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    await api.sftpChmod({
+      sftpSessionId: "sftp-1",
+      path: "/var/log/app.log",
+      permissions: 0o640
+    });
+
+    expect(fake.invoke).toHaveBeenCalledWith(ipcChannels.sftp.chmod, {
+      sftpSessionId: "sftp-1",
+      path: "/var/log/app.log",
+      permissions: 0o640
+    });
+  });
 });

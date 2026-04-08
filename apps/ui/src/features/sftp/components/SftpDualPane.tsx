@@ -13,6 +13,7 @@ export interface SftpDualPaneProps {
   onUpload: (localPaths: string[], remotePath: string) => void;
   onDownload: (remotePaths: string[], localPath: string) => void;
   onEdit: (remotePath: string) => void;
+  onProperties: (remotePath: string) => void;
   onRename: (remotePath: string) => void;
   onDelete: (paths: string[]) => void;
   onMkdir: () => void;
@@ -26,6 +27,7 @@ export function SftpDualPane({
   onUpload,
   onDownload,
   onEdit,
+  onProperties,
   onRename,
   onDelete,
   onMkdir,
@@ -205,6 +207,7 @@ export function SftpDualPane({
           store={store}
           onTransfer={onDownload}
           onEdit={onEdit}
+          onProperties={onProperties}
           onRename={onRename}
           onDelete={onDelete}
           onMkdir={onMkdir}

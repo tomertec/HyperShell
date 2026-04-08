@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   fsListRequestSchema,
+  sftpChmodRequestSchema,
   sftpConnectRequestSchema,
   sftpEventSchema,
   sftpListRequestSchema,
@@ -37,6 +38,15 @@ describe("SFTP schemas", () => {
     const result = sftpListRequestSchema.safeParse({
       sftpSessionId: "sftp-1",
       path: "/home/user"
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates chmod request", () => {
+    const result = sftpChmodRequestSchema.safeParse({
+      sftpSessionId: "sftp-1",
+      path: "/home/user/.ssh/id_rsa",
+      permissions: 0o600
     });
     expect(result.success).toBe(true);
   });

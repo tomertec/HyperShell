@@ -31,6 +31,7 @@ export interface SftpTransportHandle {
   disconnect(): void;
   list(remotePath: string): Promise<SftpEntry[]>;
   stat(remotePath: string): Promise<SftpEntry>;
+  chmod(remotePath: string, permissions: number): Promise<void>;
   mkdir(remotePath: string): Promise<void>;
   rename(oldPath: string, newPath: string): Promise<void>;
   remove(remotePath: string, recursive?: boolean): Promise<void>;
@@ -347,6 +348,20 @@ export function createSftpTransport(
     });
   }
 
+  async function chmod(remotePath: string, permissions: number): Promise<void> {
+    const sftpSession = requireSftp();
+    await new Promise<void>((resolve, reject) => {
+      sftpSession.chmod(remotePath, permissions & 0o7777, (error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
   async function rename(oldPath: string, newPath: string): Promise<void> {
     const sftpSession = requireSftp();
     await new Promise<void>((resolve, reject) => {
@@ -474,6 +489,7 @@ export function createSftpTransport(
     disconnect,
     list,
     stat,
+    chmod,
     mkdir,
     rename,
     remove,

@@ -53,6 +53,7 @@ export const sftpChannels = {
   disconnect: "sftp:disconnect",
   list: "sftp:list",
   stat: "sftp:stat",
+  chmod: "sftp:chmod",
   mkdir: "sftp:mkdir",
   rename: "sftp:rename",
   delete: "sftp:delete",

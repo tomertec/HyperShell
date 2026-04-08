@@ -22,6 +22,7 @@ describe("createSftpTransport", () => {
     expect(transport.disconnect).toBeTypeOf("function");
     expect(transport.list).toBeTypeOf("function");
     expect(transport.stat).toBeTypeOf("function");
+    expect(transport.chmod).toBeTypeOf("function");
     expect(transport.mkdir).toBeTypeOf("function");
     expect(transport.rename).toBeTypeOf("function");
     expect(transport.remove).toBeTypeOf("function");

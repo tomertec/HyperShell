@@ -54,6 +54,13 @@ export const sftpStatRequestSchema = z.object({
 });
 export type SftpStatRequest = z.infer<typeof sftpStatRequestSchema>;
 
+export const sftpChmodRequestSchema = z.object({
+  sftpSessionId: z.string(),
+  path: z.string(),
+  permissions: z.number().int().min(0).max(0o7777)
+});
+export type SftpChmodRequest = z.infer<typeof sftpChmodRequestSchema>;
+
 export const sftpMkdirRequestSchema = z.object({
   sftpSessionId: z.string(),
   path: z.string()

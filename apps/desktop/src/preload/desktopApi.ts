@@ -27,6 +27,7 @@ import {
   sftpBookmarkUpsertRequestSchema,
   sftpConnectRequestSchema,
   sftpConnectResponseSchema,
+  sftpChmodRequestSchema,
   sftpDeleteRequestSchema,
   sftpDisconnectRequestSchema,
   sftpEventSchema,
@@ -83,6 +84,7 @@ import {
   type SftpBookmarkUpsertRequest,
   type SftpConnectRequest,
   type SftpConnectResponse,
+  type SftpChmodRequest,
   type SftpDeleteRequest,
   type SftpDisconnectRequest,
   type SftpEvent,
@@ -219,6 +221,7 @@ export interface DesktopApi {
   sftpDisconnect(request: SftpDisconnectRequest): Promise<void>;
   sftpList(request: SftpListRequest): Promise<SftpListResponse>;
   sftpStat(request: SftpStatRequest): Promise<SftpEntry>;
+  sftpChmod(request: SftpChmodRequest): Promise<void>;
   sftpMkdir(request: SftpMkdirRequest): Promise<void>;
   sftpRename(request: SftpRenameRequest): Promise<void>;
   sftpDelete(request: SftpDeleteRequest): Promise<void>;
@@ -652,6 +655,10 @@ export function createDesktopApi(
       }
 
       throw strict.error;
+    },
+    async sftpChmod(request: SftpChmodRequest): Promise<void> {
+      const parsed = sftpChmodRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.chmod, parsed);
     },
     async sftpMkdir(request: SftpMkdirRequest): Promise<void> {
       const parsed = sftpMkdirRequestSchema.parse(request);

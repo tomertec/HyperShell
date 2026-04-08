@@ -32,6 +32,7 @@ import type {
   SftpBookmarkUpsertRequest,
   SftpConnectRequest,
   SftpConnectResponse,
+  SftpChmodRequest,
   SftpDeleteRequest,
   SftpDisconnectRequest,
   SftpEvent,
@@ -104,6 +105,7 @@ declare global {
       sftpDisconnect?: (request: SftpDisconnectRequest) => Promise<void>;
       sftpList?: (request: SftpListRequest) => Promise<SftpListResponse>;
       sftpStat?: (request: SftpStatRequest) => Promise<SftpEntry>;
+      sftpChmod?: (request: SftpChmodRequest) => Promise<void>;
       sftpMkdir?: (request: SftpMkdirRequest) => Promise<void>;
       sftpRename?: (request: SftpRenameRequest) => Promise<void>;
       sftpDelete?: (request: SftpDeleteRequest) => Promise<void>;

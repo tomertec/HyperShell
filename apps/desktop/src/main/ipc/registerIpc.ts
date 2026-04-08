@@ -87,6 +87,7 @@ const registeredChannels = [
   ipcChannels.sftp.disconnect,
   ipcChannels.sftp.list,
   ipcChannels.sftp.stat,
+  ipcChannels.sftp.chmod,
   ipcChannels.sftp.mkdir,
   ipcChannels.sftp.rename,
   ipcChannels.sftp.delete,
