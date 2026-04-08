@@ -362,10 +362,12 @@ function MainApp() {
 
   const handleKbdInteractiveCancel = useCallback(
     (requestId: string) => {
-      void window.sshterm?.keyboardInteractiveRespond?.({ requestId, responses: [] });
+      // Send empty strings for each prompt so the server rejects auth cleanly
+      const emptyResponses = (kbdInteractiveRequest?.prompts ?? []).map(() => "");
+      void window.sshterm?.keyboardInteractiveRespond?.({ requestId, responses: emptyResponses });
       setKbdInteractiveRequest(null);
     },
-    []
+    [kbdInteractiveRequest]
   );
 
   useEffect(() => {
