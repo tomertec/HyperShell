@@ -23,6 +23,7 @@ import initSchemaSql from "@sshterm/db/src/migrations/001_init.sql";
 import sftpBookmarksSql from "@sshterm/db/src/migrations/002_sftp_bookmarks.sql";
 import hostAuthFieldsSql from "@sshterm/db/src/migrations/003_host_auth_fields.sql";
 import advancedSshSql from "@sshterm/db/src/migrations/006_advanced_ssh.sql";
+import hostFingerprintsSql from "@sshterm/db/src/migrations/007_host_fingerprints.sql";
 import {
   protectSecretStrict,
   revealSecretStrict,
@@ -239,6 +240,9 @@ export function getOrCreateDatabase(): unknown {
           }
         }
       }
+      // Migration 007: host fingerprints table
+      db.exec(hostFingerprintsSql);
+
       sharedDb = db;
       console.log("[sshterm] Database initialized successfully");
     } catch (err) {
