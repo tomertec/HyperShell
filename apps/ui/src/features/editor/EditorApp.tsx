@@ -51,7 +51,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
       });
 
       try {
-        const response = await window.sshterm?.sftpReadFile?.({
+        const response = await window.hypershell?.sftpReadFile?.({
           sftpSessionId,
           path: remotePath,
         });
@@ -83,13 +83,13 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
   );
 
   useEffect(() => {
-    return window.sshterm?.onEditorOpenFile?.((event) => {
+    return window.hypershell?.onEditorOpenFile?.((event) => {
       void openFile(event.remotePath);
     });
   }, [openFile]);
 
   useEffect(() => {
-    return window.sshterm?.onEditorSessionClosed?.(() => {
+    return window.hypershell?.onEditorSessionClosed?.(() => {
       storeRef.current.getState().setSessionDisconnected();
     });
   }, []);
@@ -102,7 +102,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
 
     setSaving(true);
     try {
-      await window.sshterm?.sftpWriteFile?.({
+      await window.hypershell?.sftpWriteFile?.({
         sftpSessionId,
         path: tab.remotePath,
         content: tab.content,

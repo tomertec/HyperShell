@@ -3,7 +3,7 @@ import { useStore } from "zustand";
 import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import type { SearchAddon } from "@xterm/addon-search";
-import type { SessionEvent } from "@sshterm/shared";
+import type { SessionEvent } from "@hypershell/shared";
 
 import { broadcastStore } from "../broadcast/broadcastStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
@@ -60,7 +60,7 @@ function toErrorMessage(error: unknown): string {
 }
 
 function logAsyncError(context: string, error: unknown): void {
-  console.warn(`[sshterm] ${context}`, error);
+  console.warn(`[hypershell] ${context}`, error);
 }
 
 export function useTerminalSession(
@@ -178,11 +178,11 @@ export function useTerminalSession(
   }, []);
 
   const sendSessionWrite = useCallback((sessionId: string, data: string): void => {
-    if (!window.sshterm?.writeSession) {
+    if (!window.hypershell?.writeSession) {
       return;
     }
 
-    void window.sshterm.writeSession({ sessionId, data }).catch((error) => {
+    void window.hypershell.writeSession({ sessionId, data }).catch((error) => {
       if (sessionId === sessionIdRef.current) {
         setStateSafe("failed");
         writeTerminalError(error);
@@ -193,11 +193,11 @@ export function useTerminalSession(
 
   const sendSessionResize = useCallback(
     (sessionId: string, cols: number, rows: number): void => {
-      if (!window.sshterm?.resizeSession) {
+      if (!window.hypershell?.resizeSession) {
         return;
       }
 
-      void window.sshterm.resizeSession({ sessionId, cols, rows }).catch((error) => {
+      void window.hypershell.resizeSession({ sessionId, cols, rows }).catch((error) => {
         if (sessionId === sessionIdRef.current) {
           setStateSafe("failed");
           writeTerminalError(error);
@@ -250,7 +250,7 @@ export function useTerminalSession(
       if (sessionId) {
         sessionStateStore.getState().removeSession(sessionId);
         // Close the session on the main process side
-        window.sshterm?.closeSession?.({ sessionId })?.catch((error) => {
+        window.hypershell?.closeSession?.({ sessionId })?.catch((error) => {
           logAsyncError("closeSession on unmount failed", error);
         });
         sessionIdRef.current = null;
@@ -320,7 +320,7 @@ export function useTerminalSession(
         applyTerminalBackground(opts.theme.background);
         try { addon.fit(); } catch { /* container may not have dimensions yet */ }
         instance.focus();
-        instance.writeln("sshterm ready.");
+        instance.writeln("hypershell ready.");
 
         const focusTerminal = () => {
           instance?.focus();
@@ -396,7 +396,7 @@ export function useTerminalSession(
       disposeInput = instance.onData((data) => {
         const activeSessionId = sessionIdRef.current;
 
-        if (!activeSessionId || !window.sshterm?.writeSession) {
+        if (!activeSessionId || !window.hypershell?.writeSession) {
           return;
         }
 
@@ -434,7 +434,7 @@ export function useTerminalSession(
 
   const connect = useCallback(async (): Promise<void> => {
     const instance = terminalRef.current;
-    if (!instance || !window.sshterm?.openSession) {
+    if (!instance || !window.hypershell?.openSession) {
       return;
     }
 
@@ -443,7 +443,7 @@ export function useTerminalSession(
     try {
       const cols = instance.cols || 120;
       const rows = instance.rows || 40;
-      const result = await window.sshterm.openSession({
+      const result = await window.hypershell.openSession({
         transport: input.transport,
         profileId: input.profileId,
         cols,
@@ -497,13 +497,13 @@ export function useTerminalSession(
   const disconnect = useCallback(async (): Promise<void> => {
     asyncOperationGuardRef.current.issueToken();
     const sessionId = sessionIdRef.current;
-    if (!sessionId || !window.sshterm?.closeSession) {
+    if (!sessionId || !window.hypershell?.closeSession) {
       setStateSafe("disconnected");
       return;
     }
 
     try {
-      await window.sshterm.closeSession({ sessionId });
+      await window.hypershell.closeSession({ sessionId });
       if (!mountedRef.current) {
         return;
       }
@@ -579,11 +579,11 @@ export function useTerminalSession(
   }, [connect, input.autoConnect, terminal]);
 
   useEffect(() => {
-    if (!window.sshterm?.onSessionEvent) {
+    if (!window.hypershell?.onSessionEvent) {
       return;
     }
 
-    const unsubscribe = window.sshterm.onSessionEvent((event) => {
+    const unsubscribe = window.hypershell.onSessionEvent((event) => {
       if (!sessionIdRef.current) {
         const queue = pendingSessionEventsRef.current;
         queue.push(event);

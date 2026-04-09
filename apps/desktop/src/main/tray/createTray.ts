@@ -1,7 +1,7 @@
 import { app, Menu, Tray, nativeImage, type NativeImage } from "electron";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 
 export interface TrayActions {
   showWindow: () => void;
@@ -71,7 +71,7 @@ export function createTray(
   const tray = new TrayClass(
     existsSyncFn(iconPath) ? iconPath : nativeImageFactory.createEmpty()
   );
-  tray.setToolTip("SSHTerm");
+  tray.setToolTip("HyperShell");
 
   const rebuildMenu = () => {
     tray.setContextMenu(

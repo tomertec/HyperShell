@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -36,7 +36,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @sshterm/ui exec playwright install chromium
+        run: pnpm --filter @hypershell/ui exec playwright install chromium
 
       - name: Workspace build
         run: pnpm ci:build
@@ -60,3 +60,17 @@ jobs:
           path: apps/desktop/release/**
           if-no-files-found: error
           retention-days: 30
+
+      - name: Attach macOS DMG to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          DMG=$(find apps/desktop/release -name '*.dmg' | head -1)
+          if [ -z "$DMG" ]; then
+            echo "No DMG found, skipping upload"
+            exit 0
+          fi
+          echo "Uploading $DMG to release $TAG"
+          gh release upload "$TAG" "$DMG" --clobber

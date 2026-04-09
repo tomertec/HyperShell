@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "../layout/Modal";
-import type { KeyboardInteractiveRequest } from "@sshterm/shared";
+import type { KeyboardInteractiveRequest } from "@hypershell/shared";
 
 interface KeyboardInteractiveDialogProps {
   request: KeyboardInteractiveRequest | null;

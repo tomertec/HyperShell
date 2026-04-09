@@ -85,7 +85,7 @@ export function useSessionStats(
 
     const fetchStats = async () => {
       try {
-        const result = await window.sshterm?.getHostStats?.({ sessionId });
+        const result = await window.hypershell?.getHostStats?.({ sessionId });
         if (result && !cancelled) {
           setStats((prev) => ({
             ...prev,

@@ -4,14 +4,14 @@ import {
   type HostProfileInput,
   type HostProfileRecord,
   type SqliteDatabase,
-} from "@sshterm/db";
+} from "@hypershell/db";
 import {
   ipcChannels,
   removeHostProfileRequestSchema,
   upsertHostProfileRequestSchema,
   type RemoveHostProfileRequest,
   type UpsertHostProfileRequest,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-HyperShell (package name: sshterm) — a Windows-first desktop SSH and serial terminal with integrated SFTP file browser, built with Electron + React + xterm.js, packaged as a pnpm monorepo.
+HyperShell (package name: hypershell) — a Windows-first desktop SSH and serial terminal with integrated SFTP file browser, built with Electron + React + xterm.js, packaged as a pnpm monorepo.
 
 Full documentation: [`docs/INDEX.md`](docs/INDEX.md)
 
@@ -16,12 +16,12 @@ pnpm test                   # Run all Vitest unit tests
 pnpm lint                   # Lint all workspaces
 
 # Per-workspace
-pnpm --filter @sshterm/ui test
-pnpm --filter @sshterm/desktop test
+pnpm --filter @hypershell/ui test
+pnpm --filter @hypershell/desktop test
 
 # E2E (Playwright, headless Chromium)
-pnpm --filter @sshterm/ui test:e2e
-pnpm --filter @sshterm/ui test:e2e:headed
+pnpm --filter @hypershell/ui test:e2e
+pnpm --filter @hypershell/ui test:e2e:headed
 
 # CI pipelines
 pnpm ci:build
@@ -33,7 +33,7 @@ pnpm release:windows:unsigned
 pnpm release:windows:signed
 ```
 
-**Important:** After changing main process or preload code, you must `pnpm --filter @sshterm/desktop build` and restart Electron. UI changes are picked up by Vite HMR automatically — unless Electron is loading the bundled renderer (delete `apps/desktop/dist/renderer/` to force Vite dev server in development).
+**Important:** After changing main process or preload code, you must `pnpm --filter @hypershell/desktop build` and restart Electron. UI changes are picked up by Vite HMR automatically — unless Electron is loading the bundled renderer (delete `apps/desktop/dist/renderer/` to force Vite dev server in development).
 
 ## Monorepo Structure
 
@@ -53,7 +53,7 @@ Dependency direction: `desktop` → `shared`, `session-core`, `db`; `ui` → `sh
 
 **Three-layer Electron model:**
 1. **Main process** (`apps/desktop/src/main/`) — bootstraps app lifecycle, registers 40+ IPC handlers, manages sessions, tray, windows. Entry: `main.ts`.
-2. **Preload bridge** (`apps/desktop/src/preload/`) — exposes `window.sshterm` API to renderer with Zod-validated typed IPC methods. Both request and response are validated.
+2. **Preload bridge** (`apps/desktop/src/preload/`) — exposes `window.hypershell` API to renderer with Zod-validated typed IPC methods. Both request and response are validated.
 3. **Renderer** (`apps/ui/`) — React SPA loaded by Electron. Vite dev server on port 5173.
 
 **IPC contract pattern:** All IPC channels and payloads are defined in `packages/shared/src/ipc/` using Zod schemas. Both preload and main validate against the same schemas. Types are inferred via `z.infer`. See [`docs/ipc-reference.md`](docs/ipc-reference.md) for the full channel list.
@@ -98,7 +98,7 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 1. Create directory: `apps/ui/src/features/<feature-name>/`
 2. Components, stores (Zustand), hooks in that directory
 3. Wire into `App.tsx` or relevant parent
-4. Call backend via `window.sshterm.<method>()`
+4. Call backend via `window.hypershell.<method>()`
 
 ## Testing
 
@@ -121,5 +121,5 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 - **SFTP empty file list** — Usually a CSS height collapse, not an IPC issue. Check computed height of SFTP pane containers in DevTools. Fix: ensure `PaneView` uses `h-full` not just `flex-1`.
 - **SFTP auth failure** — SSH terminal uses system `ssh` binary (full agent support), but SFTP uses ssh2 library (needs explicit credentials). They resolve auth differently.
 - **Bundled vs dev renderer** — If `apps/desktop/dist/renderer/index.html` exists, Electron loads it instead of the Vite dev server. Delete that directory during development to get HMR.
-- **Native module version mismatch** — After Node.js updates, run `pnpm --filter @sshterm/desktop rebuild:native`.
+- **Native module version mismatch** — After Node.js updates, run `pnpm --filter @hypershell/desktop rebuild:native`.
 - **Auto-reconnect not triggering** — Check that `autoReconnect` is enabled on the host record (DB) and that the network monitor hasn't paused reconnection (`waiting_for_network` state). The connection pool ref-counts connections, so closing one consumer doesn't necessarily close the underlying ssh2 client.

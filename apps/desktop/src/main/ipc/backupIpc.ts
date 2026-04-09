@@ -2,8 +2,8 @@ import {
   ipcChannels,
   createBackupRequestSchema,
   restoreBackupRequestSchema,
-} from "@sshterm/shared";
-import type { BackupInfo } from "@sshterm/shared";
+} from "@hypershell/shared";
+import type { BackupInfo } from "@hypershell/shared";
 import { app, dialog } from "electron";
 import {
   copyFileSync,
@@ -17,23 +17,23 @@ import {
 import path from "node:path";
 import type { IpcMainLike } from "./registerIpc";
 
-const BACKUP_FILENAME_PREFIX = "sshterm-backup-";
+const BACKUP_FILENAME_PREFIX = "hypershell-backup-";
 const BACKUP_EXTENSION = ".db";
 const MAX_AUTO_BACKUPS = 5;
 const SQLITE_MAGIC = "SQLite format 3\0";
 
 /**
- * Resolves the path to the SSHTerm database file.
+ * Resolves the path to the HyperShell database file.
  * Mirrors the logic in hostsIpc.ts resolveDatabasePath().
  */
 function getDatabasePath(): string {
-  const stableDataDir = path.join(app.getPath("appData"), "SSHTerm");
-  return path.join(stableDataDir, "sshterm.db");
+  const stableDataDir = path.join(app.getPath("appData"), "HyperShell");
+  return path.join(stableDataDir, "hypershell.db");
 }
 
 /** Directory where auto-backups are stored. */
 export function getBackupDir(): string {
-  const dir = path.join(app.getPath("appData"), "SSHTerm", "backups");
+  const dir = path.join(app.getPath("appData"), "HyperShell", "backups");
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -127,10 +127,10 @@ export function performAutoBackup(): void {
 
   try {
     copyFileSync(dbPath, backupPath);
-    console.log("[sshterm] Auto-backup created:", backupPath);
+    console.log("[hypershell] Auto-backup created:", backupPath);
     rotateBackups(backupDir, MAX_AUTO_BACKUPS);
   } catch (error) {
-    console.warn("[sshterm] Auto-backup failed:", error);
+    console.warn("[hypershell] Auto-backup failed:", error);
   }
 }
 

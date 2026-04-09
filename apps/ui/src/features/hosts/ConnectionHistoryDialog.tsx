@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ConnectionHistoryRecord } from "@sshterm/shared";
+import type { ConnectionHistoryRecord } from "@hypershell/shared";
 
 import type { HostRecord } from "./HostsView";
 import { Modal } from "../layout/Modal";
@@ -48,7 +48,7 @@ export function ConnectionHistoryDialog({
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!host?.id || !window.sshterm?.connectionHistoryListByHost) {
+    if (!host?.id || !window.hypershell?.connectionHistoryListByHost) {
       setRows([]);
       return;
     }
@@ -56,7 +56,7 @@ export function ConnectionHistoryDialog({
     setLoading(true);
     setError(null);
     try {
-      const data = await window.sshterm.connectionHistoryListByHost({
+      const data = await window.hypershell.connectionHistoryListByHost({
         hostId: host.id,
         limit: 200,
       });

@@ -3,7 +3,7 @@
 ## Monorepo Layout
 
 ```
-sshterm/
+hypershell/
 ├── apps/
 │   ├── desktop/                    # Electron app (main + preload)
 │   │   ├── src/
@@ -39,7 +39,7 @@ sshterm/
 │   │   │   │       └── createMainWindow.ts  # BrowserWindow factory
 │   │   │   └── preload/
 │   │   │       ├── index.ts                 # Preload entry
-│   │   │       └── desktopApi.ts            # window.sshterm API (Zod-validated)
+│   │   │       └── desktopApi.ts            # window.hypershell API (Zod-validated)
 │   │   ├── esbuild.config.mjs              # Main/preload bundler config
 │   │   ├── electron-builder.yml            # NSIS installer config
 │   │   └── tsconfig.json
@@ -51,7 +51,7 @@ sshterm/
 │       │   ├── app/
 │       │   │   └── App.tsx                  # Root component (dialogs, routing, stores)
 │       │   ├── types/
-│       │   │   └── global.d.ts              # window.sshterm type declarations
+│       │   │   └── global.d.ts              # window.hypershell type declarations
 │       │   ├── lib/
 │       │   │   └── formStyles.ts            # Shared input/badge CSS classes
 │       │   ├── components/
@@ -155,7 +155,7 @@ session-core ──→ shared
 db (standalone, no internal deps)
 ```
 
-The renderer (`ui`) only depends on `shared` for types. It accesses all backend functionality through `window.sshterm` (the preload bridge). It never imports `session-core` or `db` directly.
+The renderer (`ui`) only depends on `shared` for types. It accesses all backend functionality through `window.hypershell` (the preload bridge). It never imports `session-core` or `db` directly.
 
 ## Where to Put New Code
 

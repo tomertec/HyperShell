@@ -19,12 +19,12 @@
 
 Run:
 ```bash
-pnpm --filter @sshterm/ui add @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
+pnpm --filter @hypershell/ui add @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities
 ```
 
 **Step 2: Verify installation**
 
-Run: `pnpm --filter @sshterm/ui exec -- node -e "require('@dnd-kit/core')"`
+Run: `pnpm --filter @hypershell/ui exec -- node -e "require('@dnd-kit/core')"`
 Expected: No errors
 
 **Step 3: Commit**
@@ -67,9 +67,9 @@ for (const stmt of [
   try { db.exec(stmt); } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("already exists") || msg.includes("duplicate column")) {
-      console.info(`[sshterm] Migration 005: column already exists`);
+      console.info(`[hypershell] Migration 005: column already exists`);
     } else {
-      console.error(`[sshterm] Migration 005 failed:`, msg);
+      console.error(`[hypershell] Migration 005 failed:`, msg);
     }
   }
 }
@@ -277,7 +277,7 @@ sortOrder: parsed.sortOrder ?? null,
 
 **Step 2: Add to preload bridge**
 
-Find the preload file that exposes `window.sshterm` API. Add:
+Find the preload file that exposes `window.hypershell` API. Add:
 ```typescript
 reorderHosts: (request) => ipcRenderer.invoke(ipcChannels.hosts.reorder, request),
 ```
@@ -628,7 +628,7 @@ const reorderHosts = useCallback((items: Array<{ id: string; sortOrder: number; 
       (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999)
     );
   });
-  void window.sshterm?.reorderHosts?.({ items: items.map((i) => ({ id: i.id, sortOrder: i.sortOrder, groupId: null })) });
+  void window.hypershell?.reorderHosts?.({ items: items.map((i) => ({ id: i.id, sortOrder: i.sortOrder, groupId: null })) });
 }, []);
 ```
 

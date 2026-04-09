@@ -41,7 +41,7 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 |  |  Tray Integration  |  |  Settings Panel     | |
 |  +--------+-----------+  +----------+----------+ |
 |           |       Preload (Zod IPC)  |            |
-|           +----------<window.sshterm>+            |
+|           +----------<window.hypershell>+            |
 +--------------------------------------------------+
 ```
 

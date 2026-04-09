@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { HostPortForwardRecord } from "@sshterm/shared";
+import type { HostPortForwardRecord } from "@hypershell/shared";
 import { inputClasses, protocolBadgeClasses } from "../../lib/formStyles";
 
 interface HostPortForwardListProps {
@@ -21,7 +21,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
 
   const refresh = useCallback(async () => {
     try {
-      const result = await window.sshterm?.hostPortForwardList?.({ hostId });
+      const result = await window.hypershell?.hostPortForwardList?.({ hostId });
       if (result) setForwards(result);
     } catch { /* ignore */ }
   }, [hostId]);
@@ -36,7 +36,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
 
   const handleSave = async () => {
     const id = editId ?? crypto.randomUUID();
-    await window.sshterm?.hostPortForwardUpsert?.({
+    await window.hypershell?.hostPortForwardUpsert?.({
       id,
       hostId,
       name: form.name || `Forward :${form.localPort}`,
@@ -51,7 +51,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
   };
 
   const handleDelete = async (id: string) => {
-    await window.sshterm?.hostPortForwardRemove?.({ id });
+    await window.hypershell?.hostPortForwardRemove?.({ id });
     await refresh();
   };
 

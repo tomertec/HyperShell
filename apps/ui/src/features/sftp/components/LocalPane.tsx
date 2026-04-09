@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMous
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 
-import type { FsEntry } from "@sshterm/shared";
+import type { FsEntry } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
 import { getParentPath } from "../utils/fileUtils";
 import { DriveSelector } from "./DriveSelector";
@@ -65,7 +65,7 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
       setError("local", null);
 
       try {
-        const response = await window.sshterm?.fsList?.({ path });
+        const response = await window.hypershell?.fsList?.({ path });
         setLocalEntries(response?.entries ?? []);
       } catch (loadError) {
         const message =
@@ -87,7 +87,7 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
 
     async function loadHome() {
       try {
-        const home = await window.sshterm?.fsGetHome?.();
+        const home = await window.hypershell?.fsGetHome?.();
         if (disposed) {
           return;
         }

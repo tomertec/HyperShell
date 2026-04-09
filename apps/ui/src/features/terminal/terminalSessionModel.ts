@@ -1,4 +1,4 @@
-import type { SessionEvent } from "@sshterm/shared";
+import type { SessionEvent } from "@hypershell/shared";
 
 export type TerminalSessionState =
   | "idle"

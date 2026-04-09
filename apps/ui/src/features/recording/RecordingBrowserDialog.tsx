@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { SessionRecordingRecord } from "@sshterm/shared";
+import type { SessionRecordingRecord } from "@hypershell/shared";
 
 import { Modal } from "../layout/Modal";
 
@@ -50,12 +50,12 @@ export function RecordingBrowserDialog({
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!window.sshterm?.recordingList) {
+    if (!window.hypershell?.recordingList) {
       return;
     }
     setLoading(true);
     try {
-      const list = await window.sshterm.recordingList();
+      const list = await window.hypershell.recordingList();
       setRecordings(list);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load recordings");
@@ -73,7 +73,7 @@ export function RecordingBrowserDialog({
 
   const handleDelete = async (recordingId: string) => {
     try {
-      const response = await window.sshterm?.recordingDelete?.({ id: recordingId });
+      const response = await window.hypershell?.recordingDelete?.({ id: recordingId });
       if (!response?.deleted) {
         toast.error("Recording was not found");
         return;
@@ -87,14 +87,14 @@ export function RecordingBrowserDialog({
 
   const handleExport = async (recording: SessionRecordingRecord) => {
     try {
-      const destination = await window.sshterm?.fsShowSaveDialog?.({
+      const destination = await window.hypershell?.fsShowSaveDialog?.({
         defaultPath: recording.fileName,
         filters: [{ name: "ASCIINEMA Cast", extensions: ["cast"] }],
       });
       if (!destination) {
         return;
       }
-      const result = await window.sshterm?.recordingExport?.({
+      const result = await window.hypershell?.recordingExport?.({
         id: recording.id,
         filePath: destination,
       });

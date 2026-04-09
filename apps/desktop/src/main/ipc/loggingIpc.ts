@@ -28,7 +28,7 @@ import {
   startLoggingRequestSchema,
   stopLoggingRequestSchema,
   getLoggingStateRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
 
 type LogSession = {

@@ -14,22 +14,22 @@
 pnpm test
 
 # Single workspace
-pnpm --filter @sshterm/ui test
-pnpm --filter @sshterm/desktop test
-pnpm --filter @sshterm/session-core test
-pnpm --filter @sshterm/db test
+pnpm --filter @hypershell/ui test
+pnpm --filter @hypershell/desktop test
+pnpm --filter @hypershell/session-core test
+pnpm --filter @hypershell/db test
 
 # Watch mode
-pnpm --filter @sshterm/ui test -- --watch
+pnpm --filter @hypershell/ui test -- --watch
 
 # Single test file
-pnpm --filter @sshterm/ui test -- src/features/layout/layoutStore.test.ts
+pnpm --filter @hypershell/ui test -- src/features/layout/layoutStore.test.ts
 
 # E2E (headless)
-pnpm --filter @sshterm/ui test:e2e
+pnpm --filter @hypershell/ui test:e2e
 
 # E2E (headed — shows browser)
-pnpm --filter @sshterm/ui test:e2e:headed
+pnpm --filter @hypershell/ui test:e2e:headed
 
 # CI commands
 pnpm ci:test        # Unit tests

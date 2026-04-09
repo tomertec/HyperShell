@@ -7,7 +7,7 @@ import { AsciinemaWriter } from "./asciinemaWriter";
 
 describe("AsciinemaWriter", () => {
   it("writes a valid header and output frames", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "sshterm-cast-writer-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "hypershell-cast-writer-"));
     const filePath = path.join(dir, "session.cast");
 
     try {
@@ -47,7 +47,7 @@ describe("AsciinemaWriter", () => {
   });
 
   it("ignores empty writes", async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "sshterm-cast-writer-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "hypershell-cast-writer-"));
     const filePath = path.join(dir, "session.cast");
 
     try {

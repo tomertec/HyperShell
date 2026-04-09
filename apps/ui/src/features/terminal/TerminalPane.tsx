@@ -53,7 +53,7 @@ export function TerminalPane({
                 onClick={() => {
                   const next = !value;
                   setter(next);
-                  window.sshterm?.setSessionSignals?.({
+                  window.hypershell?.setSessionSignals?.({
                     sessionId: session.sessionId!,
                     signals: { [signal]: next }
                   });

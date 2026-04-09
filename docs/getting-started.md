@@ -14,18 +14,18 @@
 
 ```bash
 # Clone and install
-git clone <repo-url> sshterm
-cd sshterm
+git clone <repo-url> hypershell
+cd hypershell
 pnpm install
 
 # Rebuild native modules for Electron
-pnpm --filter @sshterm/desktop rebuild:native
+pnpm --filter @hypershell/desktop rebuild:native
 
 # Start development (terminal 1: Vite dev server)
-pnpm --filter @sshterm/ui dev
+pnpm --filter @hypershell/ui dev
 
 # Start development (terminal 2: Electron)
-pnpm --filter @sshterm/desktop dev
+pnpm --filter @hypershell/desktop dev
 ```
 
 The Electron app opens and loads the UI from `http://localhost:5173` (Vite dev server with HMR).
@@ -45,17 +45,17 @@ pnpm test           # Run all Vitest unit tests
 pnpm lint           # Lint all workspaces
 
 # Per-workspace
-pnpm --filter @sshterm/ui test
-pnpm --filter @sshterm/ui test:e2e
-pnpm --filter @sshterm/desktop test
-pnpm --filter @sshterm/session-core test
-pnpm --filter @sshterm/db test
+pnpm --filter @hypershell/ui test
+pnpm --filter @hypershell/ui test:e2e
+pnpm --filter @hypershell/desktop test
+pnpm --filter @hypershell/session-core test
+pnpm --filter @hypershell/db test
 ```
 
 ## Project Layout
 
 ```
-sshterm/
+hypershell/
 ├── apps/desktop/     # Electron main + preload
 ├── apps/ui/          # React renderer (Vite)
 ├── packages/shared/  # IPC contracts (Zod schemas)
@@ -69,7 +69,7 @@ See [Project Structure](./project-structure.md) for detailed breakdown.
 ## Development Workflow
 
 1. **UI changes** — Edit files in `apps/ui/src/`. Vite HMR updates the renderer instantly.
-2. **Main process changes** — Edit files in `apps/desktop/src/main/`. Rebuild with `pnpm --filter @sshterm/desktop build`, then restart Electron.
+2. **Main process changes** — Edit files in `apps/desktop/src/main/`. Rebuild with `pnpm --filter @hypershell/desktop build`, then restart Electron.
 3. **Preload changes** — Edit `apps/desktop/src/preload/`. Same rebuild + restart as main process.
 4. **Shared/session-core/db changes** — Rebuild the package, then rebuild desktop: `pnpm build`.
 5. **IPC contract changes** — Update schemas in `packages/shared/src/ipc/`, then update both preload (desktop) and UI consumers.
@@ -83,7 +83,7 @@ See [Project Structure](./project-structure.md) for detailed breakdown.
 3. Add the handler in the appropriate `apps/desktop/src/main/ipc/*Ipc.ts` file
 4. Register the channel in `registerIpc.ts`
 5. Expose the method in `apps/desktop/src/preload/desktopApi.ts`
-6. Add the method to `apps/ui/src/types/global.d.ts` (`window.sshterm`)
+6. Add the method to `apps/ui/src/types/global.d.ts` (`window.hypershell`)
 7. Call it from the UI
 
 ### Add a database migration
@@ -97,4 +97,4 @@ See [Project Structure](./project-structure.md) for detailed breakdown.
 1. Create a directory under `apps/ui/src/features/<feature-name>/`
 2. Create components, stores (Zustand), and hooks
 3. Wire into `App.tsx` or the relevant parent component
-4. Add any needed IPC calls through `window.sshterm`
+4. Add any needed IPC calls through `window.hypershell`

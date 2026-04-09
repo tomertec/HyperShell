@@ -1,5 +1,5 @@
 import type { IpcMainInvokeEvent } from "electron";
-import { ipcChannels, editorOpenRequestSchema } from "@sshterm/shared";
+import { ipcChannels, editorOpenRequestSchema } from "@hypershell/shared";
 import { editorWindowManager } from "../windows/editorWindowManager";
 
 export function registerEditorIpc(

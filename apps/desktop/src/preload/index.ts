@@ -4,4 +4,4 @@ import { createDesktopApi } from "./desktopApi";
 
 export const desktopApi = createDesktopApi(ipcRenderer);
 
-contextBridge.exposeInMainWorld("sshterm", desktopApi);
+contextBridge.exposeInMainWorld("hypershell", desktopApi);

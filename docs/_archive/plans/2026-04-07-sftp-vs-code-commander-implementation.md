@@ -73,7 +73,7 @@ it("resets filter when path changes", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/ui test -- --run sftpStore`
+Run: `pnpm --filter @hypershell/ui test -- --run sftpStore`
 Expected: FAIL — properties and methods not found
 
 **Step 3: Implement store additions**
@@ -119,7 +119,7 @@ Modify `setRemotePath` to also reset `remoteCursorIndex: 0` and `remoteFilterTex
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @sshterm/ui test -- --run sftpStore`
+Run: `pnpm --filter @hypershell/ui test -- --run sftpStore`
 Expected: All PASS
 
 **Step 5: Commit**
@@ -249,7 +249,7 @@ export function FileIcon({ name, isDirectory, className }: FileIconProps) {
 
 **Step 3: Run full tests to verify nothing breaks**
 
-Run: `pnpm --filter @sshterm/ui test -- --run`
+Run: `pnpm --filter @hypershell/ui test -- --run`
 Expected: All PASS
 
 **Step 4: Commit**
@@ -329,7 +329,7 @@ const cursorIndex = useStore(store, (state) => state.localCursorIndex); // or re
 
 **Step 3: Run tests and build**
 
-Run: `pnpm --filter @sshterm/ui test -- --run && pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui test -- --run && pnpm --filter @hypershell/ui build`
 Expected: All PASS, build succeeds
 
 **Step 4: Commit**
@@ -387,7 +387,7 @@ In `SftpTab.tsx`:
 
 **Step 3: Run tests and build**
 
-Run: `pnpm --filter @sshterm/ui test -- --run && pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui test -- --run && pnpm --filter @hypershell/ui build`
 Expected: All PASS, build succeeds
 
 **Step 4: Commit**
@@ -459,7 +459,7 @@ In `PathBreadcrumb.tsx`, change the outer `div` to render as an inline flex with
 
 **Step 4: Run tests and build**
 
-Run: `pnpm --filter @sshterm/ui test -- --run && pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui test -- --run && pnpm --filter @hypershell/ui build`
 Expected: All PASS, build succeeds
 
 **Step 5: Commit**
@@ -535,7 +535,7 @@ Simplest approach: add a `forceEdit` boolean prop. When it transitions from fals
 
 **Step 3: Run tests and build**
 
-Run: `pnpm --filter @sshterm/ui test -- --run && pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui test -- --run && pnpm --filter @hypershell/ui build`
 Expected: All PASS, build succeeds
 
 **Step 4: Commit**
@@ -588,7 +588,7 @@ onActivate: () => void;
 
 **Step 3: Run tests and build**
 
-Run: `pnpm --filter @sshterm/ui test -- --run && pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui test -- --run && pnpm --filter @hypershell/ui build`
 Expected: All PASS, build succeeds
 
 **Step 4: Commit**
@@ -814,7 +814,7 @@ describe("handleFileKeyDown", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/ui test -- --run useFileKeyboard`
+Run: `pnpm --filter @hypershell/ui test -- --run useFileKeyboard`
 Expected: FAIL — module not found
 
 **Step 3: Implement the keyboard handler**
@@ -1001,7 +1001,7 @@ export function handleFileKeyDown(
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @sshterm/ui test -- --run useFileKeyboard`
+Run: `pnpm --filter @hypershell/ui test -- --run useFileKeyboard`
 Expected: All PASS
 
 **Step 5: Commit**
@@ -1058,7 +1058,7 @@ And add `outline-none` to the container to prevent focus ring.
 
 **Step 4: Run tests and build**
 
-Run: `pnpm --filter @sshterm/ui test -- --run && pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui test -- --run && pnpm --filter @hypershell/ui build`
 Expected: All PASS, build succeeds
 
 **Step 5: Commit**
@@ -1107,7 +1107,7 @@ useEffect(() => {
 
 **Step 3: Run tests and build**
 
-Run: `pnpm --filter @sshterm/ui test -- --run && pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui test -- --run && pnpm --filter @hypershell/ui build`
 Expected: All PASS, build succeeds
 
 **Step 4: Commit**
@@ -1141,7 +1141,7 @@ ref={cursorIndex === index ? cursorRowRef : undefined}
 
 **Step 2: Run build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: Build succeeds
 
 **Step 3: Commit**
@@ -1175,7 +1175,7 @@ Expected: No lint errors. Fix any that appear.
 
 **Step 4: Manual smoke test checklist**
 
-Start the app (`pnpm --filter @sshterm/desktop dev`) and verify:
+Start the app (`pnpm --filter @hypershell/desktop dev`) and verify:
 - [ ] File rows are ~24px tall, no excess spacing
 - [ ] Monochrome SVG icons show for folders, code files, text files, images, archives
 - [ ] Folder names are medium weight, folder icons are accent colored

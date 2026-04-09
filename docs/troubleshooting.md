@@ -39,14 +39,14 @@ NODE_MODULE_VERSION 132. This version of Node.js requires NODE_MODULE_VERSION 12
 
 **Fix:** Rebuild native modules for the correct Electron version:
 ```bash
-pnpm --filter @sshterm/desktop rebuild:native
+pnpm --filter @hypershell/desktop rebuild:native
 ```
 
 ### TypeScript build errors after changing shared schemas
 
 After modifying `packages/shared/src/ipc/`, you may need to rebuild the package before dependent workspaces pick up the changes:
 ```bash
-pnpm --filter @sshterm/shared build
+pnpm --filter @hypershell/shared build
 pnpm build
 ```
 
@@ -82,10 +82,10 @@ Check the terminal theme and font settings in Settings. Ensure the font supports
 
 Migrations are idempotent (they check if columns/tables already exist). If you see unexpected errors:
 
-1. Check the database file location: `%APPDATA%/SSHTerm/sshterm.db`
+1. Check the database file location: `%APPDATA%/HyperShell/hypershell.db`
 2. Back up the database
 3. Delete and let the app recreate it on next launch
 
 ### Host data appears corrupted
 
-Export your hosts via SSH config import (reverse), delete `sshterm.db`, and reimport.
+Export your hosts via SSH config import (reverse), delete `hypershell.db`, and reimport.

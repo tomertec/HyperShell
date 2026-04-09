@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock window.sshterm before importing store
+// Mock window.hypershell before importing store
 const mockSshterm = {
   getSetting: vi.fn().mockResolvedValue(null),
   updateSetting: vi.fn().mockResolvedValue({ key: "app.settings", value: "{}" }),
 };
-vi.stubGlobal("window", { sshterm: mockSshterm });
+vi.stubGlobal("window", { hypershell: mockSshterm });
 
 import { settingsStore, type TerminalTheme } from "./settingsStore";
 

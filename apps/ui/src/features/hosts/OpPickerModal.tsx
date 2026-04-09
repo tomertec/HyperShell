@@ -55,7 +55,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.sshterm?.opListVaults?.();
+      const result = await window.hypershell?.opListVaults?.();
       setVaults(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to list vaults");
@@ -68,7 +68,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.sshterm?.opListItems?.({ vaultId });
+      const result = await window.hypershell?.opListItems?.({ vaultId });
       setItems(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to list items");
@@ -81,7 +81,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.sshterm?.opGetItemFields?.({ itemId });
+      const result = await window.hypershell?.opGetItemFields?.({ itemId });
       setFields(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load item fields");

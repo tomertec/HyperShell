@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ipcChannels, type SessionEvent } from "@sshterm/shared";
+import { ipcChannels, type SessionEvent } from "@hypershell/shared";
 
 import { createMainProcessLifecycle } from "./mainLifecycle";
 

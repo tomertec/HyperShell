@@ -20,7 +20,7 @@
 
 **Step 1: Install sonner**
 
-Run: `pnpm --filter @sshterm/ui add sonner`
+Run: `pnpm --filter @hypershell/ui add sonner`
 
 **Step 2: Read App.tsx to find the root layout**
 
@@ -47,7 +47,7 @@ Inside the JSX return, add as the last child:
 
 **Step 4: Verify it renders**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: Build succeeds with no errors.
 
 **Step 5: Commit**
@@ -79,7 +79,7 @@ describe("toast", () => {
 
 **Step 2: Run the test**
 
-Run: `pnpm --filter @sshterm/ui test -- toast.test`
+Run: `pnpm --filter @hypershell/ui test -- toast.test`
 Expected: PASS
 
 **Step 3: Commit**
@@ -147,7 +147,7 @@ describe("snippetsRepository", () => {
 
 **Step 2: Run it to verify it fails**
 
-Run: `pnpm --filter @sshterm/db test -- snippetsRepository.test`
+Run: `pnpm --filter @hypershell/db test -- snippetsRepository.test`
 Expected: FAIL — module not found
 
 **Step 3: Implement snippetsRepository.ts**
@@ -251,7 +251,7 @@ export type { SnippetRecord, SnippetInput } from "./repositories/snippetsReposit
 
 **Step 5: Run the test**
 
-Run: `pnpm --filter @sshterm/db test -- snippetsRepository.test`
+Run: `pnpm --filter @hypershell/db test -- snippetsRepository.test`
 Expected: PASS
 
 **Step 6: Commit**
@@ -313,7 +313,7 @@ export type RemoveSnippetRequest = z.infer<typeof removeSnippetRequestSchema>;
 
 **Step 3: Build shared package**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 Expected: Build succeeds.
 
 **Step 4: Commit**
@@ -332,19 +332,19 @@ git commit -m "feat: add snippet IPC channels and Zod schemas"
 **Step 1: Create snippetsIpc.ts**
 
 Follow the pattern from `hostsIpc.ts`. The handler file should:
-1. Import the snippets repository from `@sshterm/db`
-2. Import channel names and schemas from `@sshterm/shared`
+1. Import the snippets repository from `@hypershell/db`
+2. Import channel names and schemas from `@hypershell/shared`
 3. Register `handle` for each channel
 4. Validate request with Zod before passing to repository
 
 ```ts
-import { createSnippetsRepositoryFromDatabase } from "@sshterm/db";
-import type { SnippetInput, SnippetRecord } from "@sshterm/db";
+import { createSnippetsRepositoryFromDatabase } from "@hypershell/db";
+import type { SnippetInput, SnippetRecord } from "@hypershell/db";
 import {
   ipcChannels,
   upsertSnippetRequestSchema,
   removeSnippetRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
 
 type SnippetsRepoLike = {
@@ -357,7 +357,7 @@ let snippetsRepo: SnippetsRepoLike | null = null;
 
 export function registerSnippetsIpc(
   ipcMain: IpcMainLike,
-  getDatabase: () => import("@sshterm/db").SqliteDatabase
+  getDatabase: () => import("@hypershell/db").SqliteDatabase
 ) {
   if (!snippetsRepo) {
     snippetsRepo = createSnippetsRepositoryFromDatabase(getDatabase());
@@ -388,7 +388,7 @@ export function registerSnippetsIpc(
 
 **Step 3: Build desktop**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 Expected: Build succeeds.
 
 **Step 4: Commit**
@@ -406,7 +406,7 @@ git commit -m "feat: add snippets IPC handler"
 
 **Step 1: Add preload methods**
 
-In `desktopApi.ts`, add three methods to the `sshterm` object following the existing pattern (invoke + Zod parse response):
+In `desktopApi.ts`, add three methods to the `hypershell` object following the existing pattern (invoke + Zod parse response):
 
 ```ts
 snippetsList: async (): Promise<SnippetRecord[]> => {
@@ -426,7 +426,7 @@ Import the necessary schemas at the top of `desktopApi.ts`.
 
 **Step 2: Add type declarations**
 
-In `apps/ui/src/types/global.d.ts`, add to the `Window.sshterm` interface:
+In `apps/ui/src/types/global.d.ts`, add to the `Window.hypershell` interface:
 
 ```ts
 snippetsList?: () => Promise<SnippetRecord[]>;
@@ -434,7 +434,7 @@ snippetsUpsert?: (request: UpsertSnippetRequest) => Promise<SnippetRecord>;
 snippetsRemove?: (request: RemoveSnippetRequest) => Promise<void>;
 ```
 
-Import `SnippetRecord`, `UpsertSnippetRequest`, `RemoveSnippetRequest` from `@sshterm/shared`.
+Import `SnippetRecord`, `UpsertSnippetRequest`, `RemoveSnippetRequest` from `@hypershell/shared`.
 
 **Step 3: Build**
 
@@ -492,15 +492,15 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
   close: () => set({ isOpen: false }),
   load: async () => {
     set({ loading: true });
-    const snippets = await window.sshterm?.snippetsList?.() ?? [];
+    const snippets = await window.hypershell?.snippetsList?.() ?? [];
     set({ snippets, loading: false });
   },
   upsert: async (id, name, body) => {
-    await window.sshterm?.snippetsUpsert?.({ id, name, body });
+    await window.hypershell?.snippetsUpsert?.({ id, name, body });
     void get().load();
   },
   remove: async (id) => {
-    await window.sshterm?.snippetsRemove?.({ id });
+    await window.hypershell?.snippetsRemove?.({ id });
     void get().load();
   },
 }));
@@ -516,7 +516,7 @@ A slide-out panel (right side) showing the list of snippets. Each snippet shows 
 
 The panel should also support **sending a snippet to the active terminal** by calling:
 ```ts
-window.sshterm?.writeSession?.({ sessionId: activeSessionId, data: snippet.body });
+window.hypershell?.writeSession?.({ sessionId: activeSessionId, data: snippet.body });
 ```
 
 Get `activeSessionId` from `layoutStore`.
@@ -529,7 +529,7 @@ Render `<SnippetsPanel />` conditionally when `isOpen` is true.
 
 **Step 5: Build and manually verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: Build succeeds.
 
 **Step 6: Commit**
@@ -564,7 +564,7 @@ useEffect(() => {
 
 **Step 2: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 3: Commit**
 
@@ -627,7 +627,7 @@ export type LoggingStateResponse = z.infer<typeof loggingStateResponseSchema>;
 
 **Step 3: Build**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 
 **Step 4: Commit**
 
@@ -659,7 +659,7 @@ describe("SessionLogger", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(path.join(tmpdir(), "sshterm-log-"));
+    tempDir = mkdtempSync(path.join(tmpdir(), "hypershell-log-"));
   });
 
   afterEach(() => {
@@ -712,7 +712,7 @@ describe("SessionLogger", () => {
 
 **Step 2: Run it to verify it fails**
 
-Run: `pnpm --filter @sshterm/desktop test -- loggingIpc.test`
+Run: `pnpm --filter @hypershell/desktop test -- loggingIpc.test`
 Expected: FAIL
 
 **Step 3: Implement createSessionLogger**
@@ -726,7 +726,7 @@ import {
   startLoggingRequestSchema,
   stopLoggingRequestSchema,
   getLoggingStateRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
 
 type LogSession = {
@@ -821,7 +821,7 @@ export function registerLoggingIpc(ipcMain: IpcMainLike, logger: ReturnType<type
 
 **Step 5: Run tests**
 
-Run: `pnpm --filter @sshterm/desktop test -- loggingIpc.test`
+Run: `pnpm --filter @hypershell/desktop test -- loggingIpc.test`
 Expected: PASS
 
 **Step 6: Commit**
@@ -888,21 +888,21 @@ export function LoggingButton({ sessionId }: { sessionId: string }) {
   const [active, setActive] = useState(false);
 
   useEffect(() => {
-    window.sshterm?.loggingGetState?.({ sessionId }).then((state) => {
+    window.hypershell?.loggingGetState?.({ sessionId }).then((state) => {
       setActive(state.active);
     });
   }, [sessionId]);
 
   const toggle = async () => {
     if (active) {
-      await window.sshterm?.loggingStop?.({ sessionId });
+      await window.hypershell?.loggingStop?.({ sessionId });
       setActive(false);
       toast.success("Session logging stopped");
     } else {
       const defaultName = `session-${sessionId}-${new Date().toISOString().slice(0, 10)}.log`;
       const filePath = prompt("Log file path:", defaultName);
       if (!filePath) return;
-      await window.sshterm?.loggingStart?.({ sessionId, filePath });
+      await window.hypershell?.loggingStart?.({ sessionId, filePath });
       setActive(true);
       toast.success("Session logging started");
     }
@@ -929,7 +929,7 @@ Find where the terminal toolbar renders (likely in `TerminalPane.tsx` or the tab
 
 **Step 3: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 4: Commit**
 
@@ -987,7 +987,7 @@ describe("layoutStore.moveTab", () => {
 
 **Step 2: Run to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui test -- layoutStore.moveTab.test`
+Run: `pnpm --filter @hypershell/ui test -- layoutStore.moveTab.test`
 Expected: FAIL — `moveTab` is not a function
 
 **Step 3: Add moveTab to layoutStore**
@@ -1011,7 +1011,7 @@ moveTab: (fromIndex, toIndex) =>
 
 **Step 4: Run test**
 
-Run: `pnpm --filter @sshterm/ui test -- layoutStore.moveTab.test`
+Run: `pnpm --filter @hypershell/ui test -- layoutStore.moveTab.test`
 Expected: PASS
 
 **Step 5: Commit**
@@ -1119,7 +1119,7 @@ onReorder={(from, to) => layoutStore.getState().moveTab(from, to)}
 
 **Step 6: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: Build succeeds.
 
 **Step 7: Commit**
@@ -1194,7 +1194,7 @@ describe("paneShortcuts", () => {
 
 **Step 2: Run to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui test -- paneShortcuts.test`
+Run: `pnpm --filter @hypershell/ui test -- paneShortcuts.test`
 Expected: FAIL
 
 **Step 3: Implement paneShortcuts.ts**
@@ -1246,7 +1246,7 @@ export function handlePaneShortcut(store: LayoutStore, e: KeyboardEvent): boolea
 
 **Step 4: Run tests**
 
-Run: `pnpm --filter @sshterm/ui test -- paneShortcuts.test`
+Run: `pnpm --filter @hypershell/ui test -- paneShortcuts.test`
 Expected: PASS
 
 **Step 5: Wire into App.tsx**
@@ -1270,7 +1270,7 @@ useEffect(() => {
 
 **Step 6: Build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 7: Commit**
 
@@ -1316,7 +1316,7 @@ export type ExportHostsRequest = z.infer<typeof exportHostsRequestSchema>;
 
 **Step 3: Build**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 
 **Step 4: Commit**
 
@@ -1338,7 +1338,7 @@ Create `apps/desktop/src/main/ipc/hostExport.test.ts`:
 ```ts
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { exportHostsToJson, exportHostsToCsv } from "./hostsIpc";
-import type { HostRecord } from "@sshterm/db";
+import type { HostRecord } from "@hypershell/db";
 
 const sampleHost: HostRecord = {
   id: "h1",
@@ -1392,7 +1392,7 @@ describe("host export", () => {
 
 **Step 2: Run to verify it fails**
 
-Run: `pnpm --filter @sshterm/desktop test -- hostExport.test`
+Run: `pnpm --filter @hypershell/desktop test -- hostExport.test`
 Expected: FAIL
 
 **Step 3: Implement export functions**
@@ -1448,7 +1448,7 @@ Add `ipcChannels.hosts.exportHosts` to `registeredChannels`.
 
 **Step 5: Run tests**
 
-Run: `pnpm --filter @sshterm/desktop test -- hostExport.test`
+Run: `pnpm --filter @hypershell/desktop test -- hostExport.test`
 Expected: PASS
 
 **Step 6: Commit**
@@ -1486,7 +1486,7 @@ Find the sidebar's header/toolbar area (near the SSH Config Import button or con
 
 1. Shows a dropdown: "Export as JSON" / "Export as CSV"
 2. Prompts for file path (use `prompt()` for now — can upgrade to native dialog later)
-3. Calls `window.sshterm.exportHosts({ format, filePath })`
+3. Calls `window.hypershell.exportHosts({ format, filePath })`
 4. Shows toast: `toast.success(\`Exported ${result.exported} hosts\`)`
 
 The best location is likely in the sidebar header where the import button already lives. Check for `SshConfigImportDialog` usage to find where import is triggered.

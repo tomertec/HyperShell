@@ -1,5 +1,5 @@
-import { ipcChannels, fsListRequestSchema } from "@sshterm/shared";
-import type { FsEntry } from "@sshterm/shared";
+import { ipcChannels, fsListRequestSchema } from "@hypershell/shared";
+import type { FsEntry } from "@hypershell/shared";
 import { dialog } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import { readdir, stat, access } from "node:fs/promises";
@@ -9,7 +9,7 @@ import os from "node:os";
 import type { IpcMainLike } from "./registerIpc";
 
 const localFsEnabled = process.env.SSHTERM_ENABLE_LOCAL_FS !== "0";
-const sshKeyDiscoveryEnabled = process.env.SSHTERM_ENABLE_SSH_KEY_DISCOVERY === "1";
+const sshKeyDiscoveryEnabled = process.env.SSHTERM_ENABLE_SSH_KEY_DISCOVERY !== "0";
 const allowSystemRoots = process.env.SSHTERM_FS_ALLOW_SYSTEM_ROOTS === "1";
 const envAllowedRoots = (process.env.SSHTERM_FS_ALLOWED_ROOTS ?? "")
   .split(",")
@@ -227,6 +227,21 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
       filters,
     });
     return result.canceled ? null : result.filePath;
+  });
+
+  ipcMain.handle(ipcChannels.fs.showOpenDialog, async (_event: IpcMainInvokeEvent, request: unknown) => {
+    const { title, defaultPath, filters } = (request ?? {}) as {
+      title?: string;
+      defaultPath?: string;
+      filters?: Array<{ name: string; extensions: string[] }>;
+    };
+    const result = await dialog.showOpenDialog({
+      title,
+      defaultPath,
+      filters,
+      properties: ["openFile"],
+    });
+    return result.canceled ? null : result.filePaths[0] ?? null;
   });
 
   return () => {

@@ -21,7 +21,7 @@ describe("asciinemaReader", () => {
   });
 
   it("reads from disk", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "sshterm-cast-reader-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "hypershell-cast-reader-"));
     const filePath = path.join(dir, "read.cast");
 
     try {

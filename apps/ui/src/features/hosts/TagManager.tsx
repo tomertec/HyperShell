@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { TagRecord } from "@sshterm/shared";
+import type { TagRecord } from "@hypershell/shared";
 import { Modal } from "../layout/Modal";
 import { inputClasses } from "../../lib/formStyles";
 
@@ -50,14 +50,14 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const loadTags = useCallback(async () => {
-    if (!window.sshterm?.listTags) {
+    if (!window.hypershell?.listTags) {
       setTags([]);
       onTagsChanged?.([]);
       return;
     }
 
     try {
-      const loaded = await window.sshterm.listTags();
+      const loaded = await window.hypershell.listTags();
       setTags(loaded);
       onTagsChanged?.(loaded);
       setSelectedId((current) => {
@@ -100,7 +100,7 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
   }, []);
 
   const saveTag = useCallback(async () => {
-    if (!window.sshterm?.upsertTag) {
+    if (!window.hypershell?.upsertTag) {
       toast.error("Tag API is unavailable.");
       return;
     }
@@ -120,7 +120,7 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
     setIsSaving(true);
     try {
       const id = selectedTag?.id ?? `tag-${Date.now()}`;
-      const saved = await window.sshterm.upsertTag({
+      const saved = await window.hypershell.upsertTag({
         id,
         name: trimmedName,
         color: normalizedColor,
@@ -140,14 +140,14 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
   }, [draft.color, draft.name, loadTags, selectedTag]);
 
   const removeTag = useCallback(async () => {
-    if (!selectedTag || !window.sshterm?.removeTag) {
+    if (!selectedTag || !window.hypershell?.removeTag) {
       return;
     }
     if (!window.confirm(`Delete tag "${selectedTag.name}"?`)) {
       return;
     }
     try {
-      await window.sshterm.removeTag({ id: selectedTag.id });
+      await window.hypershell.removeTag({ id: selectedTag.id });
       await loadTags();
       setSelectedId(null);
       setDraft({ ...emptyDraft });

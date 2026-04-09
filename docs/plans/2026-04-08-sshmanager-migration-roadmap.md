@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS host_fingerprints (
 2. Create `puttyImportIpc.ts` — use `child_process.execFile("reg", ["query", "HKCU\\Software\\SimonTatham\\PuTTY\\Sessions", "/s"])` to read the registry. Parse output to extract session entries. Guard with `process.platform === "win32"` check — return empty on macOS/Linux
 3. Write unit test with mocked `execFile` output matching real PuTTY registry format
 4. Create `PuttyImportDialog.tsx` — reuse the pattern from `SshConfigImportDialog.tsx` (checkbox list with select all, import button)
-5. On import, create hosts via `window.sshterm.upsertHost()` for each selected entry
+5. On import, create hosts via `window.hypershell.upsertHost()` for each selected entry
 6. Add "Import from PuTTY" button to sidebar context menu (Windows only — hide on macOS)
 
 **Test plan:**
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS host_fingerprints (
    - `create`: use `fs.copyFileSync(dbPath, targetPath)` — SQLite is safe to copy when using WAL mode or between transactions
    - `restore`: validate the backup is a valid SQLite file (check magic bytes `SQLite format 3`), copy to DB path, return `{requiresRestart: true}`
    - `list`: read backup directory, return sorted by date
-   - `autoBackup`: copy to `app.getPath("userData")/backups/sshterm-backup-YYYY-MM-DD.db`, delete oldest when count > 5
+   - `autoBackup`: copy to `app.getPath("userData")/backups/hypershell-backup-YYYY-MM-DD.db`, delete oldest when count > 5
 3. Call `autoBackup` in `main.ts` during app initialization (after DB is opened)
 4. Create `BackupRestorePanel.tsx` with: backup list table, "Create Backup" button (opens save dialog), "Restore" button (opens file picker), last auto-backup timestamp display
 5. Add the panel as a section in `SettingsPanel.tsx`

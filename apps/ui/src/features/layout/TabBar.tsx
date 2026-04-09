@@ -175,7 +175,7 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
-        <div className="flex items-end bg-base-800 px-1 pt-2 overflow-x-auto">
+        <div className="flex h-full items-end bg-base-800 px-1 pt-2 overflow-x-auto">
           {tabs.map((tab) => {
             const isActive = tab.sessionId === activeSessionId;
             const sessionState = sessionStates[tab.sessionId]?.state;

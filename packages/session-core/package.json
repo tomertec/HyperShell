@@ -1,5 +1,5 @@
 {
-  "name": "@sshterm/session-core",
+  "name": "@hypershell/session-core",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@sshterm/shared": "workspace:*",
+    "@hypershell/shared": "workspace:*",
     "node-pty": "^1.0.0",
     "serialport": "^12.0.0",
     "ssh2": "^1.17.0",

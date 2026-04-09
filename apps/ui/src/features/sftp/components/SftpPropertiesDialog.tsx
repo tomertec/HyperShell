@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
-import type { SftpEntry } from "@sshterm/shared";
+import type { SftpEntry } from "@hypershell/shared";
 import { formatDate, formatFileSize, getParentPath } from "../utils/fileUtils";
 
 export interface SftpPropertiesDialogProps {

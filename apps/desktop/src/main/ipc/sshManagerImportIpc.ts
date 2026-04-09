@@ -5,7 +5,7 @@ import {
   type SshManagerGroup,
   type SshManagerSnippet,
   type ImportSshManagerResponse,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
 import type { IpcMainInvokeEvent } from "electron";
 import path from "node:path";
@@ -165,7 +165,7 @@ export function registerSshManagerImportIpc(
             .filter((r) => r.Hostname && r.Hostname.trim().length > 0)
             .map(parseHostRow);
         } catch (e) {
-          console.warn("[sshterm] Failed to read HostEntries from sshmanager DB:", e);
+          console.warn("[hypershell] Failed to read HostEntries from sshmanager DB:", e);
         }
 
         try {
@@ -174,7 +174,7 @@ export function registerSshManagerImportIpc(
             .all() as SshManagerGroupRow[];
           groups = groupRows.map(parseGroupRow);
         } catch (e) {
-          console.warn("[sshterm] Failed to read HostGroups from sshmanager DB:", e);
+          console.warn("[hypershell] Failed to read HostGroups from sshmanager DB:", e);
         }
 
         try {
@@ -186,7 +186,7 @@ export function registerSshManagerImportIpc(
           snippets = snippetRows.map(parseSnippetRow);
         } catch (e) {
           console.warn(
-            "[sshterm] Failed to read CommandSnippets from sshmanager DB:",
+            "[hypershell] Failed to read CommandSnippets from sshmanager DB:",
             e
           );
         }
@@ -194,7 +194,7 @@ export function registerSshManagerImportIpc(
         smDb.close();
         return { dbPath, hosts, groups, snippets };
       } catch (e) {
-        console.error("[sshterm] Failed to open sshmanager DB:", e);
+        console.error("[hypershell] Failed to open sshmanager DB:", e);
         return { dbPath, hosts: [], groups: [], snippets: [] };
       }
     }
@@ -252,11 +252,11 @@ export function registerSshManagerImportIpc(
               });
               importedGroups++;
             } catch (e) {
-              console.warn("[sshterm] Failed to import group:", group.name, e);
+              console.warn("[hypershell] Failed to import group:", group.name, e);
             }
           }
         } catch (e) {
-          console.warn("[sshterm] Failed to read groups for import:", e);
+          console.warn("[hypershell] Failed to read groups for import:", e);
         }
       }
 
@@ -314,14 +314,14 @@ export function registerSshManagerImportIpc(
               importedHosts++;
             } catch (e) {
               console.warn(
-                "[sshterm] Failed to import host:",
+                "[hypershell] Failed to import host:",
                 host.displayName,
                 e
               );
             }
           }
         } catch (e) {
-          console.warn("[sshterm] Failed to read hosts for import:", e);
+          console.warn("[hypershell] Failed to read hosts for import:", e);
         }
       }
 
@@ -348,14 +348,14 @@ export function registerSshManagerImportIpc(
               importedSnippets++;
             } catch (e) {
               console.warn(
-                "[sshterm] Failed to import snippet:",
+                "[hypershell] Failed to import snippet:",
                 snippet.name,
                 e
               );
             }
           }
         } catch (e) {
-          console.warn("[sshterm] Failed to read snippets for import:", e);
+          console.warn("[hypershell] Failed to read snippets for import:", e);
         }
       }
 

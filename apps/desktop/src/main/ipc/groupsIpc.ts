@@ -4,7 +4,7 @@ import {
   removeGroupRequestSchema,
   type UpsertGroupRequest,
   type RemoveGroupRequest
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 

@@ -4,7 +4,7 @@ import {
   ipcChannels,
   opListItemsRequestSchema,
   opGetItemFieldsRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
 import type { IpcMainInvokeEvent } from "electron";
 

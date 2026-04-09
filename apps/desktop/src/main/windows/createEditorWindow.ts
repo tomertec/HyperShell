@@ -1,5 +1,6 @@
 import { BrowserWindow } from "electron";
 import path from "node:path";
+import { resolveAppIconPath } from "./resolveAppIconPath";
 
 export interface CreateEditorWindowOptions {
   sftpSessionId: string;
@@ -10,6 +11,7 @@ export interface CreateEditorWindowOptions {
 export function createEditorWindow(options: CreateEditorWindowOptions): BrowserWindow {
   const { sftpSessionId, parentWindow, rendererUrl } = options;
   const preloadPath = path.join(__dirname, "..", "preload", "index.cjs");
+  const iconPath = resolveAppIconPath();
 
   const win = new BrowserWindow({
     width: 900,
@@ -20,6 +22,7 @@ export function createEditorWindow(options: CreateEditorWindowOptions): BrowserW
     backgroundColor: "#07111f",
     parent: parentWindow,
     modal: false,
+    ...(iconPath ? { icon: iconPath } : {}),
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

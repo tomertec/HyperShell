@@ -78,7 +78,7 @@ export type OpGetItemFieldsResponse = z.infer<typeof opGetItemFieldsResponseSche
 
 **Step 3: Run build to verify schemas compile**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 Expected: SUCCESS
 
 **Step 4: Commit**
@@ -191,7 +191,7 @@ describe("opIpc", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/desktop test -- opIpc`
+Run: `pnpm --filter @hypershell/desktop test -- opIpc`
 Expected: FAIL — `registerOpIpc` does not exist
 
 **Step 3: Write the handler**
@@ -205,7 +205,7 @@ import {
   ipcChannels,
   opListItemsRequestSchema,
   opGetItemFieldsRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
 import type { IpcMainInvokeEvent } from "electron";
 
@@ -264,7 +264,7 @@ export function registerOpIpc(ipcMain: IpcMainLike): void {
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/desktop test -- opIpc`
+Run: `pnpm --filter @hypershell/desktop test -- opIpc`
 Expected: PASS
 
 **Step 5: Register the handler**
@@ -287,7 +287,7 @@ In `apps/desktop/src/main/ipc/registerIpc.ts`:
 
 **Step 6: Run build to verify**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 Expected: SUCCESS
 
 **Step 7: Commit**
@@ -332,7 +332,7 @@ import type {
   OpListItemsResponse,
   OpGetItemFieldsRequest,
   OpGetItemFieldsResponse,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 ```
 
 **Step 2: Add implementations to createDesktopApi**
@@ -368,7 +368,7 @@ In `apps/ui/src/types/global.d.ts`, add types to the import (line 1-67):
   OpGetItemFieldsResponse,
 ```
 
-Add methods to the `Window.sshterm` interface (after `listPortForwards` around line 131):
+Add methods to the `Window.hypershell` interface (after `listPortForwards` around line 131):
 
 ```typescript
       opListVaults?: () => Promise<OpListVaultsResponse>;
@@ -457,7 +457,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.sshterm?.opListVaults?.();
+      const result = await window.hypershell?.opListVaults?.();
       setVaults(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to list vaults");
@@ -470,7 +470,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.sshterm?.opListItems?.({ vaultId });
+      const result = await window.hypershell?.opListItems?.({ vaultId });
       setItems(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to list items");
@@ -483,7 +483,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.sshterm?.opGetItemFields?.({ itemId });
+      const result = await window.hypershell?.opGetItemFields?.({ itemId });
       setFields(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load item fields");
@@ -665,7 +665,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
 
 **Step 2: Build to verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: SUCCESS
 
 **Step 3: Commit**
@@ -735,7 +735,7 @@ const [opPickerOpen, setOpPickerOpen] = useState(false);
 
 **Step 2: Build to verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: SUCCESS
 
 **Step 3: Run all tests**
@@ -758,7 +758,7 @@ git commit -m "feat: integrate 1Password picker into host form op-reference fiel
 
 **Step 1: Build desktop**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 
 **Step 2: Verify in running app**
 

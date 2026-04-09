@@ -1,14 +1,14 @@
 import {
   createSavedSessionRepositoryFromDatabase,
   type SqliteDatabase,
-} from "@sshterm/db";
+} from "@hypershell/db";
 import {
   ipcChannels,
   sessionClearSavedStateResponseSchema,
   sessionLoadSavedStateResponseSchema,
   sessionSaveStateRequestSchema,
   sessionSaveStateResponseSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 
 import type { IpcMainLike } from "./registerIpc";
 

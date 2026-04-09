@@ -5,7 +5,7 @@
 
 ## Overview
 
-A dual-pane SFTP file browser for SSHTerm, providing side-by-side local and remote file management, drag-and-drop transfers, a remote file editor, and per-host bookmarks. Integrates as a new transport type within the existing session-core architecture using the `ssh2` npm package.
+A dual-pane SFTP file browser for HyperShell, providing side-by-side local and remote file management, drag-and-drop transfers, a remote file editor, and per-host bookmarks. Integrates as a new transport type within the existing session-core architecture using the `ssh2` npm package.
 
 ## Decisions
 
@@ -233,7 +233,7 @@ Read-only projection of main process state, updated via `sftp:event` listener. U
 User double-clicks folder in RemotePane
   → sftpStore.navigateTo(path)
   → isLoading.remote = true
-  → window.sshterm.sftpList({ sftpSessionId, path })
+  → window.hypershell.sftpList({ sftpSessionId, path })
   → Main: SftpTransport.list(path) via ssh2
   → Response: FileEntry[]
   → Store: remoteEntries updated, remotePath set, history pushed
@@ -241,7 +241,7 @@ User double-clicks folder in RemotePane
 
 User drags files from LocalPane to RemotePane
   → Drop handler reads localSelection paths
-  → window.sshterm.sftpTransferStart({ sftpSessionId, operations })
+  → window.hypershell.sftpTransferStart({ sftpSessionId, operations })
   → Main: TransferManager queues jobs
   → sftp:event → transferStore → TransferPanel re-renders
   → On completion: auto-refresh remoteEntries

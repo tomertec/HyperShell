@@ -4,8 +4,8 @@ import {
   removeSerialProfileRequestSchema,
   type UpsertSerialProfileRequest,
   type RemoveSerialProfileRequest
-} from "@sshterm/shared";
-import type { SerialProfileInput, SerialProfileRecord } from "@sshterm/db";
+} from "@hypershell/shared";
+import type { SerialProfileInput, SerialProfileRecord } from "@hypershell/db";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 

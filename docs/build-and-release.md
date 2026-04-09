@@ -4,16 +4,16 @@
 
 ```bash
 # Development
-pnpm --filter @sshterm/ui dev          # Vite dev server (port 5173)
-pnpm --filter @sshterm/desktop dev     # Electron with Vite HMR
+pnpm --filter @hypershell/ui dev          # Vite dev server (port 5173)
+pnpm --filter @hypershell/desktop dev     # Electron with Vite HMR
 
 # Production build
 pnpm build                              # All workspaces
-pnpm --filter @sshterm/ui build         # UI only (outputs to apps/ui/dist/)
-pnpm --filter @sshterm/desktop build    # Desktop only (esbuild → apps/desktop/dist/)
+pnpm --filter @hypershell/ui build         # UI only (outputs to apps/ui/dist/)
+pnpm --filter @hypershell/desktop build    # Desktop only (esbuild → apps/desktop/dist/)
 
 # Native module rebuild (after Node.js version change)
-pnpm --filter @sshterm/desktop rebuild:native
+pnpm --filter @hypershell/desktop rebuild:native
 ```
 
 ## Build Pipeline
@@ -45,11 +45,11 @@ Defined in `apps/desktop/electron-builder.yml`:
 
 | Setting | Value |
 |---------|-------|
-| App ID | `com.sshterm.desktop` |
-| Product Name | SSHTerm |
+| App ID | `com.hypershell.desktop` |
+| Product Name | HyperShell |
 | Target | Windows NSIS x64 |
 | Output | `apps/desktop/release/` |
-| Artifact | `sshterm-${version}-${arch}.exe` |
+| Artifact | `hypershell-${version}-${arch}.exe` |
 | ASAR | Enabled with unpack for native modules |
 
 Native modules unpacked from ASAR: `better-sqlite3`, `node-pty`, `serialport`, `cpu-features`.

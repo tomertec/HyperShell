@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { SerialProfileRecord } from "@sshterm/shared";
+import type { SerialProfileRecord } from "@hypershell/shared";
 
 import { SerialProfileForm, type SerialProfileFormValue } from "./SerialProfileForm";
 
@@ -10,11 +10,11 @@ export function SerialProfilesView() {
   const [availablePorts, setAvailablePorts] = useState<string[]>([]);
 
   useEffect(() => {
-    window.sshterm?.listSerialProfiles?.().then(setProfiles).catch(console.error);
+    window.hypershell?.listSerialProfiles?.().then(setProfiles).catch(console.error);
   }, []);
 
   const refreshPorts = useCallback(() => {
-    window.sshterm
+    window.hypershell
       ?.listSerialPorts?.()
       .then((ports) => setAvailablePorts(ports.map((p) => p.path)))
       .catch(console.error);
@@ -27,7 +27,7 @@ export function SerialProfilesView() {
 
   function handleSubmit(value: SerialProfileFormValue) {
     const id = selectedProfile?.id ?? `serial-${Date.now()}`;
-    window.sshterm
+    window.hypershell
       ?.upsertSerialProfile?.({
         id,
         name: value.name,
@@ -59,7 +59,7 @@ export function SerialProfilesView() {
   function handleDelete() {
     if (!selectedProfile) return;
     if (!window.confirm(`Delete profile "${selectedProfile.name}"?`)) return;
-    window.sshterm
+    window.hypershell
       ?.removeSerialProfile?.({ id: selectedProfile.id })
       .then(() => {
         setProfiles((current) => current.filter((p) => p.id !== selectedProfile.id));

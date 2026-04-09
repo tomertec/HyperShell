@@ -1,9 +1,9 @@
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import { parseSshConfig } from "@sshterm/session-core";
+import { parseSshConfig } from "@hypershell/session-core";
 import { randomUUID } from "node:crypto";
 
 import type { IpcMainLike } from "./registerIpc";

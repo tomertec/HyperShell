@@ -8,7 +8,7 @@ describe("SessionLogger", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(path.join(tmpdir(), "sshterm-log-"));
+    tempDir = mkdtempSync(path.join(tmpdir(), "hypershell-log-"));
   });
 
   afterEach(() => {

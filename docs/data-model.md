@@ -2,7 +2,7 @@
 
 ## Database
 
-SQLite via `better-sqlite3`. Database file location: `{app.getPath('userData')}/sshterm.db` (typically `%APPDATA%/SSHTerm/sshterm.db` on Windows).
+SQLite via `better-sqlite3`. Database file location: `{app.getPath('userData')}/hypershell.db` (typically `%APPDATA%/HyperShell/hypershell.db` on Windows).
 
 Foreign keys are enabled globally. Schema is managed through numbered migrations in `packages/db/src/migrations/`.
 

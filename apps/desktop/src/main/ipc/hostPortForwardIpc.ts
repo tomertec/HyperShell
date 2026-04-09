@@ -4,11 +4,11 @@ import {
   upsertHostPortForwardRequestSchema,
   removeHostPortForwardRequestSchema,
   reorderHostPortForwardsRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
-import { createHostPortForwardsRepositoryFromDatabase } from "@sshterm/db";
-import type { SqliteDatabase } from "@sshterm/db";
+import { createHostPortForwardsRepositoryFromDatabase } from "@hypershell/db";
+import type { SqliteDatabase } from "@hypershell/db";
 
 export function registerHostPortForwardIpc(
   ipcMain: IpcMainLike,

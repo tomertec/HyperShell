@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { HostProfileRecord } from "@sshterm/shared";
+import type { HostProfileRecord } from "@hypershell/shared";
 import { Modal } from "../layout/Modal";
 import { inputClasses } from "../../lib/formStyles";
 
@@ -61,7 +61,7 @@ export function HostProfileManagerDialog({
 
   const loadProfiles = useCallback(async () => {
     try {
-      const items = (await window.sshterm?.listHostProfiles?.()) ?? [];
+      const items = (await window.hypershell?.listHostProfiles?.()) ?? [];
       setProfiles(items);
       onProfilesChanged?.(items);
       setSelectedId((current) => {
@@ -100,7 +100,7 @@ export function HostProfileManagerDialog({
   }, []);
 
   const saveProfile = useCallback(async () => {
-    if (!window.sshterm?.upsertHostProfile) {
+    if (!window.hypershell?.upsertHostProfile) {
       toast.error("Host profile API is unavailable.");
       return;
     }
@@ -128,7 +128,7 @@ export function HostProfileManagerDialog({
     setIsSaving(true);
     try {
       const id = selectedProfile?.id ?? `profile-${Date.now()}`;
-      const saved = await window.sshterm.upsertHostProfile({
+      const saved = await window.hypershell.upsertHostProfile({
         id,
         name: trimmedName,
         description: draft.description.trim() || null,
@@ -150,14 +150,14 @@ export function HostProfileManagerDialog({
   }, [draft, loadProfiles, selectedProfile]);
 
   const removeProfile = useCallback(async () => {
-    if (!selectedProfile || !window.sshterm?.removeHostProfile) {
+    if (!selectedProfile || !window.hypershell?.removeHostProfile) {
       return;
     }
     if (!window.confirm(`Delete host profile "${selectedProfile.name}"?`)) {
       return;
     }
     try {
-      await window.sshterm.removeHostProfile({ id: selectedProfile.id });
+      await window.hypershell.removeHostProfile({ id: selectedProfile.id });
       await loadProfiles();
       setSelectedId(null);
       setDraft({ ...emptyDraft });

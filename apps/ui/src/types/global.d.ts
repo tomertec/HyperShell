@@ -133,11 +133,11 @@ import type {
   RestoreBackupRequest,
   RestoreBackupResponse,
   ListBackupsResponse,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 
 declare global {
   interface Window {
-    sshterm?: {
+    hypershell?: {
       openSession?: (request: OpenSessionRequest) => Promise<OpenSessionResponse>;
       resizeSession?: (request: ResizeSessionRequest) => Promise<void>;
       writeSession?: (request: WriteSessionRequest) => Promise<void>;
@@ -200,6 +200,7 @@ declare global {
       fsGetDrives?: () => Promise<FsGetDrivesResponse>;
       fsListSshKeys?: () => Promise<string[]>;
       fsShowSaveDialog?: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
+      fsShowOpenDialog?: (options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
       workspaceSave?: (request: SaveWorkspaceRequest) => Promise<{ success: boolean }>;
       workspaceLoad?: (request: LoadWorkspaceRequest) => Promise<WorkspaceRecord | null>;
       workspaceList?: () => Promise<WorkspaceRecord[]>;

@@ -1,5 +1,5 @@
 import type { BrowserWindow } from "electron";
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 import { createEditorWindow } from "./createEditorWindow";
 
 interface ManagedEditorWindow {

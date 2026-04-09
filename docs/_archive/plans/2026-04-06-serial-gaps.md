@@ -35,7 +35,7 @@ Add `serialProfiles: serialProfileChannels` to `ipcChannels`.
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 
 **Step 3: Commit**
 
@@ -114,7 +114,7 @@ export type SetSignalsRequest = z.infer<typeof setSignalsRequestSchema>;
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 
 **Step 3: Commit**
 
@@ -162,7 +162,7 @@ Ensure `createSerialProfilesRepository` return type includes `remove`. No explic
 
 **Step 4: Verify build**
 
-Run: `pnpm --filter @sshterm/db build`
+Run: `pnpm --filter @hypershell/db build`
 
 **Step 5: Commit**
 
@@ -188,8 +188,8 @@ import {
   removeSerialProfileRequestSchema,
   type UpsertSerialProfileRequest,
   type RemoveSerialProfileRequest
-} from "@sshterm/shared";
-import type { SerialProfileInput, SerialProfileRecord } from "@sshterm/db";
+} from "@hypershell/shared";
+import type { SerialProfileInput, SerialProfileRecord } from "@hypershell/db";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 
@@ -232,7 +232,7 @@ export function registerSerialProfilesIpc(
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 
 **Step 3: Commit**
 
@@ -302,7 +302,7 @@ setSignals(sessionId: string, signals: { dtr?: boolean; rts?: boolean }): void {
 
 **Step 4: Verify build**
 
-Run: `pnpm --filter @sshterm/session-core build`
+Run: `pnpm --filter @hypershell/session-core build`
 
 **Step 5: Commit**
 
@@ -323,8 +323,8 @@ Add imports:
 
 ```typescript
 import { registerSerialProfilesIpc } from "./serialProfilesIpc";
-import { createSerialProfilesRepository } from "@sshterm/db";
-import { setSignalsRequestSchema } from "@sshterm/shared";
+import { createSerialProfilesRepository } from "@hypershell/db";
+import { setSignalsRequestSchema } from "@hypershell/shared";
 ```
 
 Create the repo alongside groupsRepo:
@@ -360,7 +360,7 @@ ipcMain.handle(ipcChannels.session.setSignals, (_event, request) => {
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 
 **Step 3: Commit**
 
@@ -377,7 +377,7 @@ feat: register serial profile IPC handlers and setSignals
 
 **Step 1: Add imports**
 
-Add to the import from `@sshterm/shared`:
+Add to the import from `@hypershell/shared`:
 
 ```typescript
 upsertSerialProfileRequestSchema,
@@ -432,7 +432,7 @@ async setSessionSignals(request: SetSignalsRequest): Promise<void> {
 
 **Step 4: Verify build**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 
 **Step 5: Commit**
 
@@ -442,7 +442,7 @@ feat: expose serial profile CRUD, port enumeration, and signal control in preloa
 
 ---
 
-### Task 8: Update window.sshterm global type
+### Task 8: Update window.hypershell global type
 
 **Files:**
 - Modify: `apps/ui/src/types/global.d.ts`
@@ -457,10 +457,10 @@ import type {
   RemoveSerialProfileRequest,
   SerialPortInfo,
   SetSignalsRequest,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 ```
 
-**Step 2: Add methods to Window.sshterm**
+**Step 2: Add methods to Window.hypershell**
 
 ```typescript
 listSerialProfiles?: () => Promise<SerialProfileRecord[]>;
@@ -473,7 +473,7 @@ setSessionSignals?: (request: SetSignalsRequest) => Promise<void>;
 **Step 3: Commit**
 
 ```
-feat: add serial profile methods to window.sshterm type
+feat: add serial profile methods to window.hypershell type
 ```
 
 ---
@@ -504,7 +504,7 @@ Use two-column grid for related pairs (baud/data bits, stop bits/parity, flow co
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 3: Commit**
 
@@ -536,15 +536,15 @@ const [selectedId, setSelectedId] = useState<string>("");
 const [availablePorts, setAvailablePorts] = useState<string[]>([]);
 ```
 
-Load profiles from `window.sshterm.listSerialProfiles()` on mount.
+Load profiles from `window.hypershell.listSerialProfiles()` on mount.
 
-On form submit: call `window.sshterm.upsertSerialProfile()` and update local state.
+On form submit: call `window.hypershell.upsertSerialProfile()` and update local state.
 
-On delete: call `window.sshterm.removeSerialProfile()` and update local state.
+On delete: call `window.hypershell.removeSerialProfile()` and update local state.
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 3: Commit**
 
@@ -578,7 +578,7 @@ Add a new `SidebarSection` titled "Serial" below hosts with add button and Sideb
 
 **Step 3: Verify build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 4: Commit**
 
@@ -665,7 +665,7 @@ Add `<Modal>` with `<SerialProfileForm>` for new/edit serial profiles, following
 
 **Step 7: Verify build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 8: Commit**
 
@@ -710,7 +710,7 @@ Pass `serialOptions` to `manager.open()`.
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 
 **Step 3: Commit**
 
@@ -736,7 +736,7 @@ When `transport === "serial"` and `session.state === "connected"`, show DTR and 
       onClick={() => {
         setDtr(d => {
           const next = !d;
-          window.sshterm?.setSessionSignals?.({ sessionId: session.sessionId!, signals: { dtr: next } });
+          window.hypershell?.setSessionSignals?.({ sessionId: session.sessionId!, signals: { dtr: next } });
           return next;
         });
       }}
@@ -757,7 +757,7 @@ Add local state `dtr` and `rts` (default `true` matching transport defaults).
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 
 **Step 3: Commit**
 

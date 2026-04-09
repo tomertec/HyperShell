@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Terminal } from "@xterm/xterm";
 import { toast } from "sonner";
-import type { RecordingFrame, RecordingFramesResponse } from "@sshterm/shared";
+import type { RecordingFrame, RecordingFramesResponse } from "@hypershell/shared";
 
 import { Modal } from "../layout/Modal";
 
@@ -73,7 +73,7 @@ export function RecordingPlaybackDialog({
       return;
     }
 
-    if (!recordingId || !window.sshterm?.recordingGetFrames) {
+    if (!recordingId || !window.hypershell?.recordingGetFrames) {
       return;
     }
 
@@ -81,7 +81,7 @@ export function RecordingPlaybackDialog({
     setPlaying(false);
     setCursor(0);
 
-    void window.sshterm
+    void window.hypershell
       .recordingGetFrames({ id: recordingId })
       .then((response) => {
         setPayload(response);

@@ -2,7 +2,7 @@ import {
   createTagRepository,
   createTagRepositoryFromDatabase,
   type SqliteDatabase,
-} from "@sshterm/db";
+} from "@hypershell/db";
 import {
   getHostTagsRequestSchema,
   ipcChannels,
@@ -13,7 +13,7 @@ import {
   type RemoveTagRequest,
   type SetHostTagsRequest,
   type UpsertTagRequest,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 

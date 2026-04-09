@@ -18,7 +18,7 @@ export function TunnelForm({ onSubmit, onCancel }: TunnelFormProps) {
   });
 
   const handleStart = async () => {
-    await window.sshterm?.startPortForward?.({
+    await window.hypershell?.startPortForward?.({
       hostname: form.hostname,
       username: form.username || undefined,
       port: Number(form.port) || undefined,

@@ -31,7 +31,7 @@ Before running the signed flow, set these environment variables in the Windows s
 PowerShell example:
 
 ```powershell
-$env:CSC_LINK = "C:\\certs\\sshterm-release.pfx"
+$env:CSC_LINK = "C:\\certs\\hypershell-release.pfx"
 $env:CSC_KEY_PASSWORD = "<certificate-password>"
 pnpm release:windows:signed
 ```

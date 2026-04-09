@@ -1,4 +1,4 @@
-import type { SavedSessionRecord } from "@sshterm/shared";
+import type { SavedSessionRecord } from "@hypershell/shared";
 
 import { Modal } from "../layout/Modal";
 
@@ -37,7 +37,7 @@ export function SessionRecoveryDialog({
     <Modal open={open} onClose={onDismiss} title="Restore Previous Sessions">
       <div className="grid gap-4">
         <p className="text-xs text-text-muted">
-          SSHTerm detected sessions from an ungraceful shutdown. Restore the
+          HyperShell detected sessions from an ungraceful shutdown. Restore the
           previous tab set?
         </p>
 

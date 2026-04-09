@@ -39,7 +39,7 @@ export function SshKeyManager() {
   const [converting, setConverting] = useState(false);
 
   const refresh = async () => {
-    const result = await window.sshterm?.sshKeysList?.();
+    const result = await window.hypershell?.sshKeysList?.();
     if (result) setKeys(result);
   };
 
@@ -51,7 +51,7 @@ export function SshKeyManager() {
     if (!genName.trim()) return;
     setGenerating(true);
     try {
-      await window.sshterm?.sshKeysGenerate?.({
+      await window.hypershell?.sshKeysGenerate?.({
         type: genType,
         name: genName.trim(),
         passphrase: genPassphrase || undefined,
@@ -70,7 +70,7 @@ export function SshKeyManager() {
 
   const handleRemove = async (path: string, name: string) => {
     if (!confirm(`Delete key "${name}" and its public key?`)) return;
-    await window.sshterm?.sshKeysRemove?.({ path });
+    await window.hypershell?.sshKeysRemove?.({ path });
     await refresh();
   };
 
@@ -90,7 +90,7 @@ export function SshKeyManager() {
       }
       setConverting(true);
       try {
-        const result = await window.sshterm?.sshKeysConvertPpk?.({ ppkPath });
+        const result = await window.hypershell?.sshKeysConvertPpk?.({ ppkPath });
         if (!result) {
           toast.error("PPK conversion not available.");
           return;

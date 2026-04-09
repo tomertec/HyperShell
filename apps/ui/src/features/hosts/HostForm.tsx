@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
-import type { HostEnvVarRecord, HostProfileRecord, TagRecord } from "@sshterm/shared";
+import type { HostEnvVarRecord, HostProfileRecord, TagRecord } from "@hypershell/shared";
 import { HostPortForwardList } from "./HostPortForwardList";
 import { OpPickerModal } from "./OpPickerModal";
 import { HostProfileManagerDialog } from "./HostProfileManagerDialog";
@@ -308,7 +308,7 @@ export function HostForm({
     if (!value.identityFile) return;
     setPpkConverting(true);
     try {
-      const result = await window.sshterm?.sshKeysConvertPpk?.({ ppkPath: value.identityFile });
+      const result = await window.hypershell?.sshKeysConvertPpk?.({ ppkPath: value.identityFile });
       if (!result) {
         toast.error("PPK conversion not available.");
         return;
@@ -388,7 +388,7 @@ export function HostForm({
   useEffect(() => {
     async function loadKeys() {
       try {
-        const keys = await window.sshterm?.fsListSshKeys?.();
+        const keys = await window.hypershell?.fsListSshKeys?.();
         if (keys?.length) setSshKeys(keys);
       } catch { /* ignore */ }
     }
@@ -398,7 +398,7 @@ export function HostForm({
   useEffect(() => {
     async function loadHostProfiles() {
       try {
-        const profiles = await window.sshterm?.listHostProfiles?.();
+        const profiles = await window.hypershell?.listHostProfiles?.();
         setHostProfiles(profiles ?? []);
       } catch {
         setHostProfiles([]);
@@ -410,7 +410,7 @@ export function HostForm({
   useEffect(() => {
     let cancelled = false;
     async function loadTags() {
-      if (!window.sshterm?.listTags) {
+      if (!window.hypershell?.listTags) {
         if (!cancelled) {
           setTags([]);
           onTagsChanged?.([]);
@@ -419,7 +419,7 @@ export function HostForm({
       }
 
       try {
-        const loadedTags = await window.sshterm.listTags();
+        const loadedTags = await window.hypershell.listTags();
         if (cancelled) {
           return;
         }
@@ -446,13 +446,13 @@ export function HostForm({
 
   useEffect(() => {
     const currentHostId = hostId;
-    if (!currentHostId || !window.sshterm?.tagsGetHostTags) {
+    if (!currentHostId || !window.hypershell?.tagsGetHostTags) {
       return;
     }
     let cancelled = false;
     async function loadHostTags() {
       try {
-        const hostTags = await window.sshterm?.tagsGetHostTags?.({
+        const hostTags = await window.hypershell?.tagsGetHostTags?.({
           hostId: currentHostId,
         });
         if (cancelled || !hostTags) {
@@ -508,13 +508,13 @@ export function HostForm({
 
   useEffect(() => {
     const currentHostId = hostId;
-    if (!currentHostId || !window.sshterm?.listHostEnvVars) {
+    if (!currentHostId || !window.hypershell?.listHostEnvVars) {
       return;
     }
     let cancelled = false;
     async function loadHostEnvVars() {
       try {
-        const envVars = await window.sshterm?.listHostEnvVars?.({ hostId: currentHostId });
+        const envVars = await window.hypershell?.listHostEnvVars?.({ hostId: currentHostId });
         if (cancelled || !envVars) {
           return;
         }
@@ -769,6 +769,39 @@ export function HostForm({
                 )}
               </label>
             )}
+          </div>
+        )}
+
+        {value.authMethod === "keyfile" && (
+          <div className="grid gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">Key File</span>
+            <div className="flex gap-1.5">
+              <input
+                id={`${formId}-keyfilePath`}
+                value={value.identityFile}
+                onChange={(e) => setValue({ ...value, identityFile: e.target.value })}
+                placeholder="Path to SSH private key"
+                className={`${inputClasses} flex-1`}
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  const filePath = await window.hypershell?.fsShowOpenDialog?.({
+                    title: "Select SSH Key File",
+                    filters: [{ name: "All Files", extensions: ["*"] }],
+                  });
+                  if (filePath) {
+                    setValue({ ...value, identityFile: filePath });
+                  }
+                }}
+                className="shrink-0 rounded-md border border-border bg-base-800 px-2.5 hover:bg-base-700 text-text-muted hover:text-text-primary transition-colors"
+                title="Browse for key file"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M2 13h12M8 3v7M4 7l4-4 4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
 

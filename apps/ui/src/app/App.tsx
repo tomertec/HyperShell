@@ -34,14 +34,14 @@ import type {
   PuttySession,
   SerialProfileRecord,
   TagRecord,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import { EditorApp } from "../features/editor/EditorApp";
 import {
   HostKeyVerificationDialog,
   type HostKeyVerificationInfo,
 } from "../features/hosts/HostKeyVerificationDialog";
 import { KeyboardInteractiveDialog } from "../features/hosts/KeyboardInteractiveDialog";
-import type { KeyboardInteractiveRequest } from "@sshterm/shared";
+import type { KeyboardInteractiveRequest } from "@hypershell/shared";
 
 
 function normalizeHostEnvVars(
@@ -103,46 +103,46 @@ function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
 }
 
 async function loadHosts(): Promise<HostRecord[]> {
-  if (!window.sshterm?.listHosts) {
-    console.warn("[sshterm] listHosts not available on window.sshterm");
+  if (!window.hypershell?.listHosts) {
+    console.warn("[hypershell] listHosts not available on window.hypershell");
     return [];
   }
   try {
-    const dbHosts = await window.sshterm.listHosts();
-    console.log("[sshterm] loaded hosts from DB:", dbHosts.length);
+    const dbHosts = await window.hypershell.listHosts();
+    console.log("[hypershell] loaded hosts from DB:", dbHosts.length);
     return dbHosts.map((h: Record<string, unknown>) => mapDbHostToUiHost(h));
   } catch (err) {
-    console.error("[sshterm] failed to load hosts:", err);
+    console.error("[hypershell] failed to load hosts:", err);
     return [];
   }
 }
 
 async function loadSerialProfiles(): Promise<SerialProfileRecord[]> {
-  if (!window.sshterm?.listSerialProfiles) {
+  if (!window.hypershell?.listSerialProfiles) {
     return [];
   }
   try {
-    return await window.sshterm.listSerialProfiles();
+    return await window.hypershell.listSerialProfiles();
   } catch (err) {
-    console.error("[sshterm] failed to load serial profiles:", err);
+    console.error("[hypershell] failed to load serial profiles:", err);
     return [];
   }
 }
 
 async function loadTags(): Promise<TagRecord[]> {
-  if (!window.sshterm?.listTags) {
+  if (!window.hypershell?.listTags) {
     return [];
   }
   try {
-    return await window.sshterm.listTags();
+    return await window.hypershell.listTags();
   } catch (err) {
-    console.error("[sshterm] failed to load tags:", err);
+    console.error("[hypershell] failed to load tags:", err);
     return [];
   }
 }
 
 async function attachHostTags(hosts: HostRecord[]): Promise<HostRecord[]> {
-  if (!window.sshterm?.tagsGetHostTags) {
+  if (!window.hypershell?.tagsGetHostTags) {
     return hosts.map((host) => ({
       ...host,
       tagIds: host.tagIds ?? [],
@@ -153,7 +153,7 @@ async function attachHostTags(hosts: HostRecord[]): Promise<HostRecord[]> {
   const hostTagsById = await Promise.all(
     hosts.map(async (host) => {
       try {
-        const hostTags = await window.sshterm?.tagsGetHostTags?.({
+        const hostTags = await window.hypershell?.tagsGetHostTags?.({
           hostId: host.id,
         });
         const safeHostTags = hostTags ?? [];
@@ -187,17 +187,17 @@ async function attachHostTags(hosts: HostRecord[]): Promise<HostRecord[]> {
 }
 
 async function persistSerialProfile(profile: SerialProfileRecord): Promise<void> {
-  if (!window.sshterm?.upsertSerialProfile) return;
+  if (!window.hypershell?.upsertSerialProfile) return;
   try {
-    await window.sshterm.upsertSerialProfile(profile);
+    await window.hypershell.upsertSerialProfile(profile);
   } catch (err) {
-    console.error("[sshterm] failed to persist serial profile:", err);
+    console.error("[hypershell] failed to persist serial profile:", err);
   }
 }
 
 async function persistHost(host: HostRecord): Promise<HostRecord | null> {
-  if (!window.sshterm?.upsertHost) {
-    console.warn("[sshterm] upsertHost not available");
+  if (!window.hypershell?.upsertHost) {
+    console.warn("[hypershell] upsertHost not available");
     return null;
   }
   try {
@@ -224,7 +224,7 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
     const clearSavedPassword =
       authMethod !== "password" || host.clearSavedPassword;
 
-    const result = await window.sshterm.upsertHost({
+    const result = await window.hypershell.upsertHost({
       id: host.id,
       name: host.name,
       hostname: host.hostname,
@@ -253,10 +253,10 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
         ? { password: (host.password ?? "").trim() }
         : {})
     });
-    console.log("[sshterm] persisted host:", result);
+    console.log("[hypershell] persisted host:", result);
     return mapDbHostToUiHost(result as unknown as Record<string, unknown>);
   } catch (err) {
-    console.error("[sshterm] failed to persist host:", err);
+    console.error("[hypershell] failed to persist host:", err);
     return null;
   }
 }
@@ -365,7 +365,7 @@ function MainApp() {
     // Load settings, then check for last workspace to restore
     void settingsStore.getState().load().then(() => {
       if (!settingsStore.getState().settings.general.showRestoreBanner) return;
-      return window.sshterm?.workspaceLoadLast?.().then((last) => {
+      return window.hypershell?.workspaceLoadLast?.().then((last) => {
         if (last?.layout?.tabs && last.layout.tabs.length > 0) {
           setLastWorkspaceTabs(last.layout.tabs);
           setRestoreBannerVisible(true);
@@ -373,8 +373,8 @@ function MainApp() {
       });
     }).catch(() => {});
 
-    if (window.sshterm?.sessionLoadSavedState) {
-      void window.sshterm
+    if (window.hypershell?.sessionLoadSavedState) {
+      void window.hypershell
         .sessionLoadSavedState()
         .then((sessions) => {
           if (sessions.length === 0) {
@@ -384,7 +384,7 @@ function MainApp() {
           setSessionRecoveryOpen(true);
         })
         .catch((error) => {
-          console.warn("[sshterm] failed loading saved session recovery state:", error);
+          console.warn("[hypershell] failed loading saved session recovery state:", error);
         });
     }
     return () => {
@@ -393,13 +393,13 @@ function MainApp() {
   }, []);
 
   const refreshConnectionHistorySummary = useCallback(async () => {
-    if (!window.sshterm?.connectionHistoryListRecent) {
+    if (!window.hypershell?.connectionHistoryListRecent) {
       return;
     }
 
     try {
       const recent: ConnectionHistoryRecord[] =
-        await window.sshterm.connectionHistoryListRecent({ limit: 1000 });
+        await window.hypershell.connectionHistoryListRecent({ limit: 1000 });
       const next: Record<string, string | null> = {};
       for (const host of hosts) {
         next[host.id] = null;
@@ -415,7 +415,7 @@ function MainApp() {
       }
       setLastConnectedAtByHostId(next);
     } catch (err) {
-      console.warn("[sshterm] failed to load connection history summary:", err);
+      console.warn("[hypershell] failed to load connection history summary:", err);
     }
   }, [hosts]);
 
@@ -424,12 +424,12 @@ function MainApp() {
   }, [refreshConnectionHistorySummary]);
 
   useEffect(() => {
-    if (!window.sshterm?.onSessionEvent) {
+    if (!window.hypershell?.onSessionEvent) {
       return;
     }
 
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const unsubscribe = window.sshterm.onSessionEvent((event) => {
+    const unsubscribe = window.hypershell.onSessionEvent((event) => {
       const shouldRefresh =
         (event.type === "status" && event.state === "connected") ||
         event.type === "error" ||
@@ -459,7 +459,7 @@ function MainApp() {
       const state = layoutStore.getState();
       if (state.tabs.length === 0) return;
       const layout = serializeCurrentLayout();
-      void window.sshterm?.workspaceSaveLast?.(layout);
+      void window.hypershell?.workspaceSaveLast?.(layout);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -526,21 +526,21 @@ function MainApp() {
   }, [toggleBroadcast]);
 
   useEffect(() => {
-    return window.sshterm?.onQuickConnect?.(() => {
+    return window.hypershell?.onQuickConnect?.(() => {
       setIsQuickConnectOpen(true);
     });
   }, []);
 
   // Keyboard-interactive auth (2FA) relay
   useEffect(() => {
-    return window.sshterm?.onKeyboardInteractive?.((request) => {
+    return window.hypershell?.onKeyboardInteractive?.((request) => {
       setKbdInteractiveRequest(request);
     });
   }, []);
 
   const handleKbdInteractiveSubmit = useCallback(
     (requestId: string, responses: string[]) => {
-      void window.sshterm?.keyboardInteractiveRespond?.({ requestId, responses });
+      void window.hypershell?.keyboardInteractiveRespond?.({ requestId, responses });
       setKbdInteractiveRequest(null);
     },
     []
@@ -550,7 +550,7 @@ function MainApp() {
     (requestId: string) => {
       // Send empty strings for each prompt so the server rejects auth cleanly
       const emptyResponses = (kbdInteractiveRequest?.prompts ?? []).map(() => "");
-      void window.sshterm?.keyboardInteractiveRespond?.({ requestId, responses: emptyResponses });
+      void window.hypershell?.keyboardInteractiveRespond?.({ requestId, responses: emptyResponses });
       setKbdInteractiveRequest(null);
     },
     [kbdInteractiveRequest]
@@ -562,7 +562,7 @@ function MainApp() {
   }, [terminalThemeName, customThemes]);
 
   const refreshPorts = useCallback(() => {
-    window.sshterm?.listSerialPorts?.()
+    window.hypershell?.listSerialPorts?.()
       .then(ports => setAvailablePorts(ports.map(p => p.path)))
       .catch(console.error);
   }, []);
@@ -697,7 +697,7 @@ function MainApp() {
   );
 
   const connectSftpWithPassword = useCallback(async () => {
-    if (!window.sshterm?.sftpConnect || !sftpAuthHost) {
+    if (!window.hypershell?.sftpConnect || !sftpAuthHost) {
       return;
     }
 
@@ -710,7 +710,7 @@ function MainApp() {
     setSftpAuthSubmitting(true);
     setSftpAuthError(null);
     try {
-      const { sftpSessionId } = await window.sshterm.sftpConnect({
+      const { sftpSessionId } = await window.hypershell.sftpConnect({
         hostId: sftpAuthHost.id,
         username,
         ...(sftpAuthPassword ? { password: sftpAuthPassword } : {})
@@ -745,16 +745,16 @@ function MainApp() {
     const newHost: HostRecord = { ...host, id: `host-${Date.now()}`, name: `${host.name} (copy)` };
     setHosts((prev) => [...prev, newHost]);
     void persistHost(newHost).then(async () => {
-      if (!window.sshterm?.tagsSetHostTags) {
+      if (!window.hypershell?.tagsSetHostTags) {
         return;
       }
       try {
-        await window.sshterm.tagsSetHostTags({
+        await window.hypershell.tagsSetHostTags({
           hostId: newHost.id,
           tagIds: newHost.tagIds ?? [],
         });
       } catch (error) {
-        console.warn("[sshterm] failed to copy host tags:", error);
+        console.warn("[hypershell] failed to copy host tags:", error);
       }
     });
   }, []);
@@ -762,7 +762,7 @@ function MainApp() {
   const deleteHost = useCallback(async (host: HostRecord) => {
     setHosts((prev) => prev.filter((h) => h.id !== host.id));
     setConnectionHistoryHost((current) => (current?.id === host.id ? null : current));
-    await window.sshterm?.removeHost?.({ id: host.id });
+    await window.hypershell?.removeHost?.({ id: host.id });
   }, []);
 
   const toggleFavoriteHost = useCallback(
@@ -793,19 +793,19 @@ function MainApp() {
         (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999)
       );
     });
-    void window.sshterm?.reorderHosts?.({
+    void window.hypershell?.reorderHosts?.({
       items: items.map((i) => ({ id: i.id, sortOrder: i.sortOrder, groupId: null }))
     });
   }, []);
 
   const handleHostKeyTrust = useCallback(async () => {
-    if (!hostKeyVerifyInfo || !hostKeyVerifyHost || !window.sshterm?.hostFingerprintTrust) {
+    if (!hostKeyVerifyInfo || !hostKeyVerifyHost || !window.hypershell?.hostFingerprintTrust) {
       setHostKeyVerifyOpen(false);
       return;
     }
 
     const id = `fp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    await window.sshterm.hostFingerprintTrust({
+    await window.hypershell.hostFingerprintTrust({
       id,
       hostname: hostKeyVerifyInfo.hostname,
       port: hostKeyVerifyInfo.port,
@@ -826,9 +826,9 @@ function MainApp() {
       openSftpAuthModal(host);
     } else {
       // Retry the direct connect
-      if (!window.sshterm?.sftpConnect) return;
+      if (!window.hypershell?.sftpConnect) return;
       try {
-        const { sftpSessionId } = await window.sshterm.sftpConnect({
+        const { sftpSessionId } = await window.hypershell.sftpConnect({
           hostId: host.id,
         });
         openSftpTab(host, sftpSessionId);
@@ -849,12 +849,12 @@ function MainApp() {
 
   const openSftpHost = useCallback(
     async (host: HostRecord) => {
-      if (!window.sshterm?.sftpConnect) {
+      if (!window.hypershell?.sftpConnect) {
         return;
       }
 
       try {
-        const { sftpSessionId } = await window.sshterm.sftpConnect({
+        const { sftpSessionId } = await window.hypershell.sftpConnect({
           hostId: host.id
         });
         openSftpTab(host, sftpSessionId);
@@ -877,13 +877,13 @@ function MainApp() {
   );
 
   const clearSavedSessionRecoveryState = useCallback(async () => {
-    if (!window.sshterm?.sessionClearSavedState) {
+    if (!window.hypershell?.sessionClearSavedState) {
       return;
     }
     try {
-      await window.sshterm.sessionClearSavedState();
+      await window.hypershell.sessionClearSavedState();
     } catch (error) {
-      console.warn("[sshterm] failed clearing saved session recovery state:", error);
+      console.warn("[hypershell] failed clearing saved session recovery state:", error);
     }
   }, []);
 
@@ -1070,9 +1070,9 @@ function MainApp() {
               if (!persisted) {
                 return;
               }
-              if (window.sshterm?.replaceHostEnvVars) {
+              if (window.hypershell?.replaceHostEnvVars) {
                 try {
-                  await window.sshterm.replaceHostEnvVars({
+                  await window.hypershell.replaceHostEnvVars({
                     hostId: id,
                     envVars: normalizedEnvVars.map((item) => ({
                       id: item.id,
@@ -1083,19 +1083,19 @@ function MainApp() {
                     })),
                   });
                 } catch (error) {
-                  console.warn("[sshterm] failed to persist host env vars:", error);
+                  console.warn("[hypershell] failed to persist host env vars:", error);
                 }
               }
 
               let persistedHostTags: TagRecord[] = [];
-              if (window.sshterm?.tagsSetHostTags) {
+              if (window.hypershell?.tagsSetHostTags) {
                 try {
-                  persistedHostTags = await window.sshterm.tagsSetHostTags({
+                  persistedHostTags = await window.hypershell.tagsSetHostTags({
                     hostId: id,
                     tagIds: normalizedTagIds,
                   });
                 } catch (error) {
-                  console.warn("[sshterm] failed to persist host tags:", error);
+                  console.warn("[hypershell] failed to persist host tags:", error);
                 }
               }
 

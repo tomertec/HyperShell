@@ -1,5 +1,5 @@
-import { ipcChannels } from "@sshterm/shared";
-import type { PuttySession } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
+import type { PuttySession } from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, extname, join, posix } from "node:path";
 
-import type { SftpTransportHandle } from "@sshterm/session-core";
-import type { TransferJob, TransferOp } from "@sshterm/shared";
+import type { SftpTransportHandle } from "@hypershell/session-core";
+import type { TransferJob, TransferOp } from "@hypershell/shared";
 
 export type TransferEventListener = (event: TransferEvent) => void;
 

@@ -1,4 +1,4 @@
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 import type {
   IpcMainLike,
   RegisterIpcOptions

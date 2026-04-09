@@ -8,8 +8,8 @@ import {
   resizeSessionRequestSchema,
   setSignalsRequestSchema,
   writeSessionRequestSchema
-} from "@sshterm/shared";
-import type { HostStatsResponse } from "@sshterm/shared";
+} from "@hypershell/shared";
+import type { HostStatsResponse } from "@hypershell/shared";
 import type {
   CloseSessionRequest,
   OpenSessionRequest,
@@ -17,9 +17,9 @@ import type {
   ResizeSessionRequest,
   SftpConnectRequest,
   WriteSessionRequest
-} from "@sshterm/shared";
-import { createSessionManager } from "@sshterm/session-core";
-import { parseSshConfig } from "@sshterm/session-core";
+} from "@hypershell/shared";
+import { createSessionManager } from "@hypershell/session-core";
+import { parseSshConfig } from "@hypershell/session-core";
 import {
   registerHostIpc,
   getOrCreateHostsRepo,
@@ -72,8 +72,8 @@ import {
   createConnectionHistoryRepositoryFromDatabase,
   createGroupsRepository,
   createSerialProfilesRepository
-} from "@sshterm/db";
-import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@sshterm/db";
+} from "@hypershell/db";
+import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@hypershell/db";
 import type {
   SessionManager,
   SessionTransportEvent,
@@ -81,7 +81,7 @@ import type {
   OpenSessionInput,
   SerialConnectionOptions,
   SftpConnectionOptions
-} from "@sshterm/session-core";
+} from "@hypershell/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -411,7 +411,7 @@ function logAuthTrace(
     return;
   }
 
-  const prefix = `[sshterm][auth:${scope}] ${message}`;
+  const prefix = `[hypershell][auth:${scope}] ${message}`;
   if (metadata) {
     console.info(prefix, metadata);
     return;
@@ -1402,7 +1402,7 @@ export function registerIpc(
     () => getOrCreateHostsRepo(),
     () => groupsRepo,
     () => {
-      const { createSnippetsRepositoryFromDatabase } = require("@sshterm/db");
+      const { createSnippetsRepositoryFromDatabase } = require("@hypershell/db");
       return createSnippetsRepositoryFromDatabase(getOrCreateDatabase() as SqliteDatabase);
     }
   );

@@ -133,7 +133,7 @@ export function TransferPanel() {
                   type="button"
                   className="text-xs text-text-secondary hover:text-red-400"
                   onClick={() =>
-                    window.sshterm?.sftpTransferCancel?.({
+                    window.hypershell?.sftpTransferCancel?.({
                       transferId: transfer.transferId
                     })
                   }

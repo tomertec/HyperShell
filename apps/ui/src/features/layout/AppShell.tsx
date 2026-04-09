@@ -1,7 +1,6 @@
 import { cloneElement, isValidElement, useState } from "react";
 import { motion } from "framer-motion";
 import { TunnelManagerPanel } from "../tunnels/TunnelManagerPanel";
-import { StatusBar } from "../statusbar/StatusBar";
 
 export interface AppShellProps {
   sidebar: React.ReactNode;
@@ -32,16 +31,17 @@ export function AppShell({ sidebar, children }: AppShellProps) {
 
       <div className="flex flex-1 min-h-0">
         <aside
-          className={`relative flex flex-col border-r border-border bg-base-800 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${
+          className={`relative flex flex-col bg-base-800 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${
             sidebarOpen ? "w-64" : "w-12"
           }`}
+          style={{ borderRight: '0.5px solid var(--terminal-frame-line)' }}
         >
           {/* Subtle gradient overlay on sidebar */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-accent/[0.02] via-transparent to-transparent" />
           {/* Right edge highlight */}
           <div className="pointer-events-none absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-accent/[0.06] via-transparent to-transparent" />
 
-          <div className="relative flex items-center justify-end px-3 py-2 border-b border-border">
+          <div className="terminal-logo-row relative flex h-11 items-center justify-end px-3">
             {sidebarOpen && (
               <span className="absolute inset-0 flex items-center justify-center select-none pointer-events-none">
                 <span
@@ -96,7 +96,6 @@ export function AppShell({ sidebar, children }: AppShellProps) {
           <div className="flex-1 flex flex-col min-h-0">
             {children}
           </div>
-          <StatusBar />
         </main>
 
         <TunnelManagerPanel />

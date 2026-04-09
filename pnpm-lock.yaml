@@ -20,13 +20,13 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@sshterm/db':
+      '@hypershell/db':
         specifier: workspace:^
         version: link:../../packages/db
-      '@sshterm/session-core':
+      '@hypershell/session-core':
         specifier: workspace:*
         version: link:../../packages/session-core
-      '@sshterm/shared':
+      '@hypershell/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       better-sqlite3:
@@ -120,12 +120,12 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.4)
+      '@hypershell/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@replit/codemirror-minimap':
         specifier: ^0.5.2
         version: 0.5.2(@codemirror/language@6.12.3)(@codemirror/lint@6.9.5)(@codemirror/state@6.6.0)(@codemirror/view@6.41.0)(@lezer/common@1.5.1)(@lezer/highlight@1.2.3)
-      '@sshterm/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@xterm/addon-fit':
         specifier: ^0.11.0
         version: 0.11.0
@@ -181,7 +181,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@sshterm/shared':
+      '@hypershell/shared':
         specifier: workspace:*
         version: link:../shared
       better-sqlite3:
@@ -194,7 +194,7 @@ importers:
 
   packages/session-core:
     dependencies:
-      '@sshterm/shared':
+      '@hypershell/shared':
         specifier: workspace:*
         version: link:../shared
       node-pty:

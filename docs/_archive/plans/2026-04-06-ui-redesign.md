@@ -1,8 +1,8 @@
-# SSHTerm UI Redesign Implementation Plan
+# HyperShell UI Redesign Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Transform SSHTerm from a prototype with inline styles and flat layout into a polished desktop app with Tailwind CSS, sidebar+workspace layout, and proper component organization.
+**Goal:** Transform HyperShell from a prototype with inline styles and flat layout into a polished desktop app with Tailwind CSS, sidebar+workspace layout, and proper component organization.
 
 **Architecture:** Replace the single scrollable Workbench page with a fixed-viewport shell: collapsible sidebar (hosts, serial profiles, actions) on the left, tabbed terminal workspace on the right. All inline styles replaced with Tailwind utility classes. Forms (HostForm, SshConfigImportDialog, PortForwardProfileForm) become modal dialogs. QuickConnectDialog becomes a centered command-palette overlay.
 
@@ -23,7 +23,7 @@
 
 Run from repo root:
 ```bash
-pnpm --filter @sshterm/ui add -D @tailwindcss/vite tailwindcss
+pnpm --filter @hypershell/ui add -D @tailwindcss/vite tailwindcss
 ```
 
 **Step 2: Configure Vite plugin**
@@ -111,7 +111,7 @@ Add to `<head>` in `apps/ui/index.html`:
 
 **Step 6: Verify Tailwind works**
 
-Run: `pnpm --filter @sshterm/ui dev`
+Run: `pnpm --filter @hypershell/ui dev`
 
 Temporarily add `className="text-red-500"` to the `<h1>` in Workbench.tsx and confirm it turns red in browser.
 
@@ -155,7 +155,7 @@ export function AppShell({ sidebar, children }: AppShellProps) {
         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
           {sidebarOpen && (
             <span className="text-sm font-semibold text-text-primary tracking-tight">
-              SSHTerm
+              HyperShell
             </span>
           )}
           <button
@@ -221,7 +221,7 @@ export function App() {
 
 **Step 3: Run and verify the sidebar + workspace split renders**
 
-Run: `pnpm --filter @sshterm/ui dev`
+Run: `pnpm --filter @hypershell/ui dev`
 
 **Step 4: Commit**
 ```bash
@@ -445,7 +445,7 @@ export function Sidebar({
 
       {/* Bottom area */}
       <div className="mt-auto border-t border-border px-3 py-2">
-        <div className="text-[11px] text-text-muted">SSHTerm v0.1.0</div>
+        <div className="text-[11px] text-text-muted">HyperShell v0.1.0</div>
       </div>
     </div>
   );
@@ -539,7 +539,7 @@ export function Workspace() {
     tabs.find((t) => t.sessionId === activeSessionId) ?? tabs[0] ?? null;
 
   const closeTab = (sessionId: string) => {
-    window.sshterm?.closeSession({ sessionId }).catch(() => {});
+    window.hypershell?.closeSession({ sessionId }).catch(() => {});
     layoutStore.setState((state) => {
       const nextTabs = state.tabs.filter((t) => t.sessionId !== sessionId);
       const nextActive =
@@ -1161,7 +1161,7 @@ export function App() {
   }, [toggleBroadcast]);
 
   useEffect(() => {
-    return window.sshterm?.onQuickConnect?.(() => {
+    return window.hypershell?.onQuickConnect?.(() => {
       setIsQuickConnectOpen(true);
     });
   }, []);
@@ -1169,9 +1169,9 @@ export function App() {
   const connectHost = useCallback(
     async (host: HostRecord) => {
       const fallbackSessionId = `ssh-${host.id}-${Date.now()}`;
-      if (window.sshterm?.openSession) {
+      if (window.hypershell?.openSession) {
         try {
-          const opened = await window.sshterm.openSession({
+          const opened = await window.hypershell.openSession({
             transport: "ssh",
             profileId: host.hostname,
             cols: 120,
@@ -1292,13 +1292,13 @@ export { Workspace as Workbench } from "./Workspace";
 
 **Step 3: Run tests**
 
-Run: `pnpm --filter @sshterm/ui test`
+Run: `pnpm --filter @hypershell/ui test`
 
 Fix any broken imports. The existing E2E tests may need updates if they look for specific text content.
 
 **Step 4: Run the dev server and verify the full layout**
 
-Run: `pnpm --filter @sshterm/ui dev`
+Run: `pnpm --filter @hypershell/ui dev`
 
 Verify:
 - Sidebar with grouped hosts appears on the left
@@ -1327,7 +1327,7 @@ Fix any failures. Most likely the Workbench tests will need updating since Workb
 
 **Step 2: Run E2E tests**
 
-Run: `pnpm --filter @sshterm/ui test:e2e`
+Run: `pnpm --filter @hypershell/ui test:e2e`
 
 Fix any failures — selectors may have changed.
 

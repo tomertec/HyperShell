@@ -23,7 +23,7 @@ HyperShell follows Electron's recommended security model with strict process iso
 │         │                                               │
 ├─────────┼───────────────────────────────────────────────┤
 │         │        Preload Bridge                         │
-│         │        window.sshterm = { ... }               │
+│         │        window.hypershell = { ... }               │
 │         │        (contextBridge.exposeInMainWorld)       │
 ├─────────┼───────────────────────────────────────────────┤
 │         ▼        Renderer Process                       │
@@ -52,7 +52,7 @@ Key responsibilities:
 
 ### Preload Bridge (`apps/desktop/src/preload/`)
 
-The security boundary. Exposes a typed `window.sshterm` API to the renderer using `contextBridge.exposeInMainWorld`. Every method:
+The security boundary. Exposes a typed `window.hypershell` API to the renderer using `contextBridge.exposeInMainWorld`. Every method:
 1. Validates the request with Zod (`schema.parse(request)`)
 2. Calls `ipcRenderer.invoke(channel, parsed)`
 3. Validates the response with Zod before returning
@@ -137,7 +137,7 @@ All IPC communication follows this pattern:
 3. Register handler           → apps/desktop/src/main/ipc/*Ipc.ts
 4. Expose in preload          → apps/desktop/src/preload/desktopApi.ts
 5. Declare in renderer types  → apps/ui/src/types/global.d.ts
-6. Call from UI               → window.sshterm.methodName(request)
+6. Call from UI               → window.hypershell.methodName(request)
 ```
 
 Both sides validate. The preload validates outgoing requests AND incoming responses. The main process validates incoming requests. Types are inferred from Zod schemas via `z.infer<>`.

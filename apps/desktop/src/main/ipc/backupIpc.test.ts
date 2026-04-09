@@ -10,7 +10,7 @@ import {
 } from "./backupIpc";
 
 function createTempDir(): string {
-  const dir = path.join(tmpdir(), `sshterm-backup-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const dir = path.join(tmpdir(), `hypershell-backup-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -18,12 +18,12 @@ function createTempDir(): string {
 describe("generateBackupFilename", () => {
   it("produces a filename with the expected prefix and extension", () => {
     const filename = generateBackupFilename(new Date("2025-06-15T10:30:00.000Z"));
-    expect(filename).toBe("sshterm-backup-2025-06-15T10-30-00.db");
+    expect(filename).toBe("hypershell-backup-2025-06-15T10-30-00.db");
   });
 
   it("uses current date when no argument provided", () => {
     const filename = generateBackupFilename();
-    expect(filename).toMatch(/^sshterm-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/);
+    expect(filename).toMatch(/^hypershell-backup-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.db$/);
   });
 });
 
@@ -83,21 +83,21 @@ describe("listBackupFiles", () => {
   });
 
   it("lists only files matching the backup pattern", () => {
-    writeFileSync(path.join(tempDir, "sshterm-backup-2025-01-01T00-00-00.db"), "data");
-    writeFileSync(path.join(tempDir, "sshterm-backup-2025-01-02T00-00-00.db"), "data");
+    writeFileSync(path.join(tempDir, "hypershell-backup-2025-01-01T00-00-00.db"), "data");
+    writeFileSync(path.join(tempDir, "hypershell-backup-2025-01-02T00-00-00.db"), "data");
     writeFileSync(path.join(tempDir, "unrelated.txt"), "data");
-    writeFileSync(path.join(tempDir, "sshterm-backup-partial"), "data");
+    writeFileSync(path.join(tempDir, "hypershell-backup-partial"), "data");
 
     const result = listBackupFiles(tempDir);
     expect(result).toHaveLength(2);
-    expect(result[0].fileName).toBe("sshterm-backup-2025-01-02T00-00-00.db");
-    expect(result[1].fileName).toBe("sshterm-backup-2025-01-01T00-00-00.db");
+    expect(result[0].fileName).toBe("hypershell-backup-2025-01-02T00-00-00.db");
+    expect(result[1].fileName).toBe("hypershell-backup-2025-01-01T00-00-00.db");
   });
 
   it("sorts backups newest-first", () => {
     // Create files with slightly different timestamps
-    const file1 = path.join(tempDir, "sshterm-backup-2025-01-01T00-00-00.db");
-    const file2 = path.join(tempDir, "sshterm-backup-2025-06-15T12-00-00.db");
+    const file1 = path.join(tempDir, "hypershell-backup-2025-01-01T00-00-00.db");
+    const file2 = path.join(tempDir, "hypershell-backup-2025-06-15T12-00-00.db");
     writeFileSync(file1, "old");
     writeFileSync(file2, "new");
 
@@ -120,35 +120,35 @@ describe("rotateBackups", () => {
   });
 
   it("does nothing when fewer than maxKeep backups exist", () => {
-    writeFileSync(path.join(tempDir, "sshterm-backup-2025-01-01T00-00-00.db"), "data");
-    writeFileSync(path.join(tempDir, "sshterm-backup-2025-01-02T00-00-00.db"), "data");
+    writeFileSync(path.join(tempDir, "hypershell-backup-2025-01-01T00-00-00.db"), "data");
+    writeFileSync(path.join(tempDir, "hypershell-backup-2025-01-02T00-00-00.db"), "data");
 
     rotateBackups(tempDir, 5);
-    const files = readdirSync(tempDir).filter((f) => f.startsWith("sshterm-backup-"));
+    const files = readdirSync(tempDir).filter((f) => f.startsWith("hypershell-backup-"));
     expect(files).toHaveLength(2);
   });
 
   it("deletes oldest backups when exceeding maxKeep", () => {
     // Create 7 backup files
     for (let i = 0; i < 7; i++) {
-      const fileName = `sshterm-backup-2025-01-0${i + 1}T00-00-00.db`;
+      const fileName = `hypershell-backup-2025-01-0${i + 1}T00-00-00.db`;
       writeFileSync(path.join(tempDir, fileName), `data-${i}`);
     }
 
     rotateBackups(tempDir, 3);
-    const remaining = readdirSync(tempDir).filter((f) => f.startsWith("sshterm-backup-"));
+    const remaining = readdirSync(tempDir).filter((f) => f.startsWith("hypershell-backup-"));
     expect(remaining).toHaveLength(3);
   });
 
   it("keeps the newest backups after rotation", () => {
     for (let i = 1; i <= 5; i++) {
-      const fileName = `sshterm-backup-2025-01-0${i}T00-00-00.db`;
+      const fileName = `hypershell-backup-2025-01-0${i}T00-00-00.db`;
       writeFileSync(path.join(tempDir, fileName), `data-${i}`);
     }
 
     rotateBackups(tempDir, 2);
     const remaining = readdirSync(tempDir)
-      .filter((f) => f.startsWith("sshterm-backup-"))
+      .filter((f) => f.startsWith("hypershell-backup-"))
       .sort();
     expect(remaining).toHaveLength(2);
     // The newest files by mtime should remain. Since we wrote them sequentially,

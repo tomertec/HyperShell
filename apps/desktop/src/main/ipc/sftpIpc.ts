@@ -1,4 +1,4 @@
-import { createHostsRepositoryFromDatabase, openDatabase, createSftpBookmarksRepository, createHostFingerprintRepositoryFromDatabase } from "@sshterm/db";
+import { createHostsRepositoryFromDatabase, openDatabase, createSftpBookmarksRepository, createHostFingerprintRepositoryFromDatabase } from "@hypershell/db";
 import {
   ipcChannels,
   sftpBookmarkListRequestSchema,
@@ -36,9 +36,9 @@ import {
   type SftpTransferStartRequest,
   type SftpWriteFileRequest,
   type KeyboardInteractiveRequest,
-} from "@sshterm/shared";
-import type { SessionManager, SftpConnectionOptions, KeyboardInteractiveCallback } from "@sshterm/session-core";
-import { createSyncEngine, probeHostKey } from "@sshterm/session-core";
+} from "@hypershell/shared";
+import type { SessionManager, SftpConnectionOptions, KeyboardInteractiveCallback } from "@hypershell/session-core";
+import { createSyncEngine, probeHostKey } from "@hypershell/session-core";
 import { timingSafeEqual } from "node:crypto";
 import type { IpcMainInvokeEvent } from "electron";
 

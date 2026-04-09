@@ -1,5 +1,5 @@
-appId: com.sshterm.desktop
-productName: SSHTerm
+appId: com.hypershell.desktop
+productName: HyperShell
 npmRebuild: false
 asar: true
 asarUnpack:
@@ -13,17 +13,18 @@ files:
 directories:
   output: release
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
         - x64
-  artifactName: sshterm-${version}-${arch}.${ext}
+  artifactName: hypershell-${version}-${arch}.${ext}
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
-  shortcutName: SSHTerm
+  shortcutName: HyperShell
 mac:
   target:
     - target: dmg
@@ -32,7 +33,7 @@ mac:
     - target: zip
       arch:
         - x64
-  artifactName: sshterm-${version}-mac-${arch}.${ext}
+  artifactName: hypershell-${version}-mac-${arch}.${ext}
   category: public.app-category.developer-tools
   darkModeSupport: true
   hardenedRuntime: true

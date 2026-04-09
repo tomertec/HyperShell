@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ipcChannels, type SessionEvent } from "@sshterm/shared";
-import type { SessionManager, SessionSnapshot } from "@sshterm/session-core";
+import { ipcChannels, type SessionEvent } from "@hypershell/shared";
+import type { SessionManager, SessionSnapshot } from "@hypershell/session-core";
 import type { IpcMainInvokeEvent } from "electron";
 
 import { getRegisteredChannels, registerIpc } from "./registerIpc";

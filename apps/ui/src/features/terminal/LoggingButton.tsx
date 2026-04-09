@@ -25,13 +25,13 @@ export function LoggingButton({
   const [playbackRecordingId, setPlaybackRecordingId] = useState<string | null>(null);
 
   useEffect(() => {
-    window.sshterm?.loggingGetState?.({ sessionId }).then((state) => {
+    window.hypershell?.loggingGetState?.({ sessionId }).then((state) => {
       setLoggingActive(state.active);
     }).catch(() => {
       setLoggingActive(false);
     });
 
-    window.sshterm?.recordingGetState?.({ sessionId }).then((state) => {
+    window.hypershell?.recordingGetState?.({ sessionId }).then((state) => {
       setRecordingActive(state.active);
     }).catch(() => {
       setRecordingActive(false);
@@ -41,17 +41,17 @@ export function LoggingButton({
   const toggleLogging = async () => {
     try {
       if (loggingActive) {
-        await window.sshterm?.loggingStop?.({ sessionId });
+        await window.hypershell?.loggingStop?.({ sessionId });
         setLoggingActive(false);
         toast.success("Session text logging stopped");
       } else {
         const defaultName = `session-${new Date().toISOString().replace(/[:.]/g, "-")}.log`;
-        const filePath = await window.sshterm?.fsShowSaveDialog?.({
+        const filePath = await window.hypershell?.fsShowSaveDialog?.({
           defaultPath: defaultName,
           filters: [{ name: "Log Files", extensions: ["log", "txt"] }],
         });
         if (!filePath) return;
-        await window.sshterm?.loggingStart?.({ sessionId, filePath });
+        await window.hypershell?.loggingStart?.({ sessionId, filePath });
         setLoggingActive(true);
         toast.success("Session text logging started");
       }
@@ -63,11 +63,11 @@ export function LoggingButton({
   const toggleRecording = async () => {
     try {
       if (recordingActive) {
-        await window.sshterm?.recordingStop?.({ sessionId });
+        await window.hypershell?.recordingStop?.({ sessionId });
         setRecordingActive(false);
         toast.success("Session recording stopped");
       } else {
-        await window.sshterm?.recordingStart?.({
+        await window.hypershell?.recordingStart?.({
           sessionId,
           hostId: hostId ?? null,
           title,

@@ -36,7 +36,7 @@ export function RemoteEditor({
       setError(null);
 
       try {
-        const response = await window.sshterm?.sftpReadFile?.({
+        const response = await window.hypershell?.sftpReadFile?.({
           sftpSessionId,
           path: remotePath
         });
@@ -116,7 +116,7 @@ export function RemoteEditor({
 
     try {
       const content = editorViewRef.current.state.doc.toString();
-      await window.sshterm?.sftpWriteFile?.({
+      await window.hypershell?.sftpWriteFile?.({
         sftpSessionId,
         path: remotePath,
         content,

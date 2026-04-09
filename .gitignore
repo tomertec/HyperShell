@@ -5,3 +5,4 @@ out/
 .env
 .env.*
 test-results/
+apps/desktop/release/

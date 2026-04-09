@@ -8,7 +8,7 @@ export function TunnelList() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const handleStop = async (id: string) => {
-    await window.sshterm?.stopPortForward?.({ id });
+    await window.hypershell?.stopPortForward?.({ id });
     await refresh();
   };
 

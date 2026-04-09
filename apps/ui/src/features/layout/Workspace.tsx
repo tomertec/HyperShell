@@ -10,6 +10,7 @@ import { useTunnelStore } from "../tunnels/tunnelStore";
 import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
 import { useSnippetStore } from "../snippets/snippetStore";
 import { SnippetsPanel } from "../snippets/SnippetsPanel";
+import { StatusBar } from "../statusbar/StatusBar";
 import { type Pane, layoutStore } from "./layoutStore";
 import { PaneResizeHandle } from "./PaneResizeHandle";
 import { TabBar } from "./TabBar";
@@ -145,9 +146,9 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   const closeTab = (sessionId: string) => {
     const tab = layoutStore.getState().tabs.find((candidate) => candidate.sessionId === sessionId);
     if (tab?.type === "sftp" && tab.sftpSessionId) {
-      void window.sshterm?.sftpDisconnect?.({ sftpSessionId: tab.sftpSessionId }).catch(() => {});
+      void window.hypershell?.sftpDisconnect?.({ sftpSessionId: tab.sftpSessionId }).catch(() => {});
     } else {
-      void window.sshterm?.closeSession?.({ sessionId }).catch(() => {});
+      void window.hypershell?.closeSession?.({ sessionId }).catch(() => {});
     }
 
     layoutStore.setState((state) => {
@@ -183,8 +184,8 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   return (
     <div className="relative flex flex-col flex-1 min-h-0">
       <BroadcastBar />
-      <div className="flex items-end bg-base-800 border-b border-border">
-        <div className="flex-1 min-w-0">
+      <div className="flex h-11 items-end bg-base-800">
+        <div className="flex-1 min-w-0 h-full">
           <TabBar
             tabs={tabs}
             activeSessionId={activeSessionId}
@@ -193,7 +194,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
             onReorder={(from, to) => layoutStore.getState().moveTab(from, to)}
           />
         </div>
-        <div className="relative flex items-center gap-0.5 px-2 pb-1.5 pt-2">
+        <div className="relative flex h-full items-end gap-0.5 px-2 pb-1.5">
           <BroadcastButton />
           <button
             onClick={() => useSnippetStore.getState().toggle()}
@@ -236,49 +237,53 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
         </div>
       </div>
 
-      {tabs.length > 0 ? (
-        <div
-          ref={containerRef}
-          className={`flex-1 min-h-0 flex ${
-            splitDirection === "horizontal" ? "flex-row" : "flex-col"
-          }`}
-        >
-          {panes.map((pane, i) => (
-            <Fragment key={pane.paneId}>
-              {i > 0 && (
-                <PaneResizeHandle
-                  direction={splitDirection}
-                  onResize={(delta) => handleResize(i - 1, delta)}
-                  onResizeEnd={() => {}}
-                />
-              )}
-              <div
-                style={{
-                  [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
-                }}
-                className="h-full min-h-0 min-w-0 relative"
-              >
-                <ErrorBoundary>
-                  <PaneView
-                    pane={pane}
-                    isActive={pane.paneId === activePaneId}
-                    activeSessionId={activeSessionId}
-                    onActivate={() => activatePane(pane.paneId)}
-                    onCloseTab={closeTab}
+      <div className="terminal-content-frame relative flex-1 min-h-0 flex flex-col">
+        {tabs.length > 0 ? (
+          <div
+            ref={containerRef}
+            className={`flex-1 min-h-0 flex ${
+              splitDirection === "horizontal" ? "flex-row" : "flex-col"
+            }`}
+          >
+            {panes.map((pane, i) => (
+              <Fragment key={pane.paneId}>
+                {i > 0 && (
+                  <PaneResizeHandle
+                    direction={splitDirection}
+                    onResize={(delta) => handleResize(i - 1, delta)}
+                    onResizeEnd={() => {}}
                   />
-                </ErrorBoundary>
-              </div>
-            </Fragment>
-          ))}
-        </div>
-      ) : (
-        <WelcomeScreen
-          availablePorts={availablePorts}
-          onRefreshPorts={onRefreshPorts}
-          onConnectSsh={onConnectSsh}
-          onConnectSerial={onConnectSerial}
-        />
-      )}
+                )}
+                <div
+                  style={{
+                    [splitDirection === "horizontal" ? "width" : "height"]: `${paneSizes[i] ?? 100}%`,
+                  }}
+                  className="h-full min-h-0 min-w-0 relative"
+                >
+                  <ErrorBoundary>
+                    <PaneView
+                      pane={pane}
+                      isActive={pane.paneId === activePaneId}
+                      activeSessionId={activeSessionId}
+                      onActivate={() => activatePane(pane.paneId)}
+                      onCloseTab={closeTab}
+                    />
+                  </ErrorBoundary>
+                </div>
+              </Fragment>
+            ))}
+          </div>
+        ) : (
+          <WelcomeScreen
+            availablePorts={availablePorts}
+            onRefreshPorts={onRefreshPorts}
+            onConnectSsh={onConnectSsh}
+            onConnectSerial={onConnectSerial}
+          />
+        )}
+
+        <StatusBar />
+      </div>
       <SnippetsPanel />
     </div>
   );

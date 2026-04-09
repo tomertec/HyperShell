@@ -8,7 +8,7 @@ import {
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 
-import type { SftpEntry } from "@sshterm/shared";
+import type { SftpEntry } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
 import { getParentPath } from "../utils/fileUtils";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
@@ -123,7 +123,7 @@ export function RemotePane({
       setError("remote", null);
 
       try {
-        const sftpList = window.sshterm?.sftpList;
+        const sftpList = window.hypershell?.sftpList;
         if (!sftpList) {
           throw new Error("SFTP list API is unavailable in preload bridge");
         }

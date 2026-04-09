@@ -105,7 +105,7 @@ export function SnippetsPanel() {
       toast.error("No active terminal session");
       return;
     }
-    void window.sshterm?.writeSession?.({ sessionId: activeSessionId, data: body });
+    void window.hypershell?.writeSession?.({ sessionId: activeSessionId, data: body });
     // Move focus back to the terminal so Enter goes to the session, not the button
     (document.activeElement as HTMLElement | null)?.blur();
     const termEl = document.querySelector<HTMLElement>(".xterm-helper-textarea");

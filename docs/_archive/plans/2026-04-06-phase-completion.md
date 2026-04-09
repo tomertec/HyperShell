@@ -1,10 +1,10 @@
-# SSHTerm Phase 2-4 Completion Plan
+# HyperShell Phase 2-4 Completion Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Complete all remaining Phase 2-4 features identified in the gap analysis — split panes, auth wiring, host delete, SSH config import, group management, session reconnect, broadcast UI, port forwarding execution, and settings persistence.
 
-**Architecture:** Each task builds on the existing three-layer Electron model (main → preload → renderer). All IPC additions follow the established pattern: Zod schema in `packages/shared`, handler in `apps/desktop`, preload method in `desktopApi.ts`, UI consumption via `window.sshterm`. Database changes use existing repositories pattern with `better-sqlite3`.
+**Architecture:** Each task builds on the existing three-layer Electron model (main → preload → renderer). All IPC additions follow the established pattern: Zod schema in `packages/shared`, handler in `apps/desktop`, preload method in `desktopApi.ts`, UI consumption via `window.hypershell`. Database changes use existing repositories pattern with `better-sqlite3`.
 
 **Tech Stack:** TypeScript, Zod, Zustand, React, xterm.js, better-sqlite3, node-pty, Vitest
 
@@ -105,7 +105,7 @@ it("returns false when removing a non-existent host", () => {
 **Step 5: Run tests**
 
 ```bash
-pnpm --filter @sshterm/db test
+pnpm --filter @hypershell/db test
 ```
 
 **Step 6: Commit**
@@ -165,7 +165,7 @@ import {
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 
@@ -276,7 +276,7 @@ import {
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 ```
 
 Add to `DesktopApi` interface:
@@ -349,7 +349,7 @@ describe("settingsIpc", () => {
 **Step 7: Run tests**
 
 ```bash
-pnpm --filter @sshterm/desktop test
+pnpm --filter @hypershell/desktop test
 ```
 
 **Step 8: Commit**
@@ -603,7 +603,7 @@ function createTestTransport(sessionId: string): TransportHandle {
 **Step 7: Run tests**
 
 ```bash
-pnpm --filter @sshterm/session-core test
+pnpm --filter @hypershell/session-core test
 ```
 
 **Step 8: Commit**
@@ -761,7 +761,7 @@ export function Workspace() {
   const activePaneId = useStore(layoutStore, (s) => s.activePaneId);
 
   const closeTab = (sessionId: string) => {
-    window.sshterm?.closeSession?.({ sessionId }).catch(() => {});
+    window.hypershell?.closeSession?.({ sessionId }).catch(() => {});
     layoutStore.setState((state) => {
       const nextTabs = state.tabs.filter((t) => t.sessionId !== sessionId);
       const nextPanes = state.panes.map((p) =>
@@ -863,7 +863,7 @@ it("does not close the last pane", () => {
 **Step 4: Run tests**
 
 ```bash
-pnpm --filter @sshterm/ui test
+pnpm --filter @hypershell/ui test
 ```
 
 **Step 5: Commit**
@@ -904,12 +904,12 @@ export type ImportSshConfigResponse = z.infer<typeof importSshConfigResponseSche
 Create `apps/desktop/src/main/ipc/sshConfigIpc.ts`:
 
 ```typescript
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import { parseSshConfig } from "@sshterm/session-core";
+import { parseSshConfig } from "@hypershell/session-core";
 import { randomUUID } from "node:crypto";
 
 import type { IpcMainLike } from "./registerIpc";
@@ -1019,7 +1019,7 @@ describe("sshConfigIpc", () => {
 **Step 6: Run tests and commit**
 
 ```bash
-pnpm --filter @sshterm/desktop test
+pnpm --filter @hypershell/desktop test
 git add packages/shared/src/ipc/schemas.ts apps/desktop/src/main/ipc/sshConfigIpc.ts apps/desktop/src/main/ipc/sshConfigIpc.test.ts apps/desktop/src/main/ipc/registerIpc.ts apps/desktop/src/preload/desktopApi.ts
 git commit -m "feat: add SSH config import IPC to read ~/.ssh/config and bulk-import hosts"
 ```
@@ -1146,7 +1146,7 @@ it("deduplicates target session ids", () => {
 **Step 4: Run tests and commit**
 
 ```bash
-pnpm --filter @sshterm/ui test
+pnpm --filter @hypershell/ui test
 git add apps/ui/src/features/broadcast/BroadcastBar.tsx apps/ui/src/features/layout/Workspace.tsx apps/ui/src/features/broadcast/broadcastStore.test.ts
 git commit -m "feat: add broadcast targeting bar with session toggles and safety banner"
 ```
@@ -1378,7 +1378,7 @@ it("does not reconnect when user closes session", () => {
 **Step 3: Run tests and commit**
 
 ```bash
-pnpm --filter @sshterm/session-core test
+pnpm --filter @hypershell/session-core test
 git add packages/session-core/src/sessionManager.ts packages/session-core/src/sessionManager.test.ts
 git commit -m "feat: add auto-reconnect with exponential backoff to session manager"
 ```
@@ -1557,8 +1557,8 @@ import {
   stopPortForwardRequestSchema,
   type StartPortForwardRequest,
   type StopPortForwardRequest
-} from "@sshterm/shared";
-import { createPortForward, type PortForwardHandle } from "@sshterm/session-core";
+} from "@hypershell/shared";
+import { createPortForward, type PortForwardHandle } from "@hypershell/session-core";
 import type { IpcMainInvokeEvent } from "electron";
 import { randomUUID } from "node:crypto";
 import type { IpcMainLike } from "./registerIpc";
@@ -1571,7 +1571,7 @@ export function registerPortForwardIpc(ipcMain: IpcMainLike): void {
     const id = randomUUID();
 
     // node-pty loaded at runtime
-    const nodePty = require("node-pty") as { spawn: import("@sshterm/session-core").SshPtySpawn };
+    const nodePty = require("node-pty") as { spawn: import("@hypershell/session-core").SshPtySpawn };
 
     const handle = createPortForward(
       {
@@ -1657,7 +1657,7 @@ describe("buildForwardArg", () => {
 **Step 6: Register in registerIpc.ts, add preload methods, run tests, and commit**
 
 ```bash
-pnpm --filter @sshterm/session-core test
+pnpm --filter @hypershell/session-core test
 git add packages/session-core/src/portForwarding.ts packages/session-core/src/portForwarding.test.ts packages/session-core/src/index.ts packages/shared/src/ipc/channels.ts packages/shared/src/ipc/schemas.ts apps/desktop/src/main/ipc/portForwardIpc.ts apps/desktop/src/main/ipc/registerIpc.ts apps/desktop/src/preload/desktopApi.ts
 git commit -m "feat: add port forwarding execution via SSH -L/-R/-D"
 ```
@@ -1832,10 +1832,10 @@ import {
   removeGroupRequestSchema,
   type UpsertGroupRequest,
   type RemoveGroupRequest
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
-import type { GroupInput, GroupRecord } from "@sshterm/db";
+import type { GroupInput, GroupRecord } from "@hypershell/db";
 
 type GroupsRepoLike = {
   create(input: GroupInput): GroupRecord;
@@ -1931,7 +1931,7 @@ describe("groupsRepository", () => {
 **Step 7: Run tests and commit**
 
 ```bash
-pnpm --filter @sshterm/db test
+pnpm --filter @hypershell/db test
 git add packages/db/src/repositories/groupsRepository.ts packages/db/src/repositories/groupsRepository.test.ts packages/db/src/repositories/index.ts packages/shared/src/ipc/schemas.ts packages/shared/src/ipc/channels.ts apps/desktop/src/main/ipc/groupsIpc.ts apps/desktop/src/main/ipc/registerIpc.ts apps/desktop/src/preload/desktopApi.ts
 git commit -m "feat: add group management (CRUD) with IPC and repository"
 ```

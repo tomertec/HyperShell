@@ -4,8 +4,8 @@ import {
   loadWorkspaceRequestSchema,
   removeWorkspaceRequestSchema,
   workspaceLayoutSchema,
-} from "@sshterm/shared";
-import { createWorkspaceRepository } from "@sshterm/db";
+} from "@hypershell/shared";
+import { createWorkspaceRepository } from "@hypershell/db";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 

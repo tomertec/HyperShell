@@ -37,7 +37,7 @@ jobs:
         run: pnpm ci:test
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @sshterm/ui exec playwright install --with-deps chromium
+        run: pnpm --filter @hypershell/ui exec playwright install --with-deps chromium
 
       - name: Playwright smoke
         run: pnpm ci:test:e2e

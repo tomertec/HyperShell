@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, screen } from "electron";
 import path from "node:path";
 import { getOrCreateSettingsRepo } from "../ipc/hostsIpc";
 import { sessionManager } from "../ipc/registerIpc";
+import { resolveAppIconPath } from "./resolveAppIconPath";
 
 interface WindowState {
   x?: number;
@@ -110,6 +111,7 @@ function isConfirmOnCloseEnabled(): boolean {
 
 export function createMainWindow(): BrowserWindow {
   const preloadPath = path.join(__dirname, "..", "preload", "index.cjs");
+  const iconPath = resolveAppIconPath();
   const state = loadWindowState();
 
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
@@ -131,6 +133,10 @@ export function createMainWindow(): BrowserWindow {
       nodeIntegration: false
     }
   };
+
+  if (iconPath) {
+    windowOptions.icon = iconPath;
+  }
 
   if (state.x !== undefined && state.y !== undefined) {
     const bounds: Electron.Rectangle = {

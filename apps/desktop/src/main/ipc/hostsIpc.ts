@@ -1,5 +1,5 @@
-import { createHostsRepositoryFromDatabase } from "@sshterm/db";
-import type { HostInput, HostRecord } from "@sshterm/db";
+import { createHostsRepositoryFromDatabase } from "@hypershell/db";
+import type { HostInput, HostRecord } from "@hypershell/db";
 import {
   ipcChannels,
   upsertHostRequestSchema,
@@ -8,7 +8,7 @@ import {
   type UpsertHostRequest,
   type RemoveHostRequest,
   type ReorderHostsRequest
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import { app } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
 import path from "node:path";
@@ -19,17 +19,17 @@ import {
   readFileSync,
   writeFileSync
 } from "node:fs";
-import initSchemaSql from "@sshterm/db/src/migrations/001_init.sql";
-import sftpBookmarksSql from "@sshterm/db/src/migrations/002_sftp_bookmarks.sql";
-import hostAuthFieldsSql from "@sshterm/db/src/migrations/003_host_auth_fields.sql";
-import advancedSshSql from "@sshterm/db/src/migrations/006_advanced_ssh.sql";
-import hostFingerprintsSql from "@sshterm/db/src/migrations/007_host_fingerprints.sql";
-import sessionRecordingsSql from "@sshterm/db/src/migrations/008_session_recordings.sql";
-import connectionHistorySql from "@sshterm/db/src/migrations/009_connection_history.sql";
-import savedSessionsSql from "@sshterm/db/src/migrations/010_saved_sessions.sql";
-import hostProfilesSql from "@sshterm/db/src/migrations/011_host_profiles.sql";
-import hostEnvVarsSql from "@sshterm/db/src/migrations/012_host_env_vars.sql";
-import tagsColorSql from "@sshterm/db/src/migrations/013_tags_color.sql";
+import initSchemaSql from "@hypershell/db/src/migrations/001_init.sql";
+import sftpBookmarksSql from "@hypershell/db/src/migrations/002_sftp_bookmarks.sql";
+import hostAuthFieldsSql from "@hypershell/db/src/migrations/003_host_auth_fields.sql";
+import advancedSshSql from "@hypershell/db/src/migrations/006_advanced_ssh.sql";
+import hostFingerprintsSql from "@hypershell/db/src/migrations/007_host_fingerprints.sql";
+import sessionRecordingsSql from "@hypershell/db/src/migrations/008_session_recordings.sql";
+import connectionHistorySql from "@hypershell/db/src/migrations/009_connection_history.sql";
+import savedSessionsSql from "@hypershell/db/src/migrations/010_saved_sessions.sql";
+import hostProfilesSql from "@hypershell/db/src/migrations/011_host_profiles.sql";
+import hostEnvVarsSql from "@hypershell/db/src/migrations/012_host_env_vars.sql";
+import tagsColorSql from "@hypershell/db/src/migrations/013_tags_color.sql";
 import {
   protectSecretStrict,
   revealSecretStrict,
@@ -205,7 +205,7 @@ export function getOrCreateDatabase(): unknown {
     try {
       const Database = require("better-sqlite3");
       const dbPath = resolveDatabasePath();
-      console.log("[sshterm] Opening database at:", dbPath);
+      console.log("[hypershell] Opening database at:", dbPath);
       const db = new Database(dbPath);
       db.pragma("foreign_keys = ON");
       db.exec(initSchemaSql);
@@ -214,18 +214,18 @@ export function getOrCreateDatabase(): unknown {
       try { db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT"); } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("already exists") || msg.includes("duplicate column")) {
-          console.info("[sshterm] Migration 003 (identity_file): column already exists");
+          console.info("[hypershell] Migration 003 (identity_file): column already exists");
         } else {
-          console.error("[sshterm] Migration 003 (identity_file) failed:", msg);
+          console.error("[hypershell] Migration 003 (identity_file) failed:", msg);
         }
       }
       for (const statement of hostAuthFieldsSql.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
         try { db.exec(statement); } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
           if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info("[sshterm] Migration 003 (auth fields): column already exists");
+            console.info("[hypershell] Migration 003 (auth fields): column already exists");
           } else {
-            console.error("[sshterm] Migration 003 (auth fields) failed:", msg);
+            console.error("[hypershell] Migration 003 (auth fields) failed:", msg);
           }
         }
       }
@@ -233,9 +233,9 @@ export function getOrCreateDatabase(): unknown {
       try { db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"); } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("already exists") || msg.includes("duplicate column")) {
-          console.info("[sshterm] Migration 004 (is_favorite): column already exists");
+          console.info("[hypershell] Migration 004 (is_favorite): column already exists");
         } else {
-          console.error("[sshterm] Migration 004 (is_favorite) failed:", msg);
+          console.error("[hypershell] Migration 004 (is_favorite) failed:", msg);
         }
       }
       // Migration 005: add sort_order and color columns
@@ -247,9 +247,9 @@ export function getOrCreateDatabase(): unknown {
         try { db.exec(stmt); } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
           if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info(`[sshterm] Migration 005: column already exists`);
+            console.info(`[hypershell] Migration 005: column already exists`);
           } else {
-            console.error(`[sshterm] Migration 005 failed:`, msg);
+            console.error(`[hypershell] Migration 005 failed:`, msg);
           }
         }
       }
@@ -258,9 +258,9 @@ export function getOrCreateDatabase(): unknown {
         try { db.exec(stmt); } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
           if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info("[sshterm] Migration 006: column/table already exists");
+            console.info("[hypershell] Migration 006: column/table already exists");
           } else {
-            console.error("[sshterm] Migration 006 failed:", msg);
+            console.error("[hypershell] Migration 006 failed:", msg);
           }
         }
       }
@@ -280,9 +280,9 @@ export function getOrCreateDatabase(): unknown {
         try { db.exec(statement); } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
           if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info("[sshterm] Migration 011: table/column already exists");
+            console.info("[hypershell] Migration 011: table/column already exists");
           } else {
-            console.error("[sshterm] Migration 011 failed:", msg);
+            console.error("[hypershell] Migration 011 failed:", msg);
           }
         }
       }
@@ -295,25 +295,25 @@ export function getOrCreateDatabase(): unknown {
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("already exists") || msg.includes("duplicate column")) {
-          console.info("[sshterm] Migration 013 (tags.color): column already exists");
+          console.info("[hypershell] Migration 013 (tags.color): column already exists");
         } else {
-          console.error("[sshterm] Migration 013 (tags.color) failed:", msg);
+          console.error("[hypershell] Migration 013 (tags.color) failed:", msg);
         }
       }
 
       sharedDb = db;
-      console.log("[sshterm] Database initialized successfully");
+      console.log("[hypershell] Database initialized successfully");
     } catch (err) {
-      console.error("[sshterm] Failed to initialize SQLite:", err);
+      console.error("[hypershell] Failed to initialize SQLite:", err);
     }
   }
   return sharedDb;
 }
 
 function resolveDatabasePath(): string {
-  const stableDataDir = path.join(app.getPath("appData"), "SSHTerm");
-  const stableDbPath = path.join(stableDataDir, "sshterm.db");
-  const legacyDbPath = path.join(app.getPath("userData"), "sshterm.db");
+  const stableDataDir = path.join(app.getPath("appData"), "HyperShell");
+  const stableDbPath = path.join(stableDataDir, "hypershell.db");
+  const legacyDbPath = path.join(app.getPath("userData"), "hypershell.db");
 
   mkdirSync(stableDataDir, { recursive: true });
 
@@ -324,9 +324,9 @@ function resolveDatabasePath(): string {
   ) {
     try {
       copyFileSync(legacyDbPath, stableDbPath);
-      console.log("[sshterm] Migrated host DB to stable path:", stableDbPath);
+      console.log("[hypershell] Migrated host DB to stable path:", stableDbPath);
     } catch (error) {
-      console.warn("[sshterm] Failed migrating host DB, continuing with stable path:", error);
+      console.warn("[hypershell] Failed migrating host DB, continuing with stable path:", error);
     }
   }
 
@@ -334,7 +334,7 @@ function resolveDatabasePath(): string {
 }
 
 function resolveHostsFallbackPath(): string {
-  return path.join(app.getPath("appData"), "SSHTerm", "hosts.fallback.json");
+  return path.join(app.getPath("appData"), "HyperShell", "hosts.fallback.json");
 }
 
 function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
@@ -507,9 +507,9 @@ export function getOrCreateHostsRepo() {
       // One-time import: migrate hosts from JSON fallback into SQLite
       importFallbackHosts(hostsRepo);
     } else {
-      console.error("[sshterm] No database available, falling back to JSON store");
+      console.error("[hypershell] No database available, falling back to JSON store");
       const fallbackPath = resolveHostsFallbackPath();
-      console.log("[sshterm] Using fallback hosts store at:", fallbackPath);
+      console.log("[hypershell] Using fallback hosts store at:", fallbackPath);
       hostsRepo = createFileBackedHostsRepo(fallbackPath);
     }
   }
@@ -550,14 +550,14 @@ function importFallbackHosts(repo: HostsRepoLike): void {
     }
 
     if (imported > 0) {
-      console.log(`[sshterm] Imported ${imported} host(s) from JSON fallback into SQLite`);
+      console.log(`[hypershell] Imported ${imported} host(s) from JSON fallback into SQLite`);
       // Rename fallback so we don't re-import
       const donePath = fallbackPath + ".migrated";
       try { copyFileSync(fallbackPath, donePath); } catch { /* best effort */ }
       try { writeFileSync(fallbackPath, "[]", "utf8"); } catch { /* best effort */ }
     }
   } catch (err) {
-    console.warn("[sshterm] Failed to import fallback hosts:", err);
+    console.warn("[hypershell] Failed to import fallback hosts:", err);
   }
 }
 

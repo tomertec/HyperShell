@@ -1,14 +1,14 @@
 import {
   createHostEnvVarRepositoryFromDatabase,
   type SqliteDatabase,
-} from "@sshterm/db";
+} from "@hypershell/db";
 import {
   ipcChannels,
   listHostEnvVarsRequestSchema,
   replaceHostEnvVarsRequestSchema,
   type ListHostEnvVarsRequest,
   type ReplaceHostEnvVarsRequest,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 

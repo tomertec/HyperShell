@@ -1,5 +1,5 @@
 {
-  "name": "@sshterm/db",
+  "name": "@hypershell/db",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -14,7 +14,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@sshterm/shared": "workspace:*",
+    "@hypershell/shared": "workspace:*",
     "better-sqlite3": "^11.8.0"
   },
   "devDependencies": {

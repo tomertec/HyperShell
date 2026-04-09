@@ -6,8 +6,8 @@ import {
   convertPpkRequestSchema,
   type SshKeyInfo,
   type ConvertPpkResponse,
-} from "@sshterm/shared";
-import { convertPpkToOpenSsh } from "@sshterm/session-core";
+} from "@hypershell/shared";
+import { convertPpkToOpenSsh } from "@hypershell/session-core";
 import { execFile } from "node:child_process";
 import { readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";

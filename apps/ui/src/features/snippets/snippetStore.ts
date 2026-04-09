@@ -36,15 +36,15 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
   close: () => set({ isOpen: false }),
   load: async () => {
     set({ loading: true });
-    const snippets = await window.sshterm?.snippetsList?.() ?? [];
+    const snippets = await window.hypershell?.snippetsList?.() ?? [];
     set({ snippets, loading: false });
   },
   upsert: async (id, name, body) => {
-    await window.sshterm?.snippetsUpsert?.({ id, name, body });
+    await window.hypershell?.snippetsUpsert?.({ id, name, body });
     void get().load();
   },
   remove: async (id) => {
-    await window.sshterm?.snippetsRemove?.({ id });
+    await window.hypershell?.snippetsRemove?.({ id });
     void get().load();
   },
 }));

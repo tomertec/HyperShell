@@ -1,4 +1,4 @@
-import type { SerialProfileRecord } from "@sshterm/shared";
+import type { SerialProfileRecord } from "@hypershell/shared";
 
 export interface SidebarSerialListProps {
   profiles: SerialProfileRecord[];

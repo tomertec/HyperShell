@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { BackupInfo } from "@sshterm/shared";
+import type { BackupInfo } from "@hypershell/shared";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -23,7 +23,7 @@ export function BackupRestorePanel() {
 
   const refreshBackups = useCallback(async () => {
     try {
-      const result = await window.sshterm?.backupList?.();
+      const result = await window.hypershell?.backupList?.();
       if (result) {
         setBackups(result.backups);
       }
@@ -40,9 +40,9 @@ export function BackupRestorePanel() {
     try {
       const now = new Date();
       const ts = now.toISOString().replace(/:/g, "-").replace(/\.\d{3}Z$/, "");
-      const defaultName = `sshterm-backup-${ts}.db`;
+      const defaultName = `hypershell-backup-${ts}.db`;
 
-      const filePath = await window.sshterm?.fsShowSaveDialog?.({
+      const filePath = await window.hypershell?.fsShowSaveDialog?.({
         defaultPath: defaultName,
         filters: [{ name: "SQLite Database", extensions: ["db"] }],
       });
@@ -50,7 +50,7 @@ export function BackupRestorePanel() {
       if (!filePath) return;
 
       setLoading(true);
-      const result = await window.sshterm?.backupCreate?.({ filePath });
+      const result = await window.hypershell?.backupCreate?.({ filePath });
       if (result) {
         toast.success(`Backup created (${formatFileSize(result.size)})`);
         void refreshBackups();
@@ -67,7 +67,7 @@ export function BackupRestorePanel() {
       let selectedPath = filePath;
 
       if (!selectedPath) {
-        selectedPath = (await window.sshterm?.backupShowOpenDialog?.()) ?? undefined;
+        selectedPath = (await window.hypershell?.backupShowOpenDialog?.()) ?? undefined;
         if (!selectedPath) return;
       }
 
@@ -77,7 +77,7 @@ export function BackupRestorePanel() {
       if (!confirmed) return;
 
       setLoading(true);
-      const result = await window.sshterm?.backupRestore?.({ filePath: selectedPath });
+      const result = await window.hypershell?.backupRestore?.({ filePath: selectedPath });
       if (result?.requiresRestart) {
         setRestartRequired(true);
         toast.success("Database restored. Please restart the application.");

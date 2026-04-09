@@ -19,7 +19,7 @@ export function DriveSelector({ currentPath, onSelect }: DriveSelectorProps) {
 
     async function loadDrives() {
       try {
-        const response = await window.sshterm?.fsGetDrives?.();
+        const response = await window.hypershell?.fsGetDrives?.();
         if (disposed) {
           return;
         }

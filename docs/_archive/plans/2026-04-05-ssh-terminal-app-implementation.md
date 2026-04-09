@@ -34,14 +34,14 @@ import { describe, expect, it } from "vitest";
 describe("workspace smoke", () => {
   it("loads shared package code", async () => {
     const mod = await import("../version");
-    expect(mod.WORKSPACE_NAME).toBe("sshterm");
+    expect(mod.WORKSPACE_NAME).toBe("hypershell");
   });
 });
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/shared exec vitest run src/smoke/workspace-smoke.test.ts`
+Run: `pnpm --filter @hypershell/shared exec vitest run src/smoke/workspace-smoke.test.ts`
 Expected: FAIL because the workspace files and `src/version.ts` do not exist yet
 
 **Step 3: Write minimal implementation**
@@ -51,12 +51,12 @@ Create the root workspace files and package manifests, then add:
 - `packages/shared/src/version.ts`
 
 ```ts
-export const WORKSPACE_NAME = "sshterm";
+export const WORKSPACE_NAME = "hypershell";
 ```
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/shared exec vitest run src/smoke/workspace-smoke.test.ts`
+Run: `pnpm --filter @hypershell/shared exec vitest run src/smoke/workspace-smoke.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -98,7 +98,7 @@ describe("openSessionRequestSchema", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/shared exec vitest run src/ipc/schemas.test.ts`
+Run: `pnpm --filter @hypershell/shared exec vitest run src/ipc/schemas.test.ts`
 Expected: FAIL because the IPC schema module does not exist yet
 
 **Step 3: Write minimal implementation**
@@ -117,7 +117,7 @@ Include:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/shared exec vitest run src/ipc/schemas.test.ts`
+Run: `pnpm --filter @hypershell/shared exec vitest run src/ipc/schemas.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -153,7 +153,7 @@ describe("registerIpc", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/desktop exec vitest run src/main/ipc/registerIpc.test.ts`
+Run: `pnpm --filter @hypershell/desktop exec vitest run src/main/ipc/registerIpc.test.ts`
 Expected: FAIL because the Electron shell and IPC registry do not exist yet
 
 **Step 3: Write minimal implementation**
@@ -162,12 +162,12 @@ Create:
 
 - Electron app bootstrap in `main.ts`
 - a `createMainWindow()` helper
-- a preload bridge exposing a typed `window.sshterm` API
+- a preload bridge exposing a typed `window.hypershell` API
 - `registerIpc.ts` that exports both the real registration function and a `getRegisteredChannels()` helper for tests
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/desktop exec vitest run src/main/ipc/registerIpc.test.ts`
+Run: `pnpm --filter @hypershell/desktop exec vitest run src/main/ipc/registerIpc.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -205,7 +205,7 @@ describe("layoutStore", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/layout/layoutStore.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/layout/layoutStore.test.ts`
 Expected: FAIL because the layout store does not exist yet
 
 **Step 3: Write minimal implementation**
@@ -218,7 +218,7 @@ Create the React app shell with:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/layout/layoutStore.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/layout/layoutStore.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -262,7 +262,7 @@ describe("hostsRepository", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/db exec vitest run src/repositories/hostsRepository.test.ts`
+Run: `pnpm --filter @hypershell/db exec vitest run src/repositories/hostsRepository.test.ts`
 Expected: FAIL because the DB package and migrations do not exist yet
 
 **Step 3: Write minimal implementation**
@@ -275,7 +275,7 @@ Create:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/db exec vitest run src/repositories/hostsRepository.test.ts`
+Run: `pnpm --filter @hypershell/db exec vitest run src/repositories/hostsRepository.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -324,7 +324,7 @@ describe("opResolver", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/desktop exec vitest run src/main/security/secureStorage.test.ts src/main/security/opResolver.test.ts`
+Run: `pnpm --filter @hypershell/desktop exec vitest run src/main/security/secureStorage.test.ts src/main/security/opResolver.test.ts`
 Expected: FAIL because the security helpers do not exist yet
 
 **Step 3: Write minimal implementation**
@@ -337,7 +337,7 @@ Create:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @sshterm/desktop exec vitest run src/main/security/secureStorage.test.ts src/main/security/opResolver.test.ts`
+Run: `pnpm --filter @hypershell/desktop exec vitest run src/main/security/secureStorage.test.ts src/main/security/opResolver.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -399,7 +399,7 @@ describe("buildSshArgs", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/session-core exec vitest run src/sessionManager.test.ts src/transports/sshPtyTransport.test.ts`
+Run: `pnpm --filter @hypershell/session-core exec vitest run src/sessionManager.test.ts src/transports/sshPtyTransport.test.ts`
 Expected: FAIL because session-core does not exist yet
 
 **Step 3: Write minimal implementation**
@@ -420,7 +420,7 @@ Keep the first version limited to:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @sshterm/session-core exec vitest run src/sessionManager.test.ts src/transports/sshPtyTransport.test.ts`
+Run: `pnpm --filter @hypershell/session-core exec vitest run src/sessionManager.test.ts src/transports/sshPtyTransport.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -456,7 +456,7 @@ describe("defaultTerminalTheme", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/terminal/terminalTheme.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/terminal/terminalTheme.test.ts`
 Expected: FAIL because terminal UI files do not exist yet
 
 **Step 3: Write minimal implementation**
@@ -471,7 +471,7 @@ Wire one hard-coded session tab first, then replace it with real session IDs onc
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/terminal/terminalTheme.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/terminal/terminalTheme.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -514,7 +514,7 @@ describe("openSession integration", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/desktop exec vitest run src/main/ipc/openSession.integration.test.ts`
+Run: `pnpm --filter @hypershell/desktop exec vitest run src/main/ipc/openSession.integration.test.ts`
 Expected: FAIL because the session IPC path is not connected yet
 
 **Step 3: Write minimal implementation**
@@ -528,7 +528,7 @@ Connect:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/desktop exec vitest run src/main/ipc/openSession.integration.test.ts`
+Run: `pnpm --filter @hypershell/desktop exec vitest run src/main/ipc/openSession.integration.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -563,7 +563,7 @@ describe("normalizeSerialOptions", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/session-core exec vitest run src/transports/serialTransport.test.ts`
+Run: `pnpm --filter @hypershell/session-core exec vitest run src/transports/serialTransport.test.ts`
 Expected: FAIL because serial transport support does not exist yet
 
 **Step 3: Write minimal implementation**
@@ -585,7 +585,7 @@ Include:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/session-core exec vitest run src/transports/serialTransport.test.ts`
+Run: `pnpm --filter @hypershell/session-core exec vitest run src/transports/serialTransport.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -626,7 +626,7 @@ describe("searchProfiles", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/quick-connect/searchIndex.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/quick-connect/searchIndex.test.ts`
 Expected: FAIL because host management and quick connect files do not exist yet
 
 **Step 3: Write minimal implementation**
@@ -640,7 +640,7 @@ Create:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/quick-connect/searchIndex.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/quick-connect/searchIndex.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -692,7 +692,7 @@ describe("sessionRecoveryStore", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/broadcast/broadcastStore.test.ts src/features/sessions/sessionRecoveryStore.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/broadcast/broadcastStore.test.ts src/features/sessions/sessionRecoveryStore.test.ts`
 Expected: FAIL because the stores and tray integration do not exist yet
 
 **Step 3: Write minimal implementation**
@@ -707,7 +707,7 @@ Add a persistent in-app warning banner when broadcast mode is enabled.
 
 **Step 4: Run tests to verify they pass**
 
-Run: `pnpm --filter @sshterm/ui exec vitest run src/features/broadcast/broadcastStore.test.ts src/features/sessions/sessionRecoveryStore.test.ts`
+Run: `pnpm --filter @hypershell/ui exec vitest run src/features/broadcast/broadcastStore.test.ts src/features/sessions/sessionRecoveryStore.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -749,7 +749,7 @@ Host web
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/session-core exec vitest run src/ssh/parseSshConfig.test.ts`
+Run: `pnpm --filter @hypershell/session-core exec vitest run src/ssh/parseSshConfig.test.ts`
 Expected: FAIL because SSH config import support does not exist yet
 
 **Step 3: Write minimal implementation**
@@ -763,7 +763,7 @@ Create:
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/session-core exec vitest run src/ssh/parseSshConfig.test.ts`
+Run: `pnpm --filter @hypershell/session-core exec vitest run src/ssh/parseSshConfig.test.ts`
 Expected: PASS
 
 **Step 5: Commit**
@@ -797,7 +797,7 @@ test("quick connect opens from keyboard shortcut", async ({ page }) => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui exec playwright test tests/quick-connect.spec.ts`
+Run: `pnpm --filter @hypershell/ui exec playwright test tests/quick-connect.spec.ts`
 Expected: FAIL because the app is not yet wired for end-to-end testing
 
 **Step 3: Write minimal implementation**
@@ -812,7 +812,7 @@ Wire the app so the quick connect dialog is accessible in the renderer test envi
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/ui exec playwright test tests/quick-connect.spec.ts`
+Run: `pnpm --filter @hypershell/ui exec playwright test tests/quick-connect.spec.ts`
 Expected: PASS
 
 **Step 5: Commit**

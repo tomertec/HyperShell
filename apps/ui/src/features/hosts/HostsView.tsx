@@ -69,13 +69,13 @@ export function HostsView() {
 
   const handleExport = async (format: "json" | "csv") => {
     const ext = format === "json" ? "json" : "csv";
-    const filePath = await window.sshterm?.fsShowSaveDialog?.({
+    const filePath = await window.hypershell?.fsShowSaveDialog?.({
       defaultPath: `hosts.${ext}`,
       filters: [{ name: format.toUpperCase(), extensions: [ext] }],
     });
     if (!filePath) return;
     try {
-      const result = await window.sshterm?.exportHosts?.({ format, filePath });
+      const result = await window.hypershell?.exportHosts?.({ format, filePath });
       if (result) {
         toast.success(`Exported ${result.exported} hosts to ${filePath}`);
       }

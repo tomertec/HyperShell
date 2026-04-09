@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
-import type { SftpEntry, TransferJob } from "@sshterm/shared";
+import type { SftpEntry, TransferJob } from "@hypershell/shared";
 import { getSftpStore, disposeSftpStore } from "./sftpStore";
 import { transferStore } from "./transferStore";
 import { getParentPath, joinRemotePath } from "./utils/fileUtils";
@@ -120,7 +120,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
   const refreshTransfers = useCallback(async () => {
     try {
-      const response = await window.sshterm?.sftpTransferList?.();
+      const response = await window.hypershell?.sftpTransferList?.();
       if (!response) {
         return;
       }
@@ -132,7 +132,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   }, []);
 
   const refreshRemoteDirectory = useCallback(async () => {
-    const sftpList = window.sshterm?.sftpList;
+    const sftpList = window.hypershell?.sftpList;
     if (!sftpList) {
       throw new Error("SFTP list API is unavailable in preload bridge");
     }
@@ -141,7 +141,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   }, [remotePath, sftpSessionId, store]);
 
   useEffect(() => {
-    const unsubscribe = window.sshterm?.onSftpEvent?.((event) => {
+    const unsubscribe = window.hypershell?.onSftpEvent?.((event) => {
       if (event.kind === "transfer-progress") {
         transferStore.getState().updateTransfer(event.transferId, {
           bytesTransferred: event.bytesTransferred,
@@ -187,7 +187,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
           let isDirectory = false;
 
           try {
-            const stat = await window.sshterm?.fsStat?.({ path: localPath });
+            const stat = await window.hypershell?.fsStat?.({ path: localPath });
             isDirectory = Boolean(stat?.isDirectory);
           } catch {
             isDirectory = false;
@@ -205,7 +205,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       );
 
       const created =
-        (await window.sshterm?.sftpTransferStart?.({
+        (await window.hypershell?.sftpTransferStart?.({
           sftpSessionId,
           operations
         })) ?? [];
@@ -237,7 +237,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
           let isDirectory = entriesByPath.get(remoteFilePath)?.isDirectory ?? false;
           if (!entriesByPath.has(remoteFilePath)) {
             try {
-              const stat = await window.sshterm?.sftpStat?.({
+              const stat = await window.hypershell?.sftpStat?.({
                 sftpSessionId,
                 path: remoteFilePath
               });
@@ -259,7 +259,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       );
 
       const created =
-        (await window.sshterm?.sftpTransferStart?.({
+        (await window.hypershell?.sftpTransferStart?.({
           sftpSessionId,
           operations
         })) ?? [];
@@ -289,7 +289,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       const parentPath = getParentPath(path);
       const newPath = joinRemotePath(parentPath, newName);
 
-      await window.sshterm?.sftpRename?.({
+      await window.hypershell?.sftpRename?.({
         sftpSessionId,
         oldPath: path,
         newPath
@@ -314,7 +314,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
     await Promise.all(
       paths.map((path) =>
-        window.sshterm?.sftpDelete?.({ sftpSessionId, path, recursive: true })
+        window.hypershell?.sftpDelete?.({ sftpSessionId, path, recursive: true })
       )
     );
 
@@ -330,7 +330,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       setMkdirDialog(false);
 
       const nextPath = joinRemotePath(remotePath, name);
-      await window.sshterm?.sftpMkdir?.({
+      await window.hypershell?.sftpMkdir?.({
         sftpSessionId,
         path: nextPath
       });
@@ -354,7 +354,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       const { path } = bookmarkDialog;
       setBookmarkDialog({ open: false, path: "", defaultName: "" });
 
-      await window.sshterm?.sftpBookmarksUpsert?.({
+      await window.hypershell?.sftpBookmarksUpsert?.({
         hostId,
         name,
         remotePath: path
@@ -388,7 +388,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       });
 
       try {
-        const sftpStat = window.sshterm?.sftpStat;
+        const sftpStat = window.hypershell?.sftpStat;
         if (!sftpStat) {
           throw new Error("SFTP stat API is unavailable in preload bridge");
         }
@@ -434,8 +434,8 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         throw new Error("No file selected");
       }
 
-      const sftpChmod = window.sshterm?.sftpChmod;
-      const sftpStat = window.sshterm?.sftpStat;
+      const sftpChmod = window.hypershell?.sftpChmod;
+      const sftpStat = window.hypershell?.sftpStat;
       if (!sftpChmod || !sftpStat) {
         throw new Error("SFTP chmod/stat APIs are unavailable in preload bridge");
       }
@@ -483,7 +483,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       const currentLocalPath = state.localPath;
       if (currentLocalPath) {
         try {
-          const response = await window.sshterm?.fsList?.({ path: currentLocalPath });
+          const response = await window.hypershell?.fsList?.({ path: currentLocalPath });
           store.getState().setLocalEntries(response?.entries ?? []);
         } catch {
           // ignore
@@ -493,7 +493,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   }, [refreshRemoteDirectory, store]);
 
   const handleDisconnect = useCallback(async () => {
-    await window.sshterm?.sftpDisconnect?.({ sftpSessionId });
+    await window.hypershell?.sftpDisconnect?.({ sftpSessionId });
     onClose();
   }, [onClose, sftpSessionId]);
 
@@ -517,7 +517,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         onUpload={handleUpload}
         onDownload={handleDownload}
         onEdit={(remotePath: string) => {
-          void window.sshterm?.editorOpen?.({ sftpSessionId, remotePath });
+          void window.hypershell?.editorOpen?.({ sftpSessionId, remotePath });
         }}
         onProperties={handleProperties}
         onRename={handleRename}

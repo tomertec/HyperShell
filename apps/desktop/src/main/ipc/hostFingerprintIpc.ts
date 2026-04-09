@@ -1,12 +1,12 @@
-import { createHostFingerprintRepositoryFromDatabase } from "@sshterm/db";
+import { createHostFingerprintRepositoryFromDatabase } from "@hypershell/db";
 import {
   ipcChannels,
   hostFingerprintLookupRequestSchema,
   hostFingerprintTrustRequestSchema,
   hostFingerprintRemoveRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
-import type { SqliteDatabase } from "@sshterm/db";
+import type { SqliteDatabase } from "@hypershell/db";
 
 export function registerHostFingerprintIpc(
   ipcMain: IpcMainLike,

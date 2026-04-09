@@ -1,5 +1,5 @@
 {
-  "name": "sshterm",
+  "name": "hypershell",
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@10.8.1",
@@ -13,11 +13,11 @@
     "lint": "pnpm -r --if-present lint",
     "ci:build": "pnpm build",
     "ci:test": "pnpm test",
-    "ci:test:e2e": "pnpm --filter @sshterm/ui run test:e2e",
-    "release:windows:unsigned": "pnpm --filter @sshterm/desktop run package:win:unsigned",
-    "release:windows:signed": "pnpm --filter @sshterm/desktop run package:win:signed",
-    "release:mac:unsigned": "pnpm --filter @sshterm/desktop run package:mac:unsigned",
-    "release:manifest": "pnpm --filter @sshterm/desktop run release:manifest",
+    "ci:test:e2e": "pnpm --filter @hypershell/ui run test:e2e",
+    "release:windows:unsigned": "pnpm --filter @hypershell/desktop run package:win:unsigned",
+    "release:windows:signed": "pnpm --filter @hypershell/desktop run package:win:signed",
+    "release:mac:unsigned": "pnpm --filter @hypershell/desktop run package:mac:unsigned",
+    "release:manifest": "pnpm --filter @hypershell/desktop run release:manifest",
     "release:prepare": "node .tools/release/prepare-version-and-changelog.mjs"
   },
   "pnpm": {

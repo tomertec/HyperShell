@@ -110,7 +110,7 @@ export function ContextMenu({ x, y, actions, onClose }: ContextMenuProps) {
 
 **Step 2: Verify it compiles**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 3: Commit**
@@ -343,7 +343,7 @@ const duplicateHost = useCallback(
 const deleteHost = useCallback(
   async (host: HostRecord) => {
     setHosts((prev) => prev.filter((h) => h.id !== host.id));
-    await window.sshterm?.removeHost?.({ id: host.id });
+    await window.hypershell?.removeHost?.({ id: host.id });
   },
   []
 );
@@ -351,7 +351,7 @@ const deleteHost = useCallback(
 const toggleFavoriteHost = useCallback(
   (_host: HostRecord) => {
     // TODO: Implement favorites system with settings store
-    console.log("[sshterm] toggle favorite — not yet implemented");
+    console.log("[hypershell] toggle favorite — not yet implemented");
   },
   []
 );
@@ -376,7 +376,7 @@ const toggleFavoriteHost = useCallback(
 
 **Step 4: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 5: Commit**
@@ -434,7 +434,7 @@ interface SettingsState {
 
 async function getSetting(key: string): Promise<string | null> {
   try {
-    const result = await window.sshterm?.getSetting?.({ key });
+    const result = await window.hypershell?.getSetting?.({ key });
     return result?.value ?? null;
   } catch {
     return null;
@@ -443,7 +443,7 @@ async function getSetting(key: string): Promise<string | null> {
 
 async function saveSetting(key: string, value: string): Promise<void> {
   try {
-    await window.sshterm?.updateSetting?.({ key, value });
+    await window.hypershell?.updateSetting?.({ key, value });
   } catch (err) {
     console.error("[settings] failed to save", key, err);
   }
@@ -486,7 +486,7 @@ export const settingsStore = createStore<SettingsState>((set, get) => ({
 
 **Step 2: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 3: Commit**
@@ -652,7 +652,7 @@ export function getTerminalOptions(settings?: {
 
 **Step 2: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 3: Commit**
@@ -848,7 +848,7 @@ In `Sidebar.tsx`, add a settings gear icon button next to the version text:
 ```tsx
 // In Sidebar.tsx, update the footer div:
 <div className="mt-auto border-t border-border px-3 py-2 flex items-center justify-between">
-  <div className="text-[10px] text-text-muted/60 tracking-wide select-none">SSHTerm v0.1.0</div>
+  <div className="text-[10px] text-text-muted/60 tracking-wide select-none">HyperShell v0.1.0</div>
   <button
     type="button"
     onClick={onOpenSettings}
@@ -893,7 +893,7 @@ onOpenSettings={() => setSettingsOpen(true)}
 
 **Step 4: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 5: Commit**
@@ -952,7 +952,7 @@ useEffect(() => {
 
 **Step 3: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 4: Commit**
@@ -1222,7 +1222,7 @@ import { StatusBar } from "../statusbar/StatusBar";
 
 **Step 4: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 5: Commit**
@@ -1308,7 +1308,7 @@ const connectedAt = activeState?.connectedAt ?? null;
 
 **Step 4: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 5: Commit**
@@ -1393,7 +1393,7 @@ opReference?: string;
 
 **Step 3: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 4: Commit**
@@ -1531,7 +1531,7 @@ Sort hosts so favorites appear at the top of each group. Add a star icon next to
 
 **Step 4: Wire up the toggleFavorite callback through IPC**
 
-Update `App.tsx` `toggleFavoriteHost` to call `window.sshterm.upsertHost` with the toggled favorite status.
+Update `App.tsx` `toggleFavoriteHost` to call `window.hypershell.upsertHost` with the toggled favorite status.
 
 **Step 5: Build and verify**
 
@@ -1565,7 +1565,7 @@ if (e.key === "," && (e.ctrlKey || e.metaKey)) {
 
 **Step 2: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: BUILD SUCCESS
 
 **Step 3: Commit**

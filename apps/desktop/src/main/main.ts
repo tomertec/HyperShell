@@ -7,7 +7,7 @@ import {
   type HostRecord,
   type SavedSessionInput,
   type SqliteDatabase,
-} from "@sshterm/db";
+} from "@hypershell/db";
 
 import { createHostMonitor } from "./monitoring/hostMonitor";
 import { registerIpc, sessionManager } from "./ipc/registerIpc";

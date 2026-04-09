@@ -4,8 +4,8 @@ import {
   stopPortForwardRequestSchema,
   type StartPortForwardRequest,
   type StopPortForwardRequest
-} from "@sshterm/shared";
-import { createPortForward, type PortForwardHandle, type SshPtySpawn } from "@sshterm/session-core";
+} from "@hypershell/shared";
+import { createPortForward, type PortForwardHandle, type SshPtySpawn } from "@hypershell/session-core";
 import type { IpcMainInvokeEvent } from "electron";
 import { randomUUID } from "node:crypto";
 import type { IpcMainLike } from "./registerIpc";

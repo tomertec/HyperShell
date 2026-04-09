@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import type { TransferJob } from "@sshterm/shared";
+import type { TransferJob } from "@hypershell/shared";
 
 export type TransferFilter = "all" | "active" | "completed" | "failed";
 

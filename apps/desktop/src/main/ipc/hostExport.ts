@@ -1,4 +1,4 @@
-import type { HostRecord } from "@sshterm/db";
+import type { HostRecord } from "@hypershell/db";
 
 const CSV_FIELDS = [
   "name", "hostname", "port", "username", "identityFile",

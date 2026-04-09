@@ -127,6 +127,7 @@ export const fsChannels = {
   getDrives: "fs:get-drives",
   listSshKeys: "fs:list-ssh-keys",
   showSaveDialog: "fs:show-save-dialog",
+  showOpenDialog: "fs:show-open-dialog",
 } as const;
 
 export const hostPortForwardChannels = {

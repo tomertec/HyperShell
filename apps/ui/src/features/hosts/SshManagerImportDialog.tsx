@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { SshManagerHost, SshManagerGroup, SshManagerSnippet } from "@sshterm/shared";
+import type { SshManagerHost, SshManagerGroup, SshManagerSnippet } from "@hypershell/shared";
 
 export interface SshManagerImportDialogProps {
   onImported: () => void;
@@ -23,7 +23,7 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
 
     async function scan() {
       try {
-        const result = await window.sshterm?.scanSshManager?.();
+        const result = await window.hypershell?.scanSshManager?.();
         if (cancelled) return;
         if (!result || (result.hosts.length === 0 && result.groups.length === 0 && result.snippets.length === 0)) {
           setError("No SshManager database found or it contains no data.");
@@ -100,7 +100,7 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
   const handleImport = useCallback(async () => {
     setImporting(true);
     try {
-      const result = await window.sshterm?.importSshManager?.({
+      const result = await window.hypershell?.importSshManager?.({
         hostIds: Array.from(selectedHosts),
         groupIds: Array.from(selectedGroups),
         snippetIds: Array.from(selectedSnippets),

@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_host_port_forwards_host ON host_port_forwards(hos
 
 **Step 2: Verify migration loads**
 
-Run: `pnpm --filter @sshterm/db test`
+Run: `pnpm --filter @hypershell/db test`
 Expected: Existing tests still pass (migration is auto-applied by `openDatabase`)
 
 **Step 3: Commit**
@@ -117,7 +117,7 @@ it("defaults advanced SSH fields when not provided", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/db test`
+Run: `pnpm --filter @hypershell/db test`
 Expected: FAIL — `proxyJump` property does not exist on HostRecord
 
 **Step 3: Update HostRecord, HostInput, HostRow types**
@@ -212,7 +212,7 @@ Update `createInMemoryHostsRepository()` — add default values for new fields i
 
 **Step 8: Run tests**
 
-Run: `pnpm --filter @sshterm/db test`
+Run: `pnpm --filter @hypershell/db test`
 Expected: All tests PASS
 
 **Step 9: Commit**
@@ -299,7 +299,7 @@ describe("hostPortForwardsRepository", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/db test`
+Run: `pnpm --filter @hypershell/db test`
 Expected: FAIL — module not found
 
 **Step 3: Implement the repository**
@@ -453,7 +453,7 @@ export * from "./hostPortForwardsRepository";
 
 **Step 5: Run tests**
 
-Run: `pnpm --filter @sshterm/db test`
+Run: `pnpm --filter @hypershell/db test`
 Expected: All PASS
 
 **Step 6: Commit**
@@ -620,7 +620,7 @@ Add to `ipcChannels` object:
 
 **Step 7: Run build to verify types**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 Expected: Build succeeds with no type errors
 
 **Step 8: Commit**
@@ -695,7 +695,7 @@ reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
 
 **Step 6: Run tests**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: All PASS (existing tests use defaults)
 
 **Step 7: Write test for configurable base interval**
@@ -712,7 +712,7 @@ it("uses configurable reconnect base interval", async () => {
 
 **Step 8: Run tests**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: All PASS
 
 **Step 9: Commit**
@@ -792,7 +792,7 @@ describe("networkMonitor", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: FAIL — module not found
 
 **Step 3: Implement NetworkMonitor**
@@ -891,7 +891,7 @@ export { createNetworkMonitor, type NetworkMonitor, type NetworkMonitorOptions }
 
 **Step 5: Run tests**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: All PASS
 
 **Step 6: Commit**
@@ -969,7 +969,7 @@ describe("network-aware reconnect", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: FAIL — `networkMonitor` not accepted by createSessionManager
 
 **Step 3: Integrate into SessionManager**
@@ -995,7 +995,7 @@ In `handleEvent()`, modify the exit handler (line 159-204). When `autoReconnect`
 
 **Step 4: Run tests**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: All PASS
 
 **Step 5: Commit**
@@ -1075,7 +1075,7 @@ describe("ssh2ConnectionPool", () => {
 
 **Step 2: Run tests to verify they fail**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: FAIL — module not found
 
 **Step 3: Implement connection pool**
@@ -1282,7 +1282,7 @@ export { createSsh2ConnectionPool, type Ssh2ConnectionPool, type Ssh2PoolTarget,
 
 **Step 5: Run tests**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: All PASS
 
 **Step 6: Commit**
@@ -1314,7 +1314,7 @@ When `pool` is not provided, behavior is unchanged (backward compatible).
 
 **Step 3: Run tests**
 
-Run: `pnpm --filter @sshterm/session-core test`
+Run: `pnpm --filter @hypershell/session-core test`
 Expected: All PASS (existing tests don't pass pool, so behavior unchanged)
 
 **Step 4: Commit**
@@ -1340,13 +1340,13 @@ Follow the same pattern as `portForwardIpc.ts`. The handler needs:
 - Zod validation of all requests
 
 ```typescript
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 import {
   listHostPortForwardsRequestSchema,
   upsertHostPortForwardRequestSchema,
   removeHostPortForwardRequestSchema,
   reorderHostPortForwardsRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
 
 export function registerHostPortForwardIpc(
@@ -1385,7 +1385,7 @@ In `registerIpc.ts`, in the `openSession` handler (around line 128): after succe
 
 **Step 4: Build and verify**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 Expected: Builds without errors
 
 **Step 5: Commit**
@@ -1416,7 +1416,7 @@ In the `openSession` handler, when resolving host profile from DB, read the new 
 
 **Step 4: Build and verify**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 Expected: Builds without errors
 
 **Step 5: Commit**
@@ -1459,7 +1459,7 @@ onNetworkStatus(listener: (online: boolean) => void): () => void
 
 **Step 4: Update global.d.ts**
 
-Add all new methods to the `window.sshterm` type declaration, marked as optional (`?:`).
+Add all new methods to the `window.hypershell` type declaration, marked as optional (`?:`).
 
 **Step 5: Build and verify**
 
@@ -1496,7 +1496,7 @@ reconnectBaseInterval: number;
 
 After existing fields, add a "Connection" section with:
 
-- **Jump Hosts**: A multi-select component that lists saved hosts as selectable chips. Use existing host list from `window.sshterm?.listHosts()`. Each selected host resolves to `user@hostname:port`. Reorderable via drag. Raw text override field below.
+- **Jump Hosts**: A multi-select component that lists saved hosts as selectable chips. Use existing host list from `window.hypershell?.listHosts()`. Each selected host resolves to `user@hostname:port`. Reorderable via drag. Raw text override field below.
 - **Keep-Alive Interval**: Number input, placeholder "Default: 30", suffix "seconds"
 
 **Step 3: Add Reliability section**
@@ -1511,7 +1511,7 @@ Ensure new fields are included in the `onSubmit` payload mapping to `upsertHostR
 
 **Step 5: Verify in dev**
 
-Run: `pnpm dev` (if available) or `pnpm --filter @sshterm/ui dev`
+Run: `pnpm dev` (if available) or `pnpm --filter @hypershell/ui dev`
 Expected: Form renders with new sections, no console errors
 
 **Step 6: Commit**
@@ -1533,11 +1533,11 @@ git commit -m "feat(ui): add jump host picker, keep-alive, and auto-reconnect fi
 
 A self-contained component that:
 - Takes `hostId` prop
-- Fetches forwards via `window.sshterm?.hostPortForwardList(hostId)`
+- Fetches forwards via `window.hypershell?.hostPortForwardList(hostId)`
 - Renders a table: name, type badge (L/R/D), local port → remote host:port, auto-start toggle
 - Add button opens inline form row
 - Edit/delete via row actions
-- Calls `window.sshterm?.hostPortForwardUpsert()` and `hostPortForwardRemove()`
+- Calls `window.hypershell?.hostPortForwardUpsert()` and `hostPortForwardRemove()`
 
 **Step 2: Integrate into HostForm**
 
@@ -1729,7 +1729,7 @@ Expected: No lint errors
 
 **Step 4: Run E2E tests**
 
-Run: `pnpm --filter @sshterm/ui test:e2e`
+Run: `pnpm --filter @hypershell/ui test:e2e`
 Expected: Existing E2E tests still pass
 
 **Step 5: Fix any issues found**

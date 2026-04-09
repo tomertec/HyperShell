@@ -1,5 +1,5 @@
-import { createSftpTransport, type SftpConnectionOptions, type SftpTransportHandle, type SftpTransportOptions } from "@sshterm/session-core";
-import type { SessionTransportEvent } from "@sshterm/session-core";
+import { createSftpTransport, type SftpConnectionOptions, type SftpTransportHandle, type SftpTransportOptions } from "@hypershell/session-core";
+import type { SessionTransportEvent } from "@hypershell/session-core";
 import { randomUUID } from "node:crypto";
 
 export interface SftpSession {

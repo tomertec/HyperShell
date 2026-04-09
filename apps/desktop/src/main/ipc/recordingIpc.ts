@@ -7,8 +7,8 @@ import {
   createSessionRecordingRepositoryFromDatabase,
   type SqliteDatabase,
   type SessionRecordingRecord,
-} from "@sshterm/db";
-import { AsciinemaWriter, readAsciinemaCast } from "@sshterm/session-core";
+} from "@hypershell/db";
+import { AsciinemaWriter, readAsciinemaCast } from "@hypershell/session-core";
 import {
   ipcChannels,
   startRecordingRequestSchema,
@@ -28,7 +28,7 @@ import {
   type RecordingFramesResponse,
   type DeleteRecordingResponse,
   type ExportRecordingResponse,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 
 import type { IpcMainLike } from "./registerIpc";
 
@@ -56,7 +56,7 @@ function resolveRecordingsDir(): string {
   try {
     return path.join(app.getPath("userData"), "recordings");
   } catch {
-    return path.join(os.tmpdir(), "sshterm-recordings");
+    return path.join(os.tmpdir(), "hypershell-recordings");
   }
 }
 

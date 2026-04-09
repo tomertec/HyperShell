@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Replace the empty workspace state with an animated SSHTerm logo that morphs into an inline quick connect form with SSH/Serial pill toggle.
+**Goal:** Replace the empty workspace state with an animated HyperShell logo that morphs into an inline quick connect form with SSH/Serial pill toggle.
 
 **Architecture:** New `WelcomeScreen` component replaces the empty-state block in `Workspace.tsx`. It contains an `AnimatedLogo` sub-component (typing animation + idle glow) and a `QuickConnectForm` component (pill toggle, SSH/serial inputs, connect button). Framer Motion `layout` + `AnimatePresence` handles the morph transition. Connection dispatches go through the existing `openTab` flow in `App.tsx` via a callback prop.
 
@@ -17,7 +17,7 @@
 
 **Step 1: Create the AnimatedLogo component**
 
-This component renders the SSHTerm logo with a terminal-style typing animation on mount, then settles into an idle state with cursor blink and glow.
+This component renders the HyperShell logo with a terminal-style typing animation on mount, then settles into an idle state with cursor blink and glow.
 
 ```tsx
 import { motion, useAnimate } from "framer-motion";
@@ -31,7 +31,7 @@ interface AnimatedLogoProps {
 export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
   const [phase, setPhase] = useState<"typing" | "idle">("typing");
   const [visibleChars, setVisibleChars] = useState(0);
-  const text = "SSHTerm";
+  const text = "HyperShell";
   const prompt = ">_ ";
 
   // Typing effect
@@ -108,7 +108,7 @@ export function AnimatedLogo({ compact, onClick }: AnimatedLogoProps) {
 
 **Step 2: Verify it renders**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No TypeScript errors
 
 ---
@@ -164,7 +164,7 @@ export function TransportToggle({ value, onChange }: TransportToggleProps) {
 
 **Step 2: Verify it compiles**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No TypeScript errors
 
 ---
@@ -444,7 +444,7 @@ export function QuickConnectForm({
 
 **Step 2: Verify it compiles**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No TypeScript errors
 
 ---
@@ -546,7 +546,7 @@ export { WelcomeScreen } from "./WelcomeScreen";
 
 **Step 3: Verify it compiles**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No TypeScript errors
 
 ---
@@ -642,7 +642,7 @@ Find the `<Workspace />` usage and add the props:
 
 **Step 4: Verify build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No TypeScript errors
 
 **Step 5: Commit**
@@ -653,7 +653,7 @@ git add apps/ui/src/features/layout/Workspace.tsx
 git add apps/ui/src/app/App.tsx
 git commit -m "feat: animated logo welcome screen with quick connect form
 
-Replace empty workspace state with typing-animation SSHTerm logo.
+Replace empty workspace state with typing-animation HyperShell logo.
 Clicking the logo morphs it into an inline quick connect form with
 SSH/Serial pill toggle, input fields, and connect button."
 ```
@@ -676,7 +676,7 @@ Expected: No new errors
 
 **Step 4: Run E2E tests**
 
-Run: `pnpm --filter @sshterm/ui test:e2e`
+Run: `pnpm --filter @hypershell/ui test:e2e`
 Expected: All E2E tests pass (empty state tests may need updating if they reference the old text)
 
 **Step 5: Commit fixes if any**

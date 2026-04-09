@@ -148,7 +148,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
 
   load: async () => {
     try {
-      const result = await window.sshterm?.getSetting({ key: SETTINGS_KEY });
+      const result = await window.hypershell?.getSetting({ key: SETTINGS_KEY });
       if (result?.value) {
         try {
           const parsed = JSON.parse(result.value) as Partial<AppSettings>;
@@ -203,7 +203,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.sshterm?.updateSetting({
+      await window.hypershell?.updateSetting({
         key: SETTINGS_KEY,
         value: JSON.stringify(next)
       });
@@ -223,7 +223,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.sshterm?.updateSetting({
+      await window.hypershell?.updateSetting({
         key: SETTINGS_KEY,
         value: JSON.stringify(next)
       });
@@ -243,7 +243,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.sshterm?.updateSetting({
+      await window.hypershell?.updateSetting({
         key: SETTINGS_KEY,
         value: JSON.stringify(next)
       });
@@ -265,7 +265,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.sshterm?.updateSetting({
+      await window.hypershell?.updateSetting({
         key: SETTINGS_KEY,
         value: JSON.stringify(next)
       });
@@ -297,7 +297,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.sshterm?.updateSetting({
+      await window.hypershell?.updateSetting({
         key: SETTINGS_KEY,
         value: JSON.stringify(next),
       });
@@ -310,7 +310,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     const next: AppSettings = { ...current, customThemes: rest };
     set({ settings: next });
     try {
-      await window.sshterm?.updateSetting({
+      await window.hypershell?.updateSetting({
         key: SETTINGS_KEY,
         value: JSON.stringify(next),
       });

@@ -28,7 +28,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 let capturedTemplate: unknown[];
 
 vi.mock("electron", () => ({
-  app: { name: "SSHTerm" },
+  app: { name: "HyperShell" },
   Menu: {
     buildFromTemplate: vi.fn((t: unknown[]) => {
       capturedTemplate = t;
@@ -92,7 +92,7 @@ describe("createAppMenu", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/desktop test -- --run createAppMenu`
+Run: `pnpm --filter @hypershell/desktop test -- --run createAppMenu`
 Expected: FAIL — no "about" role, no "Window" menu
 
 **Step 3: Implement the macOS menu**
@@ -195,7 +195,7 @@ export function createAppMenu(): void {
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/desktop test -- --run createAppMenu`
+Run: `pnpm --filter @hypershell/desktop test -- --run createAppMenu`
 Expected: PASS
 
 **Step 5: Commit**
@@ -304,7 +304,7 @@ mac:
     - target: zip
       arch:
         - x64
-  artifactName: sshterm-${version}-mac-${arch}.${ext}
+  artifactName: hypershell-${version}-mac-${arch}.${ext}
   category: public.app-category.developer-tools
   darkModeSupport: true
   hardenedRuntime: true
@@ -360,14 +360,14 @@ Add to scripts:
 Add to root `package.json` scripts:
 
 ```json
-"release:mac:unsigned": "pnpm --filter @sshterm/desktop run package:mac:unsigned"
+"release:mac:unsigned": "pnpm --filter @hypershell/desktop run package:mac:unsigned"
 ```
 
 **Step 5: Test build on macOS VM**
 
 ```bash
 # Clone repo on macOS VM, install deps, build, and package
-ssh macos "cd ~ && git clone <repo-url> sshterm && cd sshterm && pnpm install && pnpm build && pnpm release:mac:unsigned"
+ssh macos "cd ~ && git clone <repo-url> hypershell && cd hypershell && pnpm install && pnpm build && pnpm release:mac:unsigned"
 ```
 
 **Step 6: Commit**
@@ -462,7 +462,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @sshterm/ui exec playwright install chromium
+        run: pnpm --filter @hypershell/ui exec playwright install chromium
 
       - name: Workspace build
         run: pnpm ci:build
@@ -505,8 +505,8 @@ SSH into the macOS VM and verify the full build + package pipeline works.
 
 ```bash
 ssh macos
-cd ~ && git clone <repo> sshterm
-cd sshterm
+cd ~ && git clone <repo> hypershell
+cd hypershell
 pnpm install
 pnpm build
 ```
@@ -527,7 +527,7 @@ ls -la apps/desktop/release/*.dmg
 **Step 4: Open the DMG and verify**
 
 Open the DMG on the Mac, drag to Applications, launch. Verify:
-- App menu shows "SSHTerm" with About, Hide, Quit
+- App menu shows "HyperShell" with About, Hide, Quit
 - Window menu has Minimize, Zoom, Close
 - Cmd+Q quits the app
 - Tray icon appears in menu bar (monochrome)

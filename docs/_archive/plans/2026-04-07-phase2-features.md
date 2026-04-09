@@ -2,9 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add 5 new features to SSHTerm — interactive pane resizing, custom themes with editor, workspace profiles with auto-recovery, SSH key manager, and SFTP sync engine.
+**Goal:** Add 5 new features to HyperShell — interactive pane resizing, custom themes with editor, workspace profiles with auto-recovery, SSH key manager, and SFTP sync engine.
 
-**Architecture:** Each feature follows the existing IPC contract pattern: Zod schemas in `@sshterm/shared`, IPC handlers in `apps/desktop`, preload bridge methods in `desktopApi.ts`, and React UI in `apps/ui`. State managed via Zustand stores. Data persisted in SQLite via repository pattern.
+**Architecture:** Each feature follows the existing IPC contract pattern: Zod schemas in `@hypershell/shared`, IPC handlers in `apps/desktop`, preload bridge methods in `desktopApi.ts`, and React UI in `apps/ui`. State managed via Zustand stores. Data persisted in SQLite via repository pattern.
 
 **Tech Stack:** TypeScript strict, Zod, Zustand, xterm.js, better-sqlite3, Electron IPC, React, Tailwind CSS.
 
@@ -56,7 +56,7 @@ it("closePane resets to single pane sizes", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui test -- --run layoutStore`
+Run: `pnpm --filter @hypershell/ui test -- --run layoutStore`
 Expected: FAIL — `splitPane` doesn't accept direction, `splitDirection`/`paneSizes`/`setPaneSizes` don't exist
 
 **Step 3: Write minimal implementation**
@@ -119,7 +119,7 @@ setPaneSizes: (sizes) => set({ paneSizes: sizes }),
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/ui test -- --run layoutStore`
+Run: `pnpm --filter @hypershell/ui test -- --run layoutStore`
 Expected: PASS
 
 **Step 5: Commit**
@@ -300,7 +300,7 @@ Search codebase for `splitPane(` calls and ensure they still work (the `directio
 
 **Step 3: Run tests and verify**
 
-Run: `pnpm --filter @sshterm/ui test -- --run`
+Run: `pnpm --filter @hypershell/ui test -- --run`
 Expected: PASS
 
 **Step 4: Commit**
@@ -325,12 +325,12 @@ git commit -m "feat(layout): integrate drag-to-resize pane handles"
 ```typescript
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock window.sshterm before importing store
+// Mock window.hypershell before importing store
 const mockSshterm = {
   getSetting: vi.fn().mockResolvedValue(null),
   updateSetting: vi.fn().mockResolvedValue({ key: "app.settings", value: "{}" }),
 };
-vi.stubGlobal("window", { sshterm: mockSshterm });
+vi.stubGlobal("window", { hypershell: mockSshterm });
 
 import { settingsStore, type TerminalTheme as CustomTheme } from "./settingsStore";
 
@@ -366,7 +366,7 @@ describe("settingsStore custom themes", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui test -- --run settingsStore`
+Run: `pnpm --filter @hypershell/ui test -- --run settingsStore`
 Expected: FAIL — `customThemes`, `saveCustomTheme`, `deleteCustomTheme` don't exist
 
 **Step 3: Write minimal implementation**
@@ -396,7 +396,7 @@ saveCustomTheme: async (name, theme) => {
   };
   set({ settings: next });
   try {
-    await window.sshterm?.updateSetting({
+    await window.hypershell?.updateSetting({
       key: SETTINGS_KEY,
       value: JSON.stringify(next),
     });
@@ -409,7 +409,7 @@ deleteCustomTheme: async (name) => {
   const next: AppSettings = { ...current, customThemes: rest };
   set({ settings: next });
   try {
-    await window.sshterm?.updateSetting({
+    await window.hypershell?.updateSetting({
       key: SETTINGS_KEY,
       value: JSON.stringify(next),
     });
@@ -423,7 +423,7 @@ customThemes: parsed.customThemes ?? {},
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/ui test -- --run settingsStore`
+Run: `pnpm --filter @hypershell/ui test -- --run settingsStore`
 Expected: PASS
 
 **Step 5: Commit**
@@ -467,7 +467,7 @@ it("resolveTerminalTheme falls back to built-in when custom not found", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui test -- --run terminalTheme`
+Run: `pnpm --filter @hypershell/ui test -- --run terminalTheme`
 Expected: FAIL — `resolveTerminalTheme` doesn't accept second argument
 
 **Step 3: Update resolveTerminalTheme**
@@ -501,7 +501,7 @@ export function getTerminalOptions(settings?: {
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/ui test -- --run terminalTheme`
+Run: `pnpm --filter @hypershell/ui test -- --run terminalTheme`
 Expected: PASS
 
 **Step 5: Commit**
@@ -720,7 +720,7 @@ const deleteCustomTheme = useStore(settingsStore, (s) => s.deleteCustomTheme);
 
 **Step 2: Run tests**
 
-Run: `pnpm --filter @sshterm/ui test -- --run`
+Run: `pnpm --filter @hypershell/ui test -- --run`
 Expected: PASS
 
 **Step 3: Commit**
@@ -749,7 +749,7 @@ const opts = getTerminalOptions({ ...settings.terminal, customThemes });
 
 **Step 2: Run full test suite**
 
-Run: `pnpm --filter @sshterm/ui test -- --run`
+Run: `pnpm --filter @hypershell/ui test -- --run`
 Expected: PASS
 
 **Step 3: Commit**
@@ -838,7 +838,7 @@ Ensure the new types and schemas are exported from `packages/shared/src/index.ts
 
 **Step 4: Build shared to verify**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 Expected: SUCCESS
 
 **Step 5: Commit**
@@ -912,7 +912,7 @@ describe("workspaceRepository", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/db test -- --run workspaceRepository`
+Run: `pnpm --filter @hypershell/db test -- --run workspaceRepository`
 Expected: FAIL — module doesn't exist
 
 **Step 3: Write implementation**
@@ -988,7 +988,7 @@ export function createWorkspaceRepository(db: Database): WorkspaceRepository {
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/db test -- --run workspaceRepository`
+Run: `pnpm --filter @hypershell/db test -- --run workspaceRepository`
 Expected: PASS
 
 **Step 5: Commit**
@@ -1014,8 +1014,8 @@ import {
   saveWorkspaceRequestSchema,
   loadWorkspaceRequestSchema,
   removeWorkspaceRequestSchema,
-} from "@sshterm/shared";
-import { createWorkspaceRepository } from "@sshterm/db";
+} from "@hypershell/shared";
+import { createWorkspaceRepository } from "@hypershell/db";
 
 let repo: ReturnType<typeof createWorkspaceRepository> | null = null;
 
@@ -1063,7 +1063,7 @@ In `apps/desktop/src/main/ipc/registerIpc.ts`, import and call `registerWorkspac
 
 **Step 3: Build to verify**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 Expected: SUCCESS (or at least no TS errors — build may fail for unrelated native module reasons)
 
 **Step 4: Commit**
@@ -1127,7 +1127,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
 
   const refresh = async () => {
-    const list = await window.sshterm?.workspaceList?.();
+    const list = await window.hypershell?.workspaceList?.();
     if (list) setWorkspaces(list.filter((w: any) => w.name !== "__last__"));
   };
 
@@ -1150,19 +1150,19 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
       paneSizes: state.paneSizes,
       paneCount: state.panes.length,
     };
-    await window.sshterm?.workspaceSave?.({ name: trimmed, layout });
+    await window.hypershell?.workspaceSave?.({ name: trimmed, layout });
     setNewName("");
     setSaving(false);
     await refresh();
   };
 
   const handleLoad = async (name: string) => {
-    const result = await window.sshterm?.workspaceLoad?.({ name });
+    const result = await window.hypershell?.workspaceLoad?.({ name });
     if (!result?.layout) return;
     // Close existing tabs, then open workspace tabs
     const currentTabs = layoutStore.getState().tabs;
     for (const tab of currentTabs) {
-      void window.sshterm?.closeSession?.({ sessionId: tab.sessionId }).catch(() => {});
+      void window.hypershell?.closeSession?.({ sessionId: tab.sessionId }).catch(() => {});
     }
     layoutStore.setState({ tabs: [], activeSessionId: null, panes: [{ paneId: "pane-1", sessionId: null }] });
 
@@ -1189,7 +1189,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   };
 
   const handleRemove = async (name: string) => {
-    await window.sshterm?.workspaceRemove?.({ name });
+    await window.hypershell?.workspaceRemove?.({ name });
     await refresh();
   };
 
@@ -1288,7 +1288,7 @@ window.addEventListener("beforeunload", () => {
     paneCount: state.panes.length,
   };
   // Use sendSync for reliability during unload
-  void window.sshterm?.workspaceSaveLast?.(layout);
+  void window.hypershell?.workspaceSaveLast?.(layout);
 });
 ```
 
@@ -1385,7 +1385,7 @@ import {
   removeSshKeyRequestSchema,
   getFingerprintRequestSchema,
   type SshKeyInfo,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 
 const execFileAsync = promisify(execFile);
 
@@ -1544,7 +1544,7 @@ export function SshKeyManager() {
   const [generating, setGenerating] = useState(false);
 
   const refresh = async () => {
-    const result = await window.sshterm?.sshKeysList?.();
+    const result = await window.hypershell?.sshKeysList?.();
     if (result) setKeys(result);
   };
 
@@ -1554,7 +1554,7 @@ export function SshKeyManager() {
     if (!genName.trim()) return;
     setGenerating(true);
     try {
-      await window.sshterm?.sshKeysGenerate?.({
+      await window.hypershell?.sshKeysGenerate?.({
         type: genType,
         name: genName.trim(),
         passphrase: genPassphrase || undefined,
@@ -1573,7 +1573,7 @@ export function SshKeyManager() {
 
   const handleRemove = async (path: string, name: string) => {
     if (!confirm(`Delete key "${name}" and its public key?`)) return;
-    await window.sshterm?.sshKeysRemove?.({ path });
+    await window.hypershell?.sshKeysRemove?.({ path });
     await refresh();
   };
 
@@ -1836,7 +1836,7 @@ describe("syncEngine", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/session-core test -- --run syncEngine`
+Run: `pnpm --filter @hypershell/session-core test -- --run syncEngine`
 Expected: FAIL
 
 **Step 3: Write implementation**
@@ -2042,7 +2042,7 @@ export function createSyncEngine(): SyncEngine {
 
 **Step 4: Run test to verify it passes**
 
-Run: `pnpm --filter @sshterm/session-core test -- --run syncEngine`
+Run: `pnpm --filter @hypershell/session-core test -- --run syncEngine`
 Expected: PASS
 
 **Step 5: Commit**

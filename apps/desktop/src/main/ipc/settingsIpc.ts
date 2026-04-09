@@ -5,7 +5,7 @@ import {
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
 

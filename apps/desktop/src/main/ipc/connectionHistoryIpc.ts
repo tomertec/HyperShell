@@ -1,13 +1,13 @@
 import {
   createConnectionHistoryRepositoryFromDatabase,
   type SqliteDatabase,
-} from "@sshterm/db";
+} from "@hypershell/db";
 import {
   ipcChannels,
   connectionHistoryRecordSchema,
   connectionHistoryListByHostRequestSchema,
   connectionHistoryListRecentRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import { z } from "zod";
 
 import type { IpcMainLike } from "./registerIpc";

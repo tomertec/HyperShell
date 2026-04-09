@@ -29,7 +29,7 @@ export const useTunnelStore = create<TunnelState>((set) => ({
 
   async refresh() {
     try {
-      const result = await window.sshterm?.listPortForwards?.();
+      const result = await window.hypershell?.listPortForwards?.();
       if (result) {
         set({
           activeForwards: result.map((f: { id: string; hostname?: string; protocol?: string; localPort?: number; remoteHost?: string; remotePort?: number }) => ({

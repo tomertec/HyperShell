@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SerialProfileRecord, TagRecord } from "@sshterm/shared";
+import type { SerialProfileRecord, TagRecord } from "@hypershell/shared";
 import { useStore } from "zustand";
 import type { HostRecord } from "../hosts/HostsView";
 import { settingsStore } from "../settings/settingsStore";

@@ -4,11 +4,11 @@
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SSHTERM_RENDERER_URL` | (auto-detected) | Override renderer URL. In dev: `http://localhost:5173`. In prod: bundled `dist/renderer/index.html`. |
-| `SSHTERM_ENABLE_LOCAL_FS` | `1` | Enable local filesystem IPC (`fs:list`, `fs:stat`, `fs:get-drives`). Set to `0` to disable local browsing. |
-| `SSHTERM_FS_ALLOW_SYSTEM_ROOTS` | `0` | Expand local FS allowlist to system roots/drives. When `0`, access is scoped to home + `SSHTERM_FS_ALLOWED_ROOTS`. |
-| `SSHTERM_FS_ALLOWED_ROOTS` | (empty) | Comma-separated absolute paths added to the local FS allowlist. |
-| `SSHTERM_ENABLE_SSH_KEY_DISCOVERY` | `0` | Enable `fs:list-ssh-keys` path discovery for `~/.ssh` private keys. |
+| `HYPERSHELL_RENDERER_URL` | (auto-detected) | Override renderer URL. In dev: `http://localhost:5173`. In prod: bundled `dist/renderer/index.html`. |
+| `HYPERSHELL_ENABLE_LOCAL_FS` | `1` | Enable local filesystem IPC (`fs:list`, `fs:stat`, `fs:get-drives`). Set to `0` to disable local browsing. |
+| `HYPERSHELL_FS_ALLOW_SYSTEM_ROOTS` | `0` | Expand local FS allowlist to system roots/drives. When `0`, access is scoped to home + `HYPERSHELL_FS_ALLOWED_ROOTS`. |
+| `HYPERSHELL_FS_ALLOWED_ROOTS` | (empty) | Comma-separated absolute paths added to the local FS allowlist. |
+| `HYPERSHELL_ENABLE_SSH_KEY_DISCOVERY` | `0` | Enable `fs:list-ssh-keys` path discovery for `~/.ssh` private keys. |
 | `SSH_AUTH_SOCK` | (none) | SSH agent socket path. Used by SFTP transport as fallback agent. |
 | `CI` | (none) | Set by GitHub Actions. Affects test timeouts and server startup. |
 
@@ -87,6 +87,6 @@ SFTP connections resolve credentials in this priority order:
 ## Database Location
 
 The SQLite database is stored at the Electron app data path:
-- **Windows:** `%APPDATA%/SSHTerm/sshterm.db`
-- **macOS:** `~/Library/Application Support/SSHTerm/sshterm.db`
-- **Linux:** `~/.config/SSHTerm/sshterm.db`
+- **Windows:** `%APPDATA%/HyperShell/hypershell.db`
+- **macOS:** `~/Library/Application Support/HyperShell/hypershell.db`
+- **Linux:** `~/.config/HyperShell/hypershell.db`

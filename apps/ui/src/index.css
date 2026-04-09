@@ -28,9 +28,29 @@
 
 :root {
   --terminal-bg: var(--color-surface);
+  --terminal-frame-line: rgba(125, 211, 252, 0.38);
+  --terminal-frame-glow: rgba(56, 189, 248, 0.10);
 }
 
-html, body, #root {
+.terminal-logo-row {
+  position: relative;
+}
+
+.terminal-logo-row::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-bottom: 1px solid var(--terminal-frame-line);
+  box-shadow: none;
+}
+
+html,
+body,
+#root {
   height: 100%;
   margin: 0;
   overflow: hidden;
@@ -40,6 +60,20 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+.terminal-content-frame {
+  position: relative;
+  isolation: isolate;
+}
+
+.terminal-content-frame::after {
+  content: "";
+  position: absolute;
+  inset: -1px 0 0 0;
+  pointer-events: none;
+  border: 1px solid var(--terminal-frame-line);
+  box-shadow: inset 0 0 6px var(--terminal-frame-glow), 0 0 8px var(--terminal-frame-glow);
 }
 
 /* Selection */
@@ -77,22 +111,28 @@ textarea:focus:not(:focus-visible) {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.13);
   border-radius: 999px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.28);
 }
+
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
 
 /* Smooth transitions globally */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -109,23 +149,29 @@ kbd {
   width: 100%;
   background: var(--terminal-bg, var(--color-surface)) !important;
 }
+
 .xterm .xterm-viewport {
   overflow-y: auto !important;
   background-color: var(--terminal-bg, var(--color-surface)) !important;
 }
+
 .xterm .xterm-screen {
   height: 100% !important;
 }
+
 .xterm .xterm-screen canvas {
   background-color: var(--terminal-bg, var(--color-surface)) !important;
 }
-.xterm .xterm-scrollable-element > .shadow {
+
+.xterm .xterm-scrollable-element>.shadow {
   display: none !important;
 }
 
 /* Host connection spinner */
 @keyframes host-connecting-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .host-status-connecting {
@@ -139,23 +185,92 @@ kbd {
   background: none;
 }
 
+/* Host active pulse */
+@keyframes host-status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 5px rgba(52, 211, 153, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+
+.host-status-pulse {
+  animation: host-status-pulse 2s ease-out infinite;
+}
+
 /* Host color tag left borders */
-.host-color-red    { border-left-color: #f87171 !important; }
-.host-color-orange { border-left-color: #fb923c !important; }
-.host-color-yellow { border-left-color: #fbbf24 !important; }
-.host-color-green  { border-left-color: #34d399 !important; }
-.host-color-blue   { border-left-color: #60a5fa !important; }
-.host-color-cyan   { border-left-color: #22d3ee !important; }
-.host-color-purple { border-left-color: #a78bfa !important; }
-.host-color-pink   { border-left-color: #f472b6 !important; }
+.host-color-red {
+  border-left-color: #f87171 !important;
+}
+
+.host-color-orange {
+  border-left-color: #fb923c !important;
+}
+
+.host-color-yellow {
+  border-left-color: #fbbf24 !important;
+}
+
+.host-color-green {
+  border-left-color: #34d399 !important;
+}
+
+.host-color-blue {
+  border-left-color: #60a5fa !important;
+}
+
+.host-color-cyan {
+  border-left-color: #22d3ee !important;
+}
+
+.host-color-purple {
+  border-left-color: #a78bfa !important;
+}
+
+.host-color-pink {
+  border-left-color: #f472b6 !important;
+}
 
 /* Color swatch circles for context menu */
-.color-swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-.color-swatch-red    { background: #f87171; }
-.color-swatch-orange { background: #fb923c; }
-.color-swatch-yellow { background: #fbbf24; }
-.color-swatch-green  { background: #34d399; }
-.color-swatch-blue   { background: #60a5fa; }
-.color-swatch-cyan   { background: #22d3ee; }
-.color-swatch-purple { background: #a78bfa; }
-.color-swatch-pink   { background: #f472b6; }
+.color-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.color-swatch-red {
+  background: #f87171;
+}
+
+.color-swatch-orange {
+  background: #fb923c;
+}
+
+.color-swatch-yellow {
+  background: #fbbf24;
+}
+
+.color-swatch-green {
+  background: #34d399;
+}
+
+.color-swatch-blue {
+  background: #60a5fa;
+}
+
+.color-swatch-cyan {
+  background: #22d3ee;
+}
+
+.color-swatch-purple {
+  background: #a78bfa;
+}
+
+.color-swatch-pink {
+  background: #f472b6;
+}

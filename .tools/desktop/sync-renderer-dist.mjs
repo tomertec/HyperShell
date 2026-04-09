@@ -15,7 +15,7 @@ const desktopRendererDir = path.join(
 
 if (!existsSync(uiDistDir)) {
   throw new Error(
-    `Renderer build output was not found at ${uiDistDir}. Run \`pnpm --filter @sshterm/ui run build\` first.`
+    `Renderer build output was not found at ${uiDistDir}. Run \`pnpm --filter @hypershell/ui run build\` first.`
   );
 }
 

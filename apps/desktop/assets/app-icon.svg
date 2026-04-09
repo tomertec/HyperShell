@@ -1,0 +1,36 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="96" x2="896" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B2034"/>
+      <stop offset="1" stop-color="#061120"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(532 252) rotate(90) scale(468 620)">
+      <stop stop-color="#4BCBFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#4BCBFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paneStroke" x1="220" y1="250" x2="804" y2="680" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3F7299"/>
+      <stop offset="1" stop-color="#234765"/>
+    </linearGradient>
+    <filter id="softGlow" x="268" y="438" width="488" height="284" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#bg)"/>
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#glow)"/>
+  <rect x="96" y="96" width="832" height="832" rx="188" stroke="#62D7FF" stroke-opacity="0.26" stroke-width="8"/>
+
+  <rect x="220" y="250" width="584" height="430" rx="78" fill="#0A1D31" stroke="url(#paneStroke)" stroke-width="8"/>
+  <path d="M220 342H804" stroke="#2D5C7E" stroke-width="8"/>
+  <circle cx="284" cy="296" r="14" fill="#4BCBFF" fill-opacity="0.75"/>
+  <circle cx="332" cy="296" r="14" fill="#4BCBFF" fill-opacity="0.45"/>
+
+  <g filter="url(#softGlow)" opacity="0.6">
+    <path d="M358 500L452 565L358 630" stroke="#4BCBFF" stroke-width="66" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="540" y="598" width="150" height="50" rx="25" fill="#4BCBFF"/>
+  </g>
+
+  <path d="M358 500L452 565L358 630" stroke="#99EDFF" stroke-width="52" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="540" y="598" width="150" height="50" rx="25" fill="#99EDFF"/>
+</svg>

@@ -1,11 +1,11 @@
-import { createSnippetsRepositoryFromDatabase } from "@sshterm/db";
+import { createSnippetsRepositoryFromDatabase } from "@hypershell/db";
 import {
   ipcChannels,
   upsertSnippetRequestSchema,
   removeSnippetRequestSchema,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import type { IpcMainLike } from "./registerIpc";
-import type { SqliteDatabase } from "@sshterm/db";
+import type { SqliteDatabase } from "@hypershell/db";
 
 export function registerSnippetsIpc(
   ipcMain: IpcMainLike,

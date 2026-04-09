@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toast } from "sonner";
-import type { TagRecord } from "@sshterm/shared";
+import type { TagRecord } from "@hypershell/shared";
 import { ContextMenu } from "../../components/ContextMenu";
 import type { ContextMenuAction } from "../../components/ContextMenu";
 import type { HostRecord } from "../hosts/HostsView";
@@ -82,8 +82,7 @@ function StatusDot({ hostId, activeSessionHostIds, connectingHostIds, hostReacha
   if (activeSessionHostIds.has(hostId)) {
     return (
       <span className="relative flex shrink-0 items-center justify-center">
-        <span className="h-2 w-2 rounded-full bg-success" />
-        <span className="absolute inset-0 h-2 w-2 rounded-full bg-success/30 blur-[3px]" />
+        <span className="h-2 w-2 rounded-full bg-success host-status-pulse" />
       </span>
     );
   }
@@ -298,18 +297,18 @@ export function SidebarHostList({
   const activeHost = activeId ? hosts.find((h) => h.id === activeId) : null;
 
   const setStatusTargets = useCallback((hostIds: string[]) => {
-    if (!window.sshterm?.setHostStatusTargets) {
+    if (!window.hypershell?.setHostStatusTargets) {
       return;
     }
-    void window.sshterm.setHostStatusTargets({ hostIds });
+    void window.hypershell.setHostStatusTargets({ hostIds });
   }, []);
 
   useEffect(() => {
-    if (!window.sshterm?.onHostStatus) {
+    if (!window.hypershell?.onHostStatus) {
       return;
     }
 
-    return window.sshterm.onHostStatus((event) => {
+    return window.hypershell.onHostStatus((event) => {
       setHostReachabilityById((prev) => {
         const next = event.online ? "online" : "offline";
         if (prev[event.hostId] === next) {
@@ -378,12 +377,12 @@ export function SidebarHostList({
       return;
     }
 
-    if (!window.sshterm?.fsShowSaveDialog || !window.sshterm?.exportHosts) {
+    if (!window.hypershell?.fsShowSaveDialog || !window.hypershell?.exportHosts) {
       toast.error("Host export is unavailable in this environment.");
       return;
     }
 
-    const filePath = await window.sshterm.fsShowSaveDialog({
+    const filePath = await window.hypershell.fsShowSaveDialog({
       defaultPath: `hosts.${option.extension}`,
       filters: [{ name: option.filterName, extensions: [option.extension] }],
     });
@@ -392,7 +391,7 @@ export function SidebarHostList({
     }
 
     try {
-      const result = await window.sshterm.exportHosts({ format: exportFormat, filePath });
+      const result = await window.hypershell.exportHosts({ format: exportFormat, filePath });
       toast.success(`Exported ${result.exported} host${result.exported === 1 ? "" : "s"} to ${filePath}`);
     } catch (error) {
       toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`);

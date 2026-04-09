@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 
 const electronMocks = vi.hoisted(() => {
   const trayInstance = {
@@ -165,7 +165,7 @@ describe("createTray", () => {
     createTray(window, actions, deps);
 
     expect(deps.TrayClass).toHaveBeenCalledTimes(1);
-    expect(deps.trayInstance.setToolTip).toHaveBeenCalledWith("SSHTerm");
+    expect(deps.trayInstance.setToolTip).toHaveBeenCalledWith("HyperShell");
     expect(deps.menuTemplates[0]).toEqual([
       {
         label: "Show",

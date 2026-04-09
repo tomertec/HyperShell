@@ -19,12 +19,12 @@
 
 Run:
 ```bash
-pnpm --filter @sshterm/ui add @codemirror/lang-php @codemirror/lang-rust @codemirror/lang-go @codemirror/lang-java @codemirror/lang-cpp @codemirror/lang-sql @codemirror/search @replit/codemirror-minimap
+pnpm --filter @hypershell/ui add @codemirror/lang-php @codemirror/lang-rust @codemirror/lang-go @codemirror/lang-java @codemirror/lang-cpp @codemirror/lang-sql @codemirror/search @replit/codemirror-minimap
 ```
 
 **Step 2: Verify install**
 
-Run: `pnpm --filter @sshterm/ui ls @replit/codemirror-minimap`
+Run: `pnpm --filter @hypershell/ui ls @replit/codemirror-minimap`
 Expected: Shows the installed version.
 
 **Step 3: Commit**
@@ -92,7 +92,7 @@ Check `packages/shared/src/index.ts` and ensure the new schemas/types are export
 
 **Step 4: Build shared package to verify**
 
-Run: `pnpm --filter @sshterm/shared build`
+Run: `pnpm --filter @hypershell/shared build`
 Expected: No errors.
 
 **Step 5: Commit**
@@ -172,7 +172,7 @@ Create `apps/desktop/src/main/windows/editorWindowManager.ts`:
 
 ```typescript
 import type { BrowserWindow } from "electron";
-import { ipcChannels } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
 import { createEditorWindow } from "./createEditorWindow";
 
 interface ManagedEditorWindow {
@@ -291,7 +291,7 @@ Create `apps/desktop/src/main/ipc/editorIpc.ts`:
 
 ```typescript
 import type { IpcMainInvokeEvent } from "electron";
-import { ipcChannels, editorOpenRequestSchema } from "@sshterm/shared";
+import { ipcChannels, editorOpenRequestSchema } from "@hypershell/shared";
 import { editorWindowManager } from "../windows/editorWindowManager";
 
 export function registerEditorIpc(
@@ -364,7 +364,7 @@ ipcChannels.editor.openEditor,
 
 **Step 6: Build desktop to verify**
 
-Run: `pnpm --filter @sshterm/desktop build`
+Run: `pnpm --filter @hypershell/desktop build`
 Expected: No errors.
 
 **Step 7: Commit**
@@ -388,8 +388,8 @@ In `apps/desktop/src/preload/desktopApi.ts`:
 
 1. Add schema imports at top:
 ```typescript
-import { editorOpenRequestSchema, editorOpenFileSchema, editorSessionClosedSchema } from "@sshterm/shared";
-import type { EditorOpenRequest, EditorOpenFile, EditorSessionClosed } from "@sshterm/shared";
+import { editorOpenRequestSchema, editorOpenFileSchema, editorSessionClosedSchema } from "@hypershell/shared";
+import type { EditorOpenRequest, EditorOpenFile, EditorSessionClosed } from "@hypershell/shared";
 ```
 
 2. Add to the `DesktopApi` interface (after `sftpWriteFile` around line 204):
@@ -429,7 +429,7 @@ import type { EditorOpenRequest, EditorOpenFile, EditorSessionClosed } from "@ss
 
 **Step 2: Add type declarations**
 
-In `apps/ui/src/types/global.d.ts`, add imports for the new types and add to the `sshterm` interface (after `sftpWriteFile` around line 100):
+In `apps/ui/src/types/global.d.ts`, add imports for the new types and add to the `hypershell` interface (after `sftpWriteFile` around line 100):
 
 ```typescript
       editorOpen?: (request: EditorOpenRequest) => Promise<void>;
@@ -440,7 +440,7 @@ In `apps/ui/src/types/global.d.ts`, add imports for the new types and add to the
 Also add the type imports at the top of the file alongside the existing shared imports:
 
 ```typescript
-import type { EditorOpenRequest, EditorOpenFile, EditorSessionClosed } from "@sshterm/shared";
+import type { EditorOpenRequest, EditorOpenFile, EditorSessionClosed } from "@hypershell/shared";
 ```
 
 **Step 3: Build to verify**
@@ -548,7 +548,7 @@ export function getLanguageExtension(filename: string): Extension | null {
 
 **Step 2: Build to verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No errors.
 
 **Step 3: Commit**
@@ -1101,7 +1101,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
       });
 
       try {
-        const response = await window.sshterm?.sftpReadFile?.({
+        const response = await window.hypershell?.sftpReadFile?.({
           sftpSessionId,
           path: remotePath,
         });
@@ -1134,14 +1134,14 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
 
   // Listen for open-file events from main process
   useEffect(() => {
-    return window.sshterm?.onEditorOpenFile?.((event) => {
+    return window.hypershell?.onEditorOpenFile?.((event) => {
       void openFile(event.remotePath);
     });
   }, [openFile]);
 
   // Listen for session-closed events
   useEffect(() => {
-    return window.sshterm?.onEditorSessionClosed?.(() => {
+    return window.hypershell?.onEditorSessionClosed?.(() => {
       store.getState().setSessionDisconnected();
     });
   }, [store]);
@@ -1152,7 +1152,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
 
     setSaving(true);
     try {
-      await window.sshterm?.sftpWriteFile?.({
+      await window.hypershell?.sftpWriteFile?.({
         sftpSessionId,
         path: activeTab.remotePath,
         content: activeTab.content,
@@ -1321,7 +1321,7 @@ This avoids changing the import in main.tsx.
 
 **Step 2: Build to verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No errors.
 
 **Step 3: Commit**
@@ -1356,7 +1356,7 @@ In `apps/ui/src/features/sftp/SftpTab.tsx`:
 3. Replace the `onEdit={setEditingFile}` prop on `SftpDualPane` (line 361) with:
 ```typescript
 onEdit={(remotePath: string) => {
-  void window.sshterm?.editorOpen?.({ sftpSessionId, remotePath });
+  void window.hypershell?.editorOpen?.({ sftpSessionId, remotePath });
 }}
 ```
 
@@ -1364,7 +1364,7 @@ onEdit={(remotePath: string) => {
 
 **Step 2: Build and verify**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: No errors.
 
 **Step 3: Commit**

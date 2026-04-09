@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add a dual-pane SFTP file browser to SSHTerm with drag-and-drop transfers, remote file editing, and per-host bookmarks.
+**Goal:** Add a dual-pane SFTP file browser to HyperShell with drag-and-drop transfers, remote file editing, and per-host bookmarks.
 
 **Architecture:** New `SftpTransport` in session-core using the `ssh2` npm package, with dedicated IPC channels following the existing contract pattern. UI renders as a new tab type in the layout system with its own Zustand stores.
 
@@ -21,13 +21,13 @@
 
 Run:
 ```bash
-pnpm --filter @sshterm/session-core add ssh2
-pnpm --filter @sshterm/session-core add -D @types/ssh2
+pnpm --filter @hypershell/session-core add ssh2
+pnpm --filter @hypershell/session-core add -D @types/ssh2
 ```
 
 **Step 2: Verify installation**
 
-Run: `pnpm --filter @sshterm/session-core exec -- node -e "require('ssh2')"`
+Run: `pnpm --filter @hypershell/session-core exec -- node -e "require('ssh2')"`
 Expected: No error
 
 **Step 3: Commit**
@@ -88,7 +88,7 @@ describe("createSftpTransport", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/session-core test -- --run sftpTransport`
+Run: `pnpm --filter @hypershell/session-core test -- --run sftpTransport`
 Expected: FAIL — module not found
 
 **Step 3: Add "sftp" to SessionTransportKind**
@@ -385,7 +385,7 @@ export function createSftpTransport(
 
 **Step 5: Run tests to verify they pass**
 
-Run: `pnpm --filter @sshterm/session-core test -- --run sftpTransport`
+Run: `pnpm --filter @hypershell/session-core test -- --run sftpTransport`
 Expected: PASS
 
 **Step 6: Export from session-core**
@@ -487,7 +487,7 @@ describe("SFTP schemas", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/shared test -- --run sftpSchemas`
+Run: `pnpm --filter @hypershell/shared test -- --run sftpSchemas`
 Expected: FAIL — module not found
 
 **Step 3: Create SFTP schemas**
@@ -812,7 +812,7 @@ export * from "./ipc/sftpSchemas";
 
 **Step 6: Run tests**
 
-Run: `pnpm --filter @sshterm/shared test -- --run`
+Run: `pnpm --filter @hypershell/shared test -- --run`
 Expected: ALL PASS
 
 **Step 7: Commit**
@@ -911,7 +911,7 @@ describe("SftpBookmarksRepository", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/db test -- --run sftpBookmarks`
+Run: `pnpm --filter @hypershell/db test -- --run sftpBookmarks`
 Expected: FAIL — module not found
 
 **Step 3: Create migration file**
@@ -1053,7 +1053,7 @@ export * from "./sftpBookmarksRepository";
 
 **Step 7: Run tests**
 
-Run: `pnpm --filter @sshterm/db test -- --run`
+Run: `pnpm --filter @hypershell/db test -- --run`
 Expected: ALL PASS
 
 **Step 8: Commit**
@@ -1126,7 +1126,7 @@ describe("TransferManager", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/desktop test -- --run transferManager`
+Run: `pnpm --filter @hypershell/desktop test -- --run transferManager`
 Expected: FAIL — module not found
 
 **Step 3: Create SftpSessionManager**
@@ -1138,8 +1138,8 @@ import {
   createSftpTransport,
   type SftpTransportHandle,
   type SftpConnectionOptions,
-} from "@sshterm/session-core";
-import type { SessionTransportEvent } from "@sshterm/session-core";
+} from "@hypershell/session-core";
+import type { SessionTransportEvent } from "@hypershell/session-core";
 
 export interface SftpSession {
   sftpSessionId: string;
@@ -1210,8 +1210,8 @@ export function createSftpSessionManager() {
 Create `apps/desktop/src/main/sftp/transferManager.ts`:
 
 ```typescript
-import type { SftpTransportHandle } from "@sshterm/session-core";
-import type { TransferOp, TransferJob } from "@sshterm/shared";
+import type { SftpTransportHandle } from "@hypershell/session-core";
+import type { TransferOp, TransferJob } from "@hypershell/shared";
 import { createReadStream, createWriteStream, statSync, mkdirSync } from "node:fs";
 import { dirname, basename } from "node:path";
 
@@ -1400,8 +1400,8 @@ Create `apps/desktop/src/main/ipc/sftpIpc.ts`:
 import type { IpcMainInvokeEvent } from "electron";
 import type { createSftpSessionManager } from "../sftp/sftpSessionManager";
 import type { createTransferManager } from "../sftp/transferManager";
-import type { createSftpBookmarksRepository } from "@sshterm/db";
-import type { createHostsRepository } from "@sshterm/db";
+import type { createSftpBookmarksRepository } from "@hypershell/db";
+import type { createHostsRepository } from "@hypershell/db";
 import {
   sftpConnectRequestSchema,
   sftpDisconnectRequestSchema,
@@ -1419,8 +1419,8 @@ import {
   sftpBookmarkRemoveRequestSchema,
   sftpBookmarkReorderRequestSchema,
   type SftpConnectionOptions,
-} from "@sshterm/shared";
-import { ipcChannels } from "@sshterm/shared";
+} from "@hypershell/shared";
+import { ipcChannels } from "@hypershell/shared";
 import { ipcMain } from "electron";
 
 export interface SftpIpcDeps {
@@ -1557,8 +1557,8 @@ Create `apps/desktop/src/main/ipc/fsIpc.ts`:
 
 ```typescript
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
-import { ipcChannels } from "@sshterm/shared";
-import { fsListRequestSchema, type FsEntry } from "@sshterm/shared";
+import { ipcChannels } from "@hypershell/shared";
+import { fsListRequestSchema, type FsEntry } from "@hypershell/shared";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -1648,7 +1648,7 @@ cleanupFs();
 
 **Step 8: Run tests**
 
-Run: `pnpm --filter @sshterm/desktop test -- --run transferManager`
+Run: `pnpm --filter @hypershell/desktop test -- --run transferManager`
 Expected: PASS
 
 **Step 9: Commit**
@@ -1754,12 +1754,12 @@ git commit -m "feat(preload): expose SFTP and local FS methods via DesktopApi"
 
 Run:
 ```bash
-pnpm --filter @sshterm/ui add codemirror @codemirror/lang-javascript @codemirror/lang-json @codemirror/lang-python @codemirror/lang-xml @codemirror/lang-yaml @codemirror/lang-html @codemirror/lang-css @codemirror/lang-markdown @codemirror/theme-one-dark
+pnpm --filter @hypershell/ui add codemirror @codemirror/lang-javascript @codemirror/lang-json @codemirror/lang-python @codemirror/lang-xml @codemirror/lang-yaml @codemirror/lang-html @codemirror/lang-css @codemirror/lang-markdown @codemirror/theme-one-dark
 ```
 
 **Step 2: Verify build**
 
-Run: `pnpm --filter @sshterm/ui build`
+Run: `pnpm --filter @hypershell/ui build`
 Expected: PASS
 
 **Step 3: Commit**
@@ -1829,7 +1829,7 @@ describe("sftpStore", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui test -- --run sftpStore`
+Run: `pnpm --filter @hypershell/ui test -- --run sftpStore`
 Expected: FAIL
 
 **Step 3: Create sftpStore**
@@ -1838,7 +1838,7 @@ Create `apps/ui/src/features/sftp/sftpStore.ts`:
 
 ```typescript
 import { createStore } from "zustand/vanilla";
-import type { SftpEntry, FsEntry } from "@sshterm/shared";
+import type { SftpEntry, FsEntry } from "@hypershell/shared";
 
 type SortColumn = "name" | "size" | "modifiedAt" | "permissions";
 type SortDirection = "asc" | "desc";
@@ -2032,7 +2032,7 @@ Create `apps/ui/src/features/sftp/transferStore.ts`:
 
 ```typescript
 import { createStore } from "zustand/vanilla";
-import type { TransferJob } from "@sshterm/shared";
+import type { TransferJob } from "@hypershell/shared";
 
 type TransferFilter = "all" | "active" | "completed" | "failed";
 
@@ -2079,7 +2079,7 @@ export const transferStore = createStore<TransferState>()((set) => ({
 
 **Step 6: Run tests**
 
-Run: `pnpm --filter @sshterm/ui test -- --run sftp`
+Run: `pnpm --filter @hypershell/ui test -- --run sftp`
 Expected: ALL PASS
 
 **Step 7: Commit**
@@ -2128,7 +2128,7 @@ export interface LayoutTab {
 
 **Step 2: Run tests to verify no regressions**
 
-Run: `pnpm --filter @sshterm/ui test -- --run`
+Run: `pnpm --filter @hypershell/ui test -- --run`
 Expected: ALL PASS
 
 **Step 3: Commit**
@@ -2191,7 +2191,7 @@ describe("fileUtils", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `pnpm --filter @sshterm/ui test -- --run fileUtils`
+Run: `pnpm --filter @hypershell/ui test -- --run fileUtils`
 Expected: FAIL
 
 **Step 3: Create file utilities**
@@ -2279,7 +2279,7 @@ export function joinRemotePath(base: string, name: string): string {
 
 **Step 4: Run tests**
 
-Run: `pnpm --filter @sshterm/ui test -- --run fileUtils`
+Run: `pnpm --filter @hypershell/ui test -- --run fileUtils`
 Expected: PASS
 
 **Step 5: Create FileList component**
@@ -2545,7 +2545,7 @@ export function FileContextMenu({ x, y, actions, onClose }: FileContextMenuProps
 
 **Step 7: Run all tests**
 
-Run: `pnpm --filter @sshterm/ui test -- --run`
+Run: `pnpm --filter @hypershell/ui test -- --run`
 Expected: PASS
 
 **Step 8: Commit**
@@ -2637,7 +2637,7 @@ export function DriveSelector({ onSelect, currentPath }: DriveSelectorProps) {
   const currentDrive = currentPath.match(/^([A-Z]:\\)/)?.[1] || "C:\\";
 
   useEffect(() => {
-    window.sshterm.fsGetDrives().then((res) => setDrives(res.drives));
+    window.hypershell.fsGetDrives().then((res) => setDrives(res.drives));
   }, []);
 
   return (
@@ -2696,7 +2696,7 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
     setLoading("local", true);
     setError("local", null);
     try {
-      const response = await window.sshterm.fsList({ path });
+      const response = await window.hypershell.fsList({ path });
       setLocalEntries(response.entries);
       setLoading("local", false);
     } catch (err: any) {
@@ -2707,7 +2707,7 @@ export function LocalPane({ store, onTransfer }: LocalPaneProps) {
 
   useEffect(() => {
     if (!localPath) {
-      window.sshterm.fsGetHome().then((res) => {
+      window.hypershell.fsGetHome().then((res) => {
         setLocalPath(res.path);
       });
     }
@@ -2818,7 +2818,7 @@ export function RemotePane({ store, onTransfer, onEdit, onRename, onDelete, onMk
     setLoading("remote", true);
     setError("remote", null);
     try {
-      const response = await window.sshterm.sftpList({ sftpSessionId, path });
+      const response = await window.hypershell.sftpList({ sftpSessionId, path });
       setRemoteEntries(response.entries);
       setLoading("remote", false);
     } catch (err: any) {
@@ -2978,7 +2978,7 @@ import { useEffect, useState } from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 import type { SftpState } from "../sftpStore";
-import type { SftpBookmark } from "@sshterm/shared";
+import type { SftpBookmark } from "@hypershell/shared";
 
 interface SftpToolbarProps {
   store: StoreApi<SftpState>;
@@ -2997,11 +2997,11 @@ export function SftpToolbar({ store, hostId, onDisconnect }: SftpToolbarProps) {
   const [showBookmarks, setShowBookmarks] = useState(false);
 
   useEffect(() => {
-    window.sshterm.sftpBookmarksList({ hostId }).then(setBookmarks);
+    window.hypershell.sftpBookmarksList({ hostId }).then(setBookmarks);
   }, [hostId]);
 
   const refreshBookmarks = () => {
-    window.sshterm.sftpBookmarksList({ hostId }).then(setBookmarks);
+    window.hypershell.sftpBookmarksList({ hostId }).then(setBookmarks);
   };
 
   return (
@@ -3162,7 +3162,7 @@ export function TransferPanel() {
               {(transfer.status === "active" || transfer.status === "queued") && (
                 <button
                   className="text-text-secondary hover:text-red-400 text-xs"
-                  onClick={() => window.sshterm.sftpTransferCancel({ transferId: transfer.transferId })}
+                  onClick={() => window.hypershell.sftpTransferCancel({ transferId: transfer.transferId })}
                 >
                   Cancel
                 </button>
@@ -3263,7 +3263,7 @@ export function RemoteEditor({ sftpSessionId, remotePath, onClose }: RemoteEdito
 
     async function load() {
       try {
-        const response = await window.sshterm.sftpReadFile({ sftpSessionId, path: remotePath });
+        const response = await window.hypershell.sftpReadFile({ sftpSessionId, path: remotePath });
         if (cancelled) return;
 
         const content = response.encoding === "base64"
@@ -3309,7 +3309,7 @@ export function RemoteEditor({ sftpSessionId, remotePath, onClose }: RemoteEdito
     setError(null);
     try {
       const content = viewRef.current.state.doc.toString();
-      await window.sshterm.sftpWriteFile({
+      await window.hypershell.sftpWriteFile({
         sftpSessionId,
         path: remotePath,
         content,
@@ -3418,7 +3418,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
   // Subscribe to SFTP events for transfer progress
   useEffect(() => {
-    const unsubscribe = window.sshterm.onSftpEvent((event) => {
+    const unsubscribe = window.hypershell.onSftpEvent((event) => {
       if (event.kind === "transfer-progress") {
         transferStore.getState().updateTransfer(event.transferId, {
           bytesTransferred: event.bytesTransferred,
@@ -3449,7 +3449,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       remotePath: target + "/" + localPath.split(/[/\\]/).pop(),
       isDirectory: false,
     }));
-    await window.sshterm.sftpTransferStart({ sftpSessionId, operations });
+    await window.hypershell.sftpTransferStart({ sftpSessionId, operations });
   }, [sftpSessionId, remotePath]);
 
   const handleDownload = useCallback(async (remotePaths: string[], localTarget: string) => {
@@ -3460,7 +3460,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       remotePath: rp,
       isDirectory: false,
     }));
-    await window.sshterm.sftpTransferStart({ sftpSessionId, operations });
+    await window.hypershell.sftpTransferStart({ sftpSessionId, operations });
   }, [sftpSessionId, store]);
 
   const handleRename = useCallback(async (path: string) => {
@@ -3468,18 +3468,18 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     const newName = prompt("Rename to:", name);
     if (!newName || newName === name) return;
     const newPath = path.substring(0, path.lastIndexOf("/") + 1) + newName;
-    await window.sshterm.sftpRename({ sftpSessionId, oldPath: path, newPath });
+    await window.hypershell.sftpRename({ sftpSessionId, oldPath: path, newPath });
     // Refresh
-    const response = await window.sshterm.sftpList({ sftpSessionId, path: remotePath });
+    const response = await window.hypershell.sftpList({ sftpSessionId, path: remotePath });
     store.getState().setRemoteEntries(response.entries);
   }, [sftpSessionId, remotePath, store]);
 
   const handleDelete = useCallback(async (paths: string[]) => {
     if (!confirm(`Delete ${paths.length} item(s)?`)) return;
     for (const path of paths) {
-      await window.sshterm.sftpDelete({ sftpSessionId, path, recursive: true });
+      await window.hypershell.sftpDelete({ sftpSessionId, path, recursive: true });
     }
-    const response = await window.sshterm.sftpList({ sftpSessionId, path: remotePath });
+    const response = await window.hypershell.sftpList({ sftpSessionId, path: remotePath });
     store.getState().setRemoteEntries(response.entries);
   }, [sftpSessionId, remotePath, store]);
 
@@ -3487,19 +3487,19 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     const name = prompt("New folder name:");
     if (!name) return;
     const newPath = remotePath.replace(/\/$/, "") + "/" + name;
-    await window.sshterm.sftpMkdir({ sftpSessionId, path: newPath });
-    const response = await window.sshterm.sftpList({ sftpSessionId, path: remotePath });
+    await window.hypershell.sftpMkdir({ sftpSessionId, path: newPath });
+    const response = await window.hypershell.sftpList({ sftpSessionId, path: remotePath });
     store.getState().setRemoteEntries(response.entries);
   }, [sftpSessionId, remotePath, store]);
 
   const handleBookmark = useCallback(async (path: string) => {
     const name = prompt("Bookmark name:", path.split("/").pop() || path);
     if (!name) return;
-    await window.sshterm.sftpBookmarksUpsert({ hostId, name, remotePath: path });
+    await window.hypershell.sftpBookmarksUpsert({ hostId, name, remotePath: path });
   }, [hostId]);
 
   const handleDisconnect = useCallback(async () => {
-    await window.sshterm.sftpDisconnect({ sftpSessionId });
+    await window.hypershell.sftpDisconnect({ sftpSessionId });
     onClose();
   }, [sftpSessionId, onClose]);
 
@@ -3588,7 +3588,7 @@ This will depend on existing UI patterns for host actions. Add an action that:
 
 ```typescript
 async function openSftpTab(hostId: string) {
-  const { sftpSessionId } = await window.sshterm.sftpConnect({ hostId });
+  const { sftpSessionId } = await window.hypershell.sftpConnect({ hostId });
   const sessionId = `sftp-tab-${sftpSessionId}`;
   layoutStore.getState().openTab({
     sessionId,
@@ -3617,11 +3617,11 @@ git commit -m "feat(ui): integrate SftpTab into Workspace rendering"
 ## Task 16: Window Type Declaration for SFTP
 
 **Files:**
-- Modify: `apps/ui/src/types/global.d.ts` or equivalent — extend `window.sshterm` with SFTP methods
+- Modify: `apps/ui/src/types/global.d.ts` or equivalent — extend `window.hypershell` with SFTP methods
 
 **Step 1: Extend the window type**
 
-Find the existing `window.sshterm` type declaration (likely in a `.d.ts` file) and add the SFTP methods to match the `DesktopApi` interface updates from Task 6.
+Find the existing `window.hypershell` type declaration (likely in a `.d.ts` file) and add the SFTP methods to match the `DesktopApi` interface updates from Task 6.
 
 **Step 2: Run type check**
 
@@ -3632,7 +3632,7 @@ Expected: PASS — no type errors
 
 ```bash
 git add apps/ui/src/types/
-git commit -m "feat(ui): extend window.sshterm type declarations with SFTP methods"
+git commit -m "feat(ui): extend window.hypershell type declarations with SFTP methods"
 ```
 
 ---
@@ -3649,7 +3649,7 @@ In the main process entry (`apps/desktop/src/main/main.ts`), after existing init
 ```typescript
 import { createSftpSessionManager } from "./sftp/sftpSessionManager";
 import { createTransferManager } from "./sftp/transferManager";
-import { createSftpBookmarksRepository } from "@sshterm/db";
+import { createSftpBookmarksRepository } from "@hypershell/db";
 
 // After database and session manager init:
 const sftpSessionManager = createSftpSessionManager();

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 
-import type { SftpBookmark } from "@sshterm/shared";
+import type { SftpBookmark } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
 
 export interface SftpToolbarProps {
@@ -47,7 +47,7 @@ export function SftpToolbar({
     }
 
     try {
-      const list = await window.sshterm?.sftpBookmarksList?.({ hostId });
+      const list = await window.hypershell?.sftpBookmarksList?.({ hostId });
       setBookmarks(list ?? []);
     } catch {
       setBookmarks([]);

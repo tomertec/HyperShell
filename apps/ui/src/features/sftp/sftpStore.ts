@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 
-import type { FsEntry, SftpEntry } from "@sshterm/shared";
+import type { FsEntry, SftpEntry } from "@hypershell/shared";
 
 export type SftpPane = "local" | "remote";
 export type SftpSortColumn = "name" | "size" | "modifiedAt" | "permissions";

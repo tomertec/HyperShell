@@ -1,1 +1,1 @@
-export const WORKSPACE_NAME = "sshterm";
+export const WORKSPACE_NAME = "hypershell";

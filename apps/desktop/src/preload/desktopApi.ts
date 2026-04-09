@@ -271,7 +271,7 @@ import {
   type RestoreBackupRequest,
   type RestoreBackupResponse,
   type ListBackupsResponse,
-} from "@sshterm/shared";
+} from "@hypershell/shared";
 import { z } from "zod";
 
 export interface PreloadIpcRenderer {
@@ -361,6 +361,7 @@ export interface DesktopApi {
   fsGetDrives(): Promise<FsGetDrivesResponse>;
   fsListSshKeys(): Promise<string[]>;
   fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
+  fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
   workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }>;
   workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null>;
   workspaceList(): Promise<WorkspaceRecord[]>;
@@ -1022,6 +1023,10 @@ export function createDesktopApi(
     },
     async fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.showSaveDialog, options);
+      return result as string | null;
+    },
+    async fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
+      const result = await ipcRenderer.invoke(ipcChannels.fs.showOpenDialog, options);
       return result as string | null;
     },
     async workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }> {

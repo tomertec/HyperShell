@@ -12,7 +12,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
 
   const refresh = async () => {
-    const list = await window.sshterm?.workspaceList?.();
+    const list = await window.hypershell?.workspaceList?.();
     if (list) setWorkspaces(list.filter((w: WorkspaceRecord) => w.name !== "__last__"));
   };
 
@@ -37,20 +37,20 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
       paneSizes: state.paneSizes,
       paneCount: state.panes.length,
     };
-    await window.sshterm?.workspaceSave?.({ name: trimmed, layout });
+    await window.hypershell?.workspaceSave?.({ name: trimmed, layout });
     setNewName("");
     setSaving(false);
     await refresh();
   };
 
   const handleLoad = async (name: string) => {
-    const result = await window.sshterm?.workspaceLoad?.({ name });
+    const result = await window.hypershell?.workspaceLoad?.({ name });
     if (!result?.layout) return;
 
     // Close existing tabs
     const currentTabs = layoutStore.getState().tabs;
     for (const tab of currentTabs) {
-      void window.sshterm?.closeSession?.({ sessionId: tab.sessionId }).catch(() => {});
+      void window.hypershell?.closeSession?.({ sessionId: tab.sessionId }).catch(() => {});
     }
     layoutStore.setState({
       tabs: [],
@@ -80,7 +80,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   };
 
   const handleRemove = async (name: string) => {
-    await window.sshterm?.workspaceRemove?.({ name });
+    await window.hypershell?.workspaceRemove?.({ name });
     await refresh();
   };
 
