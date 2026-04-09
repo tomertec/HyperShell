@@ -2,7 +2,7 @@ import { ipcChannels, fsListRequestSchema } from "@hypershell/shared";
 import type { FsEntry } from "@hypershell/shared";
 import { dialog } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
-import { readdir, stat, access } from "node:fs/promises";
+import { readdir, stat, access, realpath } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
@@ -81,7 +81,13 @@ async function assertPathAllowed(inputPath: string): Promise<string> {
 
   const normalizedPath = normalizeAbsolutePath(inputPath);
   const allowedRoots = await getAllowedRoots();
-  if (!allowedRoots.some((root) => isPathWithinRoot(normalizedPath, root))) {
+  const canonicalTargetPath = await realpath(normalizedPath).catch(() => normalizedPath);
+  const canonicalRoots = await Promise.all(
+    allowedRoots.map(async (root) => {
+      return realpath(root).catch(() => root);
+    })
+  );
+  if (!canonicalRoots.some((root) => isPathWithinRoot(canonicalTargetPath, root))) {
     throw new Error(`Path is outside the allowed filesystem roots: ${inputPath}`);
   }
 

@@ -11,11 +11,13 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   statSync,
   unlinkSync,
 } from "node:fs";
 import path from "node:path";
 import type { IpcMainLike } from "./registerIpc";
+import { closeSharedDatabase } from "./hostsIpc";
 
 const BACKUP_FILENAME_PREFIX = "hypershell-backup-";
 const BACKUP_EXTENSION = ".db";
@@ -134,6 +136,20 @@ export function performAutoBackup(): void {
   }
 }
 
+function removeSqliteSidecars(dbPath: string): void {
+  for (const suffix of ["-wal", "-shm", "-journal"]) {
+    const sidecarPath = `${dbPath}${suffix}`;
+    if (!existsSync(sidecarPath)) {
+      continue;
+    }
+    try {
+      unlinkSync(sidecarPath);
+    } catch {
+      // Best effort cleanup.
+    }
+  }
+}
+
 export function registerBackupIpc(ipcMain: IpcMainLike): void {
   ipcMain.handle(
     ipcChannels.backup.create,
@@ -172,6 +188,16 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
       }
 
       const dbPath = getDatabasePath();
+      const dbDir = path.dirname(dbPath);
+      mkdirSync(dbDir, { recursive: true });
+
+      const restoreTempPath = path.join(
+        dbDir,
+        `hypershell.restore.${Date.now()}.tmp`
+      );
+
+      // Release any live SQLite handles before replacing the DB files.
+      closeSharedDatabase();
 
       // Create a safety backup of the current DB before restoring
       const backupDir = getBackupDir();
@@ -181,7 +207,23 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
         copyFileSync(dbPath, safetyBackupPath);
       }
 
-      copyFileSync(parsed.filePath, dbPath);
+      try {
+        copyFileSync(parsed.filePath, restoreTempPath);
+        removeSqliteSidecars(dbPath);
+        if (existsSync(dbPath)) {
+          unlinkSync(dbPath);
+        }
+        renameSync(restoreTempPath, dbPath);
+        removeSqliteSidecars(dbPath);
+      } finally {
+        if (existsSync(restoreTempPath)) {
+          try {
+            unlinkSync(restoreTempPath);
+          } catch {
+            // Best effort temp cleanup.
+          }
+        }
+      }
 
       return { requiresRestart: true };
     }

@@ -151,6 +151,9 @@ export function createSessionManager(
     if (event.type === "status") {
       updateSession(sessionId, (session) => {
         session.snapshot.state = event.state;
+        if (event.state === "connected") {
+          session.snapshot.reconnectAttempts = 0;
+        }
       });
     }
 

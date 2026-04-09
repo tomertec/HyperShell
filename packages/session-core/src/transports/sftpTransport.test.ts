@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createSftpTransport,
@@ -30,5 +30,43 @@ describe("createSftpTransport", () => {
     expect(transport.writeFile).toBeTypeOf("function");
     expect(transport.createReadStream).toBeTypeOf("function");
     expect(transport.createWriteStream).toBeTypeOf("function");
+  });
+
+  it("ends the SFTP channel before releasing pooled connections", async () => {
+    const sftpEnd = vi.fn();
+    const sftpWrapper = {
+      end: sftpEnd,
+    };
+
+    const fakeClient = {
+      sftp(callback: (error: Error | undefined, session?: unknown) => void) {
+        callback(undefined, sftpWrapper);
+      },
+    };
+
+    const release = vi.fn();
+    const pool = {
+      acquire: vi.fn().mockResolvedValue({
+        connectionId: "conn-1",
+        consumerId: "consumer-1",
+        client: fakeClient,
+      }),
+      release,
+      destroy() {},
+      destroyAll() {},
+      getStats() {
+        return [];
+      },
+    };
+
+    const transport = createSftpTransport("test-session", validOptions, {
+      pool: pool as never,
+    });
+
+    await transport.connect();
+    transport.disconnect();
+
+    expect(sftpEnd).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledWith("conn-1", "consumer-1");
   });
 });

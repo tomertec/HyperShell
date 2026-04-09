@@ -84,7 +84,7 @@ import type {
 } from "@hypershell/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -313,6 +313,19 @@ const DEFAULT_CREDENTIAL_CACHE_ENABLED = true;
 const DEFAULT_CREDENTIAL_CACHE_TTL_MINUTES = 15;
 const MIN_CREDENTIAL_CACHE_TTL_MINUTES = 1;
 const MAX_CREDENTIAL_CACHE_TTL_MINUTES = 24 * 60;
+
+function toComparablePath(inputPath: string): string {
+  return process.platform === "win32" ? inputPath.toLowerCase() : inputPath;
+}
+
+function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const relative = path.relative(rootPath, targetPath);
+  if (relative === "" || relative === ".") {
+    return true;
+  }
+
+  return !relative.startsWith("..") && !path.isAbsolute(relative);
+}
 
 type DbWithPrepare = {
   prepare(sql: string): {
@@ -1358,9 +1371,11 @@ export function registerIpc(
     if (process.platform === "win32" && resolved.toLowerCase().startsWith("\\\\.")) {
       throw new Error("Blocked device path");
     }
-    const { tmpdir } = await import("node:os");
-    const allowedRoots = [homedir(), tmpdir()].map((r) => path.resolve(r).toLowerCase());
-    if (!allowedRoots.some((root) => resolved.toLowerCase().startsWith(root))) {
+    const comparableResolved = toComparablePath(resolved);
+    const allowedRoots = [homedir(), tmpdir()].map((root) =>
+      toComparablePath(path.resolve(root))
+    );
+    if (!allowedRoots.some((root) => isPathWithinRoot(comparableResolved, root))) {
       throw new Error("Export path must be within the user home or temp directory");
     }
     const repo = getOrCreateHostsRepo();

@@ -313,6 +313,13 @@ export function createSftpTransport(
 
   function disconnect(): void {
     if (pool && poolConnectionId && poolConsumerId) {
+      const activeSftp = sftp as { end?: () => void } | null;
+      try {
+        activeSftp?.end?.();
+      } catch {
+        // Best effort: the underlying pooled SSH client is still released below.
+      }
+
       // Release back to pool — don't end the client
       pool.release(poolConnectionId, poolConsumerId);
       poolConnectionId = null;

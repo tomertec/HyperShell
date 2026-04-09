@@ -60,6 +60,10 @@ let hostsRepo: HostsRepoLike | null = null;
 let settingsRepo: SettingsRepoLike | null = null;
 let sharedDb: unknown = null;
 
+type ClosableDatabase = {
+  close?: () => void;
+};
+
 type AuthProfileRow = {
   id: string;
   type: string;
@@ -308,6 +312,21 @@ export function getOrCreateDatabase(): unknown {
     }
   }
   return sharedDb;
+}
+
+export function closeSharedDatabase(): void {
+  const db = sharedDb as ClosableDatabase | null;
+  if (!db) {
+    return;
+  }
+
+  try {
+    db.close?.();
+  } finally {
+    sharedDb = null;
+    hostsRepo = null;
+    settingsRepo = null;
+  }
 }
 
 function resolveDatabasePath(): string {
