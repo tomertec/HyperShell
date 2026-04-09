@@ -65,7 +65,7 @@ export function createTray(
   const iconPath = path.join(
     process.resourcesPath || appRef.getAppPath(),
     "assets",
-    process.platform === "win32" ? "tray.ico" : "trayTemplate.png"
+    process.platform === "win32" ? "tray.png" : "trayTemplate.png"
   );
 
   const tray = new TrayClass(

@@ -1,0 +1,62 @@
+name: macOS Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: macos-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @sshterm/ui exec playwright install chromium
+
+      - name: Workspace build
+        run: pnpm ci:build
+
+      - name: Workspace unit tests
+        run: pnpm ci:test
+
+      - name: Playwright smoke
+        run: pnpm ci:test:e2e
+
+      - name: Package unsigned macOS release
+        run: pnpm release:mac:unsigned
+
+      - name: Generate release manifest
+        run: pnpm release:manifest
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release-${{ github.ref_name }}
+          path: apps/desktop/release/**
+          if-no-files-found: error
+          retention-days: 30
