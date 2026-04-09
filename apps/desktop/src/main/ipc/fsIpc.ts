@@ -8,10 +8,45 @@ import os from "node:os";
 
 import type { IpcMainLike } from "./registerIpc";
 
-const localFsEnabled = process.env.SSHTERM_ENABLE_LOCAL_FS !== "0";
-const sshKeyDiscoveryEnabled = process.env.SSHTERM_ENABLE_SSH_KEY_DISCOVERY !== "0";
-const allowSystemRoots = process.env.SSHTERM_FS_ALLOW_SYSTEM_ROOTS === "1";
-const envAllowedRoots = (process.env.SSHTERM_FS_ALLOWED_ROOTS ?? "")
+function readEnv(primary: string, fallback?: string): string | undefined {
+  const primaryValue = process.env[primary];
+  if (typeof primaryValue === "string") {
+    return primaryValue;
+  }
+  if (!fallback) {
+    return undefined;
+  }
+  const fallbackValue = process.env[fallback];
+  return typeof fallbackValue === "string" ? fallbackValue : undefined;
+}
+
+function envEnabled(primary: string, fallback: string | undefined, defaultValue: boolean): boolean {
+  const value = readEnv(primary, fallback);
+  if (value === undefined) {
+    return defaultValue;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "0" || normalized === "false" || normalized === "no") {
+    return false;
+  }
+  if (normalized === "1" || normalized === "true" || normalized === "yes") {
+    return true;
+  }
+  return defaultValue;
+}
+
+const localFsEnabled = envEnabled("SSHTERM_ENABLE_LOCAL_FS", "HYPERSHELL_ENABLE_LOCAL_FS", true);
+const sshKeyDiscoveryEnabled = envEnabled(
+  "SSHTERM_ENABLE_SSH_KEY_DISCOVERY",
+  "HYPERSHELL_ENABLE_SSH_KEY_DISCOVERY",
+  true
+);
+const allowSystemRoots = envEnabled(
+  "SSHTERM_FS_ALLOW_SYSTEM_ROOTS",
+  "HYPERSHELL_FS_ALLOW_SYSTEM_ROOTS",
+  true
+);
+const envAllowedRoots = (readEnv("SSHTERM_FS_ALLOWED_ROOTS", "HYPERSHELL_FS_ALLOWED_ROOTS") ?? "")
   .split(",")
   .map((value) => value.trim())
   .filter((value) => value.length > 0);

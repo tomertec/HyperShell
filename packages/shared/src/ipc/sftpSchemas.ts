@@ -120,6 +120,16 @@ export const sftpTransferCancelRequestSchema = z.object({
 });
 export type SftpTransferCancelRequest = z.infer<typeof sftpTransferCancelRequestSchema>;
 
+export const sftpTransferPauseRequestSchema = z.object({
+  transferId: z.string()
+});
+export type SftpTransferPauseRequest = z.infer<typeof sftpTransferPauseRequestSchema>;
+
+export const sftpTransferResumeRequestSchema = z.object({
+  transferId: z.string()
+});
+export type SftpTransferResumeRequest = z.infer<typeof sftpTransferResumeRequestSchema>;
+
 export const transferJobStatusSchema = z.enum([
   "queued",
   "active",

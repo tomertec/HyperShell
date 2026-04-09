@@ -38,6 +38,7 @@ describe("settingsStore custom themes", () => {
           showRestoreBanner: true,
           showSerialInSidebar: true,
           confirmOnClose: true,
+          usePopupTransferMonitor: false,
         },
         security: {
           credentialCacheEnabled: true,
@@ -86,6 +87,19 @@ describe("settingsStore custom themes", () => {
     expect(mockSshterm.updateSetting).toHaveBeenCalledTimes(1);
     const savedValue = JSON.parse(mockSshterm.updateSetting.mock.calls[0][0].value);
     expect(savedValue.general.showSerialInSidebar).toBe(false);
+  });
+
+  it("popup transfer monitor defaults to disabled", () => {
+    const state = settingsStore.getState();
+    expect(state.settings.general.usePopupTransferMonitor).toBe(false);
+  });
+
+  it("updateGeneral persists popup transfer monitor state", async () => {
+    await settingsStore.getState().updateGeneral({ usePopupTransferMonitor: true });
+    expect(settingsStore.getState().settings.general.usePopupTransferMonitor).toBe(true);
+    expect(mockSshterm.updateSetting).toHaveBeenCalledTimes(1);
+    const savedValue = JSON.parse(mockSshterm.updateSetting.mock.calls[0][0].value);
+    expect(savedValue.general.usePopupTransferMonitor).toBe(true);
   });
 
   it("credential cache settings default to enabled with 15 minute timeout", () => {

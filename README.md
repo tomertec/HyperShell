@@ -1,6 +1,15 @@
-# HyperShell
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.svg">
+    <img alt="HyperShell" src="assets/logo.svg" width="420">
+  </picture>
+</p>
 
-A desktop SSH and serial terminal with an integrated SFTP file browser. Built with Electron, React, and xterm.js.
+<p align="center">
+  A desktop SSH and serial terminal with an integrated SFTP file browser.<br>
+  Built with Electron, React, and xterm.js.
+</p>
 
 ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)
 ![macOS](https://img.shields.io/badge/macOS-12%2B-000000?logo=apple)

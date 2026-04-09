@@ -143,6 +143,8 @@ const registeredChannels = [
   ipcChannels.sftp.writeFile,
   ipcChannels.sftp.transferStart,
   ipcChannels.sftp.transferCancel,
+  ipcChannels.sftp.transferPause,
+  ipcChannels.sftp.transferResume,
   ipcChannels.sftp.transferList,
   ipcChannels.sftp.transferResolveConflict,
   ipcChannels.sftp.event,

@@ -31,7 +31,9 @@ import type {
   SftpStatRequest,
   SftpTransferCancelRequest,
   SftpTransferListResponse,
+  SftpTransferPauseRequest,
   SftpTransferResolveConflictRequest,
+  SftpTransferResumeRequest,
   SftpTransferStartRequest,
   SftpWriteFileRequest,
   SftpEntry,
@@ -68,6 +70,8 @@ export interface SftpIpcClient {
   writeFile(request: SftpWriteFileRequest): Promise<void>;
   transferStart(request: SftpTransferStartRequest): Promise<TransferJob[]>;
   transferCancel(request: SftpTransferCancelRequest): Promise<void>;
+  transferPause(request: SftpTransferPauseRequest): Promise<void>;
+  transferResume(request: SftpTransferResumeRequest): Promise<void>;
   transferList(): Promise<SftpTransferListResponse>;
   transferResolveConflict(request: SftpTransferResolveConflictRequest): Promise<void>;
   listBookmarks(request: SftpBookmarkListRequest): Promise<SftpBookmark[]>;
@@ -101,6 +105,12 @@ export interface SftpIpcHandlers {
   ) => Promise<TransferJob[]>;
   [ipcChannels.sftp.transferCancel]: (
     request: SftpTransferCancelRequest
+  ) => Promise<void>;
+  [ipcChannels.sftp.transferPause]: (
+    request: SftpTransferPauseRequest
+  ) => Promise<void>;
+  [ipcChannels.sftp.transferResume]: (
+    request: SftpTransferResumeRequest
   ) => Promise<void>;
   [ipcChannels.sftp.transferList]: () => Promise<SftpTransferListResponse>;
   [ipcChannels.sftp.transferResolveConflict]: (

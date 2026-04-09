@@ -4,11 +4,11 @@
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `HYPERSHELL_RENDERER_URL` | (auto-detected) | Override renderer URL. In dev: `http://localhost:5173`. In prod: bundled `dist/renderer/index.html`. |
-| `HYPERSHELL_ENABLE_LOCAL_FS` | `1` | Enable local filesystem IPC (`fs:list`, `fs:stat`, `fs:get-drives`). Set to `0` to disable local browsing. |
-| `HYPERSHELL_FS_ALLOW_SYSTEM_ROOTS` | `0` | Expand local FS allowlist to system roots/drives. When `0`, access is scoped to home + `HYPERSHELL_FS_ALLOWED_ROOTS`. |
-| `HYPERSHELL_FS_ALLOWED_ROOTS` | (empty) | Comma-separated absolute paths added to the local FS allowlist. |
-| `HYPERSHELL_ENABLE_SSH_KEY_DISCOVERY` | `0` | Enable `fs:list-ssh-keys` path discovery for `~/.ssh` private keys. |
+| `SSHTERM_RENDERER_URL` (`HYPERSHELL_RENDERER_URL` alias) | (auto-detected) | Override renderer URL. In dev: `http://localhost:5173`. In prod: bundled `dist/renderer/index.html`. |
+| `SSHTERM_ENABLE_LOCAL_FS` (`HYPERSHELL_ENABLE_LOCAL_FS` alias) | `1` | Enable local filesystem IPC (`fs:list`, `fs:stat`, `fs:get-drives`). Set to `0`/`false` to disable local browsing. |
+| `SSHTERM_FS_ALLOW_SYSTEM_ROOTS` (`HYPERSHELL_FS_ALLOW_SYSTEM_ROOTS` alias) | `1` | Enable full local drive/system-root browsing by default. Set to `0`/`false` to scope access to home + allowed roots. |
+| `SSHTERM_FS_ALLOWED_ROOTS` (`HYPERSHELL_FS_ALLOWED_ROOTS` alias) | (empty) | Comma-separated absolute paths added to the local FS allowlist. |
+| `SSHTERM_ENABLE_SSH_KEY_DISCOVERY` (`HYPERSHELL_ENABLE_SSH_KEY_DISCOVERY` alias) | `1` | Enable `fs:list-ssh-keys` path discovery for `~/.ssh` private keys. Set to `0`/`false` to disable. |
 | `SSH_AUTH_SOCK` | (none) | SSH agent socket path. Used by SFTP transport as fallback agent. |
 | `CI` | (none) | Set by GitHub Actions. Affects test timeouts and server startup. |
 

@@ -118,7 +118,10 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   const paneSizes = useStore(layoutStore, (s) => s.paneSizes);
   const setPaneSizes = useStore(layoutStore, (s) => s.setPaneSizes);
   const toggleTunnelPanel = useTunnelStore((s) => s.togglePanel);
+  const closeTunnelPanel = useTunnelStore((s) => s.closePanel);
+  const tunnelsIsOpen = useTunnelStore((s) => s.showPanel);
   const snippetsIsOpen = useSnippetStore((s) => s.isOpen);
+  const closeSnippetsPanel = useSnippetStore((s) => s.close);
   const containerRef = useRef<HTMLDivElement>(null);
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
 
@@ -182,7 +185,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   };
 
   return (
-    <div className="relative flex flex-col flex-1 min-h-0">
+    <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
       <BroadcastBar />
       <div className="flex h-11 items-end bg-base-800">
         <div className="flex-1 min-w-0 h-full">
@@ -197,7 +200,12 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
         <div className="relative flex h-full items-end gap-0.5 px-2 pb-1.5">
           <BroadcastButton />
           <button
-            onClick={() => useSnippetStore.getState().toggle()}
+            onClick={() => {
+              if (!snippetsIsOpen && tunnelsIsOpen) {
+                closeTunnelPanel();
+              }
+              useSnippetStore.getState().toggle();
+            }}
             className={`p-1.5 rounded transition-colors ${
               snippetsIsOpen
                 ? "text-accent bg-accent/10"
@@ -211,8 +219,17 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
             </svg>
           </button>
           <button
-            onClick={toggleTunnelPanel}
-            className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
+            onClick={() => {
+              if (!tunnelsIsOpen) {
+                closeSnippetsPanel();
+              }
+              toggleTunnelPanel();
+            }}
+            className={`p-1.5 rounded transition-colors ${
+              tunnelsIsOpen
+                ? "text-accent bg-accent/10"
+                : "text-text-muted hover:text-text-primary hover:bg-base-700/60"
+            }`}
             title="Tunnels"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -220,6 +237,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
             </svg>
           </button>
           <button
+            data-workspace-menu-toggle="true"
             onClick={() => setWorkspaceMenuOpen((prev) => !prev)}
             className="p-1.5 rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
             title="Workspaces"

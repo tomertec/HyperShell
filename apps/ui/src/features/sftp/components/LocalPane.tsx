@@ -70,12 +70,24 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
       } catch (loadError) {
         const message =
           loadError instanceof Error ? loadError.message : "Failed to list local directory";
+        if (message.includes("outside the allowed filesystem roots")) {
+          try {
+            const home = await window.hypershell?.fsGetHome?.();
+            if (home?.path && home.path !== path) {
+              setLocalPath(home.path);
+              setError("local", `Path is outside allowed roots. Returned to ${home.path}.`);
+              return;
+            }
+          } catch {
+            // Fall through to the original error if home lookup fails.
+          }
+        }
         setError("local", message);
       } finally {
         setLoading("local", false);
       }
     },
-    [setError, setLoading, setLocalEntries]
+    [setError, setLoading, setLocalEntries, setLocalPath]
   );
 
   useEffect(() => {

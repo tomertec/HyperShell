@@ -53,6 +53,30 @@ export function createMainProcessLifecycle(
   let isBootstrapped = false;
   let isCleaningUp = false;
 
+  function isIgnorableRendererSendError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    return (
+      message.includes("Render frame was disposed before WebFrameMain could be accessed")
+      || message.includes("WebContents was destroyed")
+    );
+  }
+
+  function sendToMainWindow(channel: string, event: unknown): void {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    try {
+      mainWindow.webContents.send(channel, event);
+    } catch (error) {
+      if (isIgnorableRendererSendError(error)) {
+        return;
+      }
+
+      console.error(`[main] Failed to send IPC event on channel ${channel}`, error);
+    }
+  }
+
   function createAndLoadMainWindow(): TrayWindowLike & {
     loadURL(url: string): Promise<void> | void;
   } {
@@ -108,16 +132,16 @@ export function createMainProcessLifecycle(
 
     unregisterIpc = deps.registerIpc(deps.ipcMain, {
       emitSessionEvent: (event: unknown) => {
-        mainWindow?.webContents.send(ipcChannels.session.event, event);
+        sendToMainWindow(ipcChannels.session.event, event);
       },
       emitSftpEvent: (event: unknown) => {
-        mainWindow?.webContents.send(ipcChannels.sftp.event, event);
+        sendToMainWindow(ipcChannels.sftp.event, event);
       },
       emitKeyboardInteractive: (event: unknown) => {
-        mainWindow?.webContents.send(ipcChannels.sftp.keyboardInteractive, event);
+        sendToMainWindow(ipcChannels.sftp.keyboardInteractive, event);
       },
       emitHostStatusEvent: (event: unknown) => {
-        mainWindow?.webContents.send(ipcChannels.hosts.status, event);
+        sendToMainWindow(ipcChannels.hosts.status, event);
       },
     });
     hostMonitor = deps.createHostMonitor();

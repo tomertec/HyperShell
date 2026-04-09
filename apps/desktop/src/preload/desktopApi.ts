@@ -59,7 +59,9 @@ import {
   sftpStatRequestSchema,
   sftpTransferCancelRequestSchema,
   sftpTransferListResponseSchema,
+  sftpTransferPauseRequestSchema,
   sftpTransferResolveConflictRequestSchema,
+  sftpTransferResumeRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
   setSignalsRequestSchema,
@@ -144,7 +146,9 @@ import {
   type SftpStatRequest,
   type SftpTransferCancelRequest,
   type SftpTransferListResponse,
+  type SftpTransferPauseRequest,
   type SftpTransferResolveConflictRequest,
+  type SftpTransferResumeRequest,
   type SftpTransferStartRequest,
   type SftpWriteFileRequest,
   type TransferJob,
@@ -348,6 +352,8 @@ export interface DesktopApi {
   sftpWriteFile(request: SftpWriteFileRequest): Promise<void>;
   sftpTransferStart(request: SftpTransferStartRequest): Promise<TransferJob[]>;
   sftpTransferCancel(request: SftpTransferCancelRequest): Promise<void>;
+  sftpTransferPause(request: SftpTransferPauseRequest): Promise<void>;
+  sftpTransferResume(request: SftpTransferResumeRequest): Promise<void>;
   sftpTransferList(): Promise<SftpTransferListResponse>;
   sftpTransferResolveConflict(request: SftpTransferResolveConflictRequest): Promise<void>;
   onSftpEvent(listener: (event: SftpEvent) => void): () => void;
@@ -947,6 +953,14 @@ export function createDesktopApi(
     async sftpTransferCancel(request: SftpTransferCancelRequest): Promise<void> {
       const parsed = sftpTransferCancelRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.sftp.transferCancel, parsed);
+    },
+    async sftpTransferPause(request: SftpTransferPauseRequest): Promise<void> {
+      const parsed = sftpTransferPauseRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.transferPause, parsed);
+    },
+    async sftpTransferResume(request: SftpTransferResumeRequest): Promise<void> {
+      const parsed = sftpTransferResumeRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.sftp.transferResume, parsed);
     },
     async sftpTransferList(): Promise<SftpTransferListResponse> {
       const result = await ipcRenderer.invoke(ipcChannels.sftp.transferList);

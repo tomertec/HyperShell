@@ -236,6 +236,51 @@ describe("createMainProcessLifecycle", () => {
     expect(app.listenerCount("before-quit")).toBe(1);
   });
 
+  it("ignores renderer-frame-disposed send errors", async () => {
+    const app = createFakeApp();
+    const window = createWindow("window-safe-send");
+    const tray = createTray("tray-safe-send");
+    const hostMonitor = createHostMonitor();
+    const cleanupIpc = vi.fn();
+    let sftpEventHandler: (event: unknown) => void = () => {};
+
+    window.webContents.send.mockImplementation(() => {
+      throw new Error("Render frame was disposed before WebFrameMain could be accessed");
+    });
+
+    const registerIpc = vi.fn(
+      (
+        _ipcMain: unknown,
+        options: {
+          emitSftpEvent?: (event: unknown) => void;
+        }
+      ) => {
+        sftpEventHandler = options.emitSftpEvent ?? (() => {});
+        return cleanupIpc;
+      }
+    );
+
+    const lifecycle = createMainProcessLifecycle({
+      app,
+      ipcMain: { handle() {} },
+      createMainWindow: vi.fn().mockReturnValue(window),
+      createTray: vi.fn().mockReturnValue(tray),
+      createHostMonitor: vi.fn().mockReturnValue(hostMonitor),
+      registerIpc,
+      getRendererUrl: () => "http://localhost:5173"
+    });
+
+    await lifecycle.bootstrap();
+
+    expect(() =>
+      sftpEventHandler({
+        kind: "status",
+        sftpSessionId: "sftp-1",
+        state: "connected"
+      })
+    ).not.toThrow();
+  });
+
   it("replaces active resources on repeated bootstrap and remains idempotent on cleanup", async () => {
     const app = createFakeApp();
     const firstWindow = createWindow("window-1");

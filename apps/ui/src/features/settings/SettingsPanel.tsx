@@ -165,7 +165,13 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 function GeneralSection() {
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateGeneral = useStore(settingsStore, (s) => s.updateGeneral);
-  const { showRecordingButton, showRestoreBanner, showSerialInSidebar, confirmOnClose } = settings.general;
+  const {
+    showRecordingButton,
+    showRestoreBanner,
+    showSerialInSidebar,
+    confirmOnClose,
+    usePopupTransferMonitor
+  } = settings.general;
 
   return (
     <div className="grid gap-6">
@@ -213,6 +219,26 @@ function GeneralSection() {
             <ToggleSwitch
               checked={confirmOnClose}
               onChange={() => void updateGeneral({ confirmOnClose: !confirmOnClose })}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Transfers</h3>
+        <div className="grid gap-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm text-text-primary">Popup SFTP Transfer Monitor</div>
+              <div className="text-xs text-text-muted">
+                Replace the inline transfer strip with a floating popup that shows animated progress and live speed
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={usePopupTransferMonitor}
+              onChange={() =>
+                void updateGeneral({ usePopupTransferMonitor: !usePopupTransferMonitor })
+              }
             />
           </div>
         </div>

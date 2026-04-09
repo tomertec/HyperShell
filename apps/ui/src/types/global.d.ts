@@ -69,7 +69,9 @@ import type {
   SftpStatRequest,
   SftpTransferCancelRequest,
   SftpTransferListResponse,
+  SftpTransferPauseRequest,
   SftpTransferResolveConflictRequest,
+  SftpTransferResumeRequest,
   SftpTransferStartRequest,
   SftpWriteFileRequest,
   TransferJob,
@@ -187,6 +189,8 @@ declare global {
       sftpWriteFile?: (request: SftpWriteFileRequest) => Promise<void>;
       sftpTransferStart?: (request: SftpTransferStartRequest) => Promise<TransferJob[]>;
       sftpTransferCancel?: (request: SftpTransferCancelRequest) => Promise<void>;
+      sftpTransferPause?: (request: SftpTransferPauseRequest) => Promise<void>;
+      sftpTransferResume?: (request: SftpTransferResumeRequest) => Promise<void>;
       sftpTransferList?: () => Promise<SftpTransferListResponse>;
       sftpTransferResolveConflict?: (request: SftpTransferResolveConflictRequest) => Promise<void>;
       onSftpEvent?: (listener: (event: SftpEvent) => void) => () => void;

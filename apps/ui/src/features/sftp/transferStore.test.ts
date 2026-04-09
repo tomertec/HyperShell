@@ -51,6 +51,59 @@ describe("transferStore", () => {
     expect(store.getState().panelOpen).toBe(true);
   });
 
+  it("does not re-open the panel after a manual close during active transfers", () => {
+    const store = createTransferStore();
+
+    store.getState().setTransfers([
+      {
+        transferId: "tx-1",
+        type: "upload",
+        localPath: "C:\\file.txt",
+        remotePath: "/file.txt",
+        status: "active",
+        bytesTransferred: 256,
+        totalBytes: 1024,
+        speed: 128
+      }
+    ]);
+
+    store.getState().setPanelOpen(false);
+    store.getState().updateTransfer("tx-1", {
+      bytesTransferred: 512,
+      totalBytes: 1024,
+      speed: 256,
+      status: "active"
+    });
+
+    expect(store.getState().panelOpen).toBe(false);
+  });
+
+  it("records completion timestamps for finished transfers", () => {
+    const store = createTransferStore();
+
+    store.getState().setTransfers([
+      {
+        transferId: "tx-1",
+        type: "download",
+        localPath: "C:\\file.txt",
+        remotePath: "/file.txt",
+        status: "active",
+        bytesTransferred: 512,
+        totalBytes: 1024,
+        speed: 256
+      }
+    ]);
+
+    store.getState().updateTransfer("tx-1", {
+      bytesTransferred: 1024,
+      totalBytes: 1024,
+      speed: 256,
+      status: "completed"
+    });
+
+    expect(store.getState().transfers[0]?.completedAt).toEqual(expect.any(Number));
+  });
+
   it("filters by status", () => {
     const store = createTransferStore();
 

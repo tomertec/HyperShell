@@ -88,6 +88,8 @@ export const sftpChannels = {
   writeFile: "sftp:write-file",
   transferStart: "sftp:transfer:start",
   transferCancel: "sftp:transfer:cancel",
+  transferPause: "sftp:transfer:pause",
+  transferResume: "sftp:transfer:resume",
   transferList: "sftp:transfer:list",
   transferResolveConflict: "sftp:transfer:resolve-conflict",
   event: "sftp:event",

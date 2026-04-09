@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { layoutStore } from "../layout/layoutStore";
 
 interface WorkspaceRecord {
@@ -10,6 +10,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([]);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const refresh = async () => {
     const list = await window.hypershell?.workspaceList?.();
@@ -19,6 +20,35 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void refresh();
   }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        target instanceof Element &&
+        target.closest('[data-workspace-menu-toggle="true"]')
+      ) {
+        return;
+      }
+      if (menuRef.current?.contains(target)) return;
+      onClose();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
   const handleSave = async () => {
     const trimmed = newName.trim();
@@ -85,7 +115,10 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="absolute top-8 right-0 z-50 w-64 rounded-lg border border-border bg-base-800 shadow-xl p-3 grid gap-3">
+    <div
+      ref={menuRef}
+      className="absolute top-8 right-0 z-50 w-64 rounded-lg border border-border bg-base-800 shadow-xl p-3 grid gap-3"
+    >
       <div className="text-xs font-semibold text-text-primary">Workspaces</div>
 
       {workspaces.length > 0 && (

@@ -27,6 +27,7 @@ import { SessionRecoveryDialog } from "../features/sessions/SessionRecoveryDialo
 import { Sidebar } from "../features/sidebar/Sidebar";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
+import { TransferPopup } from "../features/sftp/components/TransferPopup";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import type {
   ConnectionHistoryRecord,
@@ -664,9 +665,10 @@ function MainApp() {
       // Electron wraps IPC errors: "Error invoking remote method '...': ClassName: {json}"
       // Extract the JSON substring from the message
       const jsonStart = message.indexOf("{");
-      if (jsonStart === -1) return null;
+      const jsonEnd = message.lastIndexOf("}");
+      if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) return null;
       try {
-        const parsed = JSON.parse(message.slice(jsonStart));
+        const parsed = JSON.parse(message.slice(jsonStart, jsonEnd + 1));
         if (parsed && parsed.__hostKeyVerification) {
           return {
             hostname: parsed.hostname,
@@ -1357,6 +1359,8 @@ function MainApp() {
         onRestore={restoreSavedSessions}
         onDismiss={dismissSavedSessionRecovery}
       />
+
+      <TransferPopup />
 
       <Toaster
         position="bottom-right"

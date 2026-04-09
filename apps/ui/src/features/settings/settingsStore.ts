@@ -22,6 +22,7 @@ export interface GeneralSettings {
   showRestoreBanner: boolean;
   showSerialInSidebar: boolean;
   confirmOnClose: boolean;
+  usePopupTransferMonitor: boolean;
 }
 
 export interface SecuritySettings {
@@ -108,6 +109,7 @@ const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   showRestoreBanner: true,
   showSerialInSidebar: true,
   confirmOnClose: true,
+  usePopupTransferMonitor: false,
 };
 
 const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
@@ -142,13 +144,21 @@ interface SettingsState {
   deleteCustomTheme: (name: string) => Promise<void>;
 }
 
+async function persistSettings(settings: AppSettings): Promise<void> {
+  const updateSetting = window.hypershell?.updateSetting;
+  if (updateSetting) {
+    await updateSetting({ key: SETTINGS_KEY, value: JSON.stringify(settings) });
+  }
+}
+
 export const settingsStore = createStore<SettingsState>()((set, get) => ({
   settings: DEFAULT_APP_SETTINGS,
   loaded: false,
 
   load: async () => {
     try {
-      const result = await window.hypershell?.getSetting({ key: SETTINGS_KEY });
+      const getSetting = window.hypershell?.getSetting;
+      const result = getSetting ? await getSetting({ key: SETTINGS_KEY }) : null;
       if (result?.value) {
         try {
           const parsed = JSON.parse(result.value) as Partial<AppSettings>;
@@ -203,10 +213,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.hypershell?.updateSetting({
-        key: SETTINGS_KEY,
-        value: JSON.stringify(next)
-      });
+      await persistSettings(next);
     } catch {
       // persist failure is non-fatal; in-memory state is already updated
     }
@@ -223,10 +230,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.hypershell?.updateSetting({
-        key: SETTINGS_KEY,
-        value: JSON.stringify(next)
-      });
+      await persistSettings(next);
     } catch {
       // persist failure is non-fatal; in-memory state is already updated
     }
@@ -243,10 +247,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.hypershell?.updateSetting({
-        key: SETTINGS_KEY,
-        value: JSON.stringify(next)
-      });
+      await persistSettings(next);
     } catch {}
   },
 
@@ -265,10 +266,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.hypershell?.updateSetting({
-        key: SETTINGS_KEY,
-        value: JSON.stringify(next)
-      });
+      await persistSettings(next);
     } catch {}
   },
 
@@ -297,10 +295,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     };
     set({ settings: next });
     try {
-      await window.hypershell?.updateSetting({
-        key: SETTINGS_KEY,
-        value: JSON.stringify(next),
-      });
+      await persistSettings(next);
     } catch {}
   },
 
@@ -310,10 +305,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     const next: AppSettings = { ...current, customThemes: rest };
     set({ settings: next });
     try {
-      await window.hypershell?.updateSetting({
-        key: SETTINGS_KEY,
-        value: JSON.stringify(next),
-      });
+      await persistSettings(next);
     } catch {}
   }
 }));

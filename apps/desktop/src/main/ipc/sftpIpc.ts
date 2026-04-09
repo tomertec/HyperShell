@@ -15,7 +15,9 @@ import {
   sftpRenameRequestSchema,
   sftpStatRequestSchema,
   sftpTransferCancelRequestSchema,
+  sftpTransferPauseRequestSchema,
   sftpTransferResolveConflictRequestSchema,
+  sftpTransferResumeRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
   sftpSyncStartRequestSchema,
@@ -32,7 +34,9 @@ import {
   type SftpRenameRequest,
   type SftpStatRequest,
   type SftpTransferCancelRequest,
+  type SftpTransferPauseRequest,
   type SftpTransferResolveConflictRequest,
+  type SftpTransferResumeRequest,
   type SftpTransferStartRequest,
   type SftpWriteFileRequest,
   type KeyboardInteractiveRequest,
@@ -169,7 +173,7 @@ export function registerSftpIpc(
   options: RegisterSftpIpcOptions
 ): () => void {
   const sftpSessionManager = createSftpSessionManager();
-  const transferManager = createTransferManager({ autoStart: true });
+  const transferManager = createTransferManager({ autoStart: true, maxConcurrent: 1 });
 
   const db = options.db ?? openDatabase();
   const hostsRepo = createHostsRepositoryFromDatabase(db);
@@ -358,6 +362,16 @@ export function registerSftpIpc(
     transferManager.cancel(request.transferId);
   };
 
+  const handleTransferPause = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request: SftpTransferPauseRequest = sftpTransferPauseRequestSchema.parse(rawRequest);
+    transferManager.pause(request.transferId);
+  };
+
+  const handleTransferResume = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request: SftpTransferResumeRequest = sftpTransferResumeRequestSchema.parse(rawRequest);
+    transferManager.resume(request.transferId);
+  };
+
   const handleTransferList = async () => {
     return { transfers: transferManager.list() };
   };
@@ -453,6 +467,8 @@ export function registerSftpIpc(
   ipcMain.handle(ipcChannels.sftp.writeFile, handleWriteFile);
   ipcMain.handle(ipcChannels.sftp.transferStart, handleTransferStart);
   ipcMain.handle(ipcChannels.sftp.transferCancel, handleTransferCancel);
+  ipcMain.handle(ipcChannels.sftp.transferPause, handleTransferPause);
+  ipcMain.handle(ipcChannels.sftp.transferResume, handleTransferResume);
   ipcMain.handle(ipcChannels.sftp.transferList, handleTransferList);
   ipcMain.handle(ipcChannels.sftp.transferResolveConflict, handleTransferResolveConflict);
   ipcMain.handle(ipcChannels.sftp.bookmarksList, handleBookmarksList);

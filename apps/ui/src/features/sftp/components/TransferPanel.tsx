@@ -1,6 +1,9 @@
 import { useStore } from "zustand";
+import { toast } from "sonner";
 
+import { settingsStore } from "../../settings/settingsStore";
 import { transferStore } from "../transferStore";
+import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
 
 function percentage(bytesTransferred: number, totalBytes: number): number {
@@ -12,12 +15,62 @@ function percentage(bytesTransferred: number, totalBytes: number): number {
 }
 
 export function TransferPanel() {
+  const usePopupTransferMonitor = useStore(
+    settingsStore,
+    (state) => state.settings.general.usePopupTransferMonitor
+  );
   const transfers = useStore(transferStore, (state) => state.transfers);
   const activeCount = useStore(transferStore, (state) => state.activeCount);
   const panelOpen = useStore(transferStore, (state) => state.panelOpen);
   const filter = useStore(transferStore, (state) => state.filter);
   const setFilter = useStore(transferStore, (state) => state.setFilter);
   const setPanelOpen = useStore(transferStore, (state) => state.setPanelOpen);
+
+  const cancelTransfer = async (transferId: string) => {
+    const cancel = window.hypershell?.sftpTransferCancel;
+    if (!cancel) {
+      toast.error("Cancel transfer is unavailable in this build. Restart HyperShell.");
+      return;
+    }
+
+    try {
+      await cancel({ transferId });
+    } catch (error) {
+      toast.error(toErrorMessage(error, "Failed to cancel transfer"));
+    }
+  };
+
+  const pauseTransfer = async (transferId: string) => {
+    const pause = window.hypershell?.sftpTransferPause;
+    if (!pause) {
+      toast.error("Pause transfer is unavailable in this build. Restart HyperShell.");
+      return;
+    }
+
+    try {
+      await pause({ transferId });
+    } catch (error) {
+      toast.error(toErrorMessage(error, "Failed to pause transfer"));
+    }
+  };
+
+  const resumeTransfer = async (transferId: string) => {
+    const resume = window.hypershell?.sftpTransferResume;
+    if (!resume) {
+      toast.error("Resume transfer is unavailable in this build. Restart HyperShell.");
+      return;
+    }
+
+    try {
+      await resume({ transferId });
+    } catch (error) {
+      toast.error(toErrorMessage(error, "Failed to resume transfer"));
+    }
+  };
+
+  if (usePopupTransferMonitor) {
+    return null;
+  }
 
   const filteredTransfers =
     filter === "all"
@@ -128,18 +181,40 @@ export function TransferPanel() {
                 {formatFileSize(transfer.bytesTransferred)} / {formatFileSize(transfer.totalBytes)}
               </span>
 
-              {(transfer.status === "active" || transfer.status === "queued") && (
-                <button
-                  type="button"
-                  className="text-xs text-text-secondary hover:text-red-400"
-                  onClick={() =>
-                    window.hypershell?.sftpTransferCancel?.({
-                      transferId: transfer.transferId
-                    })
-                  }
-                >
-                  Cancel
-                </button>
+              {(transfer.status === "active" || transfer.status === "queued" || transfer.status === "paused") && (
+                <div className="flex items-center gap-2">
+                  {(transfer.status === "active" || transfer.status === "queued") && (
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:text-amber-300"
+                      onClick={() => {
+                        void pauseTransfer(transfer.transferId);
+                      }}
+                    >
+                      Pause
+                    </button>
+                  )}
+                  {transfer.status === "paused" && (
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:text-emerald-300"
+                      onClick={() => {
+                        void resumeTransfer(transfer.transferId);
+                      }}
+                    >
+                      Resume
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="text-xs text-text-secondary hover:text-red-400"
+                    onClick={() => {
+                      void cancelTransfer(transfer.transferId);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               )}
             </div>
           ))

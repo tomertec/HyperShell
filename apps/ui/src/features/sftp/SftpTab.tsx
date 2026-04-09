@@ -4,6 +4,7 @@ import { useStore } from "zustand";
 import type { SftpEntry, TransferJob } from "@hypershell/shared";
 import { getSftpStore, disposeSftpStore } from "./sftpStore";
 import { transferStore } from "./transferStore";
+import { toErrorMessage } from "./utils/errorUtils";
 import { getParentPath, joinRemotePath } from "./utils/fileUtils";
 import { SftpDualPane } from "./components/SftpDualPane";
 import { SftpToolbar } from "./components/SftpToolbar";
@@ -142,7 +143,16 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
   useEffect(() => {
     const unsubscribe = window.hypershell?.onSftpEvent?.((event) => {
+      const hasTransfer = transferStore
+        .getState()
+        .transfers.some((transfer) => transfer.transferId === event.transferId);
+
       if (event.kind === "transfer-progress") {
+        if (!hasTransfer) {
+          void refreshTransfers();
+          return;
+        }
+
         transferStore.getState().updateTransfer(event.transferId, {
           bytesTransferred: event.bytesTransferred,
           totalBytes: event.totalBytes,
@@ -152,17 +162,20 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       }
 
       if (event.kind === "transfer-complete") {
-        transferStore.getState().updateTransfer(event.transferId, {
-          status: event.status,
-          error: event.error
-        });
+        if (hasTransfer) {
+          transferStore.getState().updateTransfer(event.transferId, {
+            status: event.status,
+            error: event.error
+          });
+        }
+        void refreshTransfers();
       }
     });
 
     return () => {
       unsubscribe?.();
     };
-  }, []);
+  }, [refreshTransfers]);
 
   useEffect(() => {
     void refreshTransfers();
@@ -180,39 +193,44 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         return;
       }
 
-      const targetPath = remoteTargetPath || store.getState().remotePath;
+      try {
+        const targetPath = remoteTargetPath || store.getState().remotePath;
 
-      const operations = await Promise.all(
-        localPaths.map(async (localPath) => {
-          let isDirectory = false;
+        const operations = await Promise.all(
+          localPaths.map(async (localPath) => {
+            let isDirectory = false;
 
-          try {
-            const stat = await window.hypershell?.fsStat?.({ path: localPath });
-            isDirectory = Boolean(stat?.isDirectory);
-          } catch {
-            isDirectory = false;
-          }
+            try {
+              const stat = await window.hypershell?.fsStat?.({ path: localPath });
+              isDirectory = Boolean(stat?.isDirectory);
+            } catch {
+              isDirectory = false;
+            }
 
-          const fileName = localPath.split(/[/\\]/).pop() ?? localPath;
+            const fileName = localPath.split(/[/\\]/).pop() ?? localPath;
 
-          return {
-            type: "upload" as const,
-            localPath,
-            remotePath: joinRemotePath(targetPath, fileName),
-            isDirectory
-          };
-        })
-      );
+            return {
+              type: "upload" as const,
+              localPath,
+              remotePath: joinRemotePath(targetPath, fileName),
+              isDirectory
+            };
+          })
+        );
 
-      const created =
-        (await window.hypershell?.sftpTransferStart?.({
-          sftpSessionId,
-          operations
-        })) ?? [];
+        const created =
+          (await window.hypershell?.sftpTransferStart?.({
+            sftpSessionId,
+            operations
+          })) ?? [];
 
-      const current = transferStore.getState().transfers;
-      transferStore.getState().setTransfers(mergeTransfers(current, created));
-      void refreshTransfers();
+        const current = transferStore.getState().transfers;
+        transferStore.getState().setTransfers(mergeTransfers(current, created));
+        store.getState().setError("remote", null);
+        void refreshTransfers();
+      } catch (error) {
+        store.getState().setError("remote", toErrorMessage(error, "Failed to start upload"));
+      }
     },
     [refreshTransfers, sftpSessionId, store]
   );
@@ -223,50 +241,62 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         return;
       }
 
-      const localPath = localTargetPath || store.getState().localPath;
-      if (!localPath) {
-        return;
-      }
+      try {
+        const localPath = localTargetPath || store.getState().localPath;
+        if (!localPath) {
+          store.getState().setError("local", "Select a local destination folder first.");
+          return;
+        }
 
-      const entriesByPath = new Map(
-        store.getState().remoteEntries.map((entry) => [entry.path, entry])
-      );
+        const localStat = await window.hypershell?.fsStat?.({ path: localPath });
+        if (!localStat?.isDirectory) {
+          store.getState().setError("local", `Local destination is not a folder: ${localPath}`);
+          return;
+        }
 
-      const operations = await Promise.all(
-        remotePaths.map(async (remoteFilePath) => {
-          let isDirectory = entriesByPath.get(remoteFilePath)?.isDirectory ?? false;
-          if (!entriesByPath.has(remoteFilePath)) {
-            try {
-              const stat = await window.hypershell?.sftpStat?.({
-                sftpSessionId,
-                path: remoteFilePath
-              });
-              isDirectory = Boolean(stat?.isDirectory);
-            } catch {
-              isDirectory = false;
+        const entriesByPath = new Map(
+          store.getState().remoteEntries.map((entry) => [entry.path, entry])
+        );
+
+        const operations = await Promise.all(
+          remotePaths.map(async (remoteFilePath) => {
+            let isDirectory = entriesByPath.get(remoteFilePath)?.isDirectory ?? false;
+            if (!entriesByPath.has(remoteFilePath)) {
+              try {
+                const stat = await window.hypershell?.sftpStat?.({
+                  sftpSessionId,
+                  path: remoteFilePath
+                });
+                isDirectory = Boolean(stat?.isDirectory);
+              } catch {
+                isDirectory = false;
+              }
             }
-          }
 
-          const fileName = remoteFilePath.split("/").pop() ?? remoteFilePath;
+            const fileName = remoteFilePath.split("/").pop() ?? remoteFilePath;
 
-          return {
-            type: "download" as const,
-            localPath: joinLocalPath(localPath, fileName),
-            remotePath: remoteFilePath,
-            isDirectory
-          };
-        })
-      );
+            return {
+              type: "download" as const,
+              localPath: joinLocalPath(localPath, fileName),
+              remotePath: remoteFilePath,
+              isDirectory
+            };
+          })
+        );
 
-      const created =
-        (await window.hypershell?.sftpTransferStart?.({
-          sftpSessionId,
-          operations
-        })) ?? [];
+        const created =
+          (await window.hypershell?.sftpTransferStart?.({
+            sftpSessionId,
+            operations
+          })) ?? [];
 
-      const current = transferStore.getState().transfers;
-      transferStore.getState().setTransfers(mergeTransfers(current, created));
-      void refreshTransfers();
+        const current = transferStore.getState().transfers;
+        transferStore.getState().setTransfers(mergeTransfers(current, created));
+        store.getState().setError("local", null);
+        void refreshTransfers();
+      } catch (error) {
+        store.getState().setError("local", toErrorMessage(error, "Failed to start download"));
+      }
     },
     [refreshTransfers, sftpSessionId, store]
   );

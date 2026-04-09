@@ -121,8 +121,11 @@ export function SnippetsPanel() {
 
   return (
     <div
-      className={`absolute right-0 top-0 h-full w-80 z-30 flex flex-col bg-base-900 border-l border-border shadow-xl transition-transform duration-200 ease-out ${
-        isOpen ? "translate-x-0" : "translate-x-full"
+      aria-hidden={!isOpen}
+      className={`absolute right-0 top-0 h-full w-80 z-30 flex flex-col bg-base-900 border-l border-border shadow-xl transition-[transform,opacity] duration-200 ease-out ${
+        isOpen
+          ? "translate-x-0 opacity-100 pointer-events-auto"
+          : "translate-x-full opacity-0 pointer-events-none"
       }`}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-base-800 shrink-0">
