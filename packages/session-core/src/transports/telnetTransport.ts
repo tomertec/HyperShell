@@ -71,7 +71,11 @@ export function createTelnetTransport(
 
   const parser =
     profile.mode === "telnet"
-      ? new TelnetParser({ cols: request.cols, rows: request.rows })
+      ? new TelnetParser({
+          cols: request.cols,
+          rows: request.rows,
+          terminalType: profile.terminalType,
+        })
       : null;
 
   if (parser) {

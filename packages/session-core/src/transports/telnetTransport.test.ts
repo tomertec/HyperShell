@@ -222,6 +222,55 @@ describe("createTelnetTransport — telnet mode", () => {
     transport.close();
   });
 
+  it("responds to TERMINAL-TYPE SEND using configured terminal type", async () => {
+    const socket = new FakeSocket();
+    const profile: TelnetConnectionProfile = {
+      hostname: "192.168.1.1",
+      port: 23,
+      mode: "telnet",
+      terminalType: "vt100",
+    };
+
+    const transport = createTelnetTransport(makeRequest(), profile, {
+      createSocket: () => socket,
+    });
+
+    await flush();
+
+    socket.emit("data", Buffer.from([TELNET.IAC, TELNET.DO, TELNET.OPT_TERMINAL_TYPE]));
+    await flush();
+    socket.writeCalls.length = 0;
+
+    socket.emit(
+      "data",
+      Buffer.from([
+        TELNET.IAC,
+        TELNET.SB,
+        TELNET.OPT_TERMINAL_TYPE,
+        TELNET.TERMINAL_TYPE_SEND,
+        TELNET.IAC,
+        TELNET.SE,
+      ])
+    );
+    await flush();
+
+    expect(socket.writeCalls).toHaveLength(1);
+    expect(socket.writeCalls[0]).toEqual(
+      Buffer.concat([
+        Buffer.from([
+          TELNET.IAC,
+          TELNET.SB,
+          TELNET.OPT_TERMINAL_TYPE,
+          TELNET.TERMINAL_TYPE_IS,
+        ]),
+        Buffer.from("vt100"),
+        Buffer.from([TELNET.IAC, TELNET.SE]),
+      ])
+    );
+
+    transport.close();
+  });
+
   it("escapes 0xFF bytes in user write", async () => {
     // Unit-test the escapeIac helper directly with known input
     // "A" + 0xFF + "B" encoded as latin1 so the 0xFF byte survives

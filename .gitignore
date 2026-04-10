@@ -6,6 +6,8 @@ out/
 .env.*
 test-results/
 apps/desktop/release/
+tmp-linux-release/
+linux-artifacts/
 CLAUDE.md
 AGENTS.md
 .claude/

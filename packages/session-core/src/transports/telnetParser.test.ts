@@ -47,6 +47,49 @@ describe("TelnetParser", () => {
     );
   });
 
+  it("DO TERMINAL-TYPE → responds WILL TERMINAL-TYPE", () => {
+    const parser = new TelnetParser();
+    const { send } = collectEvents(parser);
+    parser.feed(Buffer.from([TELNET.IAC, TELNET.DO, TELNET.OPT_TERMINAL_TYPE]));
+    expect(send).toHaveLength(1);
+    expect(send[0]).toEqual(
+      Buffer.from([TELNET.IAC, TELNET.WILL, TELNET.OPT_TERMINAL_TYPE])
+    );
+  });
+
+  it("TERMINAL-TYPE SEND → responds with configured terminal type", () => {
+    const parser = new TelnetParser({ terminalType: "vt100" });
+    const { send } = collectEvents(parser);
+
+    parser.feed(Buffer.from([TELNET.IAC, TELNET.DO, TELNET.OPT_TERMINAL_TYPE]));
+    send.length = 0;
+
+    parser.feed(
+      Buffer.from([
+        TELNET.IAC,
+        TELNET.SB,
+        TELNET.OPT_TERMINAL_TYPE,
+        TELNET.TERMINAL_TYPE_SEND,
+        TELNET.IAC,
+        TELNET.SE,
+      ])
+    );
+
+    expect(send).toHaveLength(1);
+    expect(send[0]).toEqual(
+      Buffer.concat([
+        Buffer.from([
+          TELNET.IAC,
+          TELNET.SB,
+          TELNET.OPT_TERMINAL_TYPE,
+          TELNET.TERMINAL_TYPE_IS,
+        ]),
+        Buffer.from("vt100"),
+        Buffer.from([TELNET.IAC, TELNET.SE]),
+      ])
+    );
+  });
+
   it("WILL ECHO → responds DO ECHO", () => {
     const parser = new TelnetParser();
     const { send } = collectEvents(parser);

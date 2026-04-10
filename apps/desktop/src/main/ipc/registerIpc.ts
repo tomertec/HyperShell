@@ -69,6 +69,7 @@ import {
 } from "../security/credentialCache";
 import {
   createHostEnvVarRepositoryFromDatabase,
+  createHostFingerprintRepositoryFromDatabase,
   createConnectionHistoryRepositoryFromDatabase,
   createGroupsRepository,
   createSerialProfilesRepository
@@ -210,6 +211,7 @@ const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;
 let connectionHistoryRepository: ReturnType<typeof createConnectionHistoryRepositoryFromDatabase> | null = null;
 let hostEnvVarRepository: ReturnType<typeof createHostEnvVarRepositoryFromDatabase> | null = null;
+let hostFingerprintRepository: ReturnType<typeof createHostFingerprintRepositoryFromDatabase> | null = null;
 
 function getSessionRecorder(): SessionRecordingManager {
   if (!sessionRecorder) {
@@ -289,6 +291,22 @@ function getHostEnvVarRepository():
 
   hostEnvVarRepository = createHostEnvVarRepositoryFromDatabase(db);
   return hostEnvVarRepository;
+}
+
+function getHostFingerprintRepository():
+  | ReturnType<typeof createHostFingerprintRepositoryFromDatabase>
+  | null {
+  if (hostFingerprintRepository) {
+    return hostFingerprintRepository;
+  }
+
+  const db = getOrCreateDatabase() as SqliteDatabase | null;
+  if (!db) {
+    return null;
+  }
+
+  hostFingerprintRepository = createHostFingerprintRepositoryFromDatabase(db);
+  return hostFingerprintRepository;
 }
 
 const groupsRepo = createGroupsRepository();
@@ -1130,10 +1148,27 @@ async function hostStatsHandler(
     return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
   }
 
+  const sessionInput = manager.getSessionInput(parsed.sessionId);
+  const hostname = sessionInput?.sshOptions?.hostname;
+  const port = sessionInput?.sshOptions?.port ?? 22;
+  if (!hostname) {
+    return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
+  }
+
+  const trustedFingerprints = getHostFingerprintRepository()
+    ?.findByHost(hostname, port)
+    .filter((record) => record.isTrusted)
+    .map((record) => record.fingerprint) ?? [];
+  if (trustedFingerprints.length === 0) {
+    return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
+  }
+
   const startTime = Date.now();
 
   try {
-    const stdout = await manager.execCommand(parsed.sessionId, STATS_COMMAND);
+    const stdout = await manager.execCommand(parsed.sessionId, STATS_COMMAND, {
+      expectedHostFingerprints: trustedFingerprints
+    });
     const latencyMs = Date.now() - startTime;
     const stats = parseStatsOutput(stdout);
     return { ...stats, latencyMs };

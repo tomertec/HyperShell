@@ -100,6 +100,40 @@ describe("sessionManager", () => {
     expect(manager.getSession(sessionId)).toBeUndefined();
   });
 
+  it("uses unique default session IDs after sessions are closed", () => {
+    const manager = createSessionManager({
+      createTransport: () => createStubTransport()
+    });
+
+    const first = manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24
+    });
+    const second = manager.open({
+      transport: "ssh",
+      profileId: "host-2",
+      cols: 80,
+      rows: 24
+    });
+
+    manager.close(first.sessionId);
+
+    const third = manager.open({
+      transport: "ssh",
+      profileId: "host-3",
+      cols: 80,
+      rows: 24
+    });
+
+    expect(first.sessionId).toBe("session-1");
+    expect(second.sessionId).toBe("session-2");
+    expect(third.sessionId).toBe("session-3");
+    expect(manager.getSession(second.sessionId)).toBeDefined();
+    expect(manager.getSession(third.sessionId)).toBeDefined();
+  });
+
   it("removes sessions when the transport exits", () => {
     const { transport, emit } = createControllableTransport();
     const manager = createSessionManager({

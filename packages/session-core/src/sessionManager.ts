@@ -10,6 +10,7 @@ import type {
 } from "./transports/transportEvents";
 import { Client } from "ssh2";
 import { readFileSync } from "node:fs";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { createSerialTransport } from "./transports/serialTransport";
 import { createSshPtyTransport } from "./transports/sshPtyTransport";
 import { createTelnetTransport } from "./transports/telnetTransport";
@@ -51,6 +52,10 @@ export interface OpenSessionResult {
   state: SessionState;
 }
 
+export interface ExecCommandOptions {
+  expectedHostFingerprints?: string[];
+}
+
 export interface SessionManager {
   open(input: OpenSessionInput): OpenSessionResult;
   write(sessionId: string, data: string): void;
@@ -62,7 +67,7 @@ export interface SessionManager {
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
   setSignals(sessionId: string, signals: { dtr?: boolean; rts?: boolean }): void;
   getSessionInput(sessionId: string): OpenSessionInput | undefined;
-  execCommand(sessionId: string, command: string): Promise<string>;
+  execCommand(sessionId: string, command: string, options?: ExecCommandOptions): Promise<string>;
 }
 
 interface ManagedSession {
@@ -146,8 +151,9 @@ export function createSessionManager(
 ): SessionManager {
   const sessions = new Map<string, ManagedSession>();
   const listeners = new Set<(event: SessionTransportEvent) => void>();
+  let nextSessionId = 1;
   const sessionIdFactory =
-    deps.sessionIdFactory ?? (() => `session-${sessions.size + 1}`);
+    deps.sessionIdFactory ?? (() => `session-${nextSessionId++}`);
   const createTransport = deps.createTransport ?? createDefaultTransport;
   const networkMonitor = deps.networkMonitor;
 
@@ -398,11 +404,19 @@ export function createSessionManager(
       return { ...rest, sshOptions: safeSshOptions };
     },
 
-    execCommand(sessionId: string, command: string): Promise<string> {
+    execCommand(sessionId: string, command: string, options: ExecCommandOptions = {}): Promise<string> {
       const session = sessions.get(sessionId);
       if (!session) return Promise.reject(new Error("Session not found"));
       const opts = session.input.sshOptions;
       if (!opts) return Promise.reject(new Error("Not an SSH session"));
+      const expectedFingerprints = (options.expectedHostFingerprints ?? [])
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+        .map((value) => Buffer.from(value, "utf8"));
+
+      if (expectedFingerprints.length === 0) {
+        return Promise.reject(new Error("Host key verification is required for SSH exec"));
+      }
 
       return new Promise((resolve, reject) => {
         const client = new Client();
@@ -454,8 +468,17 @@ export function createSessionManager(
           }
         }
 
-        // Accept any host key for stats commands (the PTY session already verified)
-        connectConfig.hostVerifier = () => true;
+        connectConfig.hostVerifier = (key: Buffer) => {
+          const actual = Buffer.from(
+            `SHA256:${createHash("sha256").update(key).digest("base64")}`,
+            "utf8"
+          );
+          return expectedFingerprints.some(
+            (expected) =>
+              expected.length === actual.length
+              && timingSafeEqual(expected, actual)
+          );
+        };
 
         client.connect(connectConfig);
       });

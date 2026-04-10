@@ -9,6 +9,9 @@ export const TELNET = {
   OPT_ECHO: 0x01,
   OPT_SGA: 0x03,
   OPT_NAWS: 0x1f,
+  OPT_TERMINAL_TYPE: 0x18,
+  TERMINAL_TYPE_IS: 0x00,
+  TERMINAL_TYPE_SEND: 0x01,
 } as const;
 
 type State = "data" | "iac" | "will" | "wont" | "do" | "dont" | "sb" | "sb_data" | "sb_iac";
@@ -22,15 +25,20 @@ export class TelnetParser {
   private state: State = "data";
   private cols: number;
   private rows: number;
+  private terminalType: string;
   private nawsNegotiated = false;
+  private terminalTypeNegotiated = false;
+  private sbOption: number | null = null;
+  private sbData: number[] = [];
   private listeners: { data: Array<(buf: Buffer) => void>; send: Array<(buf: Buffer) => void> } = {
     data: [],
     send: [],
   };
 
-  constructor(opts?: { cols?: number; rows?: number }) {
+  constructor(opts?: { cols?: number; rows?: number; terminalType?: string }) {
     this.cols = opts?.cols ?? 80;
     this.rows = opts?.rows ?? 24;
+    this.terminalType = opts?.terminalType?.trim() || "xterm-256color";
   }
 
   on<K extends keyof EventMap>(event: K, listener: EventMap[K]): void {
@@ -115,20 +123,29 @@ export class TelnetParser {
           break;
 
         case "sb":
-          // First byte after SB is the option; move to sb_data to consume until IAC SE
+          // First byte after SB is the option identifier.
+          this.sbOption = byte;
+          this.sbData = [];
           this.state = "sb_data";
           break;
 
         case "sb_data":
           if (byte === TELNET.IAC) {
             this.state = "sb_iac";
+          } else {
+            this.sbData.push(byte);
           }
-          // Otherwise skip the subneg data byte
           break;
 
         case "sb_iac":
           if (byte === TELNET.SE) {
+            this.handleSubnegotiation(this.sbOption, this.sbData);
+            this.sbOption = null;
+            this.sbData = [];
             this.state = "data";
+          } else if (byte === TELNET.IAC) {
+            this.sbData.push(TELNET.IAC);
+            this.state = "sb_data";
           } else {
             // IAC IAC inside subneg (escaped 0xFF) or unexpected byte — stay in subneg
             this.state = "sb_data";
@@ -161,6 +178,10 @@ export class TelnetParser {
         this.emit("send", Buffer.from([TELNET.IAC, TELNET.WILL, TELNET.OPT_NAWS]));
         this.emitNaws(this.cols, this.rows);
         break;
+      case TELNET.OPT_TERMINAL_TYPE:
+        this.terminalTypeNegotiated = true;
+        this.emit("send", Buffer.from([TELNET.IAC, TELNET.WILL, TELNET.OPT_TERMINAL_TYPE]));
+        break;
       case TELNET.OPT_SGA:
         this.emit("send", Buffer.from([TELNET.IAC, TELNET.WILL, TELNET.OPT_SGA]));
         break;
@@ -190,6 +211,35 @@ export class TelnetParser {
         rows & 0xff,
         TELNET.IAC,
         TELNET.SE,
+      ])
+    );
+  }
+
+  private handleSubnegotiation(option: number | null, data: number[]): void {
+    if (option === null) {
+      return;
+    }
+    if (!this.terminalTypeNegotiated) {
+      return;
+    }
+    if (option !== TELNET.OPT_TERMINAL_TYPE) {
+      return;
+    }
+    if (data.length === 0 || data[0] !== TELNET.TERMINAL_TYPE_SEND) {
+      return;
+    }
+
+    this.emit(
+      "send",
+      Buffer.concat([
+        Buffer.from([
+          TELNET.IAC,
+          TELNET.SB,
+          TELNET.OPT_TERMINAL_TYPE,
+          TELNET.TERMINAL_TYPE_IS,
+        ]),
+        Buffer.from(this.terminalType, "ascii"),
+        Buffer.from([TELNET.IAC, TELNET.SE]),
       ])
     );
   }

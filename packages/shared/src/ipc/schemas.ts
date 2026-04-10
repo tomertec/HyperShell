@@ -13,7 +13,7 @@ export const sessionStateSchema = z.enum([
 
 export const telnetConnectionOptionsSchema = z.object({
   hostname: z.string().min(1),
-  port: z.number().int().positive().default(23),
+  port: z.number().int().min(1).max(65535).default(23),
   mode: z.enum(["telnet", "raw"]),
   terminalType: z.string().optional(),
 });

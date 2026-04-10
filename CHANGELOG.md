@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ### Added
 
+- Telnet / Raw TCP transport — connect to network gear and raw TCP services via a quick-connect dialog. Supports Telnet protocol negotiation (NAWS window sizing, SGA, echo) and raw passthrough mode. Feature-gated behind Settings → General → "Enable Telnet / Raw TCP" (off by default).
 - Linux support — AppImage and deb packaging via electron-builder, `release:linux:unsigned` script, and `linux-release.yml` CI workflow that attaches artifacts to GitHub releases on tag push.
 - Linux build job added to PR gates (`pr-gates.yml`) alongside Windows and macOS.
 - macOS support — app menu, DMG packaging, tray icons, and CI pipeline.
