@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Readable, Writable } from "node:stream";
-import { Client, type ConnectConfig, type SFTPWrapper, type Stats } from "ssh2";
+import { Client, type ConnectConfig, type OpenMode, type SFTPWrapper, type Stats } from "ssh2";
 
 import type {
   SessionState,
@@ -49,8 +49,8 @@ export interface SftpTransportHandle {
   remove(remotePath: string, recursive?: boolean): Promise<void>;
   readFile(remotePath: string): Promise<Buffer>;
   writeFile(remotePath: string, data: Buffer): Promise<void>;
-  createReadStream(remotePath: string): Readable;
-  createWriteStream(remotePath: string): Writable;
+  createReadStream(remotePath: string, options?: { start?: number }): Readable;
+  createWriteStream(remotePath: string, options?: { start?: number; flags?: OpenMode }): Writable;
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
 }
 
@@ -511,12 +511,12 @@ export function createSftpTransport(
     });
   }
 
-  function createReadStream(remotePath: string): Readable {
-    return requireSftp().createReadStream(remotePath);
+  function createReadStream(remotePath: string, options?: { start?: number }): Readable {
+    return requireSftp().createReadStream(remotePath, options);
   }
 
-  function createWriteStream(remotePath: string): Writable {
-    return requireSftp().createWriteStream(remotePath);
+  function createWriteStream(remotePath: string, options?: { start?: number; flags?: OpenMode }): Writable {
+    return requireSftp().createWriteStream(remotePath, options);
   }
 
   function onEvent(listener: (event: SessionTransportEvent) => void): () => void {
