@@ -15,13 +15,19 @@ export function registerWorkspaceIpc(
   ipcMain: IpcMainLike,
   getDb: () => unknown
 ): void {
-  const repo = createWorkspaceRepository(getDb() as Parameters<typeof createWorkspaceRepository>[0]);
+  let repo: WorkspaceRepoLike | null = null;
+  function getRepo(): WorkspaceRepoLike {
+    if (!repo) {
+      repo = createWorkspaceRepository(getDb() as Parameters<typeof createWorkspaceRepository>[0]);
+    }
+    return repo;
+  }
 
   ipcMain.handle(
     ipcChannels.workspace.save,
     (_event: IpcMainInvokeEvent, request: unknown) => {
       const parsed = saveWorkspaceRequestSchema.parse(request);
-      repo.save(parsed.name, parsed.layout);
+      getRepo().save(parsed.name, parsed.layout);
       return { success: true };
     }
   );
@@ -30,19 +36,19 @@ export function registerWorkspaceIpc(
     ipcChannels.workspace.load,
     (_event: IpcMainInvokeEvent, request: unknown) => {
       const parsed = loadWorkspaceRequestSchema.parse(request);
-      return repo.load(parsed.name) ?? null;
+      return getRepo().load(parsed.name) ?? null;
     }
   );
 
   ipcMain.handle(ipcChannels.workspace.list, () => {
-    return repo.list();
+    return getRepo().list();
   });
 
   ipcMain.handle(
     ipcChannels.workspace.remove,
     (_event: IpcMainInvokeEvent, request: unknown) => {
       const parsed = removeWorkspaceRequestSchema.parse(request);
-      const removed = repo.remove(parsed.name);
+      const removed = getRepo().remove(parsed.name);
       if (!removed) throw new Error(`Workspace "${parsed.name}" not found`);
       return { success: true };
     }
@@ -52,12 +58,12 @@ export function registerWorkspaceIpc(
     ipcChannels.workspace.saveLast,
     (_event: IpcMainInvokeEvent, request: unknown) => {
       const parsed = workspaceLayoutSchema.parse(request);
-      repo.save("__last__", parsed);
+      getRepo().save("__last__", parsed);
       return { success: true };
     }
   );
 
   ipcMain.handle(ipcChannels.workspace.loadLast, () => {
-    return repo.load("__last__") ?? null;
+    return getRepo().load("__last__") ?? null;
   });
 }
