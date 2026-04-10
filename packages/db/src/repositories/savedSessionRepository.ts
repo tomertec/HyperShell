@@ -1,7 +1,7 @@
 import { openDatabase } from "../index";
 import type { SqliteDatabase } from "../index";
 
-export type SavedSessionTransport = "ssh" | "serial" | "sftp";
+export type SavedSessionTransport = "ssh" | "serial" | "sftp" | "telnet";
 
 export type SavedSessionRecord = {
   id: string;
