@@ -90,6 +90,7 @@ export const sftpChannels = {
   transferCancel: "sftp:transfer:cancel",
   transferPause: "sftp:transfer:pause",
   transferResume: "sftp:transfer:resume",
+  transferRetry: "sftp:transfer:retry",
   transferList: "sftp:transfer:list",
   transferResolveConflict: "sftp:transfer:resolve-conflict",
   event: "sftp:event",
