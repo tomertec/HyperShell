@@ -65,7 +65,7 @@ function updateWorkspaceVersions(version, dryRun) {
   }
 }
 
-function validateChangelog(version) {
+function promoteChangelog(version, dryRun) {
   const changelogPath = path.resolve(process.cwd(), "CHANGELOG.md");
   const changelog = readFileSync(changelogPath, "utf8");
 
@@ -74,12 +74,22 @@ function validateChangelog(version) {
   }
 
   if (changelog.includes(`## [${version}]`)) {
-    console.log(`CHANGELOG.md already contains a section for ${version}.`);
+    console.log(`CHANGELOG.md already contains a section for ${version}, skipping.`);
     return;
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+  const updated = changelog.replace(
+    "## [Unreleased]",
+    `## [Unreleased]\n\n## [${version}] - ${today}`
+  );
+
+  if (!dryRun) {
+    writeFileSync(changelogPath, updated, "utf8");
+  }
+
   console.log(
-    `CHANGELOG.md does not yet contain a section for ${version}. Add one before tagging.`
+    `${dryRun ? "Would promote" : "Promoted"} [Unreleased] → [${version}] - ${today} in CHANGELOG.md`
   );
 }
 
@@ -96,7 +106,7 @@ if (!isSemverLike(version)) {
 }
 
 updateWorkspaceVersions(version, dryRun);
-validateChangelog(version);
+promoteChangelog(version, dryRun);
 
 console.log(
   `${dryRun ? "Dry run complete." : "Release prep complete."} Next: curate CHANGELOG.md and run packaging flows.`

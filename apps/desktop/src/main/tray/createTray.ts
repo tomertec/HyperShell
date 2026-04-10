@@ -62,10 +62,15 @@ export function createTray(
   const appRef = deps.appRef ?? app;
   const existsSyncFn = deps.existsSyncFn ?? existsSync;
 
+  const iconName =
+    process.platform === "darwin"
+      ? "trayTemplate.png"
+      : "tray.png"; // Windows and Linux both use tray.png
+
   const iconPath = path.join(
     process.resourcesPath || appRef.getAppPath(),
     "assets",
-    process.platform === "win32" ? "tray.png" : "trayTemplate.png"
+    iconName
   );
 
   const tray = new TrayClass(

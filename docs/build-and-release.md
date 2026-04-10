@@ -37,6 +37,12 @@ pnpm release:windows:unsigned
 
 # Signed Windows installer (for distribution)
 pnpm release:windows:signed
+
+# macOS DMG (unsigned)
+pnpm release:mac:unsigned
+
+# Linux AppImage + deb (unsigned)
+pnpm release:linux:unsigned
 ```
 
 ### electron-builder Configuration
@@ -47,7 +53,7 @@ Defined in `apps/desktop/electron-builder.yml`:
 |---------|-------|
 | App ID | `com.hypershell.desktop` |
 | Product Name | HyperShell |
-| Target | Windows NSIS x64 |
+| Target | Windows NSIS x64, macOS DMG x64, Linux AppImage/deb x64 |
 | Output | `apps/desktop/release/` |
 | Artifact | `hypershell-${version}-${arch}.exe` |
 | ASAR | Enabled with unpack for native modules |
@@ -84,7 +90,7 @@ git push origin v<version>
 
 ### PR Gates (`.github/workflows/pr-gates.yml`)
 Triggered on every pull request:
-1. Ubuntu + Windows matrix
+1. Ubuntu (build + test + E2E), Windows (build), macOS (build), Linux (build)
 2. pnpm install → build → unit tests → E2E (Playwright)
 3. All checks must pass before merge
 
@@ -95,6 +101,18 @@ Triggered by version tag (`v*`) or manual dispatch:
 3. Packages with electron-builder (NSIS)
 4. Signs installer with CSC certificate
 5. Uploads artifact to GitHub release
+
+### macOS Release (`.github/workflows/macos-release.yml`)
+Triggered by version tag (`v*`) or manual dispatch:
+1. Runs on `macos-latest`
+2. Builds, tests, packages DMG (unsigned)
+3. Uploads artifact to GitHub release
+
+### Linux Release (`.github/workflows/linux-release.yml`)
+Triggered by version tag (`v*`) or manual dispatch:
+1. Runs on `ubuntu-latest`
+2. Builds, tests, packages AppImage + deb (unsigned)
+3. Uploads artifacts to GitHub release
 
 ## Utility Scripts
 

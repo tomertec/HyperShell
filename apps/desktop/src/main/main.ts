@@ -126,7 +126,7 @@ async function bootstrap(): Promise<void> {
     );
   }
 
-  if (process.platform === "win32") {
+  if (process.platform === "win32" || process.platform === "linux") {
     powerMonitor.on("lock-screen", () => {
       clearCredentialCache();
     });

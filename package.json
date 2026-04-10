@@ -17,6 +17,7 @@
     "release:windows:unsigned": "pnpm --filter @hypershell/desktop run package:win:unsigned",
     "release:windows:signed": "pnpm --filter @hypershell/desktop run package:win:signed",
     "release:mac:unsigned": "pnpm --filter @hypershell/desktop run package:mac:unsigned",
+    "release:linux:unsigned": "pnpm --filter @hypershell/desktop run package:linux:unsigned",
     "release:manifest": "pnpm --filter @hypershell/desktop run release:manifest",
     "release:prepare": "node .tools/release/prepare-version-and-changelog.mjs"
   },

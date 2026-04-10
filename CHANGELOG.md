@@ -8,8 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ### Added
 
+- Linux support — AppImage and deb packaging via electron-builder, `release:linux:unsigned` script, and `linux-release.yml` CI workflow that attaches artifacts to GitHub releases on tag push.
+- Linux build job added to PR gates (`pr-gates.yml`) alongside Windows and macOS.
 - macOS support — app menu, DMG packaging, tray icons, and CI pipeline.
-- CI release workflows attach platform installers (`.exe`, `.dmg`) to GitHub releases automatically.
+- CI release workflows attach platform installers (`.exe`, `.dmg`, `.AppImage`, `.deb`) to GitHub releases automatically.
 - `/bump` skill for version bump, build, and draft GitHub release workflow.
 - App icon redesign with platform-specific tray icons.
 

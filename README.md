@@ -13,6 +13,7 @@
 
 ![Windows](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)
 ![macOS](https://img.shields.io/badge/macOS-12%2B-000000?logo=apple)
+![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)
 ![Electron](https://img.shields.io/badge/Electron-34-47848F?logo=electron)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)
 ![License](https://img.shields.io/badge/License-MIT-green)

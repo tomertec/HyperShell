@@ -19,6 +19,7 @@
     "package:win:unsigned": "pnpm run prepare:package && electron-builder --config electron-builder.yml --win nsis --x64 --publish never",
     "package:win:signed": "node ../../.tools/desktop/verify-signing-env.mjs && pnpm run package:win:unsigned",
     "package:mac:unsigned": "pnpm run prepare:package && electron-builder --config electron-builder.yml --mac --x64 --publish never",
+    "package:linux:unsigned": "pnpm run prepare:package && electron-builder --config electron-builder.yml --linux --x64 --publish never",
     "release:manifest": "node ../../.tools/release/write-release-manifest.mjs --artifacts-dir release",
     "start": "electron .",
     "start:native": "pnpm run rebuild:native && electron .",
