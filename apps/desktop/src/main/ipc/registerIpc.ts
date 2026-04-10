@@ -80,7 +80,8 @@ import type {
   TransportHandle,
   OpenSessionInput,
   SerialConnectionOptions,
-  SftpConnectionOptions
+  SftpConnectionOptions,
+  TelnetConnectionOptions
 } from "@hypershell/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -592,10 +593,22 @@ async function openSessionHandler(
     }
   }
 
+  let telnetOptions: TelnetConnectionOptions | undefined;
+
+  if (parsed.transport === "telnet" && parsed.telnetOptions) {
+    telnetOptions = {
+      hostname: parsed.telnetOptions.hostname,
+      port: parsed.telnetOptions.port,
+      mode: parsed.telnetOptions.mode,
+      terminalType: parsed.telnetOptions.terminalType,
+    };
+  }
+
   const openInput: OpenSessionInput = {
     ...parsed,
     sshOptions: sshOptions ?? { hostname: parsed.profileId },
     serialOptions,
+    telnetOptions,
     autoReconnect: parsed.autoReconnect ?? Boolean(resolvedHost?.autoReconnect),
     maxReconnectAttempts: parsed.reconnectMaxAttempts ?? resolvedHost?.reconnectMaxAttempts ?? 5,
     reconnectBaseInterval: parsed.reconnectBaseInterval ?? resolvedHost?.reconnectBaseInterval ?? 1,
