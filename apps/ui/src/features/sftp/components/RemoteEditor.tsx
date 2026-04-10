@@ -52,7 +52,7 @@ export function RemoteEditor({
 
         originalContentRef.current = content;
 
-        const languageExtension = getLanguageExtension(fileName);
+        const languageExtension = await getLanguageExtension(fileName);
         let dirtyCheckTimer: ReturnType<typeof setTimeout> | null = null;
         const extensions = [
           basicSetup,
