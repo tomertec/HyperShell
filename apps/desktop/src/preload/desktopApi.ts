@@ -62,6 +62,7 @@ import {
   sftpTransferPauseRequestSchema,
   sftpTransferResolveConflictRequestSchema,
   sftpTransferResumeRequestSchema,
+  sftpTransferRetryRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
   setSignalsRequestSchema,
@@ -149,6 +150,7 @@ import {
   type SftpTransferPauseRequest,
   type SftpTransferResolveConflictRequest,
   type SftpTransferResumeRequest,
+  type SftpTransferRetryRequest,
   type SftpTransferStartRequest,
   type SftpWriteFileRequest,
   type TransferJob,
@@ -358,6 +360,7 @@ export interface DesktopApi {
   sftpTransferCancel(request: SftpTransferCancelRequest): Promise<void>;
   sftpTransferPause(request: SftpTransferPauseRequest): Promise<void>;
   sftpTransferResume(request: SftpTransferResumeRequest): Promise<void>;
+  sftpTransferRetry(request: SftpTransferRetryRequest): Promise<TransferJob>;
   sftpTransferList(): Promise<SftpTransferListResponse>;
   sftpTransferResolveConflict(request: SftpTransferResolveConflictRequest): Promise<void>;
   onSftpEvent(listener: (event: SftpEvent) => void): () => void;
@@ -966,6 +969,11 @@ export function createDesktopApi(
     async sftpTransferResume(request: SftpTransferResumeRequest): Promise<void> {
       const parsed = sftpTransferResumeRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.sftp.transferResume, parsed);
+    },
+    async sftpTransferRetry(request: SftpTransferRetryRequest): Promise<TransferJob> {
+      const parsed = sftpTransferRetryRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.transferRetry, parsed);
+      return transferJobSchema.parse(result);
     },
     async sftpTransferList(): Promise<SftpTransferListResponse> {
       const result = await ipcRenderer.invoke(ipcChannels.sftp.transferList);
