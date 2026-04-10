@@ -42,7 +42,18 @@ export function TerminalSearchBar({
         return;
       }
 
-      const options = { caseSensitive, regex };
+      const options = {
+        caseSensitive,
+        regex,
+        decorations: {
+          matchBackground: "#ffb83280",
+          matchBorder: "transparent",
+          matchOverviewRuler: "#ffb832",
+          activeMatchBackground: "#ffb832",
+          activeMatchBorder: "#ffffff",
+          activeMatchColorOverviewRuler: "#ffb832",
+        },
+      };
       if (direction === "next") {
         searchAddon.findNext(query, options);
       } else {
