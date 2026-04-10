@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.1.1",
   "description": "HyperShell Electron desktop shell",
-  "author": "HyperShell Team",
+  "author": "HyperShell Team <team@hypershell.app>",
+  "homepage": "https://github.com/tomertec/HyperShell",
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {
