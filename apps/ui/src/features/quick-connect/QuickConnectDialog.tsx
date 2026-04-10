@@ -106,6 +106,8 @@ export function QuickConnectDialog({
           transition={{ duration: 0.12 }}
         >
           <motion.div
+            role="dialog"
+            aria-label="Quick Connect"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={handleKeyDown}
             className="w-full max-w-md mx-4 rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/50 overflow-hidden"
