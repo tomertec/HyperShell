@@ -28,6 +28,7 @@ export function WelcomeScreen({
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_40%_at_50%_40%,rgba(56,189,248,0.03),transparent)]" />
 
       <div className="relative flex flex-col items-center gap-6">
+        <h1 className="sr-only">HyperShell</h1>
         <LayoutGroup>
           <AnimatedLogo
             compact={formOpen}
