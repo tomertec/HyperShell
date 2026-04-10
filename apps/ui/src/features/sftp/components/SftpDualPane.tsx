@@ -50,6 +50,8 @@ export function SftpDualPane({
   const remotePath = useStore(store, (state) => state.remotePath);
   const localFilterText = useStore(store, (state) => state.localFilterText);
   const remoteFilterText = useStore(store, (state) => state.remoteFilterText);
+  const filterCaseSensitive = useStore(store, (state) => state.filterCaseSensitive);
+  const filterRegex = useStore(store, (state) => state.filterRegex);
   const setCursorIndex = useStore(store, (state) => state.setCursorIndex);
   const setLocalSelection = useStore(store, (state) => state.setLocalSelection);
   const setRemoteSelection = useStore(store, (state) => state.setRemoteSelection);
@@ -71,9 +73,20 @@ export function SftpDualPane({
   );
   const filteredEntries = useMemo(() => {
     if (!activeFilterText) return sortedEntries;
+    if (filterRegex) {
+      try {
+        const re = new RegExp(activeFilterText, filterCaseSensitive ? "" : "i");
+        return sortedEntries.filter((e) => re.test(e.name));
+      } catch {
+        return sortedEntries;
+      }
+    }
+    if (filterCaseSensitive) {
+      return sortedEntries.filter((e) => e.name.includes(activeFilterText));
+    }
     const lower = activeFilterText.toLowerCase();
     return sortedEntries.filter((e) => e.name.toLowerCase().includes(lower));
-  }, [sortedEntries, activeFilterText]);
+  }, [sortedEntries, activeFilterText, filterCaseSensitive, filterRegex]);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {

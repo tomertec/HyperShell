@@ -32,6 +32,8 @@ export function LocalPane({ store, onTransfer, isActive, onActivate, breadcrumbR
   const localSortBy = useStore(store, (state) => state.localSortBy);
   const localCursorIndex = useStore(store, (state) => state.localCursorIndex);
   const localFilterText = useStore(store, (state) => state.localFilterText);
+  const filterCaseSensitive = useStore(store, (state) => state.filterCaseSensitive);
+  const filterRegex = useStore(store, (state) => state.filterRegex);
   const isLoading = useStore(store, (state) => state.isLoading.local);
   const error = useStore(store, (state) => state.error.local);
 
@@ -44,9 +46,20 @@ export function LocalPane({ store, onTransfer, isActive, onActivate, breadcrumbR
 
   const filteredEntries = useMemo(() => {
     if (!localFilterText) return localEntries;
+    if (filterRegex) {
+      try {
+        const re = new RegExp(localFilterText, filterCaseSensitive ? "" : "i");
+        return localEntries.filter((entry) => re.test(entry.name));
+      } catch {
+        return localEntries;
+      }
+    }
+    if (filterCaseSensitive) {
+      return localEntries.filter((entry) => entry.name.includes(localFilterText));
+    }
     const lower = localFilterText.toLowerCase();
     return localEntries.filter((entry) => entry.name.toLowerCase().includes(lower));
-  }, [localEntries, localFilterText]);
+  }, [localEntries, localFilterText, filterCaseSensitive, filterRegex]);
 
   useEffect(() => {
     const maxIndex = Math.max(0, filteredEntries.length - 1);

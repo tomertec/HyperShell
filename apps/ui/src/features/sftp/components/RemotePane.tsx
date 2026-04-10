@@ -79,6 +79,8 @@ export function RemotePane({
   const remoteSortBy = useStore(store, (state) => state.remoteSortBy);
   const remoteCursorIndex = useStore(store, (state) => state.remoteCursorIndex);
   const remoteFilterText = useStore(store, (state) => state.remoteFilterText);
+  const filterCaseSensitive = useStore(store, (state) => state.filterCaseSensitive);
+  const filterRegex = useStore(store, (state) => state.filterRegex);
   const isLoading = useStore(store, (state) => state.isLoading.remote);
   const error = useStore(store, (state) => state.error.remote);
 
@@ -91,9 +93,20 @@ export function RemotePane({
 
   const filteredEntries = useMemo(() => {
     if (!remoteFilterText) return remoteEntries;
+    if (filterRegex) {
+      try {
+        const re = new RegExp(remoteFilterText, filterCaseSensitive ? "" : "i");
+        return remoteEntries.filter((entry) => re.test(entry.name));
+      } catch {
+        return remoteEntries;
+      }
+    }
+    if (filterCaseSensitive) {
+      return remoteEntries.filter((entry) => entry.name.includes(remoteFilterText));
+    }
     const lower = remoteFilterText.toLowerCase();
     return remoteEntries.filter((entry) => entry.name.toLowerCase().includes(lower));
-  }, [remoteEntries, remoteFilterText]);
+  }, [remoteEntries, remoteFilterText, filterCaseSensitive, filterRegex]);
 
   useEffect(() => {
     console.log(

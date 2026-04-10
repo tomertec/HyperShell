@@ -97,4 +97,36 @@ describe("sftpStore", () => {
     store.getState().setRemotePath("/new/path");
     expect(store.getState().remoteFilterText).toBe("");
   });
+
+  describe("filter options", () => {
+    it("defaults filterCaseSensitive and filterRegex to false", () => {
+      const store = createSftpStore("sftp-1");
+      expect(store.getState().filterCaseSensitive).toBe(false);
+      expect(store.getState().filterRegex).toBe(false);
+    });
+
+    it("toggles filterCaseSensitive", () => {
+      const store = createSftpStore("sftp-1");
+      store.getState().setFilterCaseSensitive(true);
+      expect(store.getState().filterCaseSensitive).toBe(true);
+      store.getState().setFilterCaseSensitive(false);
+      expect(store.getState().filterCaseSensitive).toBe(false);
+    });
+
+    it("toggles filterRegex", () => {
+      const store = createSftpStore("sftp-1");
+      store.getState().setFilterRegex(true);
+      expect(store.getState().filterRegex).toBe(true);
+      store.getState().setFilterRegex(false);
+      expect(store.getState().filterRegex).toBe(false);
+    });
+
+    it("filterCaseSensitive and filterRegex are independent", () => {
+      const store = createSftpStore("sftp-1");
+      store.getState().setFilterCaseSensitive(true);
+      store.getState().setFilterRegex(true);
+      expect(store.getState().filterCaseSensitive).toBe(true);
+      expect(store.getState().filterRegex).toBe(true);
+    });
+  });
 });

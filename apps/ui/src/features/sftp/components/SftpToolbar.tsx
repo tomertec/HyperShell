@@ -15,6 +15,10 @@ export interface SftpToolbarProps {
   filterMatchCount: number;
   filterTotalCount: number;
   filterInputRef: React.RefObject<HTMLInputElement | null>;
+  filterCaseSensitive: boolean;
+  filterRegex: boolean;
+  onToggleCaseSensitive: () => void;
+  onToggleRegex: () => void;
   onToggleSync?: () => void;
   syncActive?: boolean;
 }
@@ -28,6 +32,10 @@ export function SftpToolbar({
   filterMatchCount,
   filterTotalCount,
   filterInputRef,
+  filterCaseSensitive,
+  filterRegex,
+  onToggleCaseSensitive,
+  onToggleRegex,
   onToggleSync,
   syncActive,
 }: SftpToolbarProps) {
@@ -99,6 +107,30 @@ export function SftpToolbar({
             {filterMatchCount}/{filterTotalCount}
           </span>
         )}
+        <button
+          type="button"
+          title="Match case"
+          onClick={onToggleCaseSensitive}
+          className={`flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold transition-colors ${
+            filterCaseSensitive
+              ? "bg-accent/20 text-accent border border-accent/40"
+              : "text-text-muted hover:text-text-secondary border border-transparent"
+          }`}
+        >
+          Aa
+        </button>
+        <button
+          type="button"
+          title="Use regular expression"
+          onClick={onToggleRegex}
+          className={`flex items-center justify-center w-5 h-5 rounded text-[10px] font-mono transition-colors ${
+            filterRegex
+              ? "bg-accent/20 text-accent border border-accent/40"
+              : "text-text-muted hover:text-text-secondary border border-transparent"
+          }`}
+        >
+          .*
+        </button>
       </div>
 
       <div className="relative">

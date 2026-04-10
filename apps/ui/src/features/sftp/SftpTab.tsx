@@ -74,12 +74,29 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   const remoteEntries = useStore(store, (state) => state.remoteEntries);
   const setFilterText = useStore(store, (state) => state.setFilterText);
 
+  const filterCaseSensitive = useStore(store, (state) => state.filterCaseSensitive);
+  const filterRegex = useStore(store, (state) => state.filterRegex);
+  const setFilterCaseSensitive = useStore(store, (state) => state.setFilterCaseSensitive);
+  const setFilterRegex = useStore(store, (state) => state.setFilterRegex);
+
   const filterText = activePane === "local" ? localFilterText : remoteFilterText;
   const activeEntries = activePane === "local" ? localEntries : remoteEntries;
   const filterTotalCount = activeEntries.length;
-  const filterMatchCount = filterText
-    ? activeEntries.filter((e) => e.name.toLowerCase().includes(filterText.toLowerCase())).length
-    : filterTotalCount;
+  const filterMatchCount = useMemo(() => {
+    if (!filterText) return filterTotalCount;
+    if (filterRegex) {
+      try {
+        const re = new RegExp(filterText, filterCaseSensitive ? "" : "i");
+        return activeEntries.filter((e) => re.test(e.name)).length;
+      } catch {
+        return 0;
+      }
+    }
+    if (filterCaseSensitive) {
+      return activeEntries.filter((e) => e.name.includes(filterText)).length;
+    }
+    return activeEntries.filter((e) => e.name.toLowerCase().includes(filterText.toLowerCase())).length;
+  }, [activeEntries, filterText, filterCaseSensitive, filterRegex, filterTotalCount]);
 
   // Dialog state for rename
   const [renameDialog, setRenameDialog] = useState<{ open: boolean; path: string; oldName: string }>({
@@ -538,6 +555,10 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         filterMatchCount={filterMatchCount}
         filterTotalCount={filterTotalCount}
         filterInputRef={filterInputRef}
+        filterCaseSensitive={filterCaseSensitive}
+        filterRegex={filterRegex}
+        onToggleCaseSensitive={() => setFilterCaseSensitive(!filterCaseSensitive)}
+        onToggleRegex={() => setFilterRegex(!filterRegex)}
         onToggleSync={() => setShowSyncPanel((v) => !v)}
         syncActive={showSyncPanel}
       />

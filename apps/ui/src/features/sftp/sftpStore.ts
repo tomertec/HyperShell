@@ -30,11 +30,15 @@ export interface SftpStoreState {
   remoteCursorIndex: number;
   localFilterText: string;
   remoteFilterText: string;
+  filterCaseSensitive: boolean;
+  filterRegex: boolean;
   isLoading: { local: boolean; remote: boolean };
   error: { local: string | null; remote: string | null };
   setActivePane: (pane: SftpPane) => void;
   setCursorIndex: (pane: SftpPane, index: number) => void;
   setFilterText: (pane: SftpPane, text: string) => void;
+  setFilterCaseSensitive: (value: boolean) => void;
+  setFilterRegex: (value: boolean) => void;
   setLocalPath: (path: string) => void;
   setRemotePath: (path: string) => void;
   setLocalEntries: (entries: FsEntry[]) => void;
@@ -104,6 +108,8 @@ export function createSftpStore(sftpSessionId: string): StoreApi<SftpStoreState>
     remoteCursorIndex: 0,
     localFilterText: "",
     remoteFilterText: "",
+    filterCaseSensitive: false,
+    filterRegex: false,
     isLoading: { local: false, remote: false },
     error: { local: null, remote: null },
 
@@ -114,6 +120,9 @@ export function createSftpStore(sftpSessionId: string): StoreApi<SftpStoreState>
 
     setFilterText: (pane, text) =>
       set(pane === "local" ? { localFilterText: text } : { remoteFilterText: text }),
+
+    setFilterCaseSensitive: (value) => set({ filterCaseSensitive: value }),
+    setFilterRegex: (value) => set({ filterRegex: value }),
 
     setLocalPath: (path) =>
       set((state) => {
