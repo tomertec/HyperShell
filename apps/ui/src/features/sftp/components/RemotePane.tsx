@@ -5,6 +5,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent
 } from "react";
+import type React from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 
@@ -13,7 +14,7 @@ import type { SftpStoreState } from "../sftpStore";
 import { getParentPath } from "../utils/fileUtils";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList, type FileListEntry } from "./FileList";
-import { PathBreadcrumb } from "./PathBreadcrumb";
+import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
 
 export interface RemotePaneProps {
   store: StoreApi<SftpStoreState>;
@@ -26,6 +27,7 @@ export interface RemotePaneProps {
   onBookmark: (remotePath: string) => void;
   isActive: boolean;
   onActivate: () => void;
+  breadcrumbRef?: React.RefObject<PathBreadcrumbHandle | null>;
 }
 
 interface RemoteContextMenuState {
@@ -67,7 +69,8 @@ export function RemotePane({
   onMkdir,
   onBookmark,
   isActive,
-  onActivate
+  onActivate,
+  breadcrumbRef
 }: RemotePaneProps) {
   const sftpSessionId = useStore(store, (state) => state.sftpSessionId);
   const remotePath = useStore(store, (state) => state.remotePath);
@@ -273,7 +276,7 @@ export function RemotePane({
           ..
         </button>
         <div className="mx-0.5 h-3 w-px bg-base-700" />
-        <PathBreadcrumb path={remotePath} onNavigate={handleNavigate} editable onPathSubmit={handleNavigate} />
+        <PathBreadcrumb ref={breadcrumbRef} path={remotePath} onNavigate={handleNavigate} editable onPathSubmit={handleNavigate} />
       </div>
 
       <FileList

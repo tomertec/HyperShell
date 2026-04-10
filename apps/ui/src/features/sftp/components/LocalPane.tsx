@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
+import type React from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
 
@@ -8,13 +9,14 @@ import { getParentPath } from "../utils/fileUtils";
 import { DriveSelector } from "./DriveSelector";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList } from "./FileList";
-import { PathBreadcrumb } from "./PathBreadcrumb";
+import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
 
 export interface LocalPaneProps {
   store: StoreApi<SftpStoreState>;
   onTransfer: (localPaths: string[], remotePath: string) => void;
   isActive: boolean;
   onActivate: () => void;
+  breadcrumbRef?: React.RefObject<PathBreadcrumbHandle | null>;
 }
 
 interface LocalContextMenuState {
@@ -23,7 +25,7 @@ interface LocalContextMenuState {
   entry?: FsEntry;
 }
 
-export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPaneProps) {
+export function LocalPane({ store, onTransfer, isActive, onActivate, breadcrumbRef }: LocalPaneProps) {
   const localPath = useStore(store, (state) => state.localPath);
   const localEntries = useStore(store, (state) => state.localEntries);
   const localSelection = useStore(store, (state) => state.localSelection);
@@ -202,7 +204,7 @@ export function LocalPane({ store, onTransfer, isActive, onActivate }: LocalPane
           ..
         </button>
         <div className="mx-0.5 h-3 w-px bg-base-700" />
-        <PathBreadcrumb path={localPath} onNavigate={handleNavigate} separator="\\" editable onPathSubmit={handleNavigate} />
+        <PathBreadcrumb ref={breadcrumbRef} path={localPath} onNavigate={handleNavigate} separator="\\" editable onPathSubmit={handleNavigate} />
       </div>
 
       <FileList

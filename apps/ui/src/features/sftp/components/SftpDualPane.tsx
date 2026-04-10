@@ -7,6 +7,7 @@ import { handleFileKeyDown, type FileKeyboardContext } from "../hooks/useFileKey
 import { getParentPath, sortEntries } from "../utils/fileUtils";
 import { LocalPane } from "./LocalPane";
 import { RemotePane } from "./RemotePane";
+import type { PathBreadcrumbHandle } from "./PathBreadcrumb";
 
 export interface SftpDualPaneProps {
   store: StoreApi<SftpStoreState>;
@@ -58,6 +59,8 @@ export function SftpDualPane({
   const [splitRatio, setSplitRatio] = useState(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
+  const localBreadcrumbRef = useRef<PathBreadcrumbHandle>(null);
+  const remoteBreadcrumbRef = useRef<PathBreadcrumbHandle>(null);
 
   const activeSortBy = activePane === "local" ? localSortBy : remoteSortBy;
   const activeFilterText = activePane === "local" ? localFilterText : remoteFilterText;
@@ -106,7 +109,11 @@ export function SftpDualPane({
         onRefresh: onRefresh,
         onFocusFilter: () => filterInputRef.current?.focus(),
         onFocusBreadcrumb: () => {
-          // TODO: wire breadcrumb editing trigger
+          if (activePane === "local") {
+            localBreadcrumbRef.current?.startEditing();
+          } else {
+            remoteBreadcrumbRef.current?.startEditing();
+          }
         },
         onSwitchPane: () => setActivePane(activePane === "local" ? "remote" : "local"),
         onSelectAll: () => {
@@ -189,7 +196,7 @@ export function SftpDualPane({
         style={{ width: `${splitRatio * 100}%` }}
         className="flex min-h-0 min-w-[260px] flex-col border-r border-base-700"
       >
-        <LocalPane store={store} onTransfer={onUpload} isActive={activePane === "local"} onActivate={() => setActivePane("local")} />
+        <LocalPane store={store} onTransfer={onUpload} isActive={activePane === "local"} onActivate={() => setActivePane("local")} breadcrumbRef={localBreadcrumbRef} />
       </div>
 
       <div
@@ -214,6 +221,7 @@ export function SftpDualPane({
           onBookmark={onBookmark}
           isActive={activePane === "remote"}
           onActivate={() => setActivePane("remote")}
+          breadcrumbRef={remoteBreadcrumbRef}
         />
       </div>
     </div>

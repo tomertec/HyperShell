@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 interface BreadcrumbItem {
   label: string;
   path: string;
+}
+
+export interface PathBreadcrumbHandle {
+  startEditing: () => void;
 }
 
 export interface PathBreadcrumbProps {
@@ -50,16 +54,26 @@ function buildWindowsCrumbs(path: string): BreadcrumbItem[] {
   return crumbs;
 }
 
-export function PathBreadcrumb({
-  path,
-  onNavigate,
-  separator = "/",
-  editable,
-  onPathSubmit
-}: PathBreadcrumbProps) {
+export const PathBreadcrumb = forwardRef<PathBreadcrumbHandle, PathBreadcrumbProps>(
+  function PathBreadcrumb({
+    path,
+    onNavigate,
+    separator = "/",
+    editable,
+    onPathSubmit
+  }, ref) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(path);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    startEditing: () => {
+      if (editable) {
+        setEditValue(path);
+        setIsEditing(true);
+      }
+    },
+  }));
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -134,4 +148,5 @@ export function PathBreadcrumb({
       ))}
     </div>
   );
-}
+});
+
