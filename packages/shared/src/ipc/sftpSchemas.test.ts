@@ -7,7 +7,8 @@ import {
   sftpDragOutRequestSchema,
   sftpEventSchema,
   sftpListRequestSchema,
-  sftpTransferStartRequestSchema
+  sftpTransferStartRequestSchema,
+  transferJobStatusSchema
 } from "./sftpSchemas";
 
 describe("SFTP schemas", () => {
@@ -101,5 +102,17 @@ describe("sftpDragOutRequestSchema", () => {
     expect(() =>
       sftpDragOutRequestSchema.parse({ sftpSessionId: "sess-1" })
     ).toThrow();
+  });
+});
+
+describe("transferJobStatusSchema", () => {
+  it("accepts interrupted status", () => {
+    expect(transferJobStatusSchema.parse("interrupted")).toBe("interrupted");
+  });
+
+  it("accepts all existing statuses", () => {
+    for (const s of ["queued", "active", "paused", "completed", "failed"]) {
+      expect(transferJobStatusSchema.parse(s)).toBe(s);
+    }
   });
 });

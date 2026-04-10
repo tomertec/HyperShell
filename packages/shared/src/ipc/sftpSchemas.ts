@@ -130,10 +130,16 @@ export const sftpTransferResumeRequestSchema = z.object({
 });
 export type SftpTransferResumeRequest = z.infer<typeof sftpTransferResumeRequestSchema>;
 
+export const sftpTransferRetryRequestSchema = z.object({
+  transferId: z.string()
+});
+export type SftpTransferRetryRequest = z.infer<typeof sftpTransferRetryRequestSchema>;
+
 export const transferJobStatusSchema = z.enum([
   "queued",
   "active",
   "paused",
+  "interrupted",
   "completed",
   "failed"
 ]);
