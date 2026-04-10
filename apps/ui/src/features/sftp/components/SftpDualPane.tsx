@@ -209,7 +209,7 @@ export function SftpDualPane({
         style={{ width: `${splitRatio * 100}%` }}
         className="flex min-h-0 min-w-[260px] flex-col border-r border-base-700"
       >
-        <LocalPane store={store} onTransfer={onUpload} isActive={activePane === "local"} onActivate={() => setActivePane("local")} breadcrumbRef={localBreadcrumbRef} />
+        <LocalPane store={store} onTransfer={onUpload} onDownload={onDownload} isActive={activePane === "local"} onActivate={() => setActivePane("local")} breadcrumbRef={localBreadcrumbRef} />
       </div>
 
       <div
@@ -226,6 +226,7 @@ export function SftpDualPane({
         <RemotePane
           store={store}
           onTransfer={onDownload}
+          onUpload={onUpload}
           onEdit={onEdit}
           onProperties={onProperties}
           onRename={onRename}

@@ -31,7 +31,8 @@ export interface FileListProps {
   onNavigate: (path: string) => void;
   onSelect: (selection: Set<string>) => void;
   onSort: (column: SortColumn, direction: SortDirection) => void;
-  onDrop: (files: string[], targetPath: string) => void;
+  onInternalDrop: (paths: string[]) => void;
+  onExternalDrop: (localPaths: string[]) => void;
   onContextMenu: (event: MouseEvent, entry?: FileListEntry) => void;
   onEdit?: (path: string) => void;
   paneType: "local" | "remote";
@@ -63,7 +64,8 @@ export function FileList({
   onNavigate,
   onSelect,
   onSort,
-  onDrop,
+  onInternalDrop,
+  onExternalDrop,
   onContextMenu,
   onEdit,
   paneType,
@@ -195,17 +197,19 @@ export function FileList({
     event.preventDefault();
     setDropActive(false);
 
+    // Internal cross-pane drop (files dragged within SFTP UI)
     const internalPaths = event.dataTransfer.getData("application/x-sftp-paths");
     if (internalPaths) {
-      onDrop(JSON.parse(internalPaths) as string[], "");
+      onInternalDrop(JSON.parse(internalPaths) as string[]);
       return;
     }
 
+    // OS file drop (files dragged from Explorer/Finder)
     const files = Array.from(event.dataTransfer.files)
       .map((file) => (file as File & { path?: string }).path)
       .filter((path): path is string => Boolean(path));
     if (files.length > 0) {
-      onDrop(files, "");
+      onExternalDrop(files);
     }
   };
 

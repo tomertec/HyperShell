@@ -14,6 +14,7 @@ import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
 export interface LocalPaneProps {
   store: StoreApi<SftpStoreState>;
   onTransfer: (localPaths: string[], remotePath: string) => void;
+  onDownload: (remotePaths: string[], localPath: string) => void;
   isActive: boolean;
   onActivate: () => void;
   breadcrumbRef?: React.RefObject<PathBreadcrumbHandle | null>;
@@ -25,7 +26,7 @@ interface LocalContextMenuState {
   entry?: FsEntry;
 }
 
-export function LocalPane({ store, onTransfer, isActive, onActivate, breadcrumbRef }: LocalPaneProps) {
+export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate, breadcrumbRef }: LocalPaneProps) {
   const localPath = useStore(store, (state) => state.localPath);
   const localEntries = useStore(store, (state) => state.localEntries);
   const localSelection = useStore(store, (state) => state.localSelection);
@@ -160,6 +161,22 @@ export function LocalPane({ store, onTransfer, isActive, onActivate, breadcrumbR
     []
   );
 
+  // Internal drop: paths from remote pane's file list → these are remote paths, trigger download
+  const handleInternalDrop = useCallback(
+    (paths: string[]) => {
+      onDownload(paths, localPath);
+    },
+    [onDownload, localPath]
+  );
+
+  // External drop: OS files → no meaningful action for local-to-local
+  const handleExternalDrop = useCallback(
+    (_localPaths: string[]) => {
+      // No action — local-to-local OS drops don't make sense in this context
+    },
+    []
+  );
+
   const contextActions = useMemo<FileContextMenuAction[]>(() => {
     if (!contextMenu) {
       return [];
@@ -229,7 +246,8 @@ export function LocalPane({ store, onTransfer, isActive, onActivate, breadcrumbR
         onNavigate={handleNavigate}
         onSelect={setLocalSelection}
         onSort={(column, direction) => setLocalSortBy({ column, direction })}
-        onDrop={() => {}}
+        onInternalDrop={handleInternalDrop}
+        onExternalDrop={handleExternalDrop}
         onContextMenu={handleContextMenu}
         paneType="local"
         cursorIndex={localCursorIndex}

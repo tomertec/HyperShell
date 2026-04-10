@@ -19,6 +19,7 @@ import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
 export interface RemotePaneProps {
   store: StoreApi<SftpStoreState>;
   onTransfer: (remotePaths: string[], localPath: string) => void;
+  onUpload: (localPaths: string[], remotePath: string) => void;
   onEdit: (remotePath: string) => void;
   onProperties: (remotePath: string) => void;
   onRename: (remotePath: string) => void;
@@ -62,6 +63,7 @@ function extractRemoteEntries(
 export function RemotePane({
   store,
   onTransfer,
+  onUpload,
   onEdit,
   onProperties,
   onRename,
@@ -182,11 +184,20 @@ export function RemotePane({
     [setRemotePath, setRemoteSelection]
   );
 
-  const handleDrop = useCallback(
+  // Internal drop: paths from local pane's file list → these are local FS paths, treat as upload
+  const handleInternalDrop = useCallback(
     (paths: string[]) => {
-      onTransfer(paths, "");
+      onUpload(paths, remotePath);
     },
-    [onTransfer]
+    [onUpload, remotePath]
+  );
+
+  // External drop: OS files dragged in → upload to current remote directory
+  const handleExternalDrop = useCallback(
+    (localPaths: string[]) => {
+      onUpload(localPaths, remotePath);
+    },
+    [onUpload, remotePath]
   );
 
   const handleContextMenu = useCallback((event: ReactMouseEvent, entry?: FileListEntry) => {
@@ -301,7 +312,8 @@ export function RemotePane({
         onNavigate={handleNavigate}
         onSelect={setRemoteSelection}
         onSort={(column, direction) => setRemoteSortBy({ column, direction })}
-        onDrop={handleDrop}
+        onInternalDrop={handleInternalDrop}
+        onExternalDrop={handleExternalDrop}
         onContextMenu={handleContextMenu}
         onEdit={onEdit}
         paneType="remote"
