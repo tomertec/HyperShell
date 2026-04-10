@@ -1,14 +1,21 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { openDatabase } from "./index";
 
 describe("openDatabase pragmas", () => {
-  it("enables WAL journal mode", () => {
-    const db = openDatabase(":memory:");
-    const result = db.pragma("journal_mode");
-    // In-memory databases fall back to "memory" journal mode, so we verify
-    // the pragma call doesn't throw. For file-backed DBs it returns "wal".
-    expect(result).toBeDefined();
-    db.close();
+  it("enables WAL journal mode on file-backed DB", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hypershell-test-"));
+    const dbPath = join(dir, "test.db");
+    try {
+      const db = openDatabase(dbPath);
+      const [{ journal_mode }] = db.pragma("journal_mode");
+      expect(journal_mode).toBe("wal");
+      db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("sets synchronous to NORMAL", () => {
