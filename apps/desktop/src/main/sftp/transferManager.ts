@@ -50,6 +50,19 @@ export interface TransferManager {
     transport: SftpTransportHandle,
     operations: TransferOp[]
   ): TransferJob[];
+  enqueueResume(
+    sftpSessionId: string,
+    transport: SftpTransportHandle,
+    entry: {
+      transferId?: string;
+      type: "upload" | "download";
+      localPath: string;
+      remotePath: string;
+      bytesTransferred: number;
+      totalBytes: number;
+      batchId: string;
+    }
+  ): TransferJob;
   cancel(transferId: string): void;
   pause(transferId: string): void;
   resume(transferId: string): void;
@@ -314,6 +327,26 @@ export function createTransferManager(
             return;
           }
 
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          const isConnectionLoss =
+            errorMsg.includes("ECONNRESET")
+            || errorMsg.includes("ENOTCONN")
+            || errorMsg.includes("socket")
+            || errorMsg.includes("end of stream")
+            || errorMsg.includes("Not connected");
+
+          if (isConnectionLoss) {
+            nextJob.status = "interrupted";
+            nextJob.error = errorMsg;
+            emit({
+              kind: "transfer-complete",
+              transferId: nextJob.transferId,
+              status: "failed",
+              error: nextJob.error
+            });
+            return;
+          }
+
           if (error instanceof TransferSkippedError) {
             nextJob.status = "completed";
             emit({
@@ -395,10 +428,24 @@ export function createTransferManager(
         job.status = "active";
       }
 
-      const localStream = createReadStream(job.localPath);
-      const remoteStream = transport.createWriteStream(job.remotePath);
+      const resumeOffset = job.bytesTransferred;
+      let isResuming = false;
+      if (resumeOffset > 0) {
+        try {
+          const remoteStat = await transport.stat(job.remotePath);
+          isResuming = remoteStat.size === resumeOffset;
+        } catch {
+          // Remote file doesn't exist — start fresh
+        }
+      }
+      const localStream = isResuming
+        ? createReadStream(job.localPath, { start: resumeOffset })
+        : createReadStream(job.localPath);
+      const remoteStream = isResuming
+        ? transport.createWriteStream(job.remotePath, { start: resumeOffset, flags: "r+" })
+        : transport.createWriteStream(job.remotePath);
 
-      let bytesTransferred = 0;
+      let bytesTransferred = isResuming ? resumeOffset : 0;
       let lastEmit = Date.now();
       const startedAt = Date.now();
       const emitProgress = (status: "active" | "paused" = "active") => {
@@ -524,10 +571,16 @@ export function createTransferManager(
 
     mkdirSync(dirname(job.localPath), { recursive: true });
     const partPath = `${job.localPath}.part`;
-    const remoteStream = transport.createReadStream(job.remotePath);
-    const localStream = createWriteStream(partPath);
+    const resumeOffset = job.bytesTransferred;
+    const isResuming = resumeOffset > 0 && existsSync(partPath) && statSync(partPath).size === resumeOffset;
+    const remoteStream = isResuming
+      ? transport.createReadStream(job.remotePath, { start: resumeOffset })
+      : transport.createReadStream(job.remotePath);
+    const localStream = isResuming
+      ? createWriteStream(partPath, { flags: "r+", start: resumeOffset })
+      : createWriteStream(partPath);
 
-    let bytesTransferred = 0;
+    let bytesTransferred = isResuming ? resumeOffset : 0;
     let lastEmit = Date.now();
     const startedAt = Date.now();
     const emitProgress = (status: "active" | "paused" = "active") => {
@@ -656,6 +709,42 @@ export function createTransferManager(
 
     scheduleDrain();
     return createdJobs;
+  }
+
+  function enqueueResume(
+    sftpSessionId: string,
+    transport: SftpTransportHandle,
+    entry: {
+      transferId?: string;
+      type: "upload" | "download";
+      localPath: string;
+      remotePath: string;
+      bytesTransferred: number;
+      totalBytes: number;
+      batchId: string;
+    }
+  ): TransferJob {
+    const transferId = entry.transferId ?? `tx-${randomUUID().replace(/-/g, "")}`;
+    transports.set(sftpSessionId, transport);
+
+    const job: ManagedTransferJob = {
+      transferId,
+      sftpSessionId,
+      type: entry.type,
+      localPath: entry.localPath,
+      remotePath: entry.remotePath,
+      status: "queued",
+      bytesTransferred: entry.bytesTransferred,
+      totalBytes: entry.totalBytes,
+      speed: 0,
+      abortController: null,
+      isDirectory: false,
+      batchId: entry.batchId,
+    };
+
+    jobs.set(transferId, job);
+    scheduleDrain();
+    return snapshot(job);
   }
 
   function collectRelatedTargets(job: ManagedTransferJob): ManagedTransferJob[] {
@@ -908,6 +997,7 @@ export function createTransferManager(
 
   return {
     enqueue,
+    enqueueResume,
     cancel,
     pause,
     resume,
