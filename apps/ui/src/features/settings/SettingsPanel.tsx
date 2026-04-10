@@ -170,7 +170,8 @@ function GeneralSection() {
     showRestoreBanner,
     showSerialInSidebar,
     confirmOnClose,
-    usePopupTransferMonitor
+    usePopupTransferMonitor,
+    enableTelnet
   } = settings.general;
 
   return (
@@ -239,6 +240,24 @@ function GeneralSection() {
               onChange={() =>
                 void updateGeneral({ usePopupTransferMonitor: !usePopupTransferMonitor })
               }
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Protocols</h3>
+        <div className="grid gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Enable Telnet / Raw TCP</div>
+              <div className="text-xs text-text-muted">
+                Show Telnet quick-connect option for network gear and raw TCP services
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={enableTelnet}
+              onChange={() => void updateGeneral({ enableTelnet: !enableTelnet })}
             />
           </div>
         </div>
