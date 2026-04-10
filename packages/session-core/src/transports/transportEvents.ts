@@ -1,4 +1,4 @@
-export type SessionTransportKind = "ssh" | "serial" | "sftp";
+export type SessionTransportKind = "ssh" | "serial" | "sftp" | "telnet";
 
 export type SessionState =
   | "connecting"
@@ -61,6 +61,13 @@ export interface SerialConnectionOptions {
   rts?: boolean;
 }
 
+export interface TelnetConnectionOptions {
+  hostname: string;
+  port: number;
+  mode: "telnet" | "raw";
+  terminalType?: string;
+}
+
 export interface SftpConnectionOptions {
   hostname: string;
   port?: number;
@@ -85,4 +92,5 @@ export type OpenSessionRequest = {
   sshOptions?: SshConnectionOptions;
   serialOptions?: SerialConnectionOptions;
   sftpOptions?: SftpConnectionOptions;
+  telnetOptions?: TelnetConnectionOptions;
 };

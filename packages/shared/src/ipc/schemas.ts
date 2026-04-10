@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const transportSchema = z.enum(["ssh", "serial", "sftp"]);
+export const transportSchema = z.enum(["ssh", "serial", "sftp", "telnet"]);
 
 export const sessionStateSchema = z.enum([
   "connecting",
@@ -11,6 +11,13 @@ export const sessionStateSchema = z.enum([
   "failed"
 ]);
 
+export const telnetConnectionOptionsSchema = z.object({
+  hostname: z.string().min(1),
+  port: z.number().int().positive().default(23),
+  mode: z.enum(["telnet", "raw"]),
+  terminalType: z.string().optional(),
+});
+
 export const openSessionRequestSchema = z.object({
   transport: transportSchema,
   profileId: z.string().min(1),
@@ -19,6 +26,7 @@ export const openSessionRequestSchema = z.object({
   autoReconnect: z.boolean().optional(),
   reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
+  telnetOptions: telnetConnectionOptionsSchema.optional(),
 });
 
 export const openSessionResponseSchema = z.object({
