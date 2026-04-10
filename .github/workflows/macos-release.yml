@@ -38,9 +38,6 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @hypershell/ui exec playwright install chromium
 
-      - name: Rebuild native modules for Electron
-        run: pnpm --filter @hypershell/desktop rebuild:native
-
       - name: Workspace build
         run: pnpm ci:build
 
@@ -49,6 +46,9 @@ jobs:
 
       - name: Playwright smoke
         run: pnpm ci:test:e2e
+
+      - name: Rebuild native modules for Electron
+        run: pnpm --filter @hypershell/desktop rebuild:native
 
       - name: Package unsigned macOS release
         run: pnpm release:mac:unsigned
