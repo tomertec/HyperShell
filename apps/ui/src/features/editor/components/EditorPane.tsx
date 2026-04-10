@@ -5,11 +5,9 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { search, openSearchPanel } from "@codemirror/search";
 import { indentUnit } from "@codemirror/language";
 import { getLanguageExtension } from "../../sftp/utils/languageDetect";
+import { FONT_SIZE_MIN, FONT_SIZE_MAX } from "./editorConstants";
 import type { EditorState } from "../stores/editorStore";
 import type { StoreApi } from "zustand/vanilla";
-
-export const FONT_SIZE_MIN = 10;
-export const FONT_SIZE_MAX = 28;
 
 interface EditorPaneProps {
   store: StoreApi<EditorState>;
@@ -23,6 +21,7 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
   const wrapCompartment = useRef(new Compartment());
   const fontCompartment = useRef(new Compartment());
   const indentCompartment = useRef(new Compartment());
+  const langCompartment = useRef(new Compartment());
 
   const storeRef = useRef(store);
   storeRef.current = store;
@@ -35,7 +34,6 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
 
     const fileName = tab.fileName;
     const originalContent = tab.originalContent;
-    const languageExt = getLanguageExtension(fileName);
     const updateTab = storeRef.current.getState().updateTab;
 
     const extensions = [
@@ -58,6 +56,7 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
       indentCompartment.current.of(
         indentUnit.of(" ".repeat(settings.indentSize))
       ),
+      langCompartment.current.of([]),
       EditorView.updateListener.of((update) => {
         if (!update.docChanged && !update.selectionSet) return;
         const cursor = update.state.selection.main.head;
@@ -75,14 +74,20 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
       }),
     ];
 
-    if (languageExt) extensions.push(languageExt);
-
     const view = new EditorView({
       state: CMState.create({ doc: content, extensions }),
       parent: containerRef.current,
     });
 
     viewRef.current = view;
+
+    void getLanguageExtension(fileName).then((ext) => {
+      if (ext && viewRef.current) {
+        viewRef.current.dispatch({
+          effects: langCompartment.current.reconfigure(ext),
+        });
+      }
+    });
 
     return () => {
       view.destroy();
