@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import os from "node:os";
 import { ipcChannels, type SessionEvent } from "@hypershell/shared";
 import type { SessionManager, SessionSnapshot } from "@hypershell/session-core";
 import { openDatabase } from "@hypershell/db";
 import type { IpcMainInvokeEvent } from "electron";
+
+vi.mock("electron", () => ({
+  app: { getPath: () => os.tmpdir() },
+  ipcMain: { handle() {}, removeHandler() {} }
+}));
 
 import { getRegisteredChannels, registerIpc } from "./registerIpc";
 

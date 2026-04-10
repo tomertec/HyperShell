@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import os from "node:os";
+
+vi.mock("electron", () => ({
+  app: { getPath: () => os.tmpdir() },
+  ipcMain: { handle() {}, removeHandler() {} }
+}));
 
 import { openSessionForTest } from "./registerIpc";
 
