@@ -43,6 +43,13 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
 
   const db = new Database(databasePath);
 
+  // Performance pragmas — safe for single-process desktop app.
+  // WAL persists on the DB file after first run; re-issuing is a no-op.
+  db.pragma("journal_mode = WAL");
+  db.pragma("synchronous = NORMAL");
+  db.pragma("busy_timeout = 5000");
+  db.pragma("cache_size = -8000");
+  db.pragma("temp_store = MEMORY");
   db.pragma("foreign_keys = ON");
   db.exec(initSchemaSql);
   db.exec(sftpBookmarksSql);
