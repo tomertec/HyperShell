@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 
 import { createEditorStore } from "./stores/editorStore";
 import { EditorTabBar } from "./components/EditorTabBar";
 import { EditorToolbar } from "./components/EditorToolbar";
-import { EditorPane } from "./components/EditorPane";
+const EditorPane = lazy(() => import("./components/EditorPane").then((m) => ({ default: m.EditorPane })));
 import { EditorStatusBar } from "./components/EditorStatusBar";
 import { getLanguageName } from "../sftp/utils/languageDetect";
 import { decodeBase64Utf8 } from "../sftp/utils/fileUtils";
@@ -187,12 +187,18 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
               Loading {activeTab.fileName}...
             </div>
           ) : (
-            <EditorPane
-              key={activeTab.id}
-              store={store}
-              tabId={activeTab.id}
-              content={activeTab.content}
-            />
+            <Suspense fallback={
+              <div className="flex h-full items-center justify-center text-text-secondary">
+                Loading editor...
+              </div>
+            }>
+              <EditorPane
+                key={activeTab.id}
+                store={store}
+                tabId={activeTab.id}
+                content={activeTab.content}
+              />
+            </Suspense>
           )
         ) : (
           <div className="flex h-full items-center justify-center text-text-muted">
