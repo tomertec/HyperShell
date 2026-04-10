@@ -1105,65 +1105,120 @@ function parseStatsOutput(raw: string): Omit<HostStatsResponse, "latencyMs"> {
   return result;
 }
 
+// Unique markers that won't appear in normal terminal output.
+// The random suffix prevents false matches from user commands.
+const STATS_MARKER_START = "___HSSTATS_B_7f3a___";
+const STATS_MARKER_END = "___HSSTATS_E_7f3a___";
+
+// Inline stats command: output lands between the two markers on a single line.
+const INLINE_STATS_COMMAND =
+  `echo ${STATS_MARKER_START};"${STATS_COMMAND}";echo ${STATS_MARKER_END}`;
+
+interface PendingStatsCapture {
+  sessionId: string;
+  buffer: string;
+  capturing: boolean;
+  resolve: (value: HostStatsResponse) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+// Active stats captures keyed by sessionId.
+const pendingStatsCaptures = new Map<string, PendingStatsCapture>();
+
+/**
+ * Intercept a data event from a session transport. If a stats capture is
+ * pending for this session, strip the marker-delimited output and resolve the
+ * capture promise. Returns the data that should be forwarded to the renderer
+ * (with the stats output removed), or `null` if the entire chunk was consumed.
+ */
+function interceptStatsData(sessionId: string, data: string): string | null {
+  const capture = pendingStatsCaptures.get(sessionId);
+  if (!capture) return data;
+
+  let forwarded = "";
+  let remaining = data;
+
+  while (remaining.length > 0) {
+    if (!capture.capturing) {
+      const startIdx = remaining.indexOf(STATS_MARKER_START);
+      if (startIdx === -1) {
+        forwarded += remaining;
+        remaining = "";
+      } else {
+        forwarded += remaining.slice(0, startIdx);
+        capture.capturing = true;
+        remaining = remaining.slice(startIdx + STATS_MARKER_START.length);
+      }
+    } else {
+      const endIdx = remaining.indexOf(STATS_MARKER_END);
+      if (endIdx === -1) {
+        capture.buffer += remaining;
+        remaining = "";
+      } else {
+        capture.buffer += remaining.slice(0, endIdx);
+        remaining = remaining.slice(endIdx + STATS_MARKER_END.length);
+        // Capture complete — resolve.
+        finishStatsCapture(sessionId, capture.buffer);
+      }
+    }
+  }
+
+  // Strip any leftover ANSI or whitespace-only remnants so the terminal
+  // doesn't show a blank line from the echo commands.
+  const cleaned = forwarded.replace(/\r?\n?$/g, "");
+  return cleaned.length > 0 ? forwarded : null;
+}
+
+function finishStatsCapture(sessionId: string, raw: string): void {
+  const capture = pendingStatsCaptures.get(sessionId);
+  if (!capture) return;
+
+  clearTimeout(capture.timer);
+  pendingStatsCaptures.delete(sessionId);
+
+  const stats = parseStatsOutput(raw);
+  capture.resolve({ ...stats, latencyMs: null });
+}
+
 async function hostStatsHandler(
   _event: IpcMainInvokeEvent,
   request: unknown,
   manager: SessionManager = sessionManager
 ): Promise<HostStatsResponse> {
   const parsed = hostStatsRequestSchema.parse(request);
-  const input = manager.getSessionInput(parsed.sessionId);
+  const session = manager.getSession(parsed.sessionId);
 
-  if (!input?.sshOptions) {
-    throw new Error("Session not found or not an SSH session");
+  if (!session || session.state !== "connected") {
+    return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
   }
 
-  const { hostname, username, port, identityFile, proxyJump } = input.sshOptions;
-
-  const sshBinary = resolveSshBinaryPath();
-  const args: string[] = [
-    "-o", "BatchMode=yes",
-    "-o", "ConnectTimeout=5"
-  ];
-
-  if (port != null) {
-    args.push("-p", String(port));
+  if (session.transport !== "ssh") {
+    return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
   }
 
-  if (identityFile) {
-    args.push("-i", identityFile);
+  // If a capture is already pending for this session, skip to avoid overlap.
+  if (pendingStatsCaptures.has(parsed.sessionId)) {
+    return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
   }
 
-  if (proxyJump) {
-    args.push("-J", proxyJump);
-  }
+  return new Promise<HostStatsResponse>((resolve) => {
+    const timer = setTimeout(() => {
+      pendingStatsCaptures.delete(parsed.sessionId);
+      resolve({ cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null });
+    }, 10000);
 
-  const destination = username ? `${username}@${hostname}` : hostname;
-  args.push(destination, STATS_COMMAND);
-
-  const startTime = Date.now();
-
-  try {
-    const { stdout } = await execFileAsync(sshBinary, args, {
-      timeout: 10000,
-      windowsHide: true
+    pendingStatsCaptures.set(parsed.sessionId, {
+      sessionId: parsed.sessionId,
+      buffer: "",
+      capturing: false,
+      resolve,
+      timer
     });
 
-    const latencyMs = Date.now() - startTime;
-    const stats = parseStatsOutput(stdout);
-
-    return {
-      ...stats,
-      latencyMs
-    };
-  } catch {
-    return {
-      cpuLoad: null,
-      memUsage: null,
-      diskUsage: null,
-      uptime: null,
-      latencyMs: null
-    };
-  }
+    // Write the command to the existing PTY. The leading space prevents it
+    // from appearing in shell history on most shells (HISTCONTROL=ignorespace).
+    manager.write(parsed.sessionId, ` ${INLINE_STATS_COMMAND}\n`);
+  });
 }
 
 export function getRegisteredChannels(): readonly string[] {
@@ -1292,6 +1347,22 @@ export function registerIpc(
   }
 
   const unsubscribeSessionEvents = manager.onEvent((event) => {
+    // Intercept data events to strip hidden stats output before it reaches
+    // the renderer or session logger.
+    if ("type" in event && event.type === "data" && "sessionId" in event && "data" in event) {
+      const sessionId = String(event.sessionId);
+      const filtered = interceptStatsData(sessionId, event.data as string);
+
+      if (filtered !== null) {
+        const filteredEvent = { ...event, data: filtered };
+        options.emitSessionEvent?.(filteredEvent);
+        sessionLogger.onSessionData(sessionId, filtered);
+        recorder.onSessionData(sessionId, filtered);
+      }
+      // If filtered is null, the entire chunk was stats output — don't forward.
+      return;
+    }
+
     options.emitSessionEvent?.(event);
 
     if ("type" in event && "sessionId" in event) {
@@ -1315,6 +1386,12 @@ export function registerIpc(
         recordedFailedAttemptSessions.delete(sessionId);
         sessionErrorMessages.delete(sessionId);
         sessionHostCache.delete(sessionId);
+        // Clean up any pending stats capture for this session.
+        const pending = pendingStatsCaptures.get(sessionId);
+        if (pending) {
+          clearTimeout(pending.timer);
+          pendingStatsCaptures.delete(sessionId);
+        }
 
         // Wait one tick to let SessionManager finalize reconnect/disconnect state.
         setTimeout(() => {
@@ -1323,12 +1400,6 @@ export function registerIpc(
           }
         }, 0);
       }
-    }
-
-    // Session logging: intercept data events.
-    if ("type" in event && event.type === "data" && "sessionId" in event && "data" in event) {
-      sessionLogger.onSessionData(event.sessionId as string, event.data as string);
-      recorder.onSessionData(event.sessionId as string, event.data as string);
     }
   });
   const unsubscribeHostStatusEvents = hostStatusService.onStatus((event) => {
