@@ -80,7 +80,7 @@
 ### Install and Run
 
 ```bash
-git clone https://github.com/user/hypershell.git
+git clone https://github.com/tomertec/HyperShell.git
 cd hypershell
 pnpm install
 pnpm build
