@@ -173,6 +173,8 @@ import {
   sftpSyncStartRequestSchema,
   sftpSyncStopRequestSchema,
   sftpSyncEventSchema,
+  sftpDragOutRequestSchema,
+  sftpDragOutResponseSchema,
   listHostPortForwardsRequestSchema,
   upsertHostPortForwardRequestSchema,
   removeHostPortForwardRequestSchema,
@@ -264,6 +266,8 @@ import {
   type SftpSyncStopRequest,
   type SftpSyncStatus,
   type SftpSyncEvent,
+  type SftpDragOutRequest,
+  type SftpDragOutResponse,
   type HostPortForwardRecord,
   type UpsertHostPortForwardRequest,
   type ListHostPortForwardsRequest,
@@ -383,6 +387,7 @@ export interface DesktopApi {
   sftpSyncStop(request: SftpSyncStopRequest): Promise<void>;
   sftpSyncList(): Promise<{ syncs: SftpSyncStatus[] }>;
   onSftpSyncEvent(listener: (event: SftpSyncEvent) => void): () => void;
+  sftpDragOut(request: SftpDragOutRequest): Promise<SftpDragOutResponse>;
   // Host port forwards
   hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]>;
   hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord>;
@@ -1344,6 +1349,11 @@ export function createDesktopApi(
       const raw = await ipcRenderer.invoke(ipcChannels.backup.showOpenDialog);
       if (raw === null || raw === undefined) return null;
       return z.string().parse(raw);
+    },
+    async sftpDragOut(request: SftpDragOutRequest): Promise<SftpDragOutResponse> {
+      const parsed = sftpDragOutRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.dragOut, parsed);
+      return sftpDragOutResponseSchema.parse(result);
     },
   };
 }

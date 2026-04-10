@@ -345,3 +345,15 @@ export const editorSessionClosedSchema = z.object({
   sftpSessionId: z.string(),
 });
 export type EditorSessionClosed = z.infer<typeof editorSessionClosedSchema>;
+
+export const sftpDragOutRequestSchema = z.object({
+  sftpSessionId: z.string(),
+  remotePath: z.string(),
+  fileName: z.string(),
+});
+export type SftpDragOutRequest = z.infer<typeof sftpDragOutRequestSchema>;
+
+export const sftpDragOutResponseSchema = z.object({
+  tempPath: z.string(),
+});
+export type SftpDragOutResponse = z.infer<typeof sftpDragOutResponseSchema>;

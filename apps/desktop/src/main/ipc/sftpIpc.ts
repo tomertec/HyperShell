@@ -1,4 +1,7 @@
 import { createHostsRepositoryFromDatabase, openDatabase, createSftpBookmarksRepository, createHostFingerprintRepositoryFromDatabase } from "@hypershell/db";
+import { app } from "electron";
+import path from "node:path";
+import fs from "node:fs";
 import {
   ipcChannels,
   sftpBookmarkListRequestSchema,
@@ -22,6 +25,7 @@ import {
   sftpWriteFileRequestSchema,
   sftpSyncStartRequestSchema,
   sftpSyncStopRequestSchema,
+  sftpDragOutRequestSchema,
   keyboardInteractiveResponseSchema,
   type SftpEvent,
   type SftpSyncEvent,
@@ -438,6 +442,34 @@ export function registerSftpIpc(
     return { syncs: syncEngine.list() };
   };
 
+  const handleDragOut = async (event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = sftpDragOutRequestSchema.parse(rawRequest);
+    const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+
+    // Download to a temp directory
+    const tempDir = path.join(app.getPath("temp"), "hypershell-drag");
+    fs.mkdirSync(tempDir, { recursive: true });
+    const tempPath = path.join(tempDir, request.fileName);
+
+    // Stream remote file to local temp
+    await new Promise<void>((resolve, reject) => {
+      const readStream = transport.createReadStream(request.remotePath);
+      const writeStream = fs.createWriteStream(tempPath);
+      readStream.pipe(writeStream);
+      writeStream.on("finish", resolve);
+      writeStream.on("error", reject);
+      readStream.on("error", reject);
+    });
+
+    // Initiate native OS drag from the temp file
+    event.sender.startDrag({
+      file: tempPath,
+      icon: await app.getFileIcon(tempPath, { size: "small" }),
+    });
+
+    return { tempPath };
+  };
+
   const handleKeyboardInteractiveResponse = async (
     _event: IpcMainInvokeEvent,
     rawRequest: unknown
@@ -478,6 +510,7 @@ export function registerSftpIpc(
   ipcMain.handle(ipcChannels.sftp.syncStart, handleSyncStart);
   ipcMain.handle(ipcChannels.sftp.syncStop, handleSyncStop);
   ipcMain.handle(ipcChannels.sftp.syncList, handleSyncList);
+  ipcMain.handle(ipcChannels.sftp.dragOut, handleDragOut);
 
   const unsubscribeSyncEvents = syncEngine.onEvent((event) => {
     options.emitSyncEvent?.(event);

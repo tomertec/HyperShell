@@ -135,6 +135,8 @@ import type {
   RestoreBackupRequest,
   RestoreBackupResponse,
   ListBackupsResponse,
+  SftpDragOutRequest,
+  SftpDragOutResponse,
 } from "@hypershell/shared";
 
 declare const __APP_VERSION__: string;
@@ -268,6 +270,7 @@ declare global {
       backupRestore?: (request: RestoreBackupRequest) => Promise<RestoreBackupResponse>;
       backupList?: () => Promise<ListBackupsResponse>;
       backupShowOpenDialog?: () => Promise<string | null>;
+      sftpDragOut?: (request: SftpDragOutRequest) => Promise<SftpDragOutResponse>;
     };
   }
 }

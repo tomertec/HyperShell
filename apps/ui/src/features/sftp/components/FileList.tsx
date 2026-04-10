@@ -37,6 +37,7 @@ export interface FileListProps {
   onEdit?: (path: string) => void;
   paneType: "local" | "remote";
   cursorIndex: number;
+  sftpSessionId?: string;
 }
 
 const ROW_HEIGHT = 22;
@@ -69,7 +70,8 @@ export function FileList({
   onContextMenu,
   onEdit,
   paneType,
-  cursorIndex
+  cursorIndex,
+  sftpSessionId
 }: FileListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cursorRowRef = useCallback((node: HTMLTableRowElement | null) => {
@@ -178,9 +180,22 @@ export function FileList({
 
   const handleDragStart = (event: DragEvent<HTMLTableRowElement>, entry: FileListEntry) => {
     const paths = selection.has(entry.path) ? Array.from(selection) : [entry.path];
+
+    // Always set internal data synchronously (for cross-pane drops)
     event.dataTransfer.effectAllowed = "copyMove";
     event.dataTransfer.setData("application/x-sftp-paths", JSON.stringify(paths));
     event.dataTransfer.setData("text/plain", paths.join("\n"));
+
+    // For remote pane: fire-and-forget IPC to initiate native OS drag
+    if (sftpSessionId && paths.length === 1 && !entry.isDirectory) {
+      void window.hypershell?.sftpDragOut?.({
+        sftpSessionId,
+        remotePath: paths[0],
+        fileName: entry.name,
+      }).catch(() => {
+        // Drag-out is best-effort; internal drag still works
+      });
+    }
   };
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {

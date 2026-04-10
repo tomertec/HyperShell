@@ -4,6 +4,7 @@ import {
   fsListRequestSchema,
   sftpChmodRequestSchema,
   sftpConnectRequestSchema,
+  sftpDragOutRequestSchema,
   sftpEventSchema,
   sftpListRequestSchema,
   sftpTransferStartRequestSchema
@@ -81,5 +82,24 @@ describe("SFTP schemas", () => {
   it("validates fs list request", () => {
     const result = fsListRequestSchema.safeParse({ path: "C:\\Users" });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("sftpDragOutRequestSchema", () => {
+  it("should accept valid drag-out request", () => {
+    const result = sftpDragOutRequestSchema.parse({
+      sftpSessionId: "sess-1",
+      remotePath: "/home/user/file.txt",
+      fileName: "file.txt",
+    });
+    expect(result.sftpSessionId).toBe("sess-1");
+    expect(result.remotePath).toBe("/home/user/file.txt");
+    expect(result.fileName).toBe("file.txt");
+  });
+
+  it("should reject missing fields", () => {
+    expect(() =>
+      sftpDragOutRequestSchema.parse({ sftpSessionId: "sess-1" })
+    ).toThrow();
   });
 });

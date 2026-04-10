@@ -318,6 +318,7 @@ export function RemotePane({
         onEdit={onEdit}
         paneType="remote"
         cursorIndex={remoteCursorIndex}
+        sftpSessionId={sftpSessionId}
       />
 
       {contextMenu && (

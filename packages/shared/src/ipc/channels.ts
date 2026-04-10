@@ -102,7 +102,8 @@ export const sftpChannels = {
   syncStart: "sftp:sync:start",
   syncStop: "sftp:sync:stop",
   syncList: "sftp:sync:list",
-  syncEvent: "sftp:sync:event"
+  syncEvent: "sftp:sync:event",
+  dragOut: "sftp:drag-out",
 } as const;
 
 export const workspaceChannels = {
