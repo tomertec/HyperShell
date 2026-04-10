@@ -1,56 +1,44 @@
 import type { Extension } from "@codemirror/state";
-import { css } from "@codemirror/lang-css";
-import { html } from "@codemirror/lang-html";
-import { javascript } from "@codemirror/lang-javascript";
-import { json } from "@codemirror/lang-json";
-import { markdown } from "@codemirror/lang-markdown";
-import { python } from "@codemirror/lang-python";
-import { xml } from "@codemirror/lang-xml";
-import { yaml } from "@codemirror/lang-yaml";
-import { php } from "@codemirror/lang-php";
-import { rust } from "@codemirror/lang-rust";
-import { go } from "@codemirror/lang-go";
-import { java } from "@codemirror/lang-java";
-import { cpp } from "@codemirror/lang-cpp";
-import { sql } from "@codemirror/lang-sql";
 
-const EXTENSION_MAP: Record<string, () => Extension> = {
-  js: () => javascript(),
-  jsx: () => javascript({ jsx: true }),
-  ts: () => javascript({ typescript: true }),
-  tsx: () => javascript({ typescript: true, jsx: true }),
-  json: () => json(),
-  py: () => python(),
-  xml: () => xml(),
-  yaml: () => yaml(),
-  yml: () => yaml(),
-  html: () => html(),
-  htm: () => html(),
-  css: () => css(),
-  md: () => markdown(),
-  markdown: () => markdown(),
-  php: () => php(),
-  rs: () => rust(),
-  go: () => go(),
-  java: () => java(),
-  c: () => cpp(),
-  cpp: () => cpp(),
-  cc: () => cpp(),
-  h: () => cpp(),
-  hpp: () => cpp(),
-  sql: () => sql(),
-  sh: () => javascript(),
-  bash: () => javascript(),
-  ini: () => yaml(),
-  toml: () => yaml(),
-  conf: () => yaml(),
-  cfg: () => yaml(),
-  env: () => yaml(),
-  properties: () => yaml(),
-  svg: () => xml(),
-  xsl: () => xml(),
-  xsd: () => xml(),
-  wsdl: () => xml(),
+type LanguageLoader = () => Promise<Extension>;
+
+const EXTENSION_MAP: Record<string, LanguageLoader> = {
+  js: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
+  jsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })),
+  ts: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ typescript: true })),
+  tsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ typescript: true, jsx: true })),
+  json: () => import("@codemirror/lang-json").then((m) => m.json()),
+  py: () => import("@codemirror/lang-python").then((m) => m.python()),
+  xml: () => import("@codemirror/lang-xml").then((m) => m.xml()),
+  yaml: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  yml: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  html: () => import("@codemirror/lang-html").then((m) => m.html()),
+  htm: () => import("@codemirror/lang-html").then((m) => m.html()),
+  css: () => import("@codemirror/lang-css").then((m) => m.css()),
+  md: () => import("@codemirror/lang-markdown").then((m) => m.markdown()),
+  markdown: () => import("@codemirror/lang-markdown").then((m) => m.markdown()),
+  php: () => import("@codemirror/lang-php").then((m) => m.php()),
+  rs: () => import("@codemirror/lang-rust").then((m) => m.rust()),
+  go: () => import("@codemirror/lang-go").then((m) => m.go()),
+  java: () => import("@codemirror/lang-java").then((m) => m.java()),
+  c: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  cpp: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  cc: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  h: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  hpp: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  sql: () => import("@codemirror/lang-sql").then((m) => m.sql()),
+  sh: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
+  bash: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
+  ini: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  toml: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  conf: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  cfg: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  env: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  properties: () => import("@codemirror/lang-yaml").then((m) => m.yaml()),
+  svg: () => import("@codemirror/lang-xml").then((m) => m.xml()),
+  xsl: () => import("@codemirror/lang-xml").then((m) => m.xml()),
+  xsd: () => import("@codemirror/lang-xml").then((m) => m.xml()),
+  wsdl: () => import("@codemirror/lang-xml").then((m) => m.xml()),
 };
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -70,8 +58,8 @@ export function getLanguageName(filename: string): string {
   return LANGUAGE_NAMES[ext] ?? "Plain Text";
 }
 
-export function getLanguageExtension(filename: string): Extension | null {
+export async function getLanguageExtension(filename: string): Promise<Extension | null> {
   const extension = filename.split(".").pop()?.toLowerCase() ?? "";
-  const factory = EXTENSION_MAP[extension];
-  return factory ? factory() : null;
+  const loader = EXTENSION_MAP[extension];
+  return loader ? loader() : null;
 }
