@@ -44,7 +44,7 @@ const sshKeyDiscoveryEnabled = envEnabled(
 const allowSystemRoots = envEnabled(
   "SSHTERM_FS_ALLOW_SYSTEM_ROOTS",
   "HYPERSHELL_FS_ALLOW_SYSTEM_ROOTS",
-  true
+  false
 );
 const envAllowedRoots = (readEnv("SSHTERM_FS_ALLOWED_ROOTS", "HYPERSHELL_FS_ALLOWED_ROOTS") ?? "")
   .split(",")

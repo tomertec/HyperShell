@@ -89,6 +89,17 @@ export function createTransferManager(
   let activeCount = 0;
   let drainScheduled = false;
 
+  function emitCancelledComplete(job: ManagedTransferJob): void {
+    job.status = "failed";
+    job.error = "Cancelled by user";
+    emit({
+      kind: "transfer-complete",
+      transferId: job.transferId,
+      status: "failed",
+      error: job.error
+    });
+  }
+
   function emit(event: TransferEvent): void {
     for (const listener of listeners) {
       try {
@@ -167,10 +178,12 @@ export function createTransferManager(
   }
 
   function isLocalPathWithin(rootPath: string, candidatePath: string): boolean {
+    const nr = process.platform === "win32" ? rootPath.toLowerCase() : rootPath;
+    const nc = process.platform === "win32" ? candidatePath.toLowerCase() : candidatePath;
     return (
-      candidatePath === rootPath
-      || candidatePath.startsWith(`${rootPath}\\`)
-      || candidatePath.startsWith(`${rootPath}/`)
+      nc === nr
+      || nc.startsWith(`${nr}\\`)
+      || nc.startsWith(`${nr}/`)
     );
   }
 
@@ -269,14 +282,7 @@ export function createTransferManager(
       void processJob(nextJob, transport)
         .then(() => {
           if (cancelledByUser.has(nextJob.transferId)) {
-            nextJob.status = "failed";
-            nextJob.error = "Cancelled by user";
-            emit({
-              kind: "transfer-complete",
-              transferId: nextJob.transferId,
-              status: "failed",
-              error: nextJob.error
-            });
+            emitCancelledComplete(nextJob);
             return;
           }
 
@@ -289,14 +295,7 @@ export function createTransferManager(
         })
         .catch((error: unknown) => {
           if (cancelledByUser.has(nextJob.transferId)) {
-            nextJob.status = "failed";
-            nextJob.error = "Cancelled by user";
-            emit({
-              kind: "transfer-complete",
-              transferId: nextJob.transferId,
-              status: "failed",
-              error: nextJob.error
-            });
+            emitCancelledComplete(nextJob);
             return;
           }
 
@@ -373,13 +372,11 @@ export function createTransferManager(
     if (job.type === "upload") {
       const localStat = statSync(job.localPath);
       job.totalBytes = localStat.size;
-      throwIfCancelled(job);
 
       if (job.isDirectory) {
         await transport.mkdir(job.remotePath);
         throwIfCancelled(job);
         const childOps = collectLocalDirectoryOps(job.localPath, job.remotePath);
-        throwIfCancelled(job);
         if (childOps.length > 0) {
           enqueue(job.sftpSessionId, transport, childOps, job.batchId);
         }
@@ -396,7 +393,6 @@ export function createTransferManager(
           job.remotePath = await resolveRemoteRenamePath(transport, job.remotePath);
         }
         job.status = "active";
-        throwIfCancelled(job);
       }
 
       const localStream = createReadStream(job.localPath);
@@ -501,7 +497,6 @@ export function createTransferManager(
 
     if (job.isDirectory) {
       mkdirSync(job.localPath, { recursive: true });
-      throwIfCancelled(job);
       const entries = await transport.list(job.remotePath);
       throwIfCancelled(job);
       const childOps: TransferOp[] = entries.map((entry) => ({
@@ -510,7 +505,6 @@ export function createTransferManager(
         remotePath: entry.path,
         isDirectory: entry.isDirectory
       }));
-      throwIfCancelled(job);
       if (childOps.length > 0) {
         enqueue(job.sftpSessionId, transport, childOps, job.batchId);
       }
@@ -518,7 +512,6 @@ export function createTransferManager(
     }
 
     if (existsSync(job.localPath)) {
-      throwIfCancelled(job);
       const resolution = await resolveConflictForJob(job);
       if (resolution === "skip") {
         throw new TransferSkippedError();
@@ -527,7 +520,6 @@ export function createTransferManager(
         job.localPath = resolveLocalRenamePath(job.localPath);
       }
       job.status = "active";
-      throwIfCancelled(job);
     }
 
     mkdirSync(dirname(job.localPath), { recursive: true });

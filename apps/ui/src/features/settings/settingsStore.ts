@@ -248,7 +248,9 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     set({ settings: next });
     try {
       await persistSettings(next);
-    } catch {}
+    } catch (error) {
+      console.warn("[settings] Failed to persist settings", error);
+    }
   },
 
   updateSecurity: async (partial) => {
@@ -267,7 +269,9 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     set({ settings: next });
     try {
       await persistSettings(next);
-    } catch {}
+    } catch (error) {
+      console.warn("[settings] Failed to persist settings", error);
+    }
   },
 
   setTerminalFontSize: async (fontSize) => {
@@ -296,7 +300,9 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     set({ settings: next });
     try {
       await persistSettings(next);
-    } catch {}
+    } catch (error) {
+      console.warn("[settings] Failed to persist settings", error);
+    }
   },
 
   deleteCustomTheme: async (name) => {
@@ -306,6 +312,8 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
     set({ settings: next });
     try {
       await persistSettings(next);
-    } catch {}
+    } catch (error) {
+      console.warn("[settings] Failed to persist settings", error);
+    }
   }
 }));

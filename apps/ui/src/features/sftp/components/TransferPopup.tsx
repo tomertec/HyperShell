@@ -395,7 +395,7 @@ export function TransferPopup() {
 
     const interval = window.setInterval(() => {
       void refreshTransfers();
-    }, 1000);
+    }, 3000);
 
     return () => {
       window.clearInterval(interval);
@@ -525,18 +525,6 @@ export function TransferPopup() {
   }, []);
 
   const cancelTransfer = useCallback(async (transferId: string) => {
-    const transfer = transferStore
-      .getState()
-      .transfers
-      .find((item) => item.transferId === transferId);
-    const transferName = transfer ? getTransferName(transfer) : transferId;
-    const confirmed = window.confirm(`Cancel transfer "${transferName}"?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setPanelOpen(false);
-
     const cancel = window.hypershell?.sftpTransferCancel;
     if (!cancel) {
       toast.error("Cancel transfer is unavailable in this build. Restart HyperShell.");
@@ -553,7 +541,7 @@ export function TransferPopup() {
       setPendingOps((current) => { const next = new Map(current); next.delete(transferId); return next; });
       void refreshTransfers();
     }
-  }, [refreshTransfers, setPanelOpen]);
+  }, [refreshTransfers]);
 
   const pauseTransfer = useCallback(async (transferId: string) => {
     const pause = window.hypershell?.sftpTransferPause;
@@ -610,13 +598,6 @@ export function TransferPopup() {
       return;
     }
 
-    const confirmed = window.confirm(`Cancel ${transferIds.length} transfer(s)?`);
-    if (!confirmed) {
-      return;
-    }
-
-    setPanelOpen(false);
-
     setPendingOps((current) => {
       const next = new Map(current);
       for (const id of transferIds) {
@@ -646,7 +627,7 @@ export function TransferPopup() {
       return next;
     });
     void refreshTransfers();
-  }, [refreshTransfers, setPanelOpen]);
+  }, [refreshTransfers]);
 
   const totalSpeed = useMemo(
     () =>
