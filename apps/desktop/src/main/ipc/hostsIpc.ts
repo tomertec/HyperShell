@@ -211,6 +211,11 @@ export function getOrCreateDatabase(): unknown {
       const dbPath = resolveDatabasePath();
       console.log("[hypershell] Opening database at:", dbPath);
       const db = new Database(dbPath);
+      db.pragma("journal_mode = WAL");
+      db.pragma("synchronous = NORMAL");
+      db.pragma("busy_timeout = 5000");
+      db.pragma("cache_size = -8000");
+      db.pragma("temp_store = MEMORY");
       db.pragma("foreign_keys = ON");
       db.exec(initSchemaSql);
       db.exec(sftpBookmarksSql);
