@@ -163,6 +163,37 @@ describe("TransferManager", () => {
     expect(unrelated?.status).toBe("queued");
   });
 
+  it("enqueues a resume job with starting offset", () => {
+    const job = manager.enqueueResume("sftp-1", mockSftpTransport as any, {
+      type: "download",
+      localPath: "C:\\file.bin",
+      remotePath: "/file.bin",
+      bytesTransferred: 500_000,
+      totalBytes: 1_000_000,
+      batchId: "batch-1",
+    });
+
+    expect(job.status).toBe("queued");
+    expect(job.bytesTransferred).toBe(500_000);
+    expect(job.totalBytes).toBe(1_000_000);
+  });
+
+  it("lists resumed jobs alongside regular jobs", () => {
+    manager.enqueue("sftp-1", mockSftpTransport as any, [
+      { type: "upload", localPath: "C:\\a.txt", remotePath: "/a.txt", isDirectory: false },
+    ]);
+    manager.enqueueResume("sftp-1", mockSftpTransport as any, {
+      type: "download",
+      localPath: "C:\\b.bin",
+      remotePath: "/b.bin",
+      bytesTransferred: 100,
+      totalBytes: 200,
+      batchId: "batch-2",
+    });
+
+    expect(manager.list()).toHaveLength(2);
+  });
+
   it("cancels all jobs in the same batch when cancelling one job", () => {
     const batchJobs = manager.enqueue("sftp-1", mockSftpTransport as any, [
       {
