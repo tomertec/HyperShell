@@ -15,7 +15,6 @@ describe("SessionRecordingRepository", () => {
   it("creates and retrieves a recording", () => {
     const created = repo.create({
       id: "rec-1",
-      hostId: "host-1",
       title: "My session",
       fileName: "session.cast",
       width: 120,
@@ -24,7 +23,7 @@ describe("SessionRecordingRepository", () => {
     });
 
     expect(created.id).toBe("rec-1");
-    expect(created.hostId).toBe("host-1");
+    expect(created.hostId).toBeNull();
     expect(created.endedAt).toBeNull();
 
     const loaded = repo.get("rec-1");

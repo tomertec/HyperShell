@@ -34,7 +34,6 @@ describe("hostsRepository", () => {
       id: "h1",
       name: "bastion",
       hostname: "bastion.example.com",
-      hostProfileId: "profile-1",
       proxyJump: "jump@gateway:22",
       proxyJumpHostIds: JSON.stringify(["gw-1"]),
       keepAliveInterval: 60,
@@ -46,7 +45,6 @@ describe("hostsRepository", () => {
     expect(host.proxyJump).toBe("jump@gateway:22");
     expect(host.proxyJumpHostIds).toBe(JSON.stringify(["gw-1"]));
     expect(host.keepAliveInterval).toBe(60);
-    expect(host.hostProfileId).toBe("profile-1");
     expect(host.autoReconnect).toBe(true);
     expect(host.reconnectMaxAttempts).toBe(10);
     expect(host.reconnectBaseInterval).toBe(2);

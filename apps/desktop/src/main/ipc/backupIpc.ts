@@ -86,10 +86,10 @@ export function listBackupFiles(dir: string): BackupInfo[] {
         createdAt: stats.mtime.toISOString(),
       };
     })
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    .sort((a, b) => {
+      const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return timeDiff !== 0 ? timeDiff : b.fileName.localeCompare(a.fileName);
+    });
 
   return files;
 }
