@@ -7,6 +7,8 @@ import type {
   SerialConnectionOptions,
   TransportHandle
 } from "./transports/transportEvents";
+import { Client } from "ssh2";
+import { readFileSync } from "node:fs";
 import { createSerialTransport } from "./transports/serialTransport";
 import { createSshPtyTransport } from "./transports/sshPtyTransport";
 import type { NetworkMonitor } from "./networkMonitor";
@@ -57,6 +59,7 @@ export interface SessionManager {
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
   setSignals(sessionId: string, signals: { dtr?: boolean; rts?: boolean }): void;
   getSessionInput(sessionId: string): OpenSessionInput | undefined;
+  execCommand(sessionId: string, command: string): Promise<string>;
 }
 
 interface ManagedSession {
@@ -378,6 +381,69 @@ export function createSessionManager(
       if (!sshOptions) return rest;
       const { password: _pw, ...safeSshOptions } = sshOptions;
       return { ...rest, sshOptions: safeSshOptions };
+    },
+
+    execCommand(sessionId: string, command: string): Promise<string> {
+      const session = sessions.get(sessionId);
+      if (!session) return Promise.reject(new Error("Session not found"));
+      const opts = session.input.sshOptions;
+      if (!opts) return Promise.reject(new Error("Not an SSH session"));
+
+      return new Promise((resolve, reject) => {
+        const client = new Client();
+        const timeout = setTimeout(() => {
+          client.destroy();
+          reject(new Error("SSH exec timed out"));
+        }, 10000);
+
+        client.on("ready", () => {
+          client.exec(command, (err, stream) => {
+            if (err) {
+              clearTimeout(timeout);
+              client.end();
+              reject(err);
+              return;
+            }
+            let stdout = "";
+            stream.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+            stream.stderr.on("data", () => { /* ignore stderr */ });
+            stream.on("close", () => {
+              clearTimeout(timeout);
+              client.end();
+              resolve(stdout);
+            });
+          });
+        });
+
+        client.on("error", (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+
+        const connectConfig: Record<string, unknown> = {
+          host: opts.hostname,
+          port: opts.port ?? 22,
+          username: opts.username,
+          readyTimeout: 8000
+        };
+
+        if (opts.password) {
+          connectConfig.password = opts.password;
+        }
+
+        if (opts.identityFile) {
+          try {
+            connectConfig.privateKey = readFileSync(opts.identityFile);
+          } catch {
+            // Identity file not readable — fall through to other auth
+          }
+        }
+
+        // Accept any host key for stats commands (the PTY session already verified)
+        connectConfig.hostVerifier = () => true;
+
+        client.connect(connectConfig);
+      });
     }
   };
 }

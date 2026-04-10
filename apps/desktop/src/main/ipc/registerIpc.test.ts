@@ -86,6 +86,9 @@ function createFakeSessionManager() {
     getSessionInput() {
       return undefined;
     },
+    execCommand() {
+      return Promise.reject(new Error("Not implemented in test"));
+    },
     destroyAll() {}
   };
 
