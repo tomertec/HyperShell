@@ -21,6 +21,7 @@ import {
   sftpTransferPauseRequestSchema,
   sftpTransferResolveConflictRequestSchema,
   sftpTransferResumeRequestSchema,
+  sftpTransferRetryRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
   sftpSyncStartRequestSchema,
@@ -54,6 +55,7 @@ import type { IpcMainLike } from "./registerIpc";
 import { editorWindowManager } from "../windows/editorWindowManager";
 import { createSftpSessionManager, type SftpSessionManager } from "../sftp/sftpSessionManager";
 import { createTransferManager, type TransferManager } from "../sftp/transferManager";
+import { createTransferManifest } from "../sftp/transferManifest";
 
 /**
  * Error subclass thrown when host key verification fails.
@@ -178,6 +180,8 @@ export function registerSftpIpc(
 ): () => void {
   const sftpSessionManager = createSftpSessionManager();
   const transferManager = createTransferManager({ autoStart: true, maxConcurrent: 1 });
+  const manifest = createTransferManifest(app.getPath("userData"));
+  manifest.prune(7 * 24 * 60 * 60 * 1000); // 7 days
 
   const db = options.db ?? openDatabase();
   const hostsRepo = createHostsRepositoryFromDatabase(db);
@@ -376,6 +380,30 @@ export function registerSftpIpc(
     transferManager.resume(request.transferId);
   };
 
+  const handleTransferRetry = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = sftpTransferRetryRequestSchema.parse(rawRequest);
+    const entries = manifest.load();
+    const entry = entries.find((e) => e.transferId === request.transferId);
+    if (!entry) {
+      throw new Error(`No persisted transfer found for ${request.transferId}`);
+    }
+
+    const transport = sftpSessionManager.getTransport(entry.sftpSessionId);
+    manifest.remove(entry.transferId);
+
+    const job = transferManager.enqueueResume(entry.sftpSessionId, transport, {
+      transferId: entry.transferId,
+      type: entry.type,
+      localPath: entry.localPath,
+      remotePath: entry.remotePath,
+      bytesTransferred: entry.bytesTransferred,
+      totalBytes: entry.totalBytes,
+      batchId: entry.batchId,
+    });
+
+    return job;
+  };
+
   const handleTransferList = async () => {
     return { transfers: transferManager.list() };
   };
@@ -501,6 +529,7 @@ export function registerSftpIpc(
   ipcMain.handle(ipcChannels.sftp.transferCancel, handleTransferCancel);
   ipcMain.handle(ipcChannels.sftp.transferPause, handleTransferPause);
   ipcMain.handle(ipcChannels.sftp.transferResume, handleTransferResume);
+  ipcMain.handle(ipcChannels.sftp.transferRetry, handleTransferRetry);
   ipcMain.handle(ipcChannels.sftp.transferList, handleTransferList);
   ipcMain.handle(ipcChannels.sftp.transferResolveConflict, handleTransferResolveConflict);
   ipcMain.handle(ipcChannels.sftp.bookmarksList, handleBookmarksList);
@@ -558,6 +587,27 @@ export function registerSftpIpc(
     }
 
     if (event.kind === "transfer-complete") {
+      if (event.status === "completed") {
+        manifest.remove(event.transferId);
+      } else if (event.status === "failed") {
+        const details = transferManager.getJobDetails(event.transferId);
+        if (details && details.status === "interrupted" && details.bytesTransferred > 0) {
+          manifest.save({
+            transferId: event.transferId,
+            type: details.type,
+            localPath: details.localPath,
+            remotePath: details.remotePath,
+            totalBytes: details.totalBytes,
+            bytesTransferred: details.bytesTransferred,
+            remoteMtime: new Date().toISOString(),
+            remoteSize: details.totalBytes,
+            sftpSessionId: details.sftpSessionId,
+            batchId: details.batchId,
+            interruptedAt: new Date().toISOString(),
+          });
+        }
+      }
+
       options.emitSftpEvent?.({
         kind: "transfer-complete",
         transferId: event.transferId,

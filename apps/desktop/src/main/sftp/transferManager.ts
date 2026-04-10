@@ -44,6 +44,17 @@ export interface TransferManagerOptions {
   maxJobHistory?: number;
 }
 
+export interface TransferJobDetails {
+  sftpSessionId: string;
+  batchId: string;
+  type: "upload" | "download";
+  localPath: string;
+  remotePath: string;
+  bytesTransferred: number;
+  totalBytes: number;
+  status: string;
+}
+
 export interface TransferManager {
   enqueue(
     sftpSessionId: string,
@@ -72,6 +83,7 @@ export interface TransferManager {
     applyToAll?: boolean
   ): void;
   list(): TransferJob[];
+  getJobDetails(transferId: string): TransferJobDetails | null;
   onEvent(listener: TransferEventListener): () => void;
 }
 
@@ -984,6 +996,21 @@ export function createTransferManager(
     pending.resolve(resolution);
   }
 
+  function getJobDetails(transferId: string): TransferJobDetails | null {
+    const job = jobs.get(transferId);
+    if (!job) return null;
+    return {
+      sftpSessionId: job.sftpSessionId,
+      batchId: job.batchId,
+      type: job.type,
+      localPath: job.localPath,
+      remotePath: job.remotePath,
+      bytesTransferred: job.bytesTransferred,
+      totalBytes: job.totalBytes,
+      status: job.status,
+    };
+  }
+
   function list(): TransferJob[] {
     return [...jobs.values()].map(snapshot);
   }
@@ -1003,6 +1030,7 @@ export function createTransferManager(
     resume,
     resolveConflict,
     list,
+    getJobDetails,
     onEvent
   };
 }
