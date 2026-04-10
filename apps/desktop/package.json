@@ -1,7 +1,7 @@
 {
   "name": "@hypershell/desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "HyperShell Electron desktop shell",
   "author": "HyperShell Team",
   "type": "module",
