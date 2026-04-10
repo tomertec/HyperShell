@@ -51,11 +51,12 @@ linux:
         - x64
   artifactName: hypershell-${version}-linux-${arch}.${ext}
   desktop:
-    Name: HyperShell
-    Comment: SSH & Serial Terminal
-    Terminal: "false"
-    Type: Application
-    Categories: Development;Network;
+    entry:
+      Name: HyperShell
+      Comment: SSH & Serial Terminal
+      Terminal: "false"
+      Type: Application
+      Categories: Development;Network;
 dmg:
   contents:
     - x: 130
