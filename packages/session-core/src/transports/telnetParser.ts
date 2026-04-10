@@ -11,7 +11,7 @@ export const TELNET = {
   OPT_NAWS: 0x1f,
 } as const;
 
-type State = "data" | "iac" | "will" | "wont" | "do" | "dont" | "sb" | "sb_data";
+type State = "data" | "iac" | "will" | "wont" | "do" | "dont" | "sb" | "sb_data" | "sb_iac";
 
 type EventMap = {
   data: (buf: Buffer) => void;
@@ -121,42 +121,17 @@ export class TelnetParser {
 
         case "sb_data":
           if (byte === TELNET.IAC) {
-            // Peek: next byte should be SE
-            // But we handle it by transitioning — next byte in iac state will handle SE
-            // Actually, within SB data, IAC IAC means literal 0xFF, IAC SE means end.
-            // We need a sub-state. Let's handle inline:
-            const next = buf[i + 1];
-            if (next === TELNET.SE) {
-              i++; // skip SE
-              this.state = "data";
-            } else if (next === TELNET.IAC) {
-              i++; // skip escaped IAC within sub-negotiation (ignore it)
-            }
-            // If next byte isn't available (split), we stay in sb_data.
-            // Edge case: IAC at end of buffer with no next byte — we handle by
-            // staying in sb_data and the next feed will provide SE.
-            if (next === undefined) {
-              // We'll need to remember we saw IAC in subneg.
-              // Use a simple approach: transition to a temporary state.
-              // For simplicity, store a flag. Actually let's just re-enter iac
-              // but that would break subneg. Let's handle it properly:
-              this.state = "sb_iac" as State;
-            }
+            this.state = "sb_iac";
           }
-          // Otherwise just skip the subneg data byte
+          // Otherwise skip the subneg data byte
           break;
 
-        default:
-          // Handle "sb_iac" state for split IAC in subnegotiation
-          if ((this.state as string) === "sb_iac") {
-            if (byte === TELNET.SE) {
-              this.state = "data";
-            } else if (byte === TELNET.IAC) {
-              // Escaped IAC in subneg, ignore
-              this.state = "sb_data";
-            } else {
-              this.state = "sb_data";
-            }
+        case "sb_iac":
+          if (byte === TELNET.SE) {
+            this.state = "data";
+          } else {
+            // IAC IAC inside subneg (escaped 0xFF) or unexpected byte — stay in subneg
+            this.state = "sb_data";
           }
           break;
       }
