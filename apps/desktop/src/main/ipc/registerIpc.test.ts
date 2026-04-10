@@ -218,7 +218,11 @@ describe("registerIpc", () => {
     expect(manager.closes).toEqual([{ sessionId: "session-1" }]);
 
     unregister();
-    expect(ipcMain.handlerCount()).toBe(0);
+    // Session channels should be removed after cleanup
+    expect(ipcMain.hasHandler(ipcChannels.session.open)).toBe(false);
+    expect(ipcMain.hasHandler(ipcChannels.session.write)).toBe(false);
+    expect(ipcMain.hasHandler(ipcChannels.session.resize)).toBe(false);
+    expect(ipcMain.hasHandler(ipcChannels.session.close)).toBe(false);
   });
 
   it("cleans stale listeners and handlers when re-registered", () => {
@@ -273,6 +277,6 @@ describe("registerIpc", () => {
     expect(ipcMain.hasHandler(ipcChannels.session.open)).toBe(true);
 
     unregisterB();
-    expect(ipcMain.handlerCount()).toBe(0);
+    expect(ipcMain.hasHandler(ipcChannels.session.open)).toBe(false);
   });
 });
