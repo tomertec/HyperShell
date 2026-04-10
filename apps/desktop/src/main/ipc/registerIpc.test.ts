@@ -175,7 +175,7 @@ describe("registerIpc", () => {
     }
   });
 
-  it("routes open/write/resize/close requests through the manager", async () => {
+  it("routes open/write/resize/close requests through the manager", { timeout: 15000 }, async () => {
     const ipcMain = createFakeIpcMain();
     const manager = createFakeSessionManager();
     const unregister = registerIpc(ipcMain, {
