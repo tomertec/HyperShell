@@ -5,12 +5,14 @@ import type {
   SessionTransportKind,
   SshConnectionOptions,
   SerialConnectionOptions,
+  TelnetConnectionOptions,
   TransportHandle
 } from "./transports/transportEvents";
 import { Client } from "ssh2";
 import { readFileSync } from "node:fs";
 import { createSerialTransport } from "./transports/serialTransport";
 import { createSshPtyTransport } from "./transports/sshPtyTransport";
+import { createTelnetTransport } from "./transports/telnetTransport";
 import type { NetworkMonitor } from "./networkMonitor";
 
 export interface SessionSnapshot {
@@ -38,6 +40,7 @@ export interface OpenSessionInput {
   rows: number;
   sshOptions?: SshConnectionOptions;
   serialOptions?: SerialConnectionOptions;
+  telnetOptions?: TelnetConnectionOptions;
   autoReconnect?: boolean;
   maxReconnectAttempts?: number;
   reconnectBaseInterval?: number;
@@ -122,6 +125,16 @@ function createDefaultTransport(request: OpenSessionRequest): TransportHandle {
       localEcho: opts.localEcho,
       dtr: opts.dtr,
       rts: opts.rts
+    });
+  }
+
+  if (request.transport === "telnet") {
+    const opts = request.telnetOptions ?? { hostname: request.profileId, port: 23, mode: "telnet" as const };
+    return createTelnetTransport(request, {
+      hostname: opts.hostname,
+      port: opts.port,
+      mode: opts.mode,
+      terminalType: opts.terminalType,
     });
   }
 
@@ -243,6 +256,7 @@ export function createSessionManager(
       rows: current.snapshot.rows,
       sshOptions: input.sshOptions,
       serialOptions: input.serialOptions,
+      telnetOptions: input.telnetOptions,
     });
 
     const newUnsubscribe = newTransport.onEvent((e) => {
@@ -277,7 +291,8 @@ export function createSessionManager(
         cols: input.cols,
         rows: input.rows,
         sshOptions: input.sshOptions,
-        serialOptions: input.serialOptions
+        serialOptions: input.serialOptions,
+        telnetOptions: input.telnetOptions
       });
 
       const unsubscribe = transport.onEvent((event) => {
