@@ -255,7 +255,7 @@ export function Sidebar({
           </svg>
           <span className="text-xs font-bold tracking-wide">Settings</span>
         </button>
-        <div className="text-[10px] text-text-muted/60 tracking-wide select-none" style={{ fontFamily: "'JetBrains Mono', monospace" }}>HyperShell<span className="text-accent/50">&gt;_</span> v0.1.0</div>
+        <div className="text-[10px] text-text-muted/60 tracking-wide select-none" style={{ fontFamily: "'JetBrains Mono', monospace" }}>HyperShell<span className="text-accent/50">&gt;_</span> v{__APP_VERSION__}</div>
       </div>
     </div>
   );

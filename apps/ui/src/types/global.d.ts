@@ -137,6 +137,8 @@ import type {
   ListBackupsResponse,
 } from "@hypershell/shared";
 
+declare const __APP_VERSION__: string;
+
 declare global {
   interface Window {
     hypershell?: {
