@@ -4,7 +4,8 @@ export type LayoutTab = {
   tabKey?: string;
   sessionId: string;
   title: string;
-  transport?: "ssh" | "serial" | "sftp";
+  transport?: "ssh" | "serial" | "sftp" | "telnet";
+  telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   profileId?: string;
   preopened?: boolean;
   type?: "terminal" | "sftp";

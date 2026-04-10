@@ -44,7 +44,7 @@ export interface TabBarProps {
 }
 
 function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: string | undefined }) {
-  const transport = tab.transport === "serial" ? "Serial" : tab.transport === "sftp" ? "SFTP" : "SSH";
+  const transport = tab.transport === "serial" ? "Serial" : tab.transport === "sftp" ? "SFTP" : tab.transport === "telnet" ? "Telnet" : "SSH";
   const state = sessionState ?? "disconnected";
 
   return (

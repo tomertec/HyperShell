@@ -28,6 +28,7 @@ export interface SidebarProps {
   onEditSerial: (profile: SerialProfileRecord) => void;
   onNewSerial: () => void;
   onOpenSettings: () => void;
+  onOpenTelnet?: () => void;
   collapsed?: boolean;
   restoreCount?: number;
   onRestore?: () => void;
@@ -56,6 +57,7 @@ export function Sidebar({
   onEditSerial,
   onNewSerial,
   onOpenSettings,
+  onOpenTelnet,
   collapsed = false,
   restoreCount,
   onRestore,
@@ -65,6 +67,10 @@ export function Sidebar({
   const showSerialInSidebar = useStore(
     settingsStore,
     (s) => s.settings.general.showSerialInSidebar
+  );
+  const enableTelnet = useStore(
+    settingsStore,
+    (s) => s.settings.general.enableTelnet
   );
 
   if (collapsed) {
@@ -206,6 +212,34 @@ export function Sidebar({
             onConnect={onConnectSerial}
             onEdit={onEditSerial}
           />
+        </SidebarSection>
+      )}
+
+      {enableTelnet && onOpenTelnet && (
+        <SidebarSection
+          title="Telnet"
+          actions={
+            <div className="flex gap-0.5">
+              <button
+                onClick={onOpenTelnet}
+                className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
+                title="Quick connect"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          }
+        >
+          <div className="px-2 py-2">
+            <button
+              onClick={onOpenTelnet}
+              className="w-full text-left text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              Quick Connect...
+            </button>
+          </div>
         </SidebarSection>
       )}
 

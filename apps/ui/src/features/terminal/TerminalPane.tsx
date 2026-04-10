@@ -8,10 +8,11 @@ import { LoggingButton } from "./LoggingButton";
 import { settingsStore } from "../settings/settingsStore";
 
 export interface TerminalPaneProps {
-  transport: "ssh" | "serial";
+  transport: "ssh" | "serial" | "telnet";
   profileId: string;
   sessionId?: string;
   autoConnect?: boolean;
+  telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   onSessionOpened?: (sessionId: string) => void;
 }
 
@@ -20,6 +21,7 @@ export function TerminalPane({
   profileId,
   sessionId,
   autoConnect,
+  telnetOptions,
   onSessionOpened
 }: TerminalPaneProps) {
   const [dtr, setDtr] = useState(true);
@@ -31,6 +33,7 @@ export function TerminalPane({
     profileId,
     sessionId,
     autoConnect,
+    telnetOptions,
     onSessionOpened
   });
   const { fit } = session;

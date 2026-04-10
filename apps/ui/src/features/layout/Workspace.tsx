@@ -64,7 +64,7 @@ function PaneView({
 
       {terminalTabs.map((tab) => {
         const isVisible = !activeSftpTab && tab.sessionId === resolvedSessionId;
-        const terminalTransport = tab.transport === "serial" ? "serial" : "ssh";
+        const terminalTransport = tab.transport === "serial" ? "serial" : tab.transport === "telnet" ? "telnet" : "ssh";
         return (
           <div
             key={tab.tabKey ?? tab.sessionId}
@@ -77,6 +77,7 @@ function PaneView({
               profileId={tab.profileId ?? tab.sessionId}
               sessionId={tab.preopened ? tab.sessionId : undefined}
               autoConnect={!tab.preopened}
+              telnetOptions={tab.telnetOptions}
               onSessionOpened={(sessionId) => {
                 replaceSessionId(tab.sessionId, sessionId);
               }}

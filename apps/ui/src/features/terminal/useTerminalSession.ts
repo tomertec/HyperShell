@@ -20,10 +20,11 @@ import {
 export type { TerminalSessionState } from "./terminalSessionModel";
 
 export interface UseTerminalSessionInput {
-  transport: "ssh" | "serial";
+  transport: "ssh" | "serial" | "telnet";
   profileId: string;
   sessionId?: string;
   autoConnect?: boolean;
+  telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   onSessionOpened?: (sessionId: string) => void;
 }
 
@@ -447,7 +448,8 @@ export function useTerminalSession(
         transport: input.transport,
         profileId: input.profileId,
         cols,
-        rows
+        rows,
+        ...(input.telnetOptions ? { telnetOptions: input.telnetOptions } : {})
       });
 
       if (
@@ -489,6 +491,7 @@ export function useTerminalSession(
     applySessionEvent,
     input.onSessionOpened,
     input.profileId,
+    input.telnetOptions,
     input.transport,
     setStateSafe,
     writeTerminalError

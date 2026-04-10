@@ -37,6 +37,7 @@ import type {
   TagRecord,
 } from "@hypershell/shared";
 import { EditorApp } from "../features/editor/EditorApp";
+import { TelnetQuickConnect } from "../features/telnet/TelnetQuickConnect";
 import {
   HostKeyVerificationDialog,
   type HostKeyVerificationInfo,
@@ -336,6 +337,7 @@ function MainApp() {
     hostId?: string;
   }>>([]);
   const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
+  const [telnetDialogOpen, setTelnetDialogOpen] = useState(false);
   const [savedRecoverySessions, setSavedRecoverySessions] = useState<SavedSessionRecord[]>([]);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
@@ -630,6 +632,27 @@ function MainApp() {
         profileId: port,
         preopened: false,
       });
+    },
+    [openTab]
+  );
+
+  const connectTelnet = useCallback(
+    (opts: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string }) => {
+      const sessionId = `telnet-${Date.now()}`;
+      const portSuffix = opts.port !== 23 ? `:${opts.port}` : "";
+      const title = opts.mode === "raw"
+        ? `raw://${opts.hostname}${portSuffix}`
+        : `telnet://${opts.hostname}${portSuffix}`;
+      openTab({
+        tabKey: sessionId,
+        sessionId,
+        title,
+        transport: "telnet",
+        profileId: `${opts.hostname}:${opts.port}`,
+        telnetOptions: opts,
+        preopened: false,
+      });
+      setTelnetDialogOpen(false);
     },
     [openTab]
   );
@@ -982,6 +1005,7 @@ function MainApp() {
             onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
             onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); }}
             onOpenSettings={() => setSettingsOpen(true)}
+            onOpenTelnet={() => setTelnetDialogOpen(true)}
             restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}
             onRestore={restoreLastWorkspace}
             onDismissRestore={dismissRestoreBanner}
@@ -1009,6 +1033,12 @@ function MainApp() {
             if (host) connectHost(host);
           }
         }}
+      />
+
+      <TelnetQuickConnect
+        open={telnetDialogOpen}
+        onClose={() => setTelnetDialogOpen(false)}
+        onConnect={connectTelnet}
       />
 
       <Modal
