@@ -1,7 +1,7 @@
 import { useStore } from "zustand";
 import type { EditorState, EditorTab } from "../stores/editorStore";
 import type { StoreApi } from "zustand/vanilla";
-import { FONT_SIZE_MIN, FONT_SIZE_MAX } from "./EditorPane";
+import { FONT_SIZE_MIN, FONT_SIZE_MAX } from "./editorConstants";
 
 interface EditorToolbarProps {
   store: StoreApi<EditorState>;
