@@ -28,7 +28,7 @@ interface DragSession {
 }
 
 function isRunningStatus(status: TransferJobStatus): boolean {
-  return status === "queued" || status === "active" || status === "paused";
+  return status === "queued" || status === "active" || status === "paused" || status === "interrupted";
 }
 
 function percentage(bytesTransferred: number, totalBytes: number): number {
@@ -81,6 +81,10 @@ function getTransferCaption(transfer: TransferStoreTransfer): string {
 
   if (transfer.status === "paused") {
     return isPausedByUser(transfer) ? "Paused by user" : "Waiting for conflict resolution";
+  }
+
+  if (transfer.status === "interrupted") {
+    return "Connection lost — resume available";
   }
 
   if (transfer.status === "failed") {
@@ -167,17 +171,21 @@ function TransferRow({
   cancelling,
   pausing,
   resuming,
+  retrying,
   onCancel,
   onPause,
-  onResume
+  onResume,
+  onRetry
 }: {
   transfer: TransferStoreTransfer;
   cancelling: boolean;
   pausing: boolean;
   resuming: boolean;
+  retrying: boolean;
   onCancel: (transferId: string) => Promise<void>;
   onPause: (transferId: string) => Promise<void>;
   onResume: (transferId: string) => Promise<void>;
+  onRetry: (transferId: string) => Promise<void>;
 }) {
   const running = isRunningStatus(transfer.status);
   const pausedByUser = isPausedByUser(transfer);
@@ -203,9 +211,11 @@ function TransferRow({
                   ? "bg-sky-500/15 text-sky-200"
                   : transfer.status === "failed"
                     ? "bg-red-500/15 text-red-200"
-                    : transfer.status === "paused"
-                      ? "bg-amber-500/15 text-amber-100"
-                      : "bg-sky-400/10 text-sky-300/80"
+                    : transfer.status === "interrupted"
+                      ? "bg-yellow-500/15 text-yellow-200"
+                      : transfer.status === "paused"
+                        ? "bg-amber-500/15 text-amber-100"
+                        : "bg-sky-400/10 text-sky-300/80"
               ].join(" ")}
             >
               {transfer.status}
@@ -281,6 +291,21 @@ function TransferRow({
             </button>
           </div>
         ) : null}
+
+        {(transfer.status === "interrupted" || transfer.status === "failed") && transfer.bytesTransferred > 0 ? (
+          <div className="flex flex-col gap-1">
+            <button
+              type="button"
+              disabled={retrying}
+              className="rounded border border-sky-400/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-blue-300/70 transition-colors hover:border-blue-400/30 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => {
+                void onRetry(transfer.transferId);
+              }}
+            >
+              {retrying ? "..." : "Resume"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -298,7 +323,7 @@ export function TransferPopup() {
   const [now, setNow] = useState(() => Date.now());
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
-  const [pendingOps, setPendingOps] = useState<Map<string, "cancel" | "pause" | "resume">>(() => new Map());
+  const [pendingOps, setPendingOps] = useState<Map<string, "cancel" | "pause" | "resume" | "retry">>(() => new Map());
   const [lastInteractionAt, setLastInteractionAt] = useState(() => Date.now());
   const popupContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -581,6 +606,20 @@ export function TransferPopup() {
     }
   }, [refreshTransfers]);
 
+  const retryTransfer = useCallback(async (transferId: string) => {
+    setPendingOps((current) => new Map(current).set(transferId, "retry"));
+
+    try {
+      await window.hypershell?.sftpTransferRetry?.({ transferId });
+      toast.success("Transfer resumed");
+    } catch (err) {
+      toast.error(`Resume failed: ${toErrorMessage(err)}`);
+    } finally {
+      setPendingOps((current) => { const next = new Map(current); next.delete(transferId); return next; });
+      void refreshTransfers();
+    }
+  }, [refreshTransfers]);
+
   const cancelAllTransfers = useCallback(async () => {
     const cancel = window.hypershell?.sftpTransferCancel;
     if (!cancel) {
@@ -756,9 +795,11 @@ export function TransferPopup() {
                   cancelling={pendingOps.get(transfer.transferId) === "cancel"}
                   pausing={pendingOps.get(transfer.transferId) === "pause"}
                   resuming={pendingOps.get(transfer.transferId) === "resume"}
+                  retrying={pendingOps.get(transfer.transferId) === "retry"}
                   onCancel={cancelTransfer}
                   onPause={pauseTransfer}
                   onResume={resumeTransfer}
+                  onRetry={retryTransfer}
                 />
               ))}
             </div>

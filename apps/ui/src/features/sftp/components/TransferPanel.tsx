@@ -68,6 +68,15 @@ export function TransferPanel() {
     }
   };
 
+  const retryTransfer = async (transferId: string) => {
+    try {
+      await window.hypershell?.sftpTransferRetry?.({ transferId });
+      toast.success("Transfer resumed");
+    } catch (err) {
+      toast.error(`Resume failed: ${toErrorMessage(err)}`);
+    }
+  };
+
   if (usePopupTransferMonitor) {
     return null;
   }
@@ -102,7 +111,7 @@ export function TransferPanel() {
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-text-primary">Transfers</span>
           <div className="flex gap-1 text-xs">
-            {(["all", "active", "completed", "failed"] as const).map((option) => (
+            {(["all", "active", "completed", "failed", "interrupted"] as const).map((option) => (
               <button
                 key={option}
                 type="button"
@@ -180,6 +189,22 @@ export function TransferPanel() {
               <span className="w-20 text-right text-xs text-text-secondary">
                 {formatFileSize(transfer.bytesTransferred)} / {formatFileSize(transfer.totalBytes)}
               </span>
+
+              {transfer.status === "interrupted" && (
+                <span className="text-xs text-yellow-400">Interrupted</span>
+              )}
+
+              {(transfer.status === "interrupted" || transfer.status === "failed") && transfer.bytesTransferred > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void retryTransfer(transfer.transferId);
+                  }}
+                  className="rounded px-2 py-0.5 text-xs text-blue-400 hover:bg-blue-900/30"
+                >
+                  Resume
+                </button>
+              )}
 
               {(transfer.status === "active" || transfer.status === "queued" || transfer.status === "paused") && (
                 <div className="flex items-center gap-2">
