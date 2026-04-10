@@ -2,7 +2,7 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 
 import type { TransferJob } from "@hypershell/shared";
 
-export type TransferFilter = "all" | "active" | "completed" | "failed";
+export type TransferFilter = "all" | "active" | "completed" | "failed" | "interrupted";
 
 export interface TransferStoreTransfer extends TransferJob {
   createdAt: number;
@@ -33,6 +33,7 @@ function hasRunningTransfers(transfers: TransferJob[]): boolean {
       transfer.status === "queued"
       || transfer.status === "active"
       || transfer.status === "paused"
+      || transfer.status === "interrupted"
   );
 }
 
