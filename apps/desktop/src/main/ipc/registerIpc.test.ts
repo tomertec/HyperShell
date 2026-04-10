@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ipcChannels, type SessionEvent } from "@hypershell/shared";
 import type { SessionManager, SessionSnapshot } from "@hypershell/session-core";
+import { openDatabase } from "@hypershell/db";
 import type { IpcMainInvokeEvent } from "electron";
 
 import { getRegisteredChannels, registerIpc } from "./registerIpc";
@@ -144,7 +145,8 @@ describe("registerIpc", () => {
       const ipcMain = createFakeIpcMain();
       const manager = createFakeSessionManager();
       registerIpc(ipcMain, {
-        sessionManager: manager.manager
+        sessionManager: manager.manager,
+        db: openDatabase()
       });
 
       for (const payload of testCase.payloads) {
@@ -171,7 +173,8 @@ describe("registerIpc", () => {
     const ipcMain = createFakeIpcMain();
     const manager = createFakeSessionManager();
     const unregister = registerIpc(ipcMain, {
-      sessionManager: manager.manager
+      sessionManager: manager.manager,
+      db: openDatabase()
     });
 
     const openResult = await ipcMain.invoke(ipcChannels.session.open, {
@@ -221,6 +224,7 @@ describe("registerIpc", () => {
 
     registerIpc(ipcMain, {
       sessionManager: managerA.manager,
+      db: openDatabase(),
       emitSessionEvent(event) {
         forwardedA.push(event as SessionEvent);
       }
@@ -235,6 +239,7 @@ describe("registerIpc", () => {
 
     const unregisterB = registerIpc(ipcMain, {
       sessionManager: managerB.manager,
+      db: openDatabase(),
       emitSessionEvent(event) {
         forwardedB.push(event as SessionEvent);
       }

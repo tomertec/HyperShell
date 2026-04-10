@@ -302,6 +302,7 @@ export interface RegisterIpcOptions {
   emitKeyboardInteractive?: (event: unknown) => void;
   emitHostStatusEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
+  db?: unknown;
   resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; password?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
   resolveSerialProfile?: (profileId: string) => SerialProfileRecord | undefined;
 }
@@ -1176,6 +1177,7 @@ export function registerIpc(
   cleanupRegisteredIpc?.();
 
   const manager = options.sessionManager ?? sessionManager;
+  const getDb = () => options.db ?? getOrCreateDatabase();
   const recorder = recordingIpcManager;
   const hostStatusService = createHostStatusService();
   const sessionConnectionHistoryIds = new Map<string, string>();
@@ -1420,18 +1422,18 @@ export function registerIpc(
     () => groupsRepo,
     () => {
       const { createSnippetsRepositoryFromDatabase } = require("@hypershell/db");
-      return createSnippetsRepositoryFromDatabase(getOrCreateDatabase() as SqliteDatabase);
+      return createSnippetsRepositoryFromDatabase(getDb() as SqliteDatabase);
     }
   );
-  registerSettingsIpc(ipcMain, () => getOrCreateDatabase());
+  registerSettingsIpc(ipcMain, () => getDb());
   registerPortForwardIpc(ipcMain);
   registerGroupsIpc(ipcMain, () => groupsRepo);
-  registerTagIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerTagIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
-  registerHostProfileIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
-  registerHostEnvVarIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerHostProfileIpc(ipcMain, () => getDb() as SqliteDatabase);
+  registerHostEnvVarIpc(ipcMain, () => getDb() as SqliteDatabase);
   const cleanupSftp = registerSftpIpc(ipcMain, {
-    db: getOrCreateDatabase() as SqliteDatabase,
+    db: getDb() as SqliteDatabase,
     sessionManager: manager,
     resolveConnectionOptions: (hostId, request) =>
       resolveSftpConnectionOptions(hostId, options, request),
@@ -1463,18 +1465,18 @@ export function registerIpc(
       options.emitKeyboardInteractive?.(event);
     },
   });
-  registerWorkspaceIpc(ipcMain, () => getOrCreateDatabase());
+  registerWorkspaceIpc(ipcMain, () => getDb());
   registerSshKeysIpc(ipcMain);
-  registerHostPortForwardIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerHostPortForwardIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerOpIpc(ipcMain);
   const unregisterEditor = registerEditorIpc(ipcMain);
-  registerSnippetsIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerSnippetsIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerLoggingIpc(ipcMain, sessionLogger);
   registerRecordingIpc(ipcMain, recorder);
-  registerConnectionHistoryIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
-  registerHostFingerprintIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerConnectionHistoryIpc(ipcMain, () => getDb() as SqliteDatabase);
+  registerHostFingerprintIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerBackupIpc(ipcMain);
-  registerSessionRecoveryIpc(ipcMain, () => getOrCreateDatabase() as SqliteDatabase);
+  registerSessionRecoveryIpc(ipcMain, () => getDb() as SqliteDatabase);
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created
