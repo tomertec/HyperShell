@@ -310,6 +310,18 @@ export function getOrCreateDatabase(): unknown {
         }
       }
 
+      // Migration 014: tmux detection toggle per host
+      try {
+        db.exec("ALTER TABLE hosts ADD COLUMN tmux_detect INTEGER NOT NULL DEFAULT 0");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("already exists") || msg.includes("duplicate column")) {
+          console.info("[hypershell] Migration 014 (tmux_detect): column already exists");
+        } else {
+          console.error("[hypershell] Migration 014 (tmux_detect) failed:", msg);
+        }
+      }
+
       sharedDb = db;
       console.log("[hypershell] Database initialized successfully");
     } catch (err) {
