@@ -213,6 +213,7 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
     const autoReconnect = host.autoReconnect ?? false;
     const reconnectMaxAttempts = host.reconnectMaxAttempts ?? 5;
     const reconnectBaseInterval = host.reconnectBaseInterval ?? 1;
+    const tmuxDetect = host.tmuxDetect ?? false;
 
     const keepAliveSource =
       typeof host.keepAliveInterval === "string" ? host.keepAliveInterval : "";
@@ -251,6 +252,7 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
       autoReconnect,
       reconnectMaxAttempts,
       reconnectBaseInterval,
+      tmuxDetect,
       savePassword,
       clearSavedPassword,
       ...(savePassword && (host.password ?? "").trim()
