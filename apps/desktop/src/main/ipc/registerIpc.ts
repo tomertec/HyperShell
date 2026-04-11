@@ -1372,6 +1372,7 @@ export function registerIpc(
   ipcMain.handle(ipcChannels.session.setSignals, (_event, request) => {
     const parsed = setSignalsRequestSchema.parse(request);
     manager.setSignals(parsed.sessionId, parsed.signals);
+    return { ok: true };
   });
   ipcMain.handle(ipcChannels.session.hostStats, (event, request) =>
     hostStatsHandler(event, request, manager)

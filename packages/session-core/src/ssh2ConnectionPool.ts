@@ -102,7 +102,7 @@ export function createSsh2ConnectionPool(): Ssh2ConnectionPool {
     if (!entry) return;
 
     if (entry.idleTimer) clearTimeout(entry.idleTimer);
-    try { entry.client.end(); } catch {}
+    try { entry.client.end(); } catch (e) { console.warn("[ssh2-pool] cleanup error:", e); }
     entries.delete(connectionId);
 
     const key = poolKey(entry.target);

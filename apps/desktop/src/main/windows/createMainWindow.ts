@@ -225,7 +225,8 @@ export function createMainWindow(): BrowserWindow {
           closeConfirmed = true;
           win.close();
         }
-      });
+      })
+      .catch(() => { /* window destroyed before user responded */ });
   });
 
   return win;
