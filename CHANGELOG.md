@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-04-11
+
+### Added
+
+- **Tmux session detection** — detect and attach to existing tmux sessions on remote hosts before connecting.
+  - Per-host opt-in toggle in host settings ("Detect tmux sessions on connect").
+  - Pre-connection SSH probe runs `tmux ls` to discover sessions.
+  - Modal picker shows session name, window count, creation time, and attached/detached status.
+  - Selecting a session sends `tmux attach -t <name>` after connecting; detaching returns to a normal shell.
+  - Skipping the picker or pressing Escape connects normally.
+- New IPC channel `tmux:probe` with Zod-validated request/response schemas.
+- Database migration 014: `tmux_detect` column on hosts table.
+- `TmuxSessionPicker` modal component following existing QuickConnect dialog patterns.
+- Unit tests for `parseTmuxListOutput` tmux ls format parser.
+
+### Fixed
+
+- Password-only hosts are automatically skipped for tmux probing (requires key-based auth).
+- Warning shown in host form when tmux detection is enabled on a password-auth host.
+- Shell injection protection: tmux session names are shell-quoted before sending as terminal input.
+- Tmux attach command only sent on first connect, not on auto-reconnect.
+- Stale probe results discarded if user triggers another connection while probe is in-flight.
+
+## [0.1.1]
+
 ### Added
 
 - Telnet / Raw TCP transport — connect to network gear and raw TCP services via a quick-connect dialog. Supports Telnet protocol negotiation (NAWS window sizing, SGA, echo) and raw passthrough mode. Feature-gated behind Settings → General → "Enable Telnet / Raw TCP" (off by default).
