@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, extname, join, posix } from "node:path";
 
-import type { SftpTransportHandle } from "@hypershell/session-core";
+import type { SftpConnectionOptions, SftpTransportHandle } from "@hypershell/session-core";
 import type { TransferJob, TransferOp } from "@hypershell/shared";
 
 export type TransferEventListener = (event: TransferEvent) => void;
@@ -36,6 +36,7 @@ interface ManagedTransferJob extends TransferJob {
   abortController: AbortController | null;
   isDirectory: boolean;
   batchId: string;
+  connectionOptions: SftpConnectionOptions | null;
 }
 
 export interface TransferManagerOptions {
@@ -59,7 +60,9 @@ export interface TransferManager {
   enqueue(
     sftpSessionId: string,
     transport: SftpTransportHandle,
-    operations: TransferOp[]
+    operations: TransferOp[],
+    batchId?: string,
+    connectionOptions?: SftpConnectionOptions | null
   ): TransferJob[];
   enqueueResume(
     sftpSessionId: string,
@@ -423,7 +426,7 @@ export function createTransferManager(
         throwIfCancelled(job);
         const childOps = collectLocalDirectoryOps(job.localPath, job.remotePath);
         if (childOps.length > 0) {
-          enqueue(job.sftpSessionId, transport, childOps, job.batchId);
+          enqueue(job.sftpSessionId, transport, childOps, job.batchId, job.connectionOptions);
         }
         return;
       }
@@ -565,7 +568,7 @@ export function createTransferManager(
         isDirectory: entry.isDirectory
       }));
       if (childOps.length > 0) {
-        enqueue(job.sftpSessionId, transport, childOps, job.batchId);
+        enqueue(job.sftpSessionId, transport, childOps, job.batchId, job.connectionOptions);
       }
       return;
     }
@@ -693,7 +696,8 @@ export function createTransferManager(
     sftpSessionId: string,
     transport: SftpTransportHandle,
     operations: TransferOp[],
-    batchId = `batch-${randomUUID().replace(/-/g, "")}`
+    batchId = `batch-${randomUUID().replace(/-/g, "")}`,
+    connectionOptions: SftpConnectionOptions | null = null
   ): TransferJob[] {
     const createdJobs: TransferJob[] = [];
     transports.set(sftpSessionId, transport);
@@ -712,7 +716,8 @@ export function createTransferManager(
         speed: 0,
         abortController: null,
         isDirectory: operation.isDirectory,
-        batchId
+        batchId,
+        connectionOptions
       };
 
       jobs.set(transferId, job);
@@ -752,6 +757,7 @@ export function createTransferManager(
       abortController: null,
       isDirectory: false,
       batchId: entry.batchId,
+      connectionOptions: null,
     };
 
     jobs.set(transferId, job);

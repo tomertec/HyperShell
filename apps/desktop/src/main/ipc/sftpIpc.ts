@@ -362,7 +362,14 @@ export function registerSftpIpc(
   const handleTransferStart = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpTransferStartRequestSchema.parse(rawRequest);
     const transport = sftpSessionManager.getTransport(request.sftpSessionId);
-    return transferManager.enqueue(request.sftpSessionId, transport, request.operations);
+    const session = sftpSessionManager.getSession(request.sftpSessionId);
+    return transferManager.enqueue(
+      request.sftpSessionId,
+      transport,
+      request.operations,
+      undefined,
+      session?.connectionOptions ?? null
+    );
   };
 
   const handleTransferCancel = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
