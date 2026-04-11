@@ -13,3 +13,5 @@ AGENTS.md
 .claude/
 docs/plans/
 docs/_archive/
+.DS_Store
+*.log

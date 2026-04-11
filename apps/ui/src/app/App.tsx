@@ -113,7 +113,6 @@ async function loadHosts(): Promise<HostRecord[]> {
   }
   try {
     const dbHosts = await window.hypershell.listHosts();
-    console.log("[hypershell] loaded hosts from DB:", dbHosts.length);
     return dbHosts.map((h: Record<string, unknown>) => mapDbHostToUiHost(h));
   } catch (err) {
     console.error("[hypershell] failed to load hosts:", err);
@@ -259,7 +258,6 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
         ? { password: (host.password ?? "").trim() }
         : {})
     });
-    console.log("[hypershell] persisted host:", result);
     return mapDbHostToUiHost(result as unknown as Record<string, unknown>);
   } catch (err) {
     console.error("[hypershell] failed to persist host:", err);
@@ -324,7 +322,7 @@ function MainApp() {
   const [sftpAuthPassword, setSftpAuthPassword] = useState("");
   const [sftpAuthError, setSftpAuthError] = useState<string | null>(null);
   const [sftpAuthSubmitting, setSftpAuthSubmitting] = useState(false);
-  const [connectingHostIds, setConnectingHostIds] = useState<Set<string>>(new Set());
+  const [connectingHostIds, setConnectingHostIds] = useState<Set<string>>(() => new Set());
   const [lastConnectedAtByHostId, setLastConnectedAtByHostId] = useState<Record<string, string | null>>({});
   const [connectionHistoryHost, setConnectionHistoryHost] = useState<HostRecord | null>(null);
   const [hostKeyVerifyOpen, setHostKeyVerifyOpen] = useState(false);

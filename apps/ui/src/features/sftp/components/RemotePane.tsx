@@ -15,6 +15,7 @@ import { getParentPath } from "../utils/fileUtils";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList, type FileListEntry } from "./FileList";
 import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
+import { SftpStatusBar } from "./SftpStatusBar";
 
 export interface RemotePaneProps {
   store: StoreApi<SftpStoreState>;
@@ -111,18 +112,6 @@ export function RemotePane({
   }, [remoteEntries, remoteFilterText, filterCaseSensitive, filterRegex]);
 
   useEffect(() => {
-    console.log(
-      "[sftp-ui] remote pane state:",
-      `path=${remotePath}`,
-      `entries=${remoteEntries.length}`,
-      `filtered=${filteredEntries.length}`,
-      `filter="${remoteFilterText || ""}"`,
-      `loading=${isLoading}`,
-      `error=${error ?? "(none)"}`
-    );
-  }, [error, filteredEntries.length, isLoading, remoteEntries.length, remoteFilterText, remotePath]);
-
-  useEffect(() => {
     const maxIndex = Math.max(0, filteredEntries.length - 1);
     if (remoteCursorIndex > maxIndex) {
       store.getState().setCursorIndex("remote", maxIndex);
@@ -147,14 +136,6 @@ export function RemotePane({
         }
         const response = await sftpList({ sftpSessionId, path });
         const entries = extractRemoteEntries(response);
-        console.log(
-          "[sftp-ui] loadDirectory:",
-          path,
-          "→",
-          entries.length,
-          "entries",
-          entries.length > 0 ? `(first: ${entries[0].name})` : ""
-        );
         setRemoteEntries(entries);
       } catch (loadError) {
         const message =
@@ -320,6 +301,7 @@ export function RemotePane({
         cursorIndex={remoteCursorIndex}
         sftpSessionId={sftpSessionId}
       />
+      <SftpStatusBar entries={filteredEntries} selection={remoteSelection} />
 
       {contextMenu && (
         <FileContextMenu

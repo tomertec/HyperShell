@@ -8,7 +8,7 @@ export interface PuttyImportDialogProps {
 
 export function PuttyImportDialog({ onImport, onClose }: PuttyImportDialogProps) {
   const [sessions, setSessions] = useState<PuttySession[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
