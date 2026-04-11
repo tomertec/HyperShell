@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-04-11
+
 ### Changed
 
 - **SFTP transfers use native SCP** — file downloads and uploads now use the system `scp` binary instead of ssh2's pure-JavaScript SFTP streams, achieving ~100 MB/s on LAN (previously ~1.5 MB/s). Falls back to ssh2 streams for password-only auth, resume transfers, or when `scp` binary is unavailable.
