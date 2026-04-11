@@ -676,7 +676,8 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       keepAliveInterval: parsed.keepAliveInterval ?? null,
       autoReconnect: parsed.autoReconnect ?? false,
       reconnectMaxAttempts: parsed.reconnectMaxAttempts ?? 5,
-      reconnectBaseInterval: parsed.reconnectBaseInterval ?? 1
+      reconnectBaseInterval: parsed.reconnectBaseInterval ?? 1,
+      tmuxDetect: parsed.tmuxDetect ?? false
     });
     return attachPasswordMetadata(persistedHost);
   });
