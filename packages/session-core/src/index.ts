@@ -1,5 +1,6 @@
 export * from "./sessionManager";
 export * from "./ssh";
+export * from "./transports/scpCommand";
 export * from "./transports/serialTransport";
 export * from "./transports/sftpTransport";
 export * from "./transports/sshPtyTransport";
