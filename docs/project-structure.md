@@ -103,6 +103,9 @@ hypershell/
 │   │       │   ├── serialTransport.ts       # Serial port via serialport
 │   │       │   ├── sftpTransport.ts         # SFTP via ssh2
 │   │       │   └── transportEvents.ts       # Shared types + SftpConnectionOptions
+│   │       ├── tmux/
+│   │       │   ├── tmuxProbe.ts             # Pre-connection tmux session detection
+│   │       │   └── tmuxProbe.test.ts        # Parser unit tests
 │   │       ├── sftp/
 │   │       │   └── syncEngine.ts            # Bidirectional file sync
 │   │       ├── ssh/

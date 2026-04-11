@@ -47,6 +47,7 @@ Primary host records for SSH connections.
 | auto_reconnect | INTEGER | 0 or 1 — enable network-aware auto-reconnect |
 | reconnect_max_attempts | INTEGER | Max reconnection attempts (default 5) |
 | reconnect_base_interval | INTEGER | Base reconnect delay in seconds (default 1, exponential backoff) |
+| tmux_detect | INTEGER | 0 or 1 — probe for tmux sessions before connecting (requires key-based auth) |
 | notes | TEXT | Freeform notes |
 | created_at | TEXT | ISO timestamp |
 | updated_at | TEXT | ISO timestamp |

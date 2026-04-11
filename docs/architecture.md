@@ -123,6 +123,24 @@ When a session disconnects with `autoReconnect` enabled:
 
 Per-host configuration: `autoReconnect` (boolean), `reconnectMaxAttempts` (default 5), `reconnectBaseInterval` (default 1s).
 
+### Tmux Session Detection
+
+Pre-connection probe that detects existing tmux sessions on a remote host. Per-host opt-in via `tmux_detect` column.
+
+**Flow:**
+1. User connects to a host with `tmuxDetect: true` (and non-password auth)
+2. Renderer calls `tmuxProbe({ hostId })` IPC
+3. Main process spawns `ssh host 'tmux ls -F "..."'` via `child_process.execFile` (no TTY)
+4. Reuses `buildSshArgs()` for identical auth resolution as the real SSH connection
+5. Parses pipe-delimited output into `TmuxSession[]` (name, windows, created, attached)
+6. If sessions found, renderer shows `TmuxSessionPicker` modal
+7. On attach: opens SSH session normally, then sends `tmux attach -t '<name>'` as terminal input after `connected` event
+8. On skip/escape: connects normally
+
+**Key files:** `session-core/tmux/tmuxProbe.ts` (probe + parser), `desktop/ipc/tmuxIpc.ts` (handler), `ui/features/tmux/TmuxSessionPicker.tsx` (picker modal).
+
+**Constraints:** Requires key-based auth — password-only hosts are skipped (the probe cannot supply a password interactively). Probe timeout is 10s. All failures resolve to an empty session list (silent fallback to normal connection). The attach command is shell-quoted and only sent on first connect (not on auto-reconnect).
+
 ### Serial Transport
 
 Uses the **serialport npm library**. Supports configurable baud rate, data bits, stop bits, parity, flow control, and hardware signals (DTR/RTS).

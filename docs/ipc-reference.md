@@ -145,6 +145,16 @@ Session logging intercepts terminal `data` events in `registerIpc.ts` and writes
 
 Host port forwards are linked to a specific host via `hostId`. Forwards with `autoStart: true` activate when the host's SSH session opens and tear down on disconnect.
 
+## Tmux Channels
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `tmux:probe` | `{ hostId }` | `{ sessions: TmuxSessionIpc[] }` | `tmuxIpc.ts` |
+
+Each `TmuxSessionIpc` contains `{ name, windowCount, createdAt (ISO string), attached (boolean) }`.
+
+The probe spawns a one-shot `ssh host 'tmux ls -F ...'` command via `child_process.execFile`, reusing the same `buildSshArgs()` as the SSH terminal for identical auth resolution. Timeout is 10 seconds. Any failure (auth, timeout, tmux not installed) silently returns an empty array — the probe never blocks or errors. Password-only hosts are skipped on the renderer side before the IPC call is made.
+
 ## Connection Pool Channels
 
 | Channel | Request | Response | Handler |

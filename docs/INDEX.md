@@ -104,6 +104,7 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 | Host export (JSON/CSV) | Complete | `desktop/ipc/hostsIpc.ts` (exportHostsToJson/Csv) |
 | Toast notifications | Complete | sonner `<Toaster>` in App.tsx |
 | General settings panel | Complete | `ui/features/settings/SettingsPanel.tsx` (General section) |
+| Tmux session detection | Complete | `session-core/tmux/tmuxProbe.ts`, `ui/features/tmux/TmuxSessionPicker.tsx` |
 | SSH key manager | Partial | `ui/features/ssh-keys/` (UI only) |
 
 ## Tech Stack
