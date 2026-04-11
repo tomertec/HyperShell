@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Changed
+
+- **SFTP transfers use native SCP** — file downloads and uploads now use the system `scp` binary instead of ssh2's pure-JavaScript SFTP streams, achieving ~100 MB/s on LAN (previously ~1.5 MB/s). Falls back to ssh2 streams for password-only auth, resume transfers, or when `scp` binary is unavailable.
+
+### Fixed
+
+- **SFTP transfer conflict resolution UI** — downloading folders with existing local files no longer hangs on "Waiting for conflict resolution". The transfer popup now shows inline action buttons (Overwrite, Skip, Rename) when a file conflict is detected, with "Overwrite all" and "Skip all" options to batch-resolve remaining conflicts.
+- **SFTP path state lost on tab switch** — navigating to folders in the SFTP pane, switching to an SSH tab, and switching back no longer resets both panes to root. SFTP tabs now stay mounted (CSS visibility) like terminal tabs instead of unmounting and disposing their store.
+
 ## [0.1.2] - 2026-04-11
 
 ### Added

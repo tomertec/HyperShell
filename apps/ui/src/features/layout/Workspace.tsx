@@ -32,6 +32,7 @@ function PaneView({
   const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
 
   const terminalTabs = tabs.filter((t) => !(t.type === "sftp" && t.sftpSessionId));
+  const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftpSessionId);
   const hasTabForSession = (sessionId: string | null) =>
     sessionId ? tabs.some((t) => t.sessionId === sessionId) : false;
   const resolvedSessionId =
@@ -52,15 +53,23 @@ function PaneView({
       }`}
       onClick={onActivate}
     >
-      {activeSftpTab && (
-        <div className="absolute inset-0 flex flex-col z-10">
-          <SftpTab
-            sftpSessionId={activeSftpTab.sftpSessionId!}
-            hostId={activeSftpTab.hostId ?? activeSftpTab.profileId ?? ""}
-            onClose={() => onCloseTab(activeSftpTab.sessionId)}
-          />
-        </div>
-      )}
+      {sftpTabs.map((tab) => {
+        const isVisible = tab.sessionId === resolvedSessionId;
+        return (
+          <div
+            key={tab.tabKey ?? tab.sessionId}
+            className={`absolute inset-0 flex flex-col ${
+              isVisible ? "z-10" : "invisible pointer-events-none"
+            }`}
+          >
+            <SftpTab
+              sftpSessionId={tab.sftpSessionId!}
+              hostId={tab.hostId ?? tab.profileId ?? ""}
+              onClose={() => onCloseTab(tab.sessionId)}
+            />
+          </div>
+        );
+      })}
 
       {terminalTabs.map((tab) => {
         const isVisible = !activeSftpTab && tab.sessionId === resolvedSessionId;
