@@ -132,6 +132,13 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     // Column already exists — safe to ignore.
   }
 
+  // Migration 014: tmux detection toggle per host
+  try {
+    db.exec("ALTER TABLE hosts ADD COLUMN tmux_detect INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    // Column already exists — safe to ignore.
+  }
+
   return db;
 }
 

@@ -13,6 +13,7 @@ export interface TerminalPaneProps {
   sessionId?: string;
   autoConnect?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
+  tmuxAttachTarget?: string;
   onSessionOpened?: (sessionId: string) => void;
 }
 
@@ -22,6 +23,7 @@ export function TerminalPane({
   sessionId,
   autoConnect,
   telnetOptions,
+  tmuxAttachTarget,
   onSessionOpened
 }: TerminalPaneProps) {
   const [dtr, setDtr] = useState(true);
@@ -34,6 +36,7 @@ export function TerminalPane({
     sessionId,
     autoConnect,
     telnetOptions,
+    tmuxAttachTarget,
     onSessionOpened
   });
   const { fit } = session;

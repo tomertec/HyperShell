@@ -25,6 +25,7 @@ export interface UseTerminalSessionInput {
   sessionId?: string;
   autoConnect?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
+  tmuxAttachTarget?: string;
   onSessionOpened?: (sessionId: string) => void;
 }
 
@@ -87,6 +88,7 @@ export function useTerminalSession(
   const broadcastTargetsRef = useRef<string[]>(broadcastTargets);
   const pendingSessionEventsRef = useRef<SessionEvent[]>([]);
   const eventUnsubscribeRef = useRef<(() => void) | null>(null);
+  const tmuxAttachSentRef = useRef(false);
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [state, setState] = useState<TerminalSessionState>(
     input.sessionId ? "connecting" : "idle"
@@ -219,6 +221,16 @@ export function useTerminalSession(
       setStateSafe(effect.state);
     }
 
+    if (effect.state === "connected" && input.tmuxAttachTarget && sessionIdRef.current && !tmuxAttachSentRef.current) {
+      tmuxAttachSentRef.current = true;
+      const safeName = `'${input.tmuxAttachTarget.replace(/'/g, "'\\''")}'`;
+      const cmd = `tmux attach -t ${safeName}\r`;
+      void window.hypershell?.writeSession?.({
+        sessionId: sessionIdRef.current,
+        data: cmd,
+      });
+    }
+
     if (effect.clearSessionId) {
       sessionIdRef.current = null;
     }
@@ -235,7 +247,7 @@ export function useTerminalSession(
     if (effect.errorMessage) {
       instance.writeln(`\r\n[error] ${effect.errorMessage}`);
     }
-  }, [setStateSafe]);
+  }, [setStateSafe, input.tmuxAttachTarget]);
 
   useEffect(() => {
     return () => {

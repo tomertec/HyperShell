@@ -201,6 +201,10 @@ export const backupChannels = {
   showOpenDialog: "backup:show-open-dialog",
 } as const;
 
+export const tmuxChannels = {
+  probe: "tmux:probe",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -227,4 +231,5 @@ export const ipcChannels = {
   connectionHistory: connectionHistoryChannels,
   hostFingerprint: hostFingerprintChannels,
   backup: backupChannels,
+  tmux: tmuxChannels,
 } as const;

@@ -223,6 +223,8 @@ import {
   hostFingerprintLookupRequestSchema,
   hostFingerprintTrustRequestSchema,
   hostFingerprintRemoveRequestSchema,
+  tmuxProbeRequestSchema,
+  tmuxProbeResponseSchema,
   type SnippetRecord,
   type UpsertSnippetRequest,
   type RemoveSnippetRequest,
@@ -249,6 +251,8 @@ import {
   type HostFingerprintLookupRequest,
   type HostFingerprintTrustRequest,
   type HostFingerprintRemoveRequest,
+  type TmuxProbeRequest,
+  type TmuxProbeResponse,
   keyboardInteractiveRequestSchema,
   keyboardInteractiveResponseSchema,
   type KeyboardInteractiveRequest,
@@ -441,6 +445,8 @@ export interface DesktopApi {
   backupRestore(request: RestoreBackupRequest): Promise<RestoreBackupResponse>;
   backupList(): Promise<ListBackupsResponse>;
   backupShowOpenDialog(): Promise<string | null>;
+  // Tmux detection
+  tmuxProbe(request: TmuxProbeRequest): Promise<TmuxProbeResponse>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -1362,6 +1368,12 @@ export function createDesktopApi(
       const parsed = sftpDragOutRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sftp.dragOut, parsed);
       return sftpDragOutResponseSchema.parse(result);
+    },
+    // Tmux detection
+    async tmuxProbe(request: TmuxProbeRequest): Promise<TmuxProbeResponse> {
+      const parsed = tmuxProbeRequestSchema.parse(request);
+      const raw = await ipcRenderer.invoke(ipcChannels.tmux.probe, parsed);
+      return tmuxProbeResponseSchema.parse(raw);
     },
   };
 }

@@ -90,6 +90,7 @@ export type HostFormValue = {
   password?: string;
   savePassword?: boolean;
   clearSavedPassword?: boolean;
+  tmuxDetect: boolean;
   hasSavedPassword?: boolean;
   passwordSavedAt?: string | null;
 };
@@ -125,6 +126,7 @@ const defaultValue: HostFormValue = {
   password: "",
   savePassword: true,
   clearSavedPassword: false,
+  tmuxDetect: false,
   hasSavedPassword: false,
   passwordSavedAt: null,
 };
@@ -1088,6 +1090,22 @@ export function HostForm({
             </label>
           </div>
         )}
+
+        <label htmlFor={`${formId}-tmuxDetect`} className="flex items-center gap-3 cursor-pointer">
+          <input
+            id={`${formId}-tmuxDetect`}
+            type="checkbox"
+            checked={value.tmuxDetect}
+            onChange={(e) => setValue({ ...value, tmuxDetect: e.target.checked })}
+            className="rounded border-border accent-accent"
+          />
+          <div>
+            <span className="text-sm text-text-primary">Detect tmux sessions on connect</span>
+            {value.tmuxDetect && value.authMethod === "password" && (
+              <span className="block text-[11px] text-warning mt-0.5">Requires key-based auth — password-only hosts cannot be probed</span>
+            )}
+          </div>
+        </label>
       </div>
 
       {/* --- Port Forwards --- */}

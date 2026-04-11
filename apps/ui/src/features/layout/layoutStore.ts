@@ -11,6 +11,7 @@ export type LayoutTab = {
   type?: "terminal" | "sftp";
   sftpSessionId?: string;
   hostId?: string;
+  tmuxAttachTarget?: string;
 };
 
 export type Pane = {

@@ -24,6 +24,7 @@ export type HostRecord = {
   autoReconnect: boolean;
   reconnectMaxAttempts: number;
   reconnectBaseInterval: number;
+  tmuxDetect: boolean;
 };
 
 export type HostInput = {
@@ -49,6 +50,7 @@ export type HostInput = {
   autoReconnect?: boolean;
   reconnectMaxAttempts?: number;
   reconnectBaseInterval?: number;
+  tmuxDetect?: boolean;
 };
 
 type HostRow = {
@@ -74,6 +76,7 @@ type HostRow = {
   auto_reconnect: number;
   reconnect_max_attempts: number;
   reconnect_base_interval: number;
+  tmux_detect: number;
 };
 
 function mapRow(row: HostRow): HostRecord {
@@ -100,6 +103,7 @@ function mapRow(row: HostRow): HostRecord {
     autoReconnect: Boolean(row.auto_reconnect),
     reconnectMaxAttempts: row.reconnect_max_attempts ?? 5,
     reconnectBaseInterval: row.reconnect_base_interval ?? 1,
+    tmuxDetect: Boolean(row.tmux_detect),
   };
 }
 
@@ -121,13 +125,13 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
       auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
       proxy_jump, proxy_jump_host_ids, keep_alive_interval,
-      auto_reconnect, reconnect_max_attempts, reconnect_base_interval
+      auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect
     )
     VALUES (
       @id, @name, @hostname, @port, @username, @identityFile, @hostProfileId, @authProfileId, @groupId, @notes,
       @authMethod, @agentKind, @opReference, @isFavorite, @sortOrder, @color,
       @proxyJump, @proxyJumpHostIds, @keepAliveInterval,
-      @autoReconnect, @reconnectMaxAttempts, @reconnectBaseInterval
+      @autoReconnect, @reconnectMaxAttempts, @reconnectBaseInterval, @tmuxDetect
     )
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -151,6 +155,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       auto_reconnect = excluded.auto_reconnect,
       reconnect_max_attempts = excluded.reconnect_max_attempts,
       reconnect_base_interval = excluded.reconnect_base_interval,
+      tmux_detect = excluded.tmux_detect,
       updated_at = CURRENT_TIMESTAMP
   `);
 
@@ -159,7 +164,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
       auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
       proxy_jump, proxy_jump_host_ids, keep_alive_interval,
-      auto_reconnect, reconnect_max_attempts, reconnect_base_interval
+      auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect
     FROM hosts
     ORDER BY COALESCE(sort_order, 999999) ASC, is_favorite DESC, name COLLATE NOCASE ASC
   `);
@@ -169,7 +174,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
         auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
         proxy_jump, proxy_jump_host_ids, keep_alive_interval,
-        auto_reconnect, reconnect_max_attempts, reconnect_base_interval
+        auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect
       FROM hosts
       WHERE id = ?
     `
@@ -204,6 +209,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         autoReconnect: input.autoReconnect ? 1 : 0,
         reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
         reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
+        tmuxDetect: input.tmuxDetect ? 1 : 0,
       };
 
       insertHost.run(normalized);
@@ -265,6 +271,7 @@ function createInMemoryHostsRepository() {
         autoReconnect: input.autoReconnect ?? false,
         reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
         reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
+        tmuxDetect: input.tmuxDetect ?? false,
       };
 
       hosts.set(record.id, record);

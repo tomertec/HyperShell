@@ -150,6 +150,7 @@ export const hostRecordSchema = z.object({
   reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
   passwordSavedAt: z.string().nullable().optional(),
+  tmuxDetect: z.boolean().optional(),
 });
 
 export const upsertHostRequestSchema = z.object({
@@ -178,6 +179,7 @@ export const upsertHostRequestSchema = z.object({
   password: z.string().optional(),
   savePassword: z.boolean().optional(),
   clearSavedPassword: z.boolean().optional(),
+  tmuxDetect: z.boolean().optional(),
 });
 
 export const removeHostRequestSchema = z.object({
@@ -987,3 +989,24 @@ export type RestoreBackupRequest = z.infer<typeof restoreBackupRequestSchema>;
 export type RestoreBackupResponse = z.infer<typeof restoreBackupResponseSchema>;
 export type BackupInfo = z.infer<typeof backupInfoSchema>;
 export type ListBackupsResponse = z.infer<typeof listBackupsResponseSchema>;
+
+// --- Tmux ---
+
+export const tmuxSessionSchema = z.object({
+  name: z.string().min(1),
+  windowCount: z.number().int().nonnegative(),
+  createdAt: z.string(),
+  attached: z.boolean(),
+});
+
+export const tmuxProbeRequestSchema = z.object({
+  hostId: z.string().min(1),
+});
+
+export const tmuxProbeResponseSchema = z.object({
+  sessions: z.array(tmuxSessionSchema),
+});
+
+export type TmuxSessionIpc = z.infer<typeof tmuxSessionSchema>;
+export type TmuxProbeRequest = z.infer<typeof tmuxProbeRequestSchema>;
+export type TmuxProbeResponse = z.infer<typeof tmuxProbeResponseSchema>;

@@ -310,6 +310,18 @@ export function getOrCreateDatabase(): unknown {
         }
       }
 
+      // Migration 014: tmux detection toggle per host
+      try {
+        db.exec("ALTER TABLE hosts ADD COLUMN tmux_detect INTEGER NOT NULL DEFAULT 0");
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("already exists") || msg.includes("duplicate column")) {
+          console.info("[hypershell] Migration 014 (tmux_detect): column already exists");
+        } else {
+          console.error("[hypershell] Migration 014 (tmux_detect) failed:", msg);
+        }
+      }
+
       sharedDb = db;
       console.log("[hypershell] Database initialized successfully");
     } catch (err) {
@@ -402,7 +414,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           keepAliveInterval: item?.keepAliveInterval == null ? null : Number(item.keepAliveInterval),
           autoReconnect: Boolean(item?.autoReconnect ?? false),
           reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? 5),
-          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? 1)
+          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? 1),
+          tmuxDetect: Boolean(item?.tmuxDetect ?? false)
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
     } catch {
@@ -438,7 +451,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         keepAliveInterval: input.keepAliveInterval ?? null,
         autoReconnect: input.autoReconnect ?? false,
         reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? 1
+        reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
+        tmuxDetect: input.tmuxDetect ?? false
       };
 
       const hosts = readHosts();
@@ -662,7 +676,8 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       keepAliveInterval: parsed.keepAliveInterval ?? null,
       autoReconnect: parsed.autoReconnect ?? false,
       reconnectMaxAttempts: parsed.reconnectMaxAttempts ?? 5,
-      reconnectBaseInterval: parsed.reconnectBaseInterval ?? 1
+      reconnectBaseInterval: parsed.reconnectBaseInterval ?? 1,
+      tmuxDetect: parsed.tmuxDetect ?? false
     });
     return attachPasswordMetadata(persistedHost);
   });
