@@ -402,7 +402,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           keepAliveInterval: item?.keepAliveInterval == null ? null : Number(item.keepAliveInterval),
           autoReconnect: Boolean(item?.autoReconnect ?? false),
           reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? 5),
-          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? 1)
+          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? 1),
+          tmuxDetect: Boolean(item?.tmuxDetect ?? false)
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
     } catch {
@@ -438,7 +439,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         keepAliveInterval: input.keepAliveInterval ?? null,
         autoReconnect: input.autoReconnect ?? false,
         reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? 1
+        reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
+        tmuxDetect: input.tmuxDetect ?? false
       };
 
       const hosts = readHosts();

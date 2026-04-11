@@ -59,6 +59,7 @@ import { registerPuttyImportIpc } from "./puttyImportIpc";
 import { registerSshManagerImportIpc } from "./sshManagerImportIpc";
 import { registerBackupIpc } from "./backupIpc";
 import { registerSessionRecoveryIpc } from "./sessionRecoveryIpc";
+import { registerTmuxIpc } from "./tmuxIpc";
 import {
   createHostStatusService,
   type HostStatusTarget,
@@ -204,6 +205,7 @@ const registeredChannels = [
   ipcChannels.backup.restore,
   ipcChannels.backup.list,
   ipcChannels.backup.showOpenDialog,
+  ipcChannels.tmux.probe,
 ] as const;
 
 export const sessionManager = createSessionManager();
@@ -1488,6 +1490,7 @@ export function registerIpc(
   registerHostFingerprintIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerBackupIpc(ipcMain);
   registerSessionRecoveryIpc(ipcMain, () => getDb() as SqliteDatabase);
+  registerTmuxIpc(ipcMain, () => getOrCreateHostsRepo());
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created

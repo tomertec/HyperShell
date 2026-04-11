@@ -24,6 +24,7 @@ const sampleHost = {
   autoReconnect: false,
   reconnectMaxAttempts: 5,
   reconnectBaseInterval: 1,
+  tmuxDetect: false,
 };
 
 describe("host export", () => {
