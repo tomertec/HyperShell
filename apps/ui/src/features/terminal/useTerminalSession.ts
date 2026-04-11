@@ -88,6 +88,7 @@ export function useTerminalSession(
   const broadcastTargetsRef = useRef<string[]>(broadcastTargets);
   const pendingSessionEventsRef = useRef<SessionEvent[]>([]);
   const eventUnsubscribeRef = useRef<(() => void) | null>(null);
+  const tmuxAttachSentRef = useRef(false);
   const [terminal, setTerminal] = useState<Terminal | null>(null);
   const [state, setState] = useState<TerminalSessionState>(
     input.sessionId ? "connecting" : "idle"
@@ -220,8 +221,10 @@ export function useTerminalSession(
       setStateSafe(effect.state);
     }
 
-    if (effect.state === "connected" && input.tmuxAttachTarget && sessionIdRef.current) {
-      const cmd = `tmux attach -t ${input.tmuxAttachTarget}\r`;
+    if (effect.state === "connected" && input.tmuxAttachTarget && sessionIdRef.current && !tmuxAttachSentRef.current) {
+      tmuxAttachSentRef.current = true;
+      const safeName = `'${input.tmuxAttachTarget.replace(/'/g, "'\\''")}'`;
+      const cmd = `tmux attach -t ${safeName}\r`;
       void window.hypershell?.writeSession?.({
         sessionId: sessionIdRef.current,
         data: cmd,

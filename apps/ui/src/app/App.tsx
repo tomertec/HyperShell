@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { toast, Toaster } from "sonner";
 
@@ -347,6 +347,7 @@ function MainApp() {
     sessions: Array<{ name: string; windowCount: number; createdAt: string; attached: boolean }>;
     host: HostRecord;
   } | null>(null);
+  const tmuxProbeGenRef = useRef(0);
   const [savedRecoverySessions, setSavedRecoverySessions] = useState<SavedSessionRecord[]>([]);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
@@ -617,13 +618,17 @@ function MainApp() {
   const connectHost = useCallback(
     async (host: HostRecord) => {
       if (host.tmuxDetect && window.hypershell?.tmuxProbe) {
+        const gen = ++tmuxProbeGenRef.current;
         try {
           const result = await window.hypershell.tmuxProbe({ hostId: host.id });
+          // If another probe was started while this one was in-flight, discard
+          if (gen !== tmuxProbeGenRef.current) return;
           if (result.sessions.length > 0) {
             setTmuxPickerState({ open: true, sessions: result.sessions, host });
             return;
           }
         } catch {
+          if (gen !== tmuxProbeGenRef.current) return;
           // Probe failed — proceed with normal connection
         }
       }
