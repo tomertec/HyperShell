@@ -6,6 +6,7 @@ export interface SftpSession {
   sftpSessionId: string;
   hostId: string;
   transport: SftpTransportHandle;
+  connectionOptions: SftpConnectionOptions;
 }
 
 export type SftpSessionEvent = { sftpSessionId: string } & SessionTransportEvent;
@@ -39,7 +40,7 @@ export function createSftpSessionManager(): SftpSessionManager {
     });
 
     await transport.connect();
-    sessions.set(sftpSessionId, { sftpSessionId, hostId, transport });
+    sessions.set(sftpSessionId, { sftpSessionId, hostId, transport, connectionOptions: options });
     return sftpSessionId;
   }
 
