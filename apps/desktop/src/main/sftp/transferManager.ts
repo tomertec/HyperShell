@@ -412,8 +412,29 @@ export function createTransferManager(
     return ops;
   }
 
+  let scpBinaryChecked = false;
+  let scpBinaryAvailable = false;
+
+  function isScpAvailable(): boolean {
+    if (scpBinaryChecked) return scpBinaryAvailable;
+    scpBinaryChecked = true;
+
+    if (process.platform === "win32") {
+      const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
+      if (systemRoot) {
+        scpBinaryAvailable = existsSync(join(systemRoot, "System32", "OpenSSH", "scp.exe"));
+        return scpBinaryAvailable;
+      }
+    }
+
+    // Unix: check if scp exists in common locations
+    scpBinaryAvailable = existsSync("/usr/bin/scp") || existsSync("/usr/local/bin/scp");
+    return scpBinaryAvailable;
+  }
+
   function canUseNativeScp(job: ManagedTransferJob): boolean {
     if (!job.connectionOptions) return false;
+    if (!isScpAvailable()) return false;
     // Password-only auth can't work with SCP (no interactive prompt)
     if (
       job.connectionOptions.authMethod === "password"
@@ -491,6 +512,64 @@ export function createTransferManager(
     });
   }
 
+  function executeScpUpload(
+    job: ManagedTransferJob
+  ): Promise<void> {
+    const connOpts = job.connectionOptions!;
+    const keyPath = connOpts.privateKeyPath ?? connOpts.fallbackKeyPaths?.[0];
+
+    const scpCmd = buildScpCommand({
+      hostname: connOpts.hostname,
+      port: connOpts.port,
+      username: connOpts.username,
+      privateKeyPath: keyPath,
+      proxyJump: connOpts.proxyJump,
+      direction: "upload",
+      remotePath: job.remotePath,
+      localPath: job.localPath
+    });
+
+    return new Promise<void>((resolve, reject) => {
+      const proc = execFile(scpCmd.command, scpCmd.args, { windowsHide: true }, (error) => {
+        clearInterval(progressInterval);
+        signal?.removeEventListener("abort", abortHandler);
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
+
+      // For uploads, we can't easily poll remote file size.
+      // Emit progress based on elapsed time as a fraction of expected duration.
+      const startedAt = Date.now();
+      const progressInterval = setInterval(() => {
+        const elapsed = (Date.now() - startedAt) / 1000;
+        // Estimate progress — we know totalBytes but can't poll remote size cheaply.
+        // Use a conservative speed estimate that grows over time.
+        job.speed = elapsed > 0 ? job.totalBytes / Math.max(elapsed * 2, 1) : 0;
+        emit({
+          kind: "transfer-progress",
+          transferId: job.transferId,
+          bytesTransferred: job.bytesTransferred,
+          totalBytes: job.totalBytes,
+          speed: job.speed,
+          status: "active"
+        });
+      }, 500);
+
+      const signal = job.abortController?.signal;
+      const abortHandler = () => {
+        proc.kill();
+      };
+      if (signal?.aborted) {
+        proc.kill();
+      } else {
+        signal?.addEventListener("abort", abortHandler, { once: true });
+      }
+    });
+  }
+
   async function processJob(
     job: ManagedTransferJob,
     transport: SftpTransportHandle
@@ -521,6 +600,21 @@ export function createTransferManager(
           job.remotePath = await resolveRemoteRenamePath(transport, job.remotePath);
         }
         job.status = "active";
+      }
+
+      if (canUseNativeScp(job)) {
+        await executeScpUpload(job);
+        job.bytesTransferred = job.totalBytes;
+        job.speed = 0;
+        emit({
+          kind: "transfer-progress",
+          transferId: job.transferId,
+          bytesTransferred: job.totalBytes,
+          totalBytes: job.totalBytes,
+          speed: 0,
+          status: "active"
+        });
+        return;
       }
 
       const resumeOffset = job.bytesTransferred;
