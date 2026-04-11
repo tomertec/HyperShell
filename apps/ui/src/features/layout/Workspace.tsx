@@ -78,6 +78,7 @@ function PaneView({
               sessionId={tab.preopened ? tab.sessionId : undefined}
               autoConnect={!tab.preopened}
               telnetOptions={tab.telnetOptions}
+              tmuxAttachTarget={tab.tmuxAttachTarget}
               onSessionOpened={(sessionId) => {
                 replaceSessionId(tab.sessionId, sessionId);
               }}
