@@ -21,3 +21,9 @@ export {
   parseAsciinemaCast,
   type AsciinemaRecording
 } from "./recording/asciinemaReader";
+export {
+  tmuxProbe,
+  parseTmuxListOutput,
+  type TmuxSession,
+  type TmuxProbeOptions
+} from "./tmux/tmuxProbe";

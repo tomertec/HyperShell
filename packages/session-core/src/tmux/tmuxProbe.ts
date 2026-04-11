@@ -1,5 +1,12 @@
 // packages/session-core/src/tmux/tmuxProbe.ts
 
+import { execFile } from "node:child_process";
+import { buildSshPtyCommand } from "../transports/sshPtyTransport";
+
+const TMUX_FORMAT =
+  "#{session_name}|#{session_windows}|#{session_created}|#{session_attached}";
+const DEFAULT_TIMEOUT_MS = 10_000;
+
 export interface TmuxSession {
   name: string;
   windowCount: number;
@@ -44,6 +51,46 @@ export function parseTmuxListOutput(output: string): TmuxSession[] {
   return sessions;
 }
 
-export async function tmuxProbe(_options: TmuxProbeOptions): Promise<TmuxSession[]> {
-  throw new Error("Not implemented");
+export async function tmuxProbe(
+  options: TmuxProbeOptions,
+): Promise<TmuxSession[]> {
+  try {
+    const profile = {
+      hostname: options.hostname,
+      username: options.username,
+      port: options.port,
+      identityFile: options.identityFile,
+      proxyJump: options.proxyJump,
+      keepAliveSeconds: options.keepAliveSeconds,
+      extraArgs: options.extraArgs,
+      requestTty: false,
+    };
+
+    const { command, args } = buildSshPtyCommand(profile);
+    // buildSshPtyCommand puts destination last; append remote command after it
+    args.push(`tmux ls -F '${TMUX_FORMAT}'`);
+
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+    return new Promise<TmuxSession[]>((resolve) => {
+      const child = execFile(
+        command,
+        args,
+        { timeout: timeoutMs, windowsHide: true },
+        (error, stdout) => {
+          if (error) {
+            resolve([]);
+            return;
+          }
+          resolve(parseTmuxListOutput(stdout));
+        },
+      );
+
+      // Safety net: resolve empty on spawn errors (e.g. binary not found)
+      child.on("error", () => resolve([]));
+    });
+  } catch {
+    // buildSshPtyCommand/buildSshArgs can throw (e.g. invalid proxyJump)
+    return [];
+  }
 }
