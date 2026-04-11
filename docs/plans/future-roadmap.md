@@ -11,22 +11,22 @@ Solid MVP with SSH/serial terminals, dual-pane SFTP, port forwarding, host manag
 ### UX Polish
 1. **Keyboard shortcut customization** — let users rebind shortcuts instead of hardcoded Ctrl+Shift combos
 2. **Multi-language / i18n support** — even just English/Hebrew would broaden reach
-3. **Search within SFTP file browser** — find files by name in remote directories
-4. **Drag-and-drop file transfer** — drag files from OS explorer into SFTP pane (and vice versa)
+3. ~~**Search within SFTP file browser** — find files by name in remote directories~~ **Done** — filter text with regex support in both local and remote panes.
+4. ~~**Drag-and-drop file transfer** — drag files from OS explorer into SFTP pane (and vice versa)~~ **Done** — internal and external drop handlers in FileList.
 5. **Tab pinning** — pin frequently used sessions so they persist across restarts
-6. **Connection profiles** — save full connection configs (host + tunnels + env vars + snippets) as reusable profiles
-7. **Breadcrumb editing** — wire breadcrumb editing in SftpDualPane (existing TODO)
-8. **Terminal scrollback search highlighting** — highlight all matches in scrollback, not just current
+6. ~~**Connection profiles** — save full connection configs (host + tunnels + env vars + snippets) as reusable profiles~~ **Done** — host profiles with HostProfileManagerDialog and hostProfileRepository.
+7. ~~**Breadcrumb editing** — wire breadcrumb editing in SftpDualPane (existing TODO)~~ **Done** — editable PathBreadcrumb with double-click to edit, Enter/Escape handling.
+8. ~~**Terminal scrollback search highlighting** — highlight all matches in scrollback, not just current~~ **Done** — xterm SearchAddon with highlight decorations and match count.
 
 ### Performance & Reliability
-9. **SFTP transfer resume** — resume interrupted large file transfers
+9. ~~**SFTP transfer resume** — resume interrupted large file transfers~~ **Done** — `sftpTransferResume` IPC with resume in TransferPanel.
 10. **Connection health dashboard** — aggregate view of all active sessions' latency/status
 11. ~~**Database WAL mode** — if not already enabled, WAL improves concurrent read/write performance~~ **Done (v0.1.0)** — WAL enabled in `openDatabase()` pragmas.
-12. **Lazy-load CodeMirror** — the 12 language packages are heavy; load on demand
+12. ~~**Lazy-load CodeMirror** — the 12 language packages are heavy; load on demand~~ **Done** — EditorPane loaded via `React.lazy()` with Suspense.
 
 ### Security
 13. **SSH agent forwarding toggle** — per-host option to enable/disable agent forwarding
-14. **Audit log** — track who connected where and when (useful for teams)
+14. ~~**Audit log** — track who connected where and when (useful for teams)~~ **Done** — ConnectionHistoryDialog with connectedAt/disconnectedAt/success tracking.
 15. **Session timeout / auto-lock** — lock app after idle period
 
 ---
@@ -34,7 +34,7 @@ Solid MVP with SSH/serial terminals, dual-pane SFTP, port forwarding, host manag
 ## New Features
 
 ### High Impact
-16. **SSH key generation** — generate ed25519/RSA keys directly in-app (SshKeyManager partially implemented)
+16. ~~**SSH key generation** — generate ed25519/RSA keys directly in-app (SshKeyManager partially implemented)~~ **Done** — SshKeyManager with ed25519/RSA/ECDSA generation + PPK import.
 17. ~~**Remote terminal multiplexing (tmux integration)** — detect/attach to remote tmux/screen sessions~~ **Done (v0.1.2)** — per-host opt-in probe, picker modal, shell-quoted attach. Key-based auth only.
 18. **Cloud host discovery** — import hosts from AWS EC2, Azure VMs, GCP instances via their CLIs
 19. ~~**Telnet/Raw TCP transport** — some network gear still needs telnet~~ **Done (v0.1.1)** — quick-connect dialog, Telnet protocol negotiation (NAWS, SGA, echo), raw TCP mode.
@@ -45,7 +45,7 @@ Solid MVP with SSH/serial terminals, dual-pane SFTP, port forwarding, host manag
 ### Nice to Have
 23. ~~**Terminal recording playback** — add `.cast` format (asciinema-compatible) for replay~~ **Done (v0.1.1)** — asciinema `.cast` recording + reader/writer in session-core.
 24. **Expect/automation scripts** — simple scripting for login sequences or repeated tasks
-25. **Host grouping by tags** — filter sidebar by color tag, not just group folders
+25. ~~**Host grouping by tags** — filter sidebar by color tag, not just group folders~~ **Done** — tag-based filtering in SidebarHostList with TagManager UI.
 26. **SFTP diff viewer** — compare local and remote file before upload
 27. **Notification webhooks** — notify Slack/Teams when a session disconnects
 28. **Plugin/extension system** — let users add custom transports or UI panels
