@@ -1,8 +1,9 @@
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, extname, join, posix } from "node:path";
 
-import type { SftpConnectionOptions, SftpTransportHandle } from "@hypershell/session-core";
+import { buildScpCommand, type SftpConnectionOptions, type SftpTransportHandle } from "@hypershell/session-core";
 import type { TransferJob, TransferOp } from "@hypershell/shared";
 
 export type TransferEventListener = (event: TransferEvent) => void;
@@ -411,6 +412,85 @@ export function createTransferManager(
     return ops;
   }
 
+  function canUseNativeScp(job: ManagedTransferJob): boolean {
+    if (!job.connectionOptions) return false;
+    // Password-only auth can't work with SCP (no interactive prompt)
+    if (
+      job.connectionOptions.authMethod === "password"
+      && !job.connectionOptions.privateKeyPath
+      && !job.connectionOptions.fallbackKeyPaths?.length
+    ) {
+      return false;
+    }
+    // Resume not supported by SCP
+    if (job.bytesTransferred > 0) return false;
+    return true;
+  }
+
+  function executeScpDownload(
+    job: ManagedTransferJob,
+    partPath: string
+  ): Promise<void> {
+    const connOpts = job.connectionOptions!;
+    const keyPath = connOpts.privateKeyPath ?? connOpts.fallbackKeyPaths?.[0];
+
+    const scpCmd = buildScpCommand({
+      hostname: connOpts.hostname,
+      port: connOpts.port,
+      username: connOpts.username,
+      privateKeyPath: keyPath,
+      proxyJump: connOpts.proxyJump,
+      direction: "download",
+      remotePath: job.remotePath,
+      localPath: partPath
+    });
+
+    return new Promise<void>((resolve, reject) => {
+      const proc = execFile(scpCmd.command, scpCmd.args, { windowsHide: true }, (error) => {
+        clearInterval(progressInterval);
+        signal?.removeEventListener("abort", abortHandler);
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
+
+      // Track progress by polling .part file size
+      const startedAt = Date.now();
+      const progressInterval = setInterval(() => {
+        try {
+          const stat = statSync(partPath, { throwIfNoEntry: false });
+          const currentSize = stat?.size ?? 0;
+          job.bytesTransferred = currentSize;
+          const elapsed = (Date.now() - startedAt) / 1000;
+          job.speed = elapsed > 0 ? currentSize / elapsed : 0;
+          emit({
+            kind: "transfer-progress",
+            transferId: job.transferId,
+            bytesTransferred: currentSize,
+            totalBytes: job.totalBytes,
+            speed: job.speed,
+            status: "active"
+          });
+        } catch {
+          // File may not exist yet — SCP hasn't started writing
+        }
+      }, 200);
+
+      // Handle cancellation via AbortController
+      const signal = job.abortController?.signal;
+      const abortHandler = () => {
+        proc.kill();
+      };
+      if (signal?.aborted) {
+        proc.kill();
+      } else {
+        signal?.addEventListener("abort", abortHandler, { once: true });
+      }
+    });
+  }
+
   async function processJob(
     job: ManagedTransferJob,
     transport: SftpTransportHandle
@@ -586,6 +666,26 @@ export function createTransferManager(
 
     mkdirSync(dirname(job.localPath), { recursive: true });
     const partPath = `${job.localPath}.part`;
+
+    if (canUseNativeScp(job)) {
+      // Native SCP path — uses system OpenSSH with hardware AES-NI
+      await executeScpDownload(job, partPath);
+      job.bytesTransferred = job.totalBytes;
+      job.speed = 0;
+      emit({
+        kind: "transfer-progress",
+        transferId: job.transferId,
+        bytesTransferred: job.totalBytes,
+        totalBytes: job.totalBytes,
+        speed: 0,
+        status: "active"
+      });
+      try { rmSync(job.localPath, { force: true }); } catch { /* best effort */ }
+      renameSync(partPath, job.localPath);
+      return;
+    }
+
+    // ssh2 stream fallback (password auth, resume, no scp binary)
     const resumeOffset = job.bytesTransferred;
     const isResuming = resumeOffset > 0 && existsSync(partPath) && statSync(partPath).size === resumeOffset;
     const remoteStream = isResuming
