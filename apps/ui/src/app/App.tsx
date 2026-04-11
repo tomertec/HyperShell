@@ -38,6 +38,7 @@ import type {
 } from "@hypershell/shared";
 import { EditorApp } from "../features/editor/EditorApp";
 import { TelnetQuickConnect } from "../features/telnet/TelnetQuickConnect";
+import { TmuxSessionPicker } from "../features/tmux/TmuxSessionPicker";
 import {
   HostKeyVerificationDialog,
   type HostKeyVerificationInfo,
@@ -89,6 +90,7 @@ function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
     keepAliveInterval:
       h.keepAliveInterval == null ? "" : String(h.keepAliveInterval),
     autoReconnect: Boolean(h.autoReconnect ?? false),
+    tmuxDetect: Boolean(h.tmuxDetect ?? false),
     reconnectMaxAttempts:
       h.reconnectMaxAttempts == null ? 5 : Number(h.reconnectMaxAttempts),
     reconnectBaseInterval:
@@ -338,6 +340,11 @@ function MainApp() {
   }>>([]);
   const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
   const [telnetDialogOpen, setTelnetDialogOpen] = useState(false);
+  const [tmuxPickerState, setTmuxPickerState] = useState<{
+    open: boolean;
+    sessions: Array<{ name: string; windowCount: number; createdAt: string; attached: boolean }>;
+    host: HostRecord;
+  } | null>(null);
   const [savedRecoverySessions, setSavedRecoverySessions] = useState<SavedSessionRecord[]>([]);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
@@ -585,8 +592,8 @@ function MainApp() {
     [openTab]
   );
 
-  const connectHost = useCallback(
-    (host: HostRecord) => {
+  const openHostTab = useCallback(
+    (host: HostRecord, tmuxAttachTarget?: string) => {
       setConnectingHostIds((prev) => new Set(prev).add(host.id));
       const optimisticSessionId = `ssh-${host.id}-${Date.now()}`;
       openTab({
@@ -598,11 +605,47 @@ function MainApp() {
         // (auth method, password ref, identity file, proxy jump, keep-alive, etc.).
         profileId: host.id,
         hostId: host.id,
-        preopened: false
+        preopened: false,
+        tmuxAttachTarget,
       });
     },
     [openTab]
   );
+
+  const connectHost = useCallback(
+    async (host: HostRecord) => {
+      if (host.tmuxDetect && window.hypershell?.tmuxProbe) {
+        try {
+          const result = await window.hypershell.tmuxProbe({ hostId: host.id });
+          if (result.sessions.length > 0) {
+            setTmuxPickerState({ open: true, sessions: result.sessions, host });
+            return;
+          }
+        } catch {
+          // Probe failed — proceed with normal connection
+        }
+      }
+      openHostTab(host);
+    },
+    [openHostTab]
+  );
+
+  const handleTmuxAttach = useCallback(
+    (sessionName: string) => {
+      if (tmuxPickerState?.host) {
+        openHostTab(tmuxPickerState.host, sessionName);
+      }
+      setTmuxPickerState(null);
+    },
+    [tmuxPickerState, openHostTab]
+  );
+
+  const handleTmuxSkip = useCallback(() => {
+    if (tmuxPickerState?.host) {
+      openHostTab(tmuxPickerState.host);
+    }
+    setTmuxPickerState(null);
+  }, [tmuxPickerState, openHostTab]);
 
   const connectSshAdHoc = useCallback(
     (host: string, port: number, username: string, _password: string) => {
@@ -1039,6 +1082,14 @@ function MainApp() {
         open={telnetDialogOpen}
         onClose={() => setTelnetDialogOpen(false)}
         onConnect={connectTelnet}
+      />
+
+      <TmuxSessionPicker
+        open={tmuxPickerState?.open ?? false}
+        sessions={tmuxPickerState?.sessions ?? []}
+        hostName={tmuxPickerState?.host.name ?? ""}
+        onAttach={handleTmuxAttach}
+        onSkip={handleTmuxSkip}
       />
 
       <Modal
