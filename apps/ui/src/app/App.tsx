@@ -617,7 +617,10 @@ function MainApp() {
 
   const connectHost = useCallback(
     async (host: HostRecord) => {
-      if (host.tmuxDetect && window.hypershell?.tmuxProbe) {
+      // Tmux probe requires non-interactive auth (key-based or agent).
+      // Password-only hosts can't authenticate a one-shot SSH command.
+      const canProbe = host.tmuxDetect && host.authMethod !== "password" && window.hypershell?.tmuxProbe;
+      if (canProbe) {
         const gen = ++tmuxProbeGenRef.current;
         try {
           const result = await window.hypershell.tmuxProbe({ hostId: host.id });

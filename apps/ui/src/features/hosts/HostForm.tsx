@@ -1099,7 +1099,12 @@ export function HostForm({
             onChange={(e) => setValue({ ...value, tmuxDetect: e.target.checked })}
             className="rounded border-border accent-accent"
           />
-          <span className="text-sm text-text-primary">Detect tmux sessions on connect</span>
+          <div>
+            <span className="text-sm text-text-primary">Detect tmux sessions on connect</span>
+            {value.tmuxDetect && value.authMethod === "password" && (
+              <span className="block text-[11px] text-warning mt-0.5">Requires key-based auth — password-only hosts cannot be probed</span>
+            )}
+          </div>
         </label>
       </div>
 
