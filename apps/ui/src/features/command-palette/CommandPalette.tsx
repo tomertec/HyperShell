@@ -82,7 +82,7 @@ export function CommandPalette({ commands }: CommandPaletteProps) {
     (cmd: Command) => {
       recordExecution(cmd.id);
       close();
-      Promise.resolve().then(() => cmd.execute());
+      Promise.resolve().then(() => cmd.execute()).catch(console.error);
     },
     [recordExecution, close]
   );

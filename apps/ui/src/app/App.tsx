@@ -360,6 +360,7 @@ function MainApp() {
   );
   const customThemes = useStore(settingsStore, (s) => s.settings.customThemes);
   const toggleBroadcast = useStore(broadcastStore, (s) => s.toggle);
+  const isBroadcastEnabled = useStore(broadcastStore, (s) => s.enabled);
   const setBroadcastTargets = useStore(broadcastStore, (s) => s.setTargets);
   const rememberSession = useStore(sessionRecoveryStore, (s) => s.remember);
 
@@ -1062,7 +1063,7 @@ function MainApp() {
         const idx = state.panes.findIndex((p) => p.paneId === state.activePaneId);
         if (idx < state.panes.length - 1) state.activatePane(state.panes[idx + 1].paneId);
       },
-      isBroadcastEnabled: () => broadcastStore.getState().enabled,
+      isBroadcastEnabled: () => isBroadcastEnabled,
       toggleBroadcast: () => broadcastStore.getState().toggle(),
       openSettings: () => setSettingsOpen(true),
       toggleSnippets: () => useSnippetStore.getState().toggle(),
@@ -1100,15 +1101,12 @@ function MainApp() {
       openWorkspaceMenu: () => {
         window.dispatchEvent(new CustomEvent("hypershell:open-workspace-menu"));
       },
-      zoomIn: () => {
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "=", ctrlKey: true, shiftKey: true, bubbles: true }));
-      },
-      zoomOut: () => {
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "-", ctrlKey: true, shiftKey: true, bubbles: true }));
-      },
-      resetZoom: () => {
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "0", ctrlKey: true, shiftKey: true, bubbles: true }));
-      },
+      // Zoom and DevTools are handled by Electron menu roles/accelerators.
+      // They can't be triggered from the renderer — the palette shows them
+      // for discoverability (shortcut hints) but the execute is a no-op.
+      zoomIn: () => {},
+      zoomOut: () => {},
+      resetZoom: () => {},
       createBackup: () => {
         void (async () => {
           const filePath = await window.hypershell?.fsShowSaveDialog?.({
@@ -1120,16 +1118,14 @@ function MainApp() {
       restoreBackup: () => void window.hypershell?.backupShowOpenDialog?.(),
       openKeyManager: () => setSettingsOpen(true),
       generateKey: () => setSettingsOpen(true),
-      toggleDevTools: () => {
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "F12", bubbles: true }));
-      },
+      toggleDevTools: () => {},
       reloadWindow: () => window.location.reload(),
       openTunnelManager: () => useTunnelStore.getState().openPanel(),
       openTelnetDialog: () => setTelnetDialogOpen(true),
       openSerialModal: () => { setEditingSerial(null); setSerialModalOpen(true); },
     };
     return createCommands(ctx);
-  }, [hosts, connectHost, openSftpHost]);
+  }, [hosts, connectHost, openSftpHost, isBroadcastEnabled]);
 
   return (
     <>

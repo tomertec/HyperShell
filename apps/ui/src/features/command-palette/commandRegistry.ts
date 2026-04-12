@@ -133,14 +133,15 @@ export function createCommands(ctx: CommandContext): Command[] {
       execute: () => ctx.reconnectActiveSession(),
       keywords: ["retry", "reopen"],
     },
-    {
-      id: "session.toggle-recording",
-      title: ctx.isRecording() ? "Stop Recording" : "Start Recording",
-      category: "Session",
-      visible: () => ctx.hasActiveSession(),
-      execute: () => ctx.toggleRecording(),
-      keywords: ["log", "capture"],
-    },
+    // Recording: hidden until recording state is wired into CommandContext
+    // {
+    //   id: "session.toggle-recording",
+    //   title: ctx.isRecording() ? "Stop Recording" : "Start Recording",
+    //   category: "Session",
+    //   visible: () => ctx.hasActiveSession(),
+    //   execute: () => ctx.toggleRecording(),
+    //   keywords: ["log", "capture"],
+    // },
 
     // --- Host ---
     {
@@ -250,7 +251,7 @@ export function createCommands(ctx: CommandContext): Command[] {
     // --- Appearance ---
     {
       id: "appearance.zoom-in",
-      title: "Zoom In",
+      title: "Zoom In (use shortcut)",
       category: "Appearance",
       shortcut: "Ctrl+Shift+=",
       visible: () => true,
@@ -259,7 +260,7 @@ export function createCommands(ctx: CommandContext): Command[] {
     },
     {
       id: "appearance.zoom-out",
-      title: "Zoom Out",
+      title: "Zoom Out (use shortcut)",
       category: "Appearance",
       shortcut: "Ctrl+Shift+-",
       visible: () => true,
@@ -268,7 +269,7 @@ export function createCommands(ctx: CommandContext): Command[] {
     },
     {
       id: "appearance.zoom-reset",
-      title: "Reset Zoom",
+      title: "Reset Zoom (use shortcut)",
       category: "Appearance",
       shortcut: "Ctrl+Shift+0",
       visible: () => true,
@@ -297,15 +298,15 @@ export function createCommands(ctx: CommandContext): Command[] {
     // --- SSH Keys ---
     {
       id: "keys.manage",
-      title: "Manage SSH Keys...",
+      title: "Open Settings (SSH Keys)",
       category: "SSH Keys",
       visible: () => true,
       execute: () => ctx.openKeyManager(),
-      keywords: ["key", "identity", "certificate"],
+      keywords: ["key", "identity", "certificate", "manage"],
     },
     {
       id: "keys.generate",
-      title: "Generate SSH Key",
+      title: "Open Settings (Generate Key)",
       category: "SSH Keys",
       visible: () => true,
       execute: () => ctx.generateKey(),
@@ -315,7 +316,7 @@ export function createCommands(ctx: CommandContext): Command[] {
     // --- Dev/Debug ---
     {
       id: "dev.devtools",
-      title: "Toggle Developer Tools",
+      title: "Toggle Developer Tools (use shortcut)",
       category: "Dev/Debug",
       shortcut: "F12",
       visible: () => true,
