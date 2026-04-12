@@ -25,17 +25,16 @@ type CommandPaletteState = {
   recordExecution: (id: string) => void;
 };
 
-export const useCommandPaletteStore = create<CommandPaletteState>((set) => ({
+export const useCommandPaletteStore = create<CommandPaletteState>((set, get) => ({
   isOpen: false,
   recentIds: loadRecents(),
   open: () => set({ isOpen: true }),
   close: () => set({ isOpen: false }),
   toggle: () => set((s) => ({ isOpen: !s.isOpen })),
-  recordExecution: (id) =>
-    set((s) => {
-      const filtered = s.recentIds.filter((r) => r !== id);
-      const next = [id, ...filtered].slice(0, MAX_RECENTS);
-      saveRecents(next);
-      return { recentIds: next };
-    }),
+  recordExecution: (id) => {
+    const filtered = get().recentIds.filter((r) => r !== id);
+    const next = [id, ...filtered].slice(0, MAX_RECENTS);
+    saveRecents(next);
+    set({ recentIds: next });
+  },
 }));

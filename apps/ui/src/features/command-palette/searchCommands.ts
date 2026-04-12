@@ -5,7 +5,6 @@ export type Command = {
   title: string;
   category: string;
   shortcut?: string;
-  icon?: unknown;
   visible: () => boolean;
   execute: () => void | Promise<void>;
   keywords?: string[];

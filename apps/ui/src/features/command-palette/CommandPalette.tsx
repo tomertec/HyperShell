@@ -137,7 +137,6 @@ export function CommandPalette({ commands }: CommandPaletteProps) {
             exit={{ opacity: 0, scale: 0.96, y: -8 }}
             transition={{ duration: 0.12, ease: [0.25, 0.1, 0.25, 1] }}
           >
-            {/* Search input */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-accent/50 shrink-0">
                 <path d="M5 1L1 5L5 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -154,7 +153,6 @@ export function CommandPalette({ commands }: CommandPaletteProps) {
               <kbd className="text-[10px] text-text-muted bg-base-700/80 px-1.5 py-0.5 rounded border border-border/50">ESC</kbd>
             </div>
 
-            {/* Command list */}
             <div ref={listRef} className="max-h-72 overflow-y-auto p-1.5">
               {displayItems.items.map((cmd, index) => (
                 <div key={cmd.id}>
@@ -194,7 +192,6 @@ export function CommandPalette({ commands }: CommandPaletteProps) {
               )}
             </div>
 
-            {/* Footer hints */}
             <div className="flex items-center gap-3 px-4 py-2 border-t border-border text-[10px] text-text-muted/60">
               <span><kbd className="font-medium text-text-muted/80">↑↓</kbd> navigate</span>
               <span><kbd className="font-medium text-text-muted/80">Enter</kbd> run</span>

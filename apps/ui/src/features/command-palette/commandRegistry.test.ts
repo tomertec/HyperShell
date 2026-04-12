@@ -23,17 +23,10 @@ function makeMockContext(): CommandContext {
     hasActiveSession: () => true,
     disconnectActiveSession: () => {},
     reconnectActiveSession: () => {},
-    isRecording: () => false,
-    toggleRecording: () => {},
     openWorkspaceMenu: () => {},
-    zoomIn: () => {},
-    zoomOut: () => {},
-    resetZoom: () => {},
     createBackup: () => {},
     restoreBackup: () => {},
     openKeyManager: () => {},
-    generateKey: () => {},
-    toggleDevTools: () => {},
     reloadWindow: () => {},
     openTunnelManager: () => {},
     openTelnetDialog: () => {},
@@ -51,7 +44,7 @@ describe("commandRegistry", () => {
   it("all commands have valid categories", () => {
     const validCategories = [
       "Navigation", "Layout", "Session", "Host", "SFTP",
-      "Workspace", "Port Forwarding", "Broadcast", "Appearance",
+      "Workspace", "Port Forwarding", "Broadcast",
       "Backup", "SSH Keys", "Dev/Debug",
     ];
     const commands = createCommands(makeMockContext());

@@ -27,22 +27,14 @@ export type CommandContext = {
   hasActiveSession: () => boolean;
   disconnectActiveSession: () => void;
   reconnectActiveSession: () => void;
-  isRecording: () => boolean;
-  toggleRecording: () => void;
   // Workspace
   openWorkspaceMenu: () => void;
-  // Appearance
-  zoomIn: () => void;
-  zoomOut: () => void;
-  resetZoom: () => void;
   // Backup
   createBackup: () => void;
   restoreBackup: () => void;
   // SSH Keys
   openKeyManager: () => void;
-  generateKey: () => void;
   // Dev/Debug
-  toggleDevTools: () => void;
   reloadWindow: () => void;
   // Port Forwarding
   openTunnelManager: () => void;
@@ -133,15 +125,6 @@ export function createCommands(ctx: CommandContext): Command[] {
       execute: () => ctx.reconnectActiveSession(),
       keywords: ["retry", "reopen"],
     },
-    // Recording: hidden until recording state is wired into CommandContext
-    // {
-    //   id: "session.toggle-recording",
-    //   title: ctx.isRecording() ? "Stop Recording" : "Start Recording",
-    //   category: "Session",
-    //   visible: () => ctx.hasActiveSession(),
-    //   execute: () => ctx.toggleRecording(),
-    //   keywords: ["log", "capture"],
-    // },
 
     // --- Host ---
     {
@@ -248,35 +231,6 @@ export function createCommands(ctx: CommandContext): Command[] {
       keywords: ["multi", "all", "send"],
     },
 
-    // --- Appearance ---
-    {
-      id: "appearance.zoom-in",
-      title: "Zoom In (use shortcut)",
-      category: "Appearance",
-      shortcut: "Ctrl+Shift+=",
-      visible: () => true,
-      execute: () => ctx.zoomIn(),
-      keywords: ["bigger", "enlarge", "scale"],
-    },
-    {
-      id: "appearance.zoom-out",
-      title: "Zoom Out (use shortcut)",
-      category: "Appearance",
-      shortcut: "Ctrl+Shift+-",
-      visible: () => true,
-      execute: () => ctx.zoomOut(),
-      keywords: ["smaller", "shrink", "scale"],
-    },
-    {
-      id: "appearance.zoom-reset",
-      title: "Reset Zoom (use shortcut)",
-      category: "Appearance",
-      shortcut: "Ctrl+Shift+0",
-      visible: () => true,
-      execute: () => ctx.resetZoom(),
-      keywords: ["default", "100%", "scale"],
-    },
-
     // --- Backup ---
     {
       id: "backup.create",
@@ -298,31 +252,14 @@ export function createCommands(ctx: CommandContext): Command[] {
     // --- SSH Keys ---
     {
       id: "keys.manage",
-      title: "Open Settings (SSH Keys)",
+      title: "Manage SSH Keys...",
       category: "SSH Keys",
       visible: () => true,
       execute: () => ctx.openKeyManager(),
-      keywords: ["key", "identity", "certificate", "manage"],
-    },
-    {
-      id: "keys.generate",
-      title: "Open Settings (Generate Key)",
-      category: "SSH Keys",
-      visible: () => true,
-      execute: () => ctx.generateKey(),
-      keywords: ["create", "new", "keygen"],
+      keywords: ["key", "identity", "certificate", "generate", "keygen"],
     },
 
     // --- Dev/Debug ---
-    {
-      id: "dev.devtools",
-      title: "Toggle Developer Tools (use shortcut)",
-      category: "Dev/Debug",
-      shortcut: "F12",
-      visible: () => true,
-      execute: () => ctx.toggleDevTools(),
-      keywords: ["inspect", "console", "debug"],
-    },
     {
       id: "dev.reload",
       title: "Reload Window",

@@ -1096,17 +1096,9 @@ function MainApp() {
           if (host) void connectHost(host);
         }
       },
-      isRecording: () => false,
-      toggleRecording: () => {},
       openWorkspaceMenu: () => {
         window.dispatchEvent(new CustomEvent("hypershell:open-workspace-menu"));
       },
-      // Zoom and DevTools are handled by Electron menu roles/accelerators.
-      // They can't be triggered from the renderer — the palette shows them
-      // for discoverability (shortcut hints) but the execute is a no-op.
-      zoomIn: () => {},
-      zoomOut: () => {},
-      resetZoom: () => {},
       createBackup: () => {
         void (async () => {
           const filePath = await window.hypershell?.fsShowSaveDialog?.({
@@ -1117,8 +1109,6 @@ function MainApp() {
       },
       restoreBackup: () => void window.hypershell?.backupShowOpenDialog?.(),
       openKeyManager: () => setSettingsOpen(true),
-      generateKey: () => setSettingsOpen(true),
-      toggleDevTools: () => {},
       reloadWindow: () => window.location.reload(),
       openTunnelManager: () => useTunnelStore.getState().openPanel(),
       openTelnetDialog: () => setTelnetDialogOpen(true),
