@@ -45,6 +45,10 @@ import {
 } from "../features/hosts/HostKeyVerificationDialog";
 import { KeyboardInteractiveDialog } from "../features/hosts/KeyboardInteractiveDialog";
 import type { KeyboardInteractiveRequest } from "@hypershell/shared";
+import { CommandPalette } from "../features/command-palette/CommandPalette";
+import { useCommandPaletteStore } from "../features/command-palette/commandPaletteStore";
+import { createCommands, type CommandContext } from "../features/command-palette/commandRegistry";
+import { useTunnelStore } from "../features/tunnels/tunnelStore";
 
 
 function normalizeHostEnvVars(
@@ -513,6 +517,11 @@ function MainApp() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (handlePaneShortcut(layoutStore, e)) {
         e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        useCommandPaletteStore.getState().toggle();
         return;
       }
       if (e.key.toLowerCase() === "k" && (e.ctrlKey || e.metaKey)) {
@@ -1031,6 +1040,97 @@ function MainApp() {
     [hosts, serialProfiles]
   );
 
+  const paletteCommands = useMemo(() => {
+    const ctx: CommandContext = {
+      getActiveSessionId: () => layoutStore.getState().activeSessionId,
+      getPaneCount: () => layoutStore.getState().panes.length,
+      splitPane: (direction) => {
+        const sid = layoutStore.getState().activeSessionId;
+        if (sid) layoutStore.getState().splitPane(sid, direction);
+      },
+      closePane: () => {
+        const state = layoutStore.getState();
+        if (state.panes.length > 1) state.closePane(state.activePaneId);
+      },
+      activatePrevPane: () => {
+        const state = layoutStore.getState();
+        const idx = state.panes.findIndex((p) => p.paneId === state.activePaneId);
+        if (idx > 0) state.activatePane(state.panes[idx - 1].paneId);
+      },
+      activateNextPane: () => {
+        const state = layoutStore.getState();
+        const idx = state.panes.findIndex((p) => p.paneId === state.activePaneId);
+        if (idx < state.panes.length - 1) state.activatePane(state.panes[idx + 1].paneId);
+      },
+      isBroadcastEnabled: () => broadcastStore.getState().enabled,
+      toggleBroadcast: () => broadcastStore.getState().toggle(),
+      openSettings: () => setSettingsOpen(true),
+      toggleSnippets: () => useSnippetStore.getState().toggle(),
+      openQuickConnect: () => setIsQuickConnectOpen(true),
+      openHostModal: () => { setEditingHost(null); setHostModalOpen(true); },
+      openImportSshConfig: () => setImportModalOpen(true),
+      openImportPutty: () => setPuttyImportOpen(true),
+      openImportSshManager: () => setSshManagerImportOpen(true),
+      getActiveHost: () => {
+        const activeId = layoutStore.getState().activeSessionId;
+        const tab = layoutStore.getState().tabs.find((t) => t.sessionId === activeId);
+        if (!tab?.hostId) return null;
+        const host = hosts.find((h) => h.id === tab.hostId);
+        return host ? { id: host.id, name: host.name } : null;
+      },
+      openSftpForHost: (host) => {
+        const fullHost = hosts.find((h) => h.id === host.id);
+        if (fullHost) void openSftpHost(fullHost);
+      },
+      hasActiveSession: () => layoutStore.getState().activeSessionId !== null,
+      disconnectActiveSession: () => {
+        const sid = layoutStore.getState().activeSessionId;
+        if (sid) void window.hypershell?.closeSession?.({ sessionId: sid });
+      },
+      reconnectActiveSession: () => {
+        const state = layoutStore.getState();
+        const tab = state.tabs.find((t) => t.sessionId === state.activeSessionId);
+        if (tab?.hostId) {
+          const host = hosts.find((h) => h.id === tab.hostId);
+          if (host) void connectHost(host);
+        }
+      },
+      isRecording: () => false,
+      toggleRecording: () => {},
+      openWorkspaceMenu: () => {
+        window.dispatchEvent(new CustomEvent("hypershell:open-workspace-menu"));
+      },
+      zoomIn: () => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "=", ctrlKey: true, shiftKey: true, bubbles: true }));
+      },
+      zoomOut: () => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "-", ctrlKey: true, shiftKey: true, bubbles: true }));
+      },
+      resetZoom: () => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "0", ctrlKey: true, shiftKey: true, bubbles: true }));
+      },
+      createBackup: () => {
+        void (async () => {
+          const filePath = await window.hypershell?.fsShowSaveDialog?.({
+            filters: [{ name: "SQLite Database", extensions: ["db"] }],
+          });
+          if (filePath) void window.hypershell?.backupCreate?.({ filePath });
+        })();
+      },
+      restoreBackup: () => void window.hypershell?.backupShowOpenDialog?.(),
+      openKeyManager: () => setSettingsOpen(true),
+      generateKey: () => setSettingsOpen(true),
+      toggleDevTools: () => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "F12", bubbles: true }));
+      },
+      reloadWindow: () => window.location.reload(),
+      openTunnelManager: () => useTunnelStore.getState().openPanel(),
+      openTelnetDialog: () => setTelnetDialogOpen(true),
+      openSerialModal: () => { setEditingSerial(null); setSerialModalOpen(true); },
+    };
+    return createCommands(ctx);
+  }, [hosts, connectHost, openSftpHost]);
+
   return (
     <>
       <AppShell
@@ -1085,6 +1185,8 @@ function MainApp() {
           }
         }}
       />
+
+      <CommandPalette commands={paletteCommands} />
 
       <TelnetQuickConnect
         open={telnetDialogOpen}
