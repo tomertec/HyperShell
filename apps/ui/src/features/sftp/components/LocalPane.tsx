@@ -10,7 +10,6 @@ import { DriveSelector } from "./DriveSelector";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList } from "./FileList";
 import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
-import { SftpStatusBar } from "./SftpStatusBar";
 
 export interface LocalPaneProps {
   store: StoreApi<SftpStoreState>;
@@ -253,7 +252,6 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         paneType="local"
         cursorIndex={localCursorIndex}
       />
-      <SftpStatusBar entries={filteredEntries} selection={localSelection} />
 
       {contextMenu && (
         <FileContextMenu

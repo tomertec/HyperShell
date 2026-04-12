@@ -15,6 +15,7 @@ import { performAutoBackup } from "./ipc/backupIpc";
 import { createAppMenu } from "./menu/createAppMenu";
 import { createTray } from "./tray/createTray";
 import { createMainWindow } from "./windows/createMainWindow";
+import { assertAllowedRendererUrl } from "./windows/windowSecurity";
 import { createMainProcessLifecycle } from "./mainLifecycle";
 import { clearAll as clearCredentialCache } from "./security/credentialCache";
 import { getOrCreateDatabase, getOrCreateHostsRepo } from "./ipc/hostsIpc";
@@ -86,22 +87,23 @@ function persistSessionRecoverySnapshot(): void {
 }
 
 function getRendererUrl(): string {
-  if (process.env.SSHTERM_RENDERER_URL) {
-    return process.env.SSHTERM_RENDERER_URL;
-  }
+  const rawUrl = process.env.SSHTERM_RENDERER_URL
+    ?? (() => {
+      const bundledRendererEntry = path.join(
+        import.meta.dirname,
+        "..",
+        "renderer",
+        "index.html"
+      );
 
-  const bundledRendererEntry = path.join(
-    import.meta.dirname,
-    "..",
-    "renderer",
-    "index.html"
-  );
+      if (existsSync(bundledRendererEntry)) {
+        return pathToFileURL(bundledRendererEntry).toString();
+      }
 
-  if (existsSync(bundledRendererEntry)) {
-    return pathToFileURL(bundledRendererEntry).toString();
-  }
+      return "http://localhost:5173";
+    })();
 
-  return "http://localhost:5173";
+  return assertAllowedRendererUrl(rawUrl).toString();
 }
 
 const mainProcessLifecycle = createMainProcessLifecycle({

@@ -77,7 +77,6 @@
 - [pnpm](https://pnpm.io/) 10.8+
 - Windows: Visual Studio Build Tools (for native modules)
 - macOS: Xcode Command Line Tools
-- Linux: `build-essential`, `python3` (for native modules)
 
 ### Install and Run
 
@@ -139,9 +138,6 @@ pnpm release:windows:unsigned
 
 # macOS DMG
 pnpm release:mac:unsigned
-
-# Linux AppImage + deb
-pnpm release:linux:unsigned
 ```
 
 ## Tech Stack

@@ -436,11 +436,6 @@ export function createSessionManager(
             let stdout = "";
             stream.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
             stream.stderr.on("data", () => { /* ignore stderr */ });
-            stream.on("error", (err: Error) => {
-              clearTimeout(timeout);
-              client.end();
-              reject(err);
-            });
             stream.on("close", () => {
               clearTimeout(timeout);
               client.end();

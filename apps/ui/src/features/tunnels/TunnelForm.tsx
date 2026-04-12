@@ -40,7 +40,7 @@ export function TunnelForm({ onSubmit, onCancel }: TunnelFormProps) {
         <input type="number" value={form.port} onChange={(e) => setForm({ ...form, port: e.target.value })} placeholder="SSH Port" className={inputClasses} />
       </div>
       <div className="grid grid-cols-4 gap-2">
-        <select value={form.protocol} onChange={(e) => setForm({ ...form, protocol: e.target.value as "local" | "remote" | "dynamic" })} className={inputClasses}>
+        <select value={form.protocol} onChange={(e) => setForm({ ...form, protocol: e.target.value as any })} className={inputClasses}>
           <option value="local">Local (-L)</option>
           <option value="remote">Remote (-R)</option>
           <option value="dynamic">Dynamic (-D)</option>

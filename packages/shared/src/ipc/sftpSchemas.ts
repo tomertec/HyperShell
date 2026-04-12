@@ -356,6 +356,8 @@ export const sftpDragOutRequestSchema = z.object({
   sftpSessionId: z.string(),
   remotePath: z.string(),
   fileName: z.string(),
+  isDirectory: z.boolean().optional(),
+  prepareOnly: z.boolean().optional(),
 });
 export type SftpDragOutRequest = z.infer<typeof sftpDragOutRequestSchema>;
 

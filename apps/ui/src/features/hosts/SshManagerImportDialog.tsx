@@ -11,9 +11,9 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
   const [hosts, setHosts] = useState<SshManagerHost[]>([]);
   const [groups, setGroups] = useState<SshManagerGroup[]>([]);
   const [snippets, setSnippets] = useState<SshManagerSnippet[]>([]);
-  const [selectedHosts, setSelectedHosts] = useState<Set<string>>(() => new Set());
-  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(() => new Set());
-  const [selectedSnippets, setSelectedSnippets] = useState<Set<string>>(() => new Set());
+  const [selectedHosts, setSelectedHosts] = useState<Set<string>>(new Set());
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
+  const [selectedSnippets, setSelectedSnippets] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);

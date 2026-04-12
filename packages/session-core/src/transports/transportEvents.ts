@@ -83,6 +83,10 @@ export interface SftpConnectionOptions {
   keepAliveSeconds?: number;
 }
 
+export interface SftpSecurityOptions {
+  trustedHostFingerprints?: string[];
+}
+
 export type OpenSessionRequest = {
   sessionId: string;
   transport: SessionTransportKind;

@@ -47,7 +47,8 @@ import {
   type KeyboardInteractiveRequest,
 } from "@hypershell/shared";
 import type { SessionManager, SftpConnectionOptions, KeyboardInteractiveCallback } from "@hypershell/session-core";
-import { createSyncEngine, probeHostKey } from "@hypershell/session-core";
+import { createSyncEngine, probeHostKey, buildScpCommand } from "@hypershell/session-core";
+import { execFile } from "node:child_process";
 import { timingSafeEqual } from "node:crypto";
 import type { IpcMainInvokeEvent } from "electron";
 
@@ -56,6 +57,28 @@ import { editorWindowManager } from "../windows/editorWindowManager";
 import { createSftpSessionManager, type SftpSessionManager } from "../sftp/sftpSessionManager";
 import { createTransferManager, type TransferManager } from "../sftp/transferManager";
 import { createTransferManifest } from "../sftp/transferManifest";
+
+export function resolveSafeDragOutPath(tempDir: string, fileName: string): string {
+  const trimmed = fileName.trim();
+  if (!trimmed) {
+    throw new Error("Invalid drag-out filename");
+  }
+
+  const baseName = path.basename(trimmed);
+  const hasPathSeparators = trimmed.includes(path.posix.sep) || trimmed.includes(path.win32.sep);
+  const hasControlChars = /[\0-\x1f]/.test(trimmed);
+  if (hasPathSeparators || hasControlChars || baseName !== trimmed || baseName === "." || baseName === "..") {
+    throw new Error("Invalid drag-out filename");
+  }
+
+  const resolvedTempDir = path.resolve(tempDir);
+  const resolvedTarget = path.resolve(resolvedTempDir, baseName);
+  if (resolvedTarget !== path.join(resolvedTempDir, baseName)) {
+    throw new Error("Invalid drag-out filename");
+  }
+
+  return resolvedTarget;
+}
 
 /**
  * Error subclass thrown when host key verification fails.
@@ -188,6 +211,9 @@ export function registerSftpIpc(
   const bookmarksRepo = createSftpBookmarksRepository(db);
   const fingerprintRepo = createHostFingerprintRepositoryFromDatabase(db);
 
+  // Drag-out cache: pre-downloaded files keyed by "sessionId:remotePath"
+  const dragCache = new Map<string, string>();
+
   // Keyboard-interactive auth relay: pending requests keyed by requestId
   const pendingKbdInteractive = new Map<string, {
     resolve: (responses: string[]) => void;
@@ -236,6 +262,11 @@ export function registerSftpIpc(
     // --- Host key verification ---
     const hostname = connectOptions.hostname;
     const port = connectOptions.port ?? 22;
+
+    const trustedFingerprints = fingerprintRepo
+      .findByHost(hostname, port)
+      .filter((record) => record.isTrusted)
+      .map((record) => record.fingerprint);
 
     try {
       const { algorithm, fingerprint } = await probeHostKey(hostname, port);
@@ -294,6 +325,7 @@ export function registerSftpIpc(
 
     const sftpSessionId = await sftpSessionManager.connect(hostId, connectOptions, {
       onKeyboardInteractive: createKeyboardInteractiveCallback(),
+      trustedHostFingerprints: trustedFingerprints,
     });
     options.onConnected?.({
       sftpSessionId,
@@ -479,28 +511,65 @@ export function registerSftpIpc(
 
   const handleDragOut = async (event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpDragOutRequestSchema.parse(rawRequest);
-    const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+    const cacheKey = `${request.sftpSessionId}:${request.remotePath}`;
 
-    // Download to a temp directory
-    const tempDir = path.join(app.getPath("temp"), "hypershell-drag");
-    fs.mkdirSync(tempDir, { recursive: true });
-    const tempPath = path.join(tempDir, request.fileName);
+    // Check cache first — file may have been pre-downloaded on selection
+    let tempPath = dragCache.get(cacheKey);
 
-    // Stream remote file to local temp
-    await new Promise<void>((resolve, reject) => {
-      const readStream = transport.createReadStream(request.remotePath);
-      const writeStream = fs.createWriteStream(tempPath);
-      readStream.pipe(writeStream);
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-      readStream.on("error", reject);
-    });
+    if (!tempPath || !fs.existsSync(tempPath)) {
+      const session = sftpSessionManager.getSession(request.sftpSessionId);
+      if (!session) throw new Error(`SFTP session ${request.sftpSessionId} not found`);
 
-    // Initiate native OS drag from the temp file
-    event.sender.startDrag({
-      file: tempPath,
-      icon: await app.getFileIcon(tempPath, { size: "small" }),
-    });
+      const tempDir = path.join(app.getPath("temp"), "hypershell-drag");
+      fs.mkdirSync(tempDir, { recursive: true });
+      tempPath = resolveSafeDragOutPath(tempDir, request.fileName);
+
+      const connOpts = session.connectionOptions;
+      const keyPath = connOpts.privateKeyPath ?? connOpts.fallbackKeyPaths?.[0];
+      const scpCmd = buildScpCommand({
+        hostname: connOpts.hostname,
+        port: connOpts.port,
+        username: connOpts.username,
+        privateKeyPath: keyPath,
+        proxyJump: connOpts.proxyJump,
+        direction: "download",
+        remotePath: request.remotePath,
+        localPath: tempPath,
+      });
+      if (request.isDirectory) {
+        scpCmd.args.unshift("-r");
+      }
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          execFile(scpCmd.command, scpCmd.args, { windowsHide: true }, (error) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+        dragCache.set(cacheKey, tempPath);
+      } catch {
+        // SCP failed (directory, permission denied, etc.) — skip caching
+        return { tempPath: "" };
+      }
+    }
+
+    // prepareOnly: just cache the file, don't initiate OS drag
+    if (request.prepareOnly) {
+      return { tempPath };
+    }
+
+    // Initiate native OS drag from the cached temp file
+    let icon: Electron.NativeImage;
+    try {
+      icon = await app.getFileIcon(tempPath, { size: "small" });
+    } catch {
+      const { nativeImage } = await import("electron");
+      icon = nativeImage.createFromBuffer(
+        Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAADklEQVQ4jWNgGAWDEwAAAhAAATHKfqoAAAAASUVORK5CYII=", "base64")
+      );
+    }
+    event.sender.startDrag({ file: tempPath, icon });
 
     return { tempPath };
   };

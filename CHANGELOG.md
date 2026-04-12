@@ -6,11 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
-### Added
-
-- **SFTP status bar** — each pane now shows a footer with folder count, file count, and total size. When items are selected, selection stats are shown on the right side.
-- **SFTP mouse-drag multi-select** — click and drag across rows to select a range of files/folders. Ctrl+Click (toggle) and Shift+Click (range) continue to work. Drag-and-drop file transfer is preserved for already-selected items.
-
 ## [0.1.3] - 2026-04-11
 
 ### Changed

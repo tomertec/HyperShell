@@ -116,44 +116,25 @@ export function FileList({
     [entries, sortBy.column, sortBy.direction]
   );
 
-
-  // --- Mouse-drag range selection ---
-  const dragSelectRef = useRef<{ startIndex: number } | null>(null);
-  const didDragSelectRef = useRef(false);
-
-  const handleRowMouseDown = useCallback(
-    (index: number, entry: FileListEntry, event: MouseEvent) => {
-      if (event.button !== 0) return; // left-click only
-      // If the item is already selected, let native drag handle it (file transfer)
-      if (selection.has(entry.path)) return;
-      dragSelectRef.current = { startIndex: index };
-    },
-    [selection]
-  );
-
-  const handleRowMouseEnter = useCallback(
-    (index: number) => {
-      if (!dragSelectRef.current) return;
-      // Only activate drag-select after moving to a different row
-      if (dragSelectRef.current.startIndex === index) return;
-      didDragSelectRef.current = true;
-      const from = Math.min(dragSelectRef.current.startIndex, index);
-      const to = Math.max(dragSelectRef.current.startIndex, index);
-      const paths = sortedEntries.slice(from, to + 1).map((e) => e.path);
-      onSelect(new Set(paths));
-    },
-    [onSelect, sortedEntries]
-  );
-
   useEffect(() => {
-    const handleMouseUp = () => {
-      dragSelectRef.current = null;
-      // Reset after a microtask so onClick fires first
-      queueMicrotask(() => { didDragSelectRef.current = false; });
-    };
-    document.addEventListener("mouseup", handleMouseUp);
-    return () => document.removeEventListener("mouseup", handleMouseUp);
-  }, []);
+    const container = containerRef.current;
+    const domRows = container?.querySelectorAll("tbody tr") ?? [];
+    const firstRow = domRows.item(0) as HTMLTableRowElement | null;
+    const firstRowHeight = firstRow?.getBoundingClientRect().height ?? 0;
+    const containerHeight = container?.getBoundingClientRect().height ?? 0;
+
+    console.log(
+      "[sftp-ui] file list render:",
+      `pane=${paneType}`,
+      `entries=${entries.length}`,
+      `sorted=${sortedEntries.length}`,
+      `loading=${isLoading}`,
+      `error=${error ?? "(none)"}`,
+      `domRows=${domRows.length}`,
+      `firstRowH=${firstRowHeight.toFixed(1)}`,
+      `containerH=${containerHeight.toFixed(1)}`
+    );
+  }, [entries.length, error, isLoading, paneType, sortedEntries.length]);
 
   const handleHeaderClick = (column: SortColumn) => {
     const direction =
@@ -162,12 +143,6 @@ export function FileList({
   };
 
   const handleRowClick = (entry: FileListEntry, event: MouseEvent) => {
-    // Skip click if a drag-select gesture just completed
-    if (didDragSelectRef.current) {
-      didDragSelectRef.current = false;
-      return;
-    }
-
     if (event.metaKey || event.ctrlKey) {
       const next = new Set(selection);
       if (next.has(entry.path)) {
@@ -176,10 +151,7 @@ export function FileList({
         next.add(entry.path);
       }
       onSelect(next);
-      return;
-    }
-
-    if (event.shiftKey && selection.size > 0) {
+    } else if (event.shiftKey && selection.size > 0) {
       const paths = sortedEntries.map((item) => item.path);
       const selectedPaths = Array.from(selection);
       const lastSelected = selectedPaths[selectedPaths.length - 1];
@@ -188,10 +160,20 @@ export function FileList({
       const [from, to] =
         startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
       onSelect(new Set(paths.slice(from, to + 1)));
-      return;
+    } else {
+      onSelect(new Set([entry.path]));
     }
 
-    onSelect(new Set([entry.path]));
+    // Pre-cache single file for drag-out (background download to temp)
+    if (sftpSessionId) {
+      void window.hypershell?.sftpDragOut?.({
+        sftpSessionId,
+        remotePath: entry.path,
+        fileName: entry.name,
+        isDirectory: entry.isDirectory,
+        prepareOnly: true,
+      }).catch(() => {});
+    }
   };
 
   const handleRowDoubleClick = (entry: FileListEntry) => {
@@ -212,11 +194,12 @@ export function FileList({
     event.dataTransfer.setData("text/plain", paths.join("\n"));
 
     // For remote pane: fire-and-forget IPC to initiate native OS drag
-    if (sftpSessionId && paths.length === 1 && !entry.isDirectory) {
+    if (sftpSessionId && paths.length === 1) {
       void window.hypershell?.sftpDragOut?.({
         sftpSessionId,
         remotePath: paths[0],
         fileName: entry.name,
+        isDirectory: entry.isDirectory,
       }).catch(() => {
         // Drag-out is best-effort; internal drag still works
       });
@@ -348,7 +331,7 @@ export function FileList({
 	                <tr
 	                  key={entry.path}
 	                  ref={cursorIndex === index ? cursorRowRef : undefined}
-	                  style={{ height: ROW_HEIGHT, userSelect: "none" }}
+	                  style={{ height: ROW_HEIGHT }}
 	                  className={`transition-colors ${
 	                    selection.has(entry.path)
 	                      ? "bg-accent/15 border-l-2 border-l-accent"
@@ -356,8 +339,6 @@ export function FileList({
 	                        ? "hover:bg-base-700/30"
 	                        : "bg-base-800/20 hover:bg-base-700/30"
 	                  } ${cursorIndex === index ? "ring-1 ring-inset ring-accent/40" : ""}`}
-	                  onMouseDown={(event) => handleRowMouseDown(index, entry, event)}
-	                  onMouseEnter={() => handleRowMouseEnter(index)}
 	                  onClick={(event) => handleRowClick(entry, event)}
 	                  onDoubleClick={() => handleRowDoubleClick(entry)}
 	                  onContextMenu={(event) => {
@@ -368,7 +349,7 @@ export function FileList({
 	                    }
 	                    onContextMenu(event, entry);
 	                  }}
-	                  draggable={selection.has(entry.path)}
+	                  draggable
 	                  onDragStart={(event) => handleDragStart(event, entry)}
 	                >
 	                  <td className="overflow-hidden px-1.5">
