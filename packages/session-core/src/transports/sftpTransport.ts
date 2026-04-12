@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import type { Readable, Writable } from "node:stream";
 import { Client, type ConnectConfig, type OpenMode, type SFTPWrapper, type Stats } from "ssh2";
 
 import type {
   SessionState,
   SessionTransportEvent,
-  SftpConnectionOptions
+  SftpConnectionOptions,
+  SftpSecurityOptions
 } from "./transportEvents";
 import type { Ssh2ConnectionPool, Ssh2PoolTarget, ResolvedAuth } from "../ssh2ConnectionPool";
 
@@ -22,7 +24,7 @@ export type KeyboardInteractiveCallback = (
   prompts: KeyboardInteractivePrompt[]
 ) => Promise<string[]>;
 
-export interface SftpTransportOptions {
+export interface SftpTransportOptions extends SftpSecurityOptions {
   pool?: Ssh2ConnectionPool;
   onKeyboardInteractive?: KeyboardInteractiveCallback;
 }
@@ -66,7 +68,11 @@ function collectKeyPaths(options: SftpConnectionOptions): string[] {
   return paths;
 }
 
-function buildConnectConfig(options: SftpConnectionOptions, keyPath?: string): ConnectConfig {
+export function buildConnectConfig(
+  options: SftpConnectionOptions,
+  keyPath?: string,
+  securityOptions?: SftpSecurityOptions
+): ConnectConfig {
   // Strip Windows domain prefix (e.g. "DOMAIN\user" → "user") — SSH servers
   // don't understand Windows domain usernames.
   let sshUsername = options.username;
@@ -104,6 +110,14 @@ function buildConnectConfig(options: SftpConnectionOptions, keyPath?: string): C
 
   // Enable keyboard-interactive auth to support 2FA/MFA prompts
   config.tryKeyboard = true;
+
+  const trustedFingerprints = new Set(securityOptions?.trustedHostFingerprints ?? []);
+  if (trustedFingerprints.size > 0) {
+    config.hostVerifier = (key: Buffer) => {
+      const fingerprint = `SHA256:${createHash("sha256").update(key).digest("base64")}`;
+      return trustedFingerprints.has(fingerprint);
+    };
+  }
 
   return config;
 }
@@ -295,7 +309,7 @@ export function createSftpTransport(
 
     let lastError: Error | null = null;
     for (const keyPath of attempts) {
-      const config = buildConnectConfig(options, keyPath);
+      const config = buildConnectConfig(options, keyPath, transportOptions);
 
       try {
         await tryConnect(config);

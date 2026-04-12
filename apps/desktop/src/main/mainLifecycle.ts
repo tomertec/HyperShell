@@ -4,6 +4,7 @@ import type {
   RegisterIpcOptions
 } from "./ipc/registerIpc";
 import { editorWindowManager } from "./windows/editorWindowManager";
+import { attachWindowSecurityGuards } from "./windows/windowSecurity";
 import type { TrayWindowLike } from "./tray/createTray";
 
 interface ElectronAppLike {
@@ -81,7 +82,9 @@ export function createMainProcessLifecycle(
     loadURL(url: string): Promise<void> | void;
   } {
     const window = deps.createMainWindow();
-    void window.loadURL(deps.getRendererUrl());
+    const rendererUrl = deps.getRendererUrl();
+    attachWindowSecurityGuards(window as unknown as Electron.BrowserWindow, rendererUrl);
+    void window.loadURL(rendererUrl);
     mainWindow = window;
     return window;
   }

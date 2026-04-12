@@ -151,10 +151,7 @@ export function FileList({
         next.add(entry.path);
       }
       onSelect(next);
-      return;
-    }
-
-    if (event.shiftKey && selection.size > 0) {
+    } else if (event.shiftKey && selection.size > 0) {
       const paths = sortedEntries.map((item) => item.path);
       const selectedPaths = Array.from(selection);
       const lastSelected = selectedPaths[selectedPaths.length - 1];
@@ -163,10 +160,20 @@ export function FileList({
       const [from, to] =
         startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
       onSelect(new Set(paths.slice(from, to + 1)));
-      return;
+    } else {
+      onSelect(new Set([entry.path]));
     }
 
-    onSelect(new Set([entry.path]));
+    // Pre-cache single file for drag-out (background download to temp)
+    if (sftpSessionId) {
+      void window.hypershell?.sftpDragOut?.({
+        sftpSessionId,
+        remotePath: entry.path,
+        fileName: entry.name,
+        isDirectory: entry.isDirectory,
+        prepareOnly: true,
+      }).catch(() => {});
+    }
   };
 
   const handleRowDoubleClick = (entry: FileListEntry) => {
@@ -187,11 +194,12 @@ export function FileList({
     event.dataTransfer.setData("text/plain", paths.join("\n"));
 
     // For remote pane: fire-and-forget IPC to initiate native OS drag
-    if (sftpSessionId && paths.length === 1 && !entry.isDirectory) {
+    if (sftpSessionId && paths.length === 1) {
       void window.hypershell?.sftpDragOut?.({
         sftpSessionId,
         remotePath: paths[0],
         fileName: entry.name,
+        isDirectory: entry.isDirectory,
       }).catch(() => {
         // Drag-out is best-effort; internal drag still works
       });

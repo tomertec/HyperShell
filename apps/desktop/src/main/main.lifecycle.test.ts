@@ -38,7 +38,9 @@ function createWindow(id: string) {
       return this.destroyed;
     },
     webContents: {
-      send: vi.fn()
+      send: vi.fn(),
+      on: vi.fn(),
+      setWindowOpenHandler: vi.fn()
     }
   };
 }

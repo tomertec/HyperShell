@@ -1,6 +1,7 @@
 import { BrowserWindow } from "electron";
 import path from "node:path";
 import { resolveAppIconPath } from "./resolveAppIconPath";
+import { attachWindowSecurityGuards } from "./windowSecurity";
 
 export interface CreateEditorWindowOptions {
   sftpSessionId: string;
@@ -34,6 +35,7 @@ export function createEditorWindow(options: CreateEditorWindowOptions): BrowserW
   const url = new URL(rendererUrl);
   url.searchParams.set("window", "editor");
   url.searchParams.set("sftpSessionId", sftpSessionId);
+  attachWindowSecurityGuards(win, rendererUrl);
   void win.loadURL(url.toString());
 
   return win;
