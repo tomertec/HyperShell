@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-04-12
+
 ### Added
 
 - **SFTP status bar** — each pane now shows a footer with folder count, file count, and total size. When items are selected, selection stats are shown on the right side.
