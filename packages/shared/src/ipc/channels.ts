@@ -132,6 +132,10 @@ export const fsChannels = {
   listSshKeys: "fs:list-ssh-keys",
   showSaveDialog: "fs:show-save-dialog",
   showOpenDialog: "fs:show-open-dialog",
+  openItem: "fs:open-item",
+  showInFolder: "fs:show-in-folder",
+  trash: "fs:trash",
+  rename: "fs:rename",
 } as const;
 
 export const hostPortForwardChannels = {

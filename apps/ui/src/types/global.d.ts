@@ -211,6 +211,10 @@ declare global {
       fsListSshKeys?: () => Promise<string[]>;
       fsShowSaveDialog?: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
       fsShowOpenDialog?: (options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
+      fsOpenItem?: (request: { path: string }) => Promise<void>;
+      fsShowInFolder?: (request: { path: string }) => Promise<void>;
+      fsTrash?: (request: { path: string }) => Promise<void>;
+      fsRename?: (request: { oldPath: string; newPath: string }) => Promise<void>;
       workspaceSave?: (request: SaveWorkspaceRequest) => Promise<{ success: boolean }>;
       workspaceLoad?: (request: LoadWorkspaceRequest) => Promise<WorkspaceRecord | null>;
       workspaceList?: () => Promise<WorkspaceRecord[]>;

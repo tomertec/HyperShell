@@ -11,7 +11,7 @@ import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
 
 const RECENT_TRANSFER_WINDOW_MS = 120000;
-const MAX_VISIBLE_TRANSFERS = 4;
+const MAX_VISIBLE_TRANSFERS = 1;
 const DRAG_MARGIN_PX = 8;
 const AUTO_MINIMIZE_IDLE_MS = 120000;
 
@@ -362,6 +362,10 @@ export function TransferPopup() {
     settingsStore,
     (state) => state.settings.general.usePopupTransferMonitor
   );
+  const autoHideCompletedTransfers = useStore(
+    settingsStore,
+    (state) => state.settings.general.autoHideCompletedTransfers
+  );
   const transfers = useStore(transferStore, (state) => state.transfers);
   const activeCount = useStore(transferStore, (state) => state.activeCount);
   const panelOpen = useStore(transferStore, (state) => state.panelOpen);
@@ -506,6 +510,11 @@ export function TransferPopup() {
       return;
     }
 
+    if (autoHideCompletedTransfers) {
+      setPanelOpen(false);
+      return;
+    }
+
     const elapsed = Date.now() - lastInteractionAt;
     const remaining = Math.max(0, AUTO_MINIMIZE_IDLE_MS - elapsed);
     const timeout = window.setTimeout(() => {
@@ -516,6 +525,7 @@ export function TransferPopup() {
       window.clearTimeout(timeout);
     };
   }, [
+    autoHideCompletedTransfers,
     lastInteractionAt,
     panelOpen,
     recentTransfers.length,

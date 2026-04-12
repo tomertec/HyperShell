@@ -1,8 +1,8 @@
-import { ipcChannels, fsListRequestSchema } from "@hypershell/shared";
+import { ipcChannels, fsListRequestSchema, fsPathRequestSchema, fsRenameRequestSchema } from "@hypershell/shared";
 import type { FsEntry } from "@hypershell/shared";
-import { dialog } from "electron";
+import { dialog, shell } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
-import { readdir, stat, access, realpath } from "node:fs/promises";
+import { readdir, stat, access, realpath, rename as fsRename } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
@@ -44,7 +44,7 @@ const sshKeyDiscoveryEnabled = envEnabled(
 const allowSystemRoots = envEnabled(
   "SSHTERM_FS_ALLOW_SYSTEM_ROOTS",
   "HYPERSHELL_FS_ALLOW_SYSTEM_ROOTS",
-  false
+  true
 );
 const envAllowedRoots = (readEnv("SSHTERM_FS_ALLOWED_ROOTS", "HYPERSHELL_FS_ALLOWED_ROOTS") ?? "")
   .split(",")
@@ -283,6 +283,34 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
       properties: ["openFile"],
     });
     return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+
+  ipcMain.handle(ipcChannels.fs.openItem, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = fsPathRequestSchema.parse(rawRequest);
+    const targetPath = await assertPathAllowed(request.path);
+    const errorMessage = await shell.openPath(targetPath);
+    if (errorMessage) {
+      throw new Error(errorMessage);
+    }
+  });
+
+  ipcMain.handle(ipcChannels.fs.showInFolder, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = fsPathRequestSchema.parse(rawRequest);
+    const targetPath = await assertPathAllowed(request.path);
+    shell.showItemInFolder(targetPath);
+  });
+
+  ipcMain.handle(ipcChannels.fs.trash, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = fsPathRequestSchema.parse(rawRequest);
+    const targetPath = await assertPathAllowed(request.path);
+    await shell.trashItem(targetPath);
+  });
+
+  ipcMain.handle(ipcChannels.fs.rename, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = fsRenameRequestSchema.parse(rawRequest);
+    const oldPath = await assertPathAllowed(request.oldPath);
+    await assertPathAllowed(request.newPath);
+    await fsRename(oldPath, request.newPath);
   });
 
   return () => {

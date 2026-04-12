@@ -9,6 +9,8 @@ import {
   fsGetDrivesResponseSchema,
   fsListRequestSchema,
   fsListResponseSchema,
+  fsPathRequestSchema,
+  fsRenameRequestSchema,
   closeSessionRequestSchema,
   savedSessionRecordSchema,
   ipcChannels,
@@ -379,6 +381,10 @@ export interface DesktopApi {
   fsListSshKeys(): Promise<string[]>;
   fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
   fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
+  fsOpenItem(request: { path: string }): Promise<void>;
+  fsShowInFolder(request: { path: string }): Promise<void>;
+  fsTrash(request: { path: string }): Promise<void>;
+  fsRename(request: { oldPath: string; newPath: string }): Promise<void>;
   workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }>;
   workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null>;
   workspaceList(): Promise<WorkspaceRecord[]>;
@@ -1061,6 +1067,22 @@ export function createDesktopApi(
     async fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
       const result = await ipcRenderer.invoke(ipcChannels.fs.showOpenDialog, options);
       return result as string | null;
+    },
+    async fsOpenItem(request: { path: string }): Promise<void> {
+      const parsed = fsPathRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.fs.openItem, parsed);
+    },
+    async fsShowInFolder(request: { path: string }): Promise<void> {
+      const parsed = fsPathRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.fs.showInFolder, parsed);
+    },
+    async fsTrash(request: { path: string }): Promise<void> {
+      const parsed = fsPathRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.fs.trash, parsed);
+    },
+    async fsRename(request: { oldPath: string; newPath: string }): Promise<void> {
+      const parsed = fsRenameRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.fs.rename, parsed);
     },
     async workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }> {
       const parsed = saveWorkspaceRequestSchema.parse(request);

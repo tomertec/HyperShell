@@ -158,6 +158,17 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     store.getState().setRemoteEntries(extractSftpEntries(response));
   }, [remotePath, sftpSessionId, store]);
 
+  const refreshLocalDirectory = useCallback(async () => {
+    const currentLocalPath = store.getState().localPath;
+    if (!currentLocalPath) return;
+    try {
+      const response = await window.hypershell?.fsList?.({ path: currentLocalPath });
+      store.getState().setLocalEntries(response?.entries ?? []);
+    } catch {
+      // ignore — non-critical refresh
+    }
+  }, [store]);
+
   useEffect(() => {
     const unsubscribe = window.hypershell?.onSftpEvent?.((event) => {
       const hasTransfer = transferStore
@@ -186,13 +197,18 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
           });
         }
         void refreshTransfers();
+
+        if (event.status === "completed") {
+          void refreshRemoteDirectory().catch(() => {});
+          void refreshLocalDirectory();
+        }
       }
     });
 
     return () => {
       unsubscribe?.();
     };
-  }, [refreshTransfers]);
+  }, [refreshLocalDirectory, refreshRemoteDirectory, refreshTransfers]);
 
   useEffect(() => {
     void refreshTransfers();

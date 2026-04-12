@@ -224,6 +224,15 @@ export const fsGetDrivesResponseSchema = z.object({
 });
 export type FsGetDrivesResponse = z.infer<typeof fsGetDrivesResponseSchema>;
 
+export const fsPathRequestSchema = z.object({ path: z.string() });
+export type FsPathRequest = z.infer<typeof fsPathRequestSchema>;
+
+export const fsRenameRequestSchema = z.object({
+  oldPath: z.string(),
+  newPath: z.string(),
+});
+export type FsRenameRequest = z.infer<typeof fsRenameRequestSchema>;
+
 export const sftpBookmarkSchema = z.object({
   id: z.string(),
   hostId: z.string(),

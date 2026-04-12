@@ -434,28 +434,11 @@ export function createSftpTransport(
 
   async function remove(remotePath: string, recursive = false): Promise<void> {
     const sftpSession = requireSftp();
-    if (recursive) {
-      const entries = await list(remotePath);
-      for (const entry of entries) {
-        if (entry.isDirectory) {
-          await remove(entry.path, true);
-          continue;
-        }
+    const entry = await stat(remotePath);
 
-        await new Promise<void>((resolve, reject) => {
-          sftpSession.unlink(entry.path, (error) => {
-            if (error) {
-              reject(error);
-              return;
-            }
-
-            resolve();
-          });
-        });
-      }
-
+    if (!entry.isDirectory) {
       await new Promise<void>((resolve, reject) => {
-        sftpSession.rmdir(remotePath, (error) => {
+        sftpSession.unlink(remotePath, (error) => {
           if (error) {
             reject(error);
             return;
@@ -467,21 +450,29 @@ export function createSftpTransport(
       return;
     }
 
-    const entry = await stat(remotePath);
-    await new Promise<void>((resolve, reject) => {
-      if (entry.isDirectory) {
-        sftpSession.rmdir(remotePath, (error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
+    if (recursive) {
+      const entries = await list(remotePath);
+      for (const child of entries) {
+        if (child.isDirectory) {
+          await remove(child.path, true);
+          continue;
+        }
 
-          resolve();
+        await new Promise<void>((resolve, reject) => {
+          sftpSession.unlink(child.path, (error) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+
+            resolve();
+          });
         });
-        return;
       }
+    }
 
-      sftpSession.unlink(remotePath, (error) => {
+    await new Promise<void>((resolve, reject) => {
+      sftpSession.rmdir(remotePath, (error) => {
         if (error) {
           reject(error);
           return;

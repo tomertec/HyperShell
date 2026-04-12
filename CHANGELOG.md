@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 - **SFTP status bar** — each pane now shows a footer with folder count, file count, and total size. When items are selected, selection stats are shown on the right side.
 - **SFTP mouse-drag multi-select** — click and drag across rows to select a range of files/folders. Ctrl+Click (toggle) and Shift+Click (range) continue to work. Drag-and-drop file transfer is preserved for already-selected items.
+- **Local file explorer context menu** — right-click on local files now offers Open (files open with default app, directories navigate), Rename, Delete (moves to Recycle Bin), Copy Path, Show in Explorer, and Upload to Remote.
+- **Auto-hide completed transfers setting** — new toggle in Settings → General → Transfers to automatically hide the SFTP transfer popup when all transfers finish.
+- **Auto-refresh after transfers** — both local and remote panes now refresh automatically when a file upload or download completes.
+
+### Fixed
+
+- **All drives now visible in local pane** — the drive selector shows all accessible drives (D:\, E:\, etc.), not just C:\.
+- **SFTP delete fails on files** — deleting a single file via the remote context menu no longer fails with "No such file". The recursive delete logic now stats the path first and uses `unlink` for files instead of attempting to list them as directories.
 
 ## [0.1.3] - 2026-04-11
 

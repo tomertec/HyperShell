@@ -23,6 +23,7 @@ export interface GeneralSettings {
   showSerialInSidebar: boolean;
   confirmOnClose: boolean;
   usePopupTransferMonitor: boolean;
+  autoHideCompletedTransfers: boolean;
   enableTelnet: boolean;
 }
 
@@ -111,6 +112,7 @@ const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   showSerialInSidebar: true,
   confirmOnClose: true,
   usePopupTransferMonitor: false,
+  autoHideCompletedTransfers: false,
   enableTelnet: false,
 };
 

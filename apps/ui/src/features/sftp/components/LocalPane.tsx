@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMous
 import type React from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
+import { toast } from "sonner";
 
 import type { FsEntry } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
@@ -11,6 +12,8 @@ import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList } from "./FileList";
 import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
 import { SftpStatusBar } from "./SftpStatusBar";
+import { ConfirmDialog } from "../../../components/ConfirmDialog";
+import { PromptDialog } from "../../../components/PromptDialog";
 
 export interface LocalPaneProps {
   store: StoreApi<SftpStoreState>;
@@ -25,6 +28,11 @@ interface LocalContextMenuState {
   x: number;
   y: number;
   entry?: FsEntry;
+}
+
+function getFileName(filePath: string): string {
+  const segments = filePath.split(/[\\/]/);
+  return segments[segments.length - 1] || filePath;
 }
 
 export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate, breadcrumbRef }: LocalPaneProps) {
@@ -71,6 +79,15 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
   }, [filteredEntries.length, localCursorIndex, store]);
 
   const [contextMenu, setContextMenu] = useState<LocalContextMenuState | null>(null);
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; path: string; oldName: string }>({
+    open: false,
+    path: "",
+    oldName: "",
+  });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; paths: string[] }>({
+    open: false,
+    paths: [],
+  });
 
   const loadDirectory = useCallback(
     async (path: string) => {
@@ -178,6 +195,64 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
     []
   );
 
+  const handleRename = useCallback(
+    (filePath: string) => {
+      const oldName = getFileName(filePath);
+      setRenameDialog({ open: true, path: filePath, oldName });
+    },
+    []
+  );
+
+  const handleRenameConfirm = useCallback(
+    async (newName: string) => {
+      const { path: filePath, oldName } = renameDialog;
+      setRenameDialog({ open: false, path: "", oldName: "" });
+
+      if (newName === oldName) return;
+
+      const parentPath = getParentPath(filePath);
+      const newPath = parentPath.endsWith("\\")
+        ? `${parentPath}${newName}`
+        : `${parentPath}\\${newName}`;
+
+      try {
+        await window.hypershell?.fsRename?.({ oldPath: filePath, newPath });
+        await loadDirectory(localPath);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to rename");
+      }
+    },
+    [renameDialog, loadDirectory, localPath]
+  );
+
+  const handleDelete = useCallback(
+    (paths: string[]) => {
+      if (paths.length === 0) return;
+      setDeleteDialog({ open: true, paths });
+    },
+    []
+  );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    const { paths } = deleteDialog;
+    setDeleteDialog({ open: false, paths: [] });
+
+    let failed = 0;
+    for (const filePath of paths) {
+      try {
+        await window.hypershell?.fsTrash?.({ path: filePath });
+      } catch {
+        failed += 1;
+      }
+    }
+
+    if (failed > 0) {
+      toast.error(`Failed to delete ${failed} item${failed === 1 ? "" : "s"}`);
+    }
+
+    await loadDirectory(localPath);
+  }, [deleteDialog, loadDirectory, localPath]);
+
   const contextActions = useMemo<FileContextMenuAction[]>(() => {
     if (!contextMenu) {
       return [];
@@ -191,11 +266,17 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
           : [];
 
     if (contextMenu.entry) {
+      const entry = contextMenu.entry;
       return [
         {
           label: "Open",
-          action: () => handleNavigate(contextMenu.entry!.path),
-          disabled: !contextMenu.entry.isDirectory
+          action: () => {
+            if (entry.isDirectory) {
+              handleNavigate(entry.path);
+            } else {
+              void window.hypershell?.fsOpenItem?.({ path: entry.path });
+            }
+          }
         },
         {
           label: "Upload to Remote",
@@ -204,9 +285,25 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         },
         { label: "", action: () => {}, separator: true },
         {
+          label: "Rename",
+          action: () => handleRename(entry.path)
+        },
+        {
+          label: "Delete",
+          action: () => handleDelete(selectedPaths),
+          disabled: selectedPaths.length === 0
+        },
+        { label: "", action: () => {}, separator: true },
+        {
           label: "Copy Path",
           action: () => {
-            void navigator.clipboard?.writeText(contextMenu.entry!.path);
+            void navigator.clipboard?.writeText(entry.path);
+          }
+        },
+        {
+          label: "Show in Explorer",
+          action: () => {
+            void window.hypershell?.fsShowInFolder?.({ path: entry.path });
           }
         }
       ];
@@ -216,7 +313,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
       { label: "Go Up", action: () => handleNavigate(getParentPath(localPath)) },
       { label: "Refresh", action: () => void loadDirectory(localPath) }
     ];
-  }, [contextMenu, handleNavigate, loadDirectory, localPath, localSelection, onTransfer]);
+  }, [contextMenu, handleDelete, handleNavigate, handleRename, loadDirectory, localPath, localSelection, onTransfer]);
 
   return (
     <div
@@ -263,6 +360,26 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
           onClose={() => setContextMenu(null)}
         />
       )}
+
+      <PromptDialog
+        open={renameDialog.open}
+        title="Rename"
+        label="Enter a new name:"
+        defaultValue={renameDialog.oldName}
+        confirmLabel="Rename"
+        onConfirm={handleRenameConfirm}
+        onCancel={() => setRenameDialog({ open: false, path: "", oldName: "" })}
+      />
+
+      <ConfirmDialog
+        open={deleteDialog.open}
+        title="Delete"
+        message={`Move ${deleteDialog.paths.length} item${deleteDialog.paths.length === 1 ? "" : "s"} to Recycle Bin?`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteDialog({ open: false, paths: [] })}
+      />
     </div>
   );
 }

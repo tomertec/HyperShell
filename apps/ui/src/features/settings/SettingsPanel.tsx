@@ -171,6 +171,7 @@ function GeneralSection() {
     showSerialInSidebar,
     confirmOnClose,
     usePopupTransferMonitor,
+    autoHideCompletedTransfers,
     enableTelnet
   } = settings.general;
 
@@ -239,6 +240,21 @@ function GeneralSection() {
               checked={usePopupTransferMonitor}
               onChange={() =>
                 void updateGeneral({ usePopupTransferMonitor: !usePopupTransferMonitor })
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm text-text-primary">Auto-Hide Completed Transfers</div>
+              <div className="text-xs text-text-muted">
+                Automatically hide the transfer popup when all transfers finish
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={autoHideCompletedTransfers}
+              onChange={() =>
+                void updateGeneral({ autoHideCompletedTransfers: !autoHideCompletedTransfers })
               }
             />
           </div>
