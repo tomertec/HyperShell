@@ -89,8 +89,7 @@ import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
-import { spawnSync, execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { spawnSync } from "node:child_process";
 
 const registeredChannels = [
   ipcChannels.session.open,
@@ -1076,27 +1075,6 @@ async function resolveSftpConnectionOptions(
   };
 }
 
-const execFileAsync = promisify(execFile);
-
-function resolveSshBinaryPath(): string {
-  if (process.platform !== "win32") {
-    return "ssh";
-  }
-
-  const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
-  if (!systemRoot) {
-    return "ssh";
-  }
-
-  const bundledWindowsSshPath = path.join(
-    systemRoot,
-    "System32",
-    "OpenSSH",
-    "ssh.exe"
-  );
-  return existsSync(bundledWindowsSshPath) ? bundledWindowsSshPath : "ssh";
-}
-
 const STATS_COMMAND = `echo "CPU:$(cat /proc/loadavg 2>/dev/null | cut -d' ' -f1-3 || sysctl -n vm.loadavg 2>/dev/null | tr -d '{}');MEM:$(free -m 2>/dev/null | awk 'NR==2{printf \\"%d/%dMB\\",$3,$2}' || vm_stat 2>/dev/null | awk '/Pages (active|wired|free)/{s+=$NF}END{printf \\"%dMB\\",s*4096/1048576}');DISK:$(df -h / 2>/dev/null | awk 'NR==2{print $5}');UP:$(uptime -p 2>/dev/null || uptime | sed 's/.*up/up/' | sed 's/,.*load.*//' | xargs)"`;
 
 function parseStatsOutput(raw: string): Omit<HostStatsResponse, "latencyMs"> {
@@ -1150,27 +1128,10 @@ async function hostStatsHandler(
     return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
   }
 
-  const sessionInput = manager.getSessionInput(parsed.sessionId);
-  const hostname = sessionInput?.sshOptions?.hostname;
-  const port = sessionInput?.sshOptions?.port ?? 22;
-  if (!hostname) {
-    return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
-  }
-
-  const trustedFingerprints = getHostFingerprintRepository()
-    ?.findByHost(hostname, port)
-    .filter((record) => record.isTrusted)
-    .map((record) => record.fingerprint) ?? [];
-  if (trustedFingerprints.length === 0) {
-    return { cpuLoad: null, memUsage: null, diskUsage: null, uptime: null, latencyMs: null };
-  }
-
   const startTime = Date.now();
 
   try {
-    const stdout = await manager.execCommand(parsed.sessionId, STATS_COMMAND, {
-      expectedHostFingerprints: trustedFingerprints
-    });
+    const stdout = await manager.execCommand(parsed.sessionId, STATS_COMMAND);
     const latencyMs = Date.now() - startTime;
     const stats = parseStatsOutput(stdout);
     return { ...stats, latencyMs };

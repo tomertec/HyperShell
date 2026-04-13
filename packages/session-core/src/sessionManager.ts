@@ -8,13 +8,14 @@ import type {
   TelnetConnectionOptions,
   TransportHandle
 } from "./transports/transportEvents";
-import { Client } from "ssh2";
-import { readFileSync } from "node:fs";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createSerialTransport } from "./transports/serialTransport";
-import { createSshPtyTransport } from "./transports/sshPtyTransport";
+import { createSshPtyTransport, buildSshPtyCommand } from "./transports/sshPtyTransport";
 import { createTelnetTransport } from "./transports/telnetTransport";
 import type { NetworkMonitor } from "./networkMonitor";
+
+const execFileAsync = promisify(execFile);
 
 export interface SessionSnapshot {
   sessionId: string;
@@ -53,7 +54,7 @@ export interface OpenSessionResult {
 }
 
 export interface ExecCommandOptions {
-  expectedHostFingerprints?: string[];
+  timeoutMs?: number;
 }
 
 export interface SessionManager {
@@ -409,84 +410,22 @@ export function createSessionManager(
       if (!session) return Promise.reject(new Error("Session not found"));
       const opts = session.input.sshOptions;
       if (!opts) return Promise.reject(new Error("Not an SSH session"));
-      const expectedFingerprints = (options.expectedHostFingerprints ?? [])
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0)
-        .map((value) => Buffer.from(value, "utf8"));
 
-      if (expectedFingerprints.length === 0) {
-        return Promise.reject(new Error("Host key verification is required for SSH exec"));
-      }
-
-      return new Promise((resolve, reject) => {
-        const client = new Client();
-        const timeout = setTimeout(() => {
-          client.destroy();
-          reject(new Error("SSH exec timed out"));
-        }, 10000);
-
-        client.on("ready", () => {
-          client.exec(command, (err, stream) => {
-            if (err) {
-              clearTimeout(timeout);
-              client.end();
-              reject(err);
-              return;
-            }
-            let stdout = "";
-            stream.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-            stream.stderr.on("data", () => { /* ignore stderr */ });
-            stream.on("error", (err: Error) => {
-              clearTimeout(timeout);
-              client.end();
-              reject(err);
-            });
-            stream.on("close", () => {
-              clearTimeout(timeout);
-              client.end();
-              resolve(stdout);
-            });
-          });
-        });
-
-        client.on("error", (err) => {
-          clearTimeout(timeout);
-          reject(err);
-        });
-
-        const connectConfig: Record<string, unknown> = {
-          host: opts.hostname,
-          port: opts.port ?? 22,
-          username: opts.username,
-          readyTimeout: 8000
-        };
-
-        if (opts.password) {
-          connectConfig.password = opts.password;
-        }
-
-        if (opts.identityFile) {
-          try {
-            connectConfig.privateKey = readFileSync(opts.identityFile);
-          } catch {
-            // Identity file not readable — fall through to other auth
-          }
-        }
-
-        connectConfig.hostVerifier = (key: Buffer) => {
-          const actual = Buffer.from(
-            `SHA256:${createHash("sha256").update(key).digest("base64")}`,
-            "utf8"
-          );
-          return expectedFingerprints.some(
-            (expected) =>
-              expected.length === actual.length
-              && timingSafeEqual(expected, actual)
-          );
-        };
-
-        client.connect(connectConfig);
+      const { command: sshBin, args } = buildSshPtyCommand({
+        hostname: opts.hostname,
+        username: opts.username,
+        port: opts.port,
+        identityFile: opts.identityFile,
+        proxyJump: opts.proxyJump,
+        keepAliveSeconds: opts.keepAliveSeconds,
+        requestTty: false,
+        extraArgs: ["-o", "BatchMode=yes"]
       });
+      args.push(command);
+
+      const timeoutMs = options.timeoutMs ?? 10_000;
+      return execFileAsync(sshBin, args, { timeout: timeoutMs, windowsHide: true })
+        .then(({ stdout }) => stdout);
     }
   };
 }

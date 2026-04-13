@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-13
+
+### Fixed
+
+- **Host metrics for SSH config aliases and ProxyJump hosts** — status bar metrics (CPU, memory, disk, uptime) now work for hosts defined as SSH config aliases (e.g., `ssh medalink-tunnel`) and hosts behind ProxyJump. The stats collector now uses the system SSH binary instead of the ssh2 library, matching how the terminal connection itself works.
+
 ## [0.1.4] - 2026-04-12
 
 ### Added
