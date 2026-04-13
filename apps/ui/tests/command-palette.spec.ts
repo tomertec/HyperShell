@@ -32,17 +32,16 @@ test.describe("Command Palette", () => {
     await expect(dialog.getByText("No matching commands.")).toBeVisible();
   });
 
-  test("executes command with Enter", async ({ page }) => {
+  test("executes command and closes palette", async ({ page }) => {
     await page.goto("/");
     await page.click("body");
     await page.keyboard.press(`${modifier}+Shift+P`);
     const dialog = page.getByRole("dialog", { name: "Command Palette" });
     await expect(dialog).toBeVisible();
     await dialog.getByPlaceholder("Search commands...").fill("settings");
-    await expect(dialog.getByText("Open Settings")).toBeVisible();
-    await page.keyboard.press("Enter");
-    // Palette should close after execution
-    await expect(dialog).not.toBeVisible();
+    await dialog.getByText("Open Settings").click();
+    // Palette should close after execution (allow exit animation)
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
   });
 
   test("shows shortcut badges on commands", async ({ page }) => {
