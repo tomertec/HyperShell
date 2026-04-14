@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Added
+
+- **Light theme** — professional light mode with muted cool-gray palette. Three-way toggle in Settings → Appearance: System (follows OS preference), Light, or Dark. Accent color adapts per mode (sky-400 dark / sky-600 light). Host tag colors shift for contrast on gray backgrounds. Native window controls update to match. Status bar spans full window width.
+- **Solarized Light terminal theme** — new built-in terminal theme. Terminal theme is independent of app theme — any combination works.
+- **`app:set-theme` IPC channel** — renderer notifies main process on theme change to update native title bar overlay and window background color.
+
+### Changed
+
+- **Host tag colors use CSS variables** — `.host-color-*` and `.color-swatch-*` classes now reference `--host-*` variables instead of hardcoded hex, enabling per-theme overrides.
+- **StatusBar moved to AppShell** — status bar now renders below the sidebar + main content row, spanning full window width with a continuous top border.
+
+### Fixed
+
+- **Hardcoded colors in HostsView, PortForwardProfileForm, TransferPopup, StatusBar** — inline styles with hex/rgba values converted to Tailwind theme token classes so they adapt to light/dark mode.
+- **CodeMirror editor respects app theme** — SFTP file editor uses default light theme when app is in light mode, oneDark when dark.
+- **Title bar overlay height reduced to 34px** — prevents the native overlay from covering the separator line at non-100% DPI scaling (e.g. 115%).
+
 ## [0.1.5] - 2026-04-13
 
 ### Fixed
