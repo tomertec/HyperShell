@@ -318,6 +318,7 @@ function useAppTheme() {
         resolved = themeMode;
       }
       document.documentElement.dataset.theme = resolved;
+      window.hypershell?.setAppTheme?.(resolved);
     }
 
     apply();

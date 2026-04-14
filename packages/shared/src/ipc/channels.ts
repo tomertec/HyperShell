@@ -209,6 +209,10 @@ export const tmuxChannels = {
   probe: "tmux:probe",
 } as const;
 
+export const appChannels = {
+  setTheme: "app:set-theme",
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -236,4 +240,5 @@ export const ipcChannels = {
   hostFingerprint: hostFingerprintChannels,
   backup: backupChannels,
   tmux: tmuxChannels,
+  app: appChannels,
 } as const;

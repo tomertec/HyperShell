@@ -86,6 +86,7 @@ import type {
   TelnetConnectionOptions
 } from "@hypershell/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
+import { BrowserWindow } from "electron";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -205,6 +206,7 @@ const registeredChannels = [
   ipcChannels.backup.list,
   ipcChannels.backup.showOpenDialog,
   ipcChannels.tmux.probe,
+  ipcChannels.app.setTheme,
 ] as const;
 
 export const sessionManager = createSessionManager();
@@ -1453,6 +1455,21 @@ export function registerIpc(
   registerBackupIpc(ipcMain);
   registerSessionRecoveryIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerTmuxIpc(ipcMain, () => getOrCreateHostsRepo());
+
+  ipcMain.handle(ipcChannels.app.setTheme, (event: IpcMainInvokeEvent, theme: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    const isLight = theme === "light";
+    try {
+      win.setTitleBarOverlay({
+        color: isLight ? "#ffffff" : "#0a1929",
+        symbolColor: isLight ? "#475569" : "#8899aa",
+      });
+      win.setBackgroundColor(isLight ? "#ffffff" : "#07111f");
+    } catch {
+      // setTitleBarOverlay may not be available on all platforms
+    }
+  });
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     // Pool stats will be wired up when the pool is created
