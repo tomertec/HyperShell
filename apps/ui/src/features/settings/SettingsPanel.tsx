@@ -9,7 +9,8 @@ import {
   MIN_TERMINAL_LETTER_SPACING,
   MIN_TERMINAL_LINE_HEIGHT,
   MIN_TERMINAL_FONT_SIZE,
-  settingsStore
+  settingsStore,
+  ThemeMode
 } from "./settingsStore";
 import { terminalThemes } from "../terminal/terminalTheme";
 import { ThemeEditor } from "./ThemeEditor";
@@ -17,7 +18,7 @@ import { SshKeyManager } from "../ssh-keys/SshKeyManager";
 import { BackupRestorePanel } from "./BackupRestorePanel";
 
 const inputClasses =
-  "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright";
+  "w-full rounded-lg border border-border bg-base-900 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 hover:border-border-bright";
 
 const FONT_OPTIONS: { label: string; value: string }[] = [
   {
@@ -502,6 +503,46 @@ function TerminalSection() {
 }
 
 function AppearanceSection() {
+  const themeMode = useStore(settingsStore, (s) => s.settings.appearance.themeMode);
+  const updateAppearance = useStore(settingsStore, (s) => s.updateAppearance);
+
+  const modes: { value: ThemeMode; label: string }[] = [
+    { value: "system", label: "System" },
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+  ];
+
+  return (
+    <div className="grid gap-6">
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+          App Theme
+        </h3>
+        <div className="inline-flex rounded-lg border border-border p-0.5 bg-base-900">
+          {modes.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => void updateAppearance({ themeMode: m.value })}
+              className={[
+                "px-4 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
+                themeMode === m.value
+                  ? "bg-accent text-white shadow-sm"
+                  : "text-text-secondary hover:text-text-primary",
+              ].join(" ")}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <TerminalThemeSection />
+    </div>
+  );
+}
+
+function TerminalThemeSection() {
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateTerminal = useStore(settingsStore, (s) => s.updateTerminal);
   const customThemes = useStore(settingsStore, (s) => s.settings.customThemes ?? {});

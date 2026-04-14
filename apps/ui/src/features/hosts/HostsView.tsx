@@ -91,76 +91,34 @@ export function HostsView() {
 
   return (
     <section
-      style={{
-        display: "grid",
-        gap: 16,
-        padding: 16,
-        borderRadius: 16,
-        border: "1px solid rgba(148, 163, 184, 0.2)",
-        background: "rgba(15, 23, 42, 0.92)"
-      }}
+      className="grid gap-4 p-4 rounded-2xl border border-border bg-base-800/95"
     >
       <header>
-        <h2 style={{ margin: 0, fontSize: 18, color: "#e2e8f0" }}>Hosts</h2>
-        <p style={{ margin: "6px 0 0", color: "#94a3b8" }}>
+        <h2 className="m-0 text-lg text-text-primary">Hosts</h2>
+        <p className="mt-1.5 text-text-secondary">
           Manage SSH endpoints and organize them with groups and tags.
         </p>
         <button
           onClick={() => setSelectedId("")}
-          style={{
-            marginTop: 12,
-            borderRadius: 10,
-            border: "1px solid rgba(125, 211, 252, 0.3)",
-            background: "rgba(8, 47, 73, 0.72)",
-            color: "#e0f2fe",
-            padding: "8px 12px",
-            cursor: "pointer"
-          }}
+          className="mt-3 rounded-[10px] border border-accent-dim bg-accent/15 text-accent px-3 py-2 cursor-pointer"
         >
           New host
         </button>
         <button
           onClick={() => setIsImportOpen((current) => !current)}
-          style={{
-            marginTop: 12,
-            marginLeft: 8,
-            borderRadius: 10,
-            border: "1px solid rgba(148, 163, 184, 0.25)",
-            background: "rgba(30, 41, 59, 0.72)",
-            color: "#cbd5e1",
-            padding: "8px 12px",
-            cursor: "pointer"
-          }}
+          className="mt-3 ml-2 rounded-[10px] border border-border-bright bg-base-700/70 text-text-secondary px-3 py-2 cursor-pointer"
         >
           Import SSH Config
         </button>
         <button
           onClick={() => handleExport("json")}
-          style={{
-            marginTop: 12,
-            marginLeft: 8,
-            borderRadius: 10,
-            border: "1px solid rgba(148, 163, 184, 0.25)",
-            background: "rgba(30, 41, 59, 0.72)",
-            color: "#cbd5e1",
-            padding: "8px 12px",
-            cursor: "pointer"
-          }}
+          className="mt-3 ml-2 rounded-[10px] border border-border-bright bg-base-700/70 text-text-secondary px-3 py-2 cursor-pointer"
         >
           Export JSON
         </button>
         <button
           onClick={() => handleExport("csv")}
-          style={{
-            marginTop: 12,
-            marginLeft: 8,
-            borderRadius: 10,
-            border: "1px solid rgba(148, 163, 184, 0.25)",
-            background: "rgba(30, 41, 59, 0.72)",
-            color: "#cbd5e1",
-            padding: "8px 12px",
-            cursor: "pointer"
-          }}
+          className="mt-3 ml-2 rounded-[10px] border border-border-bright bg-base-700/70 text-text-secondary px-3 py-2 cursor-pointer"
         >
           Export CSV
         </button>
@@ -199,42 +157,32 @@ export function HostsView() {
         />
       ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 16 }}>
-        <div style={{ display: "grid", gap: 12 }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "1.2fr 0.8fr" }}>
+        <div className="grid gap-3">
           {hosts.map((host) => (
             <button
               key={host.id}
               onClick={() => setSelectedId(host.id)}
-              style={{
-                textAlign: "left",
-                borderRadius: 14,
-                border:
-                  host.id === selectedId
-                    ? "1px solid rgba(125, 211, 252, 0.45)"
-                    : "1px solid rgba(148, 163, 184, 0.14)",
-                background:
-                  host.id === selectedId
-                    ? "rgba(8, 47, 73, 0.7)"
-                    : "rgba(2, 6, 23, 0.6)",
-                color: "#e2e8f0",
-                padding: 14,
-                cursor: "pointer"
-              }}
+              className={`text-left rounded-[14px] border p-3.5 cursor-pointer text-text-primary ${
+                host.id === selectedId
+                  ? "border-accent/45 bg-accent/15"
+                  : "border-border bg-base-950/60"
+              }`}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div className="flex justify-between gap-3">
                 <strong>{host.name}</strong>
-                <span style={{ color: "#94a3b8" }}>
+                <span className="text-text-secondary">
                   {host.hostname}:{host.port}
                 </span>
               </div>
-              <div style={{ marginTop: 6, color: "#94a3b8", fontSize: 13 }}>
+              <div className="mt-1.5 text-text-secondary text-[13px]">
                 {host.group} {host.tags ? `• ${host.tags}` : ""}
               </div>
             </button>
           ))}
         </div>
 
-        <div style={{ display: "grid", gap: 12 }}>
+        <div className="grid gap-3">
           <HostForm
             key={selectedHost?.id ?? "new"}
             initialValue={selectedHost ?? undefined}
@@ -262,16 +210,10 @@ export function HostsView() {
 
           {selectedHost ? (
             <div
-              style={{
-                borderRadius: 14,
-                border: "1px solid rgba(148, 163, 184, 0.14)",
-                background: "rgba(2, 6, 23, 0.7)",
-                padding: 14,
-                color: "#cbd5e1"
-              }}
+              className="rounded-[14px] border border-border bg-base-950/70 p-3.5 text-text-secondary"
             >
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>Notes</div>
-              <div style={{ color: "#94a3b8" }}>{selectedHost.notes ?? "No notes"}</div>
+              <div className="font-semibold mb-1.5">Notes</div>
+              <div className="text-text-secondary">{selectedHost.notes ?? "No notes"}</div>
             </div>
           ) : null}
         </div>

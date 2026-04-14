@@ -20,10 +20,10 @@ export interface SerialAdvancedOptions {
 const BAUD_RATES = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200];
 
 const inputClass =
-  "w-full bg-base-750 border border-border/60 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-border/60 focus:shadow-[inset_0_0_0_1px_rgba(56,189,248,0.85)] transition-colors";
+  "w-full bg-base-900 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:shadow-[inset_0_0_0_1px_var(--color-accent)] transition-colors";
 
 const selectClass =
-  "w-full bg-base-750 border border-border/60 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-border/60 focus:shadow-[inset_0_0_0_1px_rgba(56,189,248,0.85)] transition-colors appearance-none";
+  "w-full bg-base-900 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40 focus:shadow-[inset_0_0_0_1px_var(--color-accent)] transition-colors appearance-none";
 
 export function QuickConnectForm({
   availablePorts,
@@ -153,7 +153,7 @@ export function QuickConnectForm({
               <button
                 type="button"
                 onClick={onRefreshPorts}
-                className="px-2.5 py-2 rounded-lg border border-border/60 bg-base-750 text-text-muted hover:text-text-primary hover:border-border-bright transition-colors"
+                className="px-2.5 py-2 rounded-lg border border-border bg-base-900 text-text-muted hover:text-text-primary hover:border-border-bright transition-colors"
                 title="Refresh ports"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

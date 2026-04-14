@@ -21,6 +21,7 @@
   --color-success-glow: rgba(52, 211, 153, 0.25);
   --color-warning: #fbbf24;
   --color-danger: #f87171;
+  --color-info: #c084fc;
   --color-text-primary: #e2e8f0;
   --color-text-secondary: #94a3b8;
   --color-text-muted: #64748b;
@@ -33,6 +34,79 @@
   --terminal-bg: var(--color-surface);
   --terminal-frame-line: rgba(125, 211, 252, 0.38);
   --terminal-frame-glow: rgba(56, 189, 248, 0.10);
+  --host-red: #f87171;
+  --host-orange: #fb923c;
+  --host-yellow: #fbbf24;
+  --host-green: #34d399;
+  --host-blue: #60a5fa;
+  --host-cyan: #22d3ee;
+  --host-purple: #a78bfa;
+  --host-pink: #f472b6;
+}
+
+html[data-theme="light"] {
+  /* Surfaces — layered cool grays with clear depth hierarchy
+     chrome (800) is the mid-gray shell; surface is content canvas;
+     900 is lighter for input wells / active tabs that need to stand out */
+  --color-surface: #e3e8f0;
+  --color-base-950: #d5dce7;
+  --color-base-900: #edf0f5;
+  --color-base-800: #e3e8f0;
+  --color-base-750: #dbe1ea;
+  --color-base-700: #cdd5e0;
+  --color-base-600: #b4bfce;
+  --color-base-500: #8e9db0;
+
+  /* Text — strong contrast on gray backgrounds */
+  --color-text-primary: #1a2332;
+  --color-text-secondary: #3e4f63;
+  --color-text-muted: #6b7b8f;
+
+  /* Borders — visible on gray surfaces */
+  --color-border: rgba(15, 23, 42, 0.12);
+  --color-border-bright: rgba(15, 23, 42, 0.22);
+
+  /* Accent (deeper sky for white backgrounds) */
+  --color-accent: #0284c7;
+  --color-accent-dim: rgba(2, 132, 199, 0.15);
+  --color-accent-glow: rgba(2, 132, 199, 0.08);
+
+  /* Status */
+  --color-success: #059669;
+  --color-success-glow: rgba(5, 150, 105, 0.12);
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-info: #7c3aed;
+
+  /* Terminal frame — use standard border in light mode (no blue accent tint) */
+  --terminal-frame-line: rgba(15, 23, 42, 0.18);
+  --terminal-frame-glow: rgba(15, 23, 42, 0.06);
+
+  /* Shadow color — softer on white */
+  --tw-shadow-color: rgba(0, 0, 0, 0.06);
+
+  /* Host tag colors — muted for light backgrounds */
+  --host-red: #ef4444;
+  --host-orange: #f97316;
+  --host-yellow: #d97706;
+  --host-green: #059669;
+  --host-blue: #2563eb;
+  --host-cyan: #0891b2;
+  --host-purple: #7c3aed;
+  --host-pink: #db2777;
+}
+
+html[data-theme="light"] ::selection {
+  background: rgba(2, 132, 199, 0.20);
+  color: inherit;
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.10);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.22);
 }
 
 .terminal-logo-row {
@@ -206,37 +280,14 @@ kbd {
 }
 
 /* Host color tag left borders */
-.host-color-red {
-  border-left-color: #f87171 !important;
-}
-
-.host-color-orange {
-  border-left-color: #fb923c !important;
-}
-
-.host-color-yellow {
-  border-left-color: #fbbf24 !important;
-}
-
-.host-color-green {
-  border-left-color: #34d399 !important;
-}
-
-.host-color-blue {
-  border-left-color: #60a5fa !important;
-}
-
-.host-color-cyan {
-  border-left-color: #22d3ee !important;
-}
-
-.host-color-purple {
-  border-left-color: #a78bfa !important;
-}
-
-.host-color-pink {
-  border-left-color: #f472b6 !important;
-}
+.host-color-red { border-left-color: var(--host-red) !important; }
+.host-color-orange { border-left-color: var(--host-orange) !important; }
+.host-color-yellow { border-left-color: var(--host-yellow) !important; }
+.host-color-green { border-left-color: var(--host-green) !important; }
+.host-color-blue { border-left-color: var(--host-blue) !important; }
+.host-color-cyan { border-left-color: var(--host-cyan) !important; }
+.host-color-purple { border-left-color: var(--host-purple) !important; }
+.host-color-pink { border-left-color: var(--host-pink) !important; }
 
 /* Color swatch circles for context menu */
 .color-swatch {
@@ -246,34 +297,11 @@ kbd {
   display: inline-block;
 }
 
-.color-swatch-red {
-  background: #f87171;
-}
-
-.color-swatch-orange {
-  background: #fb923c;
-}
-
-.color-swatch-yellow {
-  background: #fbbf24;
-}
-
-.color-swatch-green {
-  background: #34d399;
-}
-
-.color-swatch-blue {
-  background: #60a5fa;
-}
-
-.color-swatch-cyan {
-  background: #22d3ee;
-}
-
-.color-swatch-purple {
-  background: #a78bfa;
-}
-
-.color-swatch-pink {
-  background: #f472b6;
-}
+.color-swatch-red { background: var(--host-red); }
+.color-swatch-orange { background: var(--host-orange); }
+.color-swatch-yellow { background: var(--host-yellow); }
+.color-swatch-green { background: var(--host-green); }
+.color-swatch-blue { background: var(--host-blue); }
+.color-swatch-cyan { background: var(--host-cyan); }
+.color-swatch-purple { background: var(--host-purple); }
+.color-swatch-pink { background: var(--host-pink); }

@@ -123,7 +123,7 @@ export function Sidebar({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="group mx-3 mt-2 mb-3 flex items-center rounded-lg border border-border bg-base-750/40 text-xs text-text-secondary hover:border-accent/30 hover:bg-accent/[0.04] transition-all duration-150">
+      <div className="group mx-3 mt-2 mb-3 flex items-center rounded-lg border border-border bg-base-900/70 text-xs text-text-secondary hover:border-accent/30 hover:bg-accent/[0.06] transition-all duration-150">
         <button
           onClick={() => setShowHostFilter((v) => !v)}
           className={`flex items-center justify-center px-2.5 py-2 rounded-l-lg transition-colors duration-150 ${
@@ -147,7 +147,7 @@ export function Sidebar({
           className="flex-1 flex items-center gap-2 px-2 py-2 rounded-r-lg hover:text-text-primary transition-colors duration-150"
         >
           <span className="flex-1 text-left">Quick Connect</span>
-          <kbd className="text-[10px] text-text-muted bg-base-700/80 px-1.5 py-0.5 rounded border border-border/50">Ctrl+K</kbd>
+          <kbd className="text-[10px] text-text-muted bg-base-750 px-1.5 py-0.5 rounded border border-border">Ctrl+K</kbd>
         </button>
       </div>
 

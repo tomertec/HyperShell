@@ -453,6 +453,8 @@ export interface DesktopApi {
   backupShowOpenDialog(): Promise<string | null>;
   // Tmux detection
   tmuxProbe(request: TmuxProbeRequest): Promise<TmuxProbeResponse>;
+  // App theme
+  setAppTheme(theme: "light" | "dark"): Promise<void>;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -1396,6 +1398,10 @@ export function createDesktopApi(
       const parsed = tmuxProbeRequestSchema.parse(request);
       const raw = await ipcRenderer.invoke(ipcChannels.tmux.probe, parsed);
       return tmuxProbeResponseSchema.parse(raw);
+    },
+    // App theme
+    async setAppTheme(theme: "light" | "dark"): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.app.setTheme, theme);
     },
   };
 }
