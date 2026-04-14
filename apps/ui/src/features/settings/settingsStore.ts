@@ -32,11 +32,18 @@ export interface SecuritySettings {
   credentialCacheTtlMinutes: number;
 }
 
+export type ThemeMode = "system" | "light" | "dark";
+
+export interface AppearanceSettings {
+  themeMode: ThemeMode;
+}
+
 export interface AppSettings {
   terminal: TerminalSettings;
   debug: DebugSettings;
   general: GeneralSettings;
   security: SecuritySettings;
+  appearance: AppearanceSettings;
   customThemes: Record<string, TerminalTheme>;
 }
 
@@ -121,6 +128,10 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
   credentialCacheTtlMinutes: DEFAULT_CREDENTIAL_CACHE_TTL_MINUTES,
 };
 
+const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
+  themeMode: "system",
+};
+
 const DEFAULT_APP_SETTINGS: AppSettings = {
   terminal: DEFAULT_TERMINAL_SETTINGS,
   debug: {
@@ -128,6 +139,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
   },
   general: DEFAULT_GENERAL_SETTINGS,
   security: DEFAULT_SECURITY_SETTINGS,
+  appearance: DEFAULT_APPEARANCE_SETTINGS,
   customThemes: {}
 };
 
@@ -141,6 +153,7 @@ interface SettingsState {
   updateDebug: (partial: Partial<DebugSettings>) => Promise<void>;
   updateGeneral: (partial: Partial<GeneralSettings>) => Promise<void>;
   updateSecurity: (partial: Partial<SecuritySettings>) => Promise<void>;
+  updateAppearance: (partial: Partial<AppearanceSettings>) => Promise<void>;
   setTerminalFontSize: (fontSize: number) => Promise<void>;
   changeTerminalFontSize: (delta: number) => Promise<number>;
   resetTerminalFontSize: () => Promise<void>;
@@ -182,6 +195,10 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
             security: {
               ...DEFAULT_SECURITY_SETTINGS,
               ...(parsed.security ?? {})
+            },
+            appearance: {
+              ...DEFAULT_APPEARANCE_SETTINGS,
+              ...(parsed.appearance ?? {}),
             },
             customThemes: parsed.customThemes ?? {}
           };
@@ -275,6 +292,23 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
       await persistSettings(next);
     } catch (error) {
       console.warn("[settings] Failed to persist settings", error);
+    }
+  },
+
+  updateAppearance: async (partial) => {
+    const current = get().settings;
+    const next: AppSettings = {
+      ...current,
+      appearance: {
+        ...current.appearance,
+        ...partial,
+      },
+    };
+    set({ settings: next });
+    try {
+      await persistSettings(next);
+    } catch {
+      // persist failure is non-fatal
     }
   },
 
