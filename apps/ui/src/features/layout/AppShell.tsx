@@ -19,7 +19,7 @@ export function AppShell({ sidebar, children }: AppShellProps) {
     <div className="flex flex-col h-full">
       {/* Custom title bar — replaces native title bar */}
       <div
-        className="flex items-center h-9 shrink-0 bg-base-800 select-none"
+        className="flex items-center h-[37px] shrink-0 bg-base-800 border-b border-border-bright select-none"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
         <span className="flex-1 text-center text-xs font-medium text-text-muted tracking-wide pointer-events-none">
@@ -29,7 +29,7 @@ export function AppShell({ sidebar, children }: AppShellProps) {
         <div className="w-[140px] shrink-0" />
       </div>
 
-      <div className="flex flex-1 min-h-0 border-t border-border-bright">
+      <div className="flex flex-1 min-h-0">
         <aside
           className={`relative flex flex-col bg-base-800 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${
             sidebarOpen ? "w-64" : "w-12"
