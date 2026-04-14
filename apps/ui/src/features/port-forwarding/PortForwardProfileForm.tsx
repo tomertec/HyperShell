@@ -43,29 +43,29 @@ export function PortForwardProfileForm({
         event.preventDefault();
         onSubmit(value);
       }}
-      style={formStyle}
+      className="grid gap-3 p-4 rounded-2xl border border-border bg-base-800/95 text-text-primary"
     >
       <h2 style={{ margin: 0, fontSize: 16 }}>Port forwarding profile</h2>
 
-      <label htmlFor={`${formId}-name`} style={labelStyle}>
-        <div style={labelTitleStyle}>Name</div>
+      <label htmlFor={`${formId}-name`} className="grid gap-1.5 text-text-secondary">
+        <div className="text-[13px] text-text-secondary">Name</div>
         <input
           id={`${formId}-name`}
           value={value.name}
           onChange={(event) => setValue({ ...value, name: event.target.value })}
-          style={inputStyle}
+          className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
         />
       </label>
 
-      <label htmlFor={`${formId}-protocol`} style={labelStyle}>
-        <div style={labelTitleStyle}>Protocol</div>
+      <label htmlFor={`${formId}-protocol`} className="grid gap-1.5 text-text-secondary">
+        <div className="text-[13px] text-text-secondary">Protocol</div>
         <select
           id={`${formId}-protocol`}
           value={value.protocol}
           onChange={(event) =>
             setValue({ ...value, protocol: event.target.value as PortForwardProtocol })
           }
-          style={inputStyle}
+          className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
         >
           <option value="local">Local</option>
           <option value="remote">Remote</option>
@@ -74,20 +74,20 @@ export function PortForwardProfileForm({
       </label>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <label htmlFor={`${formId}-localAddress`} style={labelStyle}>
-          <div style={labelTitleStyle}>Local address</div>
+        <label htmlFor={`${formId}-localAddress`} className="grid gap-1.5 text-text-secondary">
+          <div className="text-[13px] text-text-secondary">Local address</div>
           <input
             id={`${formId}-localAddress`}
             value={value.localAddress}
             onChange={(event) =>
               setValue({ ...value, localAddress: event.target.value })
             }
-            style={inputStyle}
+            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
           />
         </label>
 
-        <label htmlFor={`${formId}-localPort`} style={labelStyle}>
-          <div style={labelTitleStyle}>Local port</div>
+        <label htmlFor={`${formId}-localPort`} className="grid gap-1.5 text-text-secondary">
+          <div className="text-[13px] text-text-secondary">Local port</div>
           <input
             id={`${formId}-localPort`}
             type="number"
@@ -95,26 +95,26 @@ export function PortForwardProfileForm({
             onChange={(event) =>
               setValue({ ...value, localPort: Number(event.target.value) || 0 })
             }
-            style={inputStyle}
+            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
           />
         </label>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <label htmlFor={`${formId}-remoteHost`} style={labelStyle}>
-          <div style={labelTitleStyle}>Remote host</div>
+        <label htmlFor={`${formId}-remoteHost`} className="grid gap-1.5 text-text-secondary">
+          <div className="text-[13px] text-text-secondary">Remote host</div>
           <input
             id={`${formId}-remoteHost`}
             value={value.remoteHost}
             onChange={(event) =>
               setValue({ ...value, remoteHost: event.target.value })
             }
-            style={inputStyle}
+            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
           />
         </label>
 
-        <label htmlFor={`${formId}-remotePort`} style={labelStyle}>
-          <div style={labelTitleStyle}>Remote port</div>
+        <label htmlFor={`${formId}-remotePort`} className="grid gap-1.5 text-text-secondary">
+          <div className="text-[13px] text-text-secondary">Remote port</div>
           <input
             id={`${formId}-remotePort`}
             type="number"
@@ -122,65 +122,26 @@ export function PortForwardProfileForm({
             onChange={(event) =>
               setValue({ ...value, remotePort: Number(event.target.value) || 0 })
             }
-            style={inputStyle}
+            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
           />
         </label>
       </div>
 
-      <label htmlFor={`${formId}-description`} style={labelStyle}>
-        <div style={labelTitleStyle}>Description</div>
+      <label htmlFor={`${formId}-description`} className="grid gap-1.5 text-text-secondary">
+        <div className="text-[13px] text-text-secondary">Description</div>
         <textarea
           id={`${formId}-description`}
           value={value.description}
           onChange={(event) => setValue({ ...value, description: event.target.value })}
           rows={3}
-          style={{ ...inputStyle, resize: "vertical" }}
+          style={{ resize: "vertical" }}
+          className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
         />
       </label>
 
-      <button type="submit" style={buttonStyle}>
+      <button type="submit" className="rounded-[10px] border border-accent-dim bg-accent/15 text-accent px-3.5 py-2.5 cursor-pointer justify-self-start">
         Save profile
       </button>
     </form>
   );
 }
-
-const formStyle = {
-  display: "grid",
-  gap: 12,
-  padding: 16,
-  borderRadius: 16,
-  border: "1px solid rgba(148, 163, 184, 0.18)",
-  background: "rgba(15, 23, 42, 0.92)",
-  color: "#e2e8f0"
-} as const;
-
-const labelStyle = {
-  display: "grid",
-  gap: 6,
-  color: "#cbd5e1"
-} as const;
-
-const labelTitleStyle = {
-  fontSize: 13,
-  color: "#cbd5e1"
-} as const;
-
-const inputStyle = {
-  width: "100%",
-  borderRadius: 10,
-  border: "1px solid rgba(148, 163, 184, 0.18)",
-  background: "rgba(2, 6, 23, 0.9)",
-  color: "#e2e8f0",
-  padding: "10px 12px"
-} as const;
-
-const buttonStyle = {
-  borderRadius: 10,
-  border: "1px solid rgba(125, 211, 252, 0.35)",
-  background: "rgba(8, 47, 73, 0.8)",
-  color: "#e0f2fe",
-  padding: "10px 14px",
-  cursor: "pointer",
-  justifySelf: "start"
-} as const;
