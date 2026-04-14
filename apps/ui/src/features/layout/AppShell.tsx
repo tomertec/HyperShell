@@ -19,7 +19,7 @@ export function AppShell({ sidebar, children }: AppShellProps) {
     <div className="flex flex-col h-full">
       {/* Custom title bar — replaces native title bar */}
       <div
-        className="flex items-center h-[37px] shrink-0 bg-base-800 border-b border-border-bright select-none"
+        className="flex items-center h-9 shrink-0 bg-base-800 select-none"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
         <span className="flex-1 text-center text-xs font-medium text-text-muted tracking-wide pointer-events-none">
@@ -28,6 +28,8 @@ export function AppShell({ sidebar, children }: AppShellProps) {
         {/* Reserve space for the window controls overlay on the right */}
         <div className="w-[140px] shrink-0" />
       </div>
+      {/* Separator — rendered below the native overlay so it spans full width */}
+      <div className="h-px shrink-0 bg-border-bright" />
 
       <div className="flex flex-1 min-h-0">
         <aside
