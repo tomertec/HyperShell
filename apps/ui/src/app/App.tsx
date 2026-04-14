@@ -306,6 +306,30 @@ function serializeCurrentLayout() {
   };
 }
 
+function useAppTheme() {
+  const themeMode = useStore(settingsStore, (s) => s.settings.appearance.themeMode);
+
+  useEffect(() => {
+    function apply() {
+      let resolved: "light" | "dark";
+      if (themeMode === "system") {
+        resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      } else {
+        resolved = themeMode;
+      }
+      document.documentElement.dataset.theme = resolved;
+    }
+
+    apply();
+
+    if (themeMode === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      mq.addEventListener("change", apply);
+      return () => mq.removeEventListener("change", apply);
+    }
+  }, [themeMode]);
+}
+
 function MainApp() {
   const [hosts, setHosts] = useState<HostRecord[]>([]);
   const [tags, setTags] = useState<TagRecord[]>([]);
@@ -576,6 +600,8 @@ function MainApp() {
     },
     [kbdInteractiveRequest]
   );
+
+  useAppTheme();
 
   useEffect(() => {
     const terminalBg = resolveTerminalTheme(terminalThemeName, customThemes).background;
