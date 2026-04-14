@@ -1,6 +1,7 @@
 import { cloneElement, isValidElement, useState } from "react";
 import { motion } from "framer-motion";
 import { TunnelManagerPanel } from "../tunnels/TunnelManagerPanel";
+import { StatusBar } from "../statusbar/StatusBar";
 
 export interface AppShellProps {
   sidebar: React.ReactNode;
@@ -102,6 +103,8 @@ export function AppShell({ sidebar, children }: AppShellProps) {
 
         <TunnelManagerPanel />
       </div>
+
+      <StatusBar />
     </div>
   );
 }

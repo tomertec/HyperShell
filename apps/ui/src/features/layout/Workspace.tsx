@@ -10,7 +10,6 @@ import { useTunnelStore } from "../tunnels/tunnelStore";
 import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
 import { useSnippetStore } from "../snippets/snippetStore";
 import { SnippetsPanel } from "../snippets/SnippetsPanel";
-import { StatusBar } from "../statusbar/StatusBar";
 import { type Pane, layoutStore } from "./layoutStore";
 import { PaneResizeHandle } from "./PaneResizeHandle";
 import { TabBar } from "./TabBar";
@@ -311,7 +310,6 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
           />
         )}
 
-        <StatusBar />
       </div>
       <SnippetsPanel />
     </div>
