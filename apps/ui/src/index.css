@@ -45,24 +45,24 @@
 }
 
 html[data-theme="light"] {
-  /* Surfaces */
-  --color-surface: #ffffff;
-  --color-base-950: #f1f5f9;
-  --color-base-900: #f8fafc;
-  --color-base-800: #ffffff;
-  --color-base-750: #f1f5f9;
-  --color-base-700: #e2e8f0;
-  --color-base-600: #cbd5e1;
+  /* Surfaces — soft warm grays, never pure white */
+  --color-surface: #f4f6f8;
+  --color-base-950: #e8ecf1;
+  --color-base-900: #eef1f5;
+  --color-base-800: #f4f6f8;
+  --color-base-750: #eaeef3;
+  --color-base-700: #dde3eb;
+  --color-base-600: #c4cdd8;
   --color-base-500: #94a3b8;
 
   /* Text */
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
+  --color-text-primary: #1a2332;
+  --color-text-secondary: #4a5568;
+  --color-text-muted: #8895a7;
 
-  /* Borders */
-  --color-border: rgba(15, 23, 42, 0.08);
-  --color-border-bright: rgba(15, 23, 42, 0.15);
+  /* Borders — slightly more visible on gray surfaces */
+  --color-border: rgba(15, 23, 42, 0.10);
+  --color-border-bright: rgba(15, 23, 42, 0.18);
 
   /* Accent (deeper sky for white backgrounds) */
   --color-accent: #0284c7;

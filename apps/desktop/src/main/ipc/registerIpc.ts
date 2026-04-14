@@ -1462,10 +1462,10 @@ export function registerIpc(
     const isLight = theme === "light";
     try {
       win.setTitleBarOverlay({
-        color: isLight ? "#ffffff" : "#0a1929",
-        symbolColor: isLight ? "#475569" : "#8899aa",
+        color: isLight ? "#f4f6f8" : "#0a1929",
+        symbolColor: isLight ? "#4a5568" : "#8899aa",
       });
-      win.setBackgroundColor(isLight ? "#ffffff" : "#07111f");
+      win.setBackgroundColor(isLight ? "#f4f6f8" : "#07111f");
     } catch {
       // setTitleBarOverlay may not be available on all platforms
     }
