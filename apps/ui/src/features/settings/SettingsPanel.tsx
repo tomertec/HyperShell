@@ -18,7 +18,7 @@ import { SshKeyManager } from "../ssh-keys/SshKeyManager";
 import { BackupRestorePanel } from "./BackupRestorePanel";
 
 const inputClasses =
-  "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright";
+  "w-full rounded-lg border border-border bg-base-900 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 hover:border-border-bright";
 
 const FONT_OPTIONS: { label: string; value: string }[] = [
   {

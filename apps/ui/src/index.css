@@ -45,20 +45,22 @@
 }
 
 html[data-theme="light"] {
-  /* Surfaces — muted cool grays, easy on eyes */
-  --color-surface: #e5eaf1;
-  --color-base-950: #d9e0ea;
-  --color-base-900: #dee5ee;
-  --color-base-800: #e9eef4;
-  --color-base-750: #dfe5ee;
-  --color-base-700: #d0d8e3;
-  --color-base-600: #b8c3d1;
+  /* Surfaces — layered cool grays with clear depth hierarchy
+     chrome (800) is the mid-gray shell; surface is content canvas;
+     900 is lighter for input wells / active tabs that need to stand out */
+  --color-surface: #e3e8f0;
+  --color-base-950: #d5dce7;
+  --color-base-900: #edf0f5;
+  --color-base-800: #e3e8f0;
+  --color-base-750: #dbe1ea;
+  --color-base-700: #cdd5e0;
+  --color-base-600: #b4bfce;
   --color-base-500: #8e9db0;
 
   /* Text — strong contrast on gray backgrounds */
   --color-text-primary: #1a2332;
   --color-text-secondary: #3e4f63;
-  --color-text-muted: #748497;
+  --color-text-muted: #6b7b8f;
 
   /* Borders — visible on gray surfaces */
   --color-border: rgba(15, 23, 42, 0.12);

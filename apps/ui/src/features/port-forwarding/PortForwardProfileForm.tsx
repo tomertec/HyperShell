@@ -53,7 +53,7 @@ export function PortForwardProfileForm({
           id={`${formId}-name`}
           value={value.name}
           onChange={(event) => setValue({ ...value, name: event.target.value })}
-          className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
+          className="w-full rounded-[10px] border border-border bg-base-900 text-text-primary px-3 py-2.5"
         />
       </label>
 
@@ -65,7 +65,7 @@ export function PortForwardProfileForm({
           onChange={(event) =>
             setValue({ ...value, protocol: event.target.value as PortForwardProtocol })
           }
-          className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
+          className="w-full rounded-[10px] border border-border bg-base-900 text-text-primary px-3 py-2.5"
         >
           <option value="local">Local</option>
           <option value="remote">Remote</option>
@@ -82,7 +82,7 @@ export function PortForwardProfileForm({
             onChange={(event) =>
               setValue({ ...value, localAddress: event.target.value })
             }
-            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
+            className="w-full rounded-[10px] border border-border bg-base-900 text-text-primary px-3 py-2.5"
           />
         </label>
 
@@ -95,7 +95,7 @@ export function PortForwardProfileForm({
             onChange={(event) =>
               setValue({ ...value, localPort: Number(event.target.value) || 0 })
             }
-            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
+            className="w-full rounded-[10px] border border-border bg-base-900 text-text-primary px-3 py-2.5"
           />
         </label>
       </div>
@@ -109,7 +109,7 @@ export function PortForwardProfileForm({
             onChange={(event) =>
               setValue({ ...value, remoteHost: event.target.value })
             }
-            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
+            className="w-full rounded-[10px] border border-border bg-base-900 text-text-primary px-3 py-2.5"
           />
         </label>
 
@@ -122,7 +122,7 @@ export function PortForwardProfileForm({
             onChange={(event) =>
               setValue({ ...value, remotePort: Number(event.target.value) || 0 })
             }
-            className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
+            className="w-full rounded-[10px] border border-border bg-base-900 text-text-primary px-3 py-2.5"
           />
         </label>
       </div>
@@ -135,7 +135,7 @@ export function PortForwardProfileForm({
           onChange={(event) => setValue({ ...value, description: event.target.value })}
           rows={3}
           style={{ resize: "vertical" }}
-          className="w-full rounded-[10px] border border-border bg-base-950/90 text-text-primary px-3 py-2.5"
+          className="w-full rounded-[10px] border border-border bg-base-900 text-text-primary px-3 py-2.5"
         />
       </label>
 
