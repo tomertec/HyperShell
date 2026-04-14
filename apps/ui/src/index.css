@@ -78,9 +78,9 @@ html[data-theme="light"] {
   --color-danger: #dc2626;
   --color-info: #7c3aed;
 
-  /* Terminal frame */
-  --terminal-frame-line: rgba(2, 132, 199, 0.15);
-  --terminal-frame-glow: rgba(2, 132, 199, 0.06);
+  /* Terminal frame — use standard border in light mode (no blue accent tint) */
+  --terminal-frame-line: rgba(15, 23, 42, 0.18);
+  --terminal-frame-glow: rgba(15, 23, 42, 0.06);
 
   /* Shadow color — softer on white */
   --tw-shadow-color: rgba(0, 0, 0, 0.06);

@@ -198,7 +198,7 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   return (
     <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
       <BroadcastBar />
-      <div className="flex h-11 items-end bg-base-800 border-b border-border">
+      <div className="flex h-11 items-end bg-base-800 border-b border-border-bright">
         <div className="flex-1 min-w-0 h-full">
           <TabBar
             tabs={tabs}
