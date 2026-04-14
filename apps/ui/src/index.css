@@ -45,24 +45,24 @@
 }
 
 html[data-theme="light"] {
-  /* Surfaces — soft warm grays, never pure white */
-  --color-surface: #f4f6f8;
-  --color-base-950: #e8ecf1;
-  --color-base-900: #eef1f5;
-  --color-base-800: #f4f6f8;
-  --color-base-750: #eaeef3;
-  --color-base-700: #dde3eb;
-  --color-base-600: #c4cdd8;
-  --color-base-500: #94a3b8;
+  /* Surfaces — muted cool grays, easy on eyes */
+  --color-surface: #e5eaf1;
+  --color-base-950: #d9e0ea;
+  --color-base-900: #dee5ee;
+  --color-base-800: #e9eef4;
+  --color-base-750: #dfe5ee;
+  --color-base-700: #d0d8e3;
+  --color-base-600: #b8c3d1;
+  --color-base-500: #8e9db0;
 
-  /* Text */
+  /* Text — strong contrast on gray backgrounds */
   --color-text-primary: #1a2332;
-  --color-text-secondary: #4a5568;
-  --color-text-muted: #8895a7;
+  --color-text-secondary: #3e4f63;
+  --color-text-muted: #748497;
 
-  /* Borders — slightly more visible on gray surfaces */
-  --color-border: rgba(15, 23, 42, 0.10);
-  --color-border-bright: rgba(15, 23, 42, 0.18);
+  /* Borders — visible on gray surfaces */
+  --color-border: rgba(15, 23, 42, 0.12);
+  --color-border-bright: rgba(15, 23, 42, 0.22);
 
   /* Accent (deeper sky for white backgrounds) */
   --color-accent: #0284c7;
