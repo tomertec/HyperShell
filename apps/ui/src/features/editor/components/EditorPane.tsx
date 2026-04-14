@@ -36,9 +36,11 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
     const originalContent = tab.originalContent;
     const updateTab = storeRef.current.getState().updateTab;
 
+    const isLight = document.documentElement.dataset.theme === "light";
+
     const extensions = [
       basicSetup,
-      oneDark,
+      ...(isLight ? [] : [oneDark]),
       search(),
       EditorView.theme({
         "&": { height: "100%" },
