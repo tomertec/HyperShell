@@ -62,7 +62,7 @@ export function StatusBar() {
 
   return (
     <div
-      className="relative z-10 flex items-center justify-between h-6 px-3 shrink-0 select-none bg-surface"
+      className="relative z-10 flex items-center justify-between h-6 px-3 shrink-0 select-none bg-surface border-t border-border"
     >
       {/* Left side */}
       <div className="flex items-center gap-2 text-[11px] overflow-hidden">
