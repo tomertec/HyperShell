@@ -119,7 +119,7 @@ export function StatusBar() {
 
             {/* Memory */}
             {stats.memUsage !== null && (
-              <span className="flex items-center gap-1 text-[#c084fc]">
+              <span className="flex items-center gap-1 text-info">
                 <RamIcon />
                 {stats.memUsage}
               </span>
