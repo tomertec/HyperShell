@@ -128,11 +128,11 @@ function TransferGlyph({
 }) {
   return (
     <div
-      className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-sky-400/30 bg-sky-500/10 text-sky-200"
+      className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-accent/30 bg-sky-500/10 text-sky-200"
     >
       {running ? (
         <motion.span
-          className="absolute inset-0 rounded-lg bg-sky-400/8"
+          className="absolute inset-0 rounded-lg bg-accent/8"
           animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.5, 0.2] }}
           transition={{ duration: 1.8, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
         />
@@ -201,7 +201,7 @@ function TransferRow({
       : formatFileSize(transfer.bytesTransferred);
 
   return (
-    <div className="rounded-xl border border-sky-400/8 bg-sky-950/20 px-2.5 py-2">
+    <div className="rounded-xl border border-accent/8 bg-sky-950/20 px-2.5 py-2">
       <div className="flex items-center gap-2.5">
         <TransferGlyph type={transfer.type} running={running} />
 
@@ -219,7 +219,7 @@ function TransferRow({
                       ? "bg-yellow-500/15 text-yellow-200"
                       : transfer.status === "paused"
                         ? "bg-amber-500/15 text-amber-100"
-                        : "bg-sky-400/10 text-sky-300/80"
+                        : "bg-accent/10 text-sky-300/80"
               ].join(" ")}
             >
               {hasConflict ? "conflict" : transfer.status}
@@ -233,21 +233,21 @@ function TransferRow({
               <span className="text-[10px] text-amber-200/70">File exists:</span>
               <button
                 type="button"
-                className="rounded border border-sky-400/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-sky-400/30 hover:text-sky-100"
+                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100"
                 onClick={() => onResolveConflict(transfer.transferId, "overwrite", false)}
               >
                 Overwrite
               </button>
               <button
                 type="button"
-                className="rounded border border-sky-400/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-sky-400/30 hover:text-sky-100"
+                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100"
                 onClick={() => onResolveConflict(transfer.transferId, "skip", false)}
               >
                 Skip
               </button>
               <button
                 type="button"
-                className="rounded border border-sky-400/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-sky-400/30 hover:text-sky-100"
+                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100"
                 onClick={() => onResolveConflict(transfer.transferId, "rename", false)}
               >
                 Rename
@@ -275,9 +275,9 @@ function TransferRow({
               <span>{running ? formatRate(transfer.speed) : transfer.status === "completed" ? "Done" : "Stopped"}</span>
             </div>
 
-            <div className="relative h-1.5 overflow-hidden rounded-full bg-sky-900/30">
+            <div className="relative h-1.5 overflow-hidden rounded-full bg-accent-glow">
               <motion.div
-                className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,rgba(56,189,248,0.6),rgba(14,165,233,1))]"
+                className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,var(--color-accent-dim),var(--color-accent))]"
                 initial={false}
                 animate={{ width: `${progress}%` }}
                 transition={{ type: "spring", stiffness: 130, damping: 24, mass: 0.5 }}
@@ -305,7 +305,7 @@ function TransferRow({
               <button
                 type="button"
                 disabled={pausing || resuming || cancelling}
-                className="rounded border border-sky-400/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-sky-400/30 hover:text-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => {
                   void onPause(transfer.transferId);
                 }}
@@ -317,7 +317,7 @@ function TransferRow({
               <button
                 type="button"
                 disabled={resuming || pausing || cancelling}
-                className="rounded border border-sky-400/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-sky-400/30 hover:text-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100 disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => {
                   void onResume(transfer.transferId);
                 }}
@@ -343,7 +343,7 @@ function TransferRow({
             <button
               type="button"
               disabled={retrying}
-              className="rounded border border-sky-400/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-blue-300/70 transition-colors hover:border-blue-400/30 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-blue-300/70 transition-colors hover:border-blue-400/30 hover:text-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => {
                 void onRetry(transfer.transferId);
               }}
@@ -800,14 +800,14 @@ export function TransferPopup() {
               setLastInteractionAt(Date.now());
               setPanelOpen(true);
             }}
-            className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-sky-400/20 bg-base-900/90 px-3 py-1.5 text-left shadow-[0_12px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+            className="pointer-events-auto flex items-center gap-2.5 rounded-full border border-accent/20 bg-base-900/90 px-3 py-1.5 text-left shadow-xl backdrop-blur-xl"
             initial={{ opacity: 0, y: 18, scale: 0.94 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.96 }}
             transition={{ duration: 0.2 }}
           >
             <motion.span
-              className="h-2 w-2 rounded-full bg-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.7)]"
+              className="h-2 w-2 rounded-full bg-accent shadow-[0_0_14px_var(--color-accent-dim)]"
               animate={{ scale: [1, 1.25, 1], opacity: [0.55, 1, 0.55] }}
               transition={{ duration: 1.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
             />
@@ -823,7 +823,7 @@ export function TransferPopup() {
         {panelOpen ? (
           <motion.section
             key="transfer-popup"
-            className="pointer-events-auto w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-sky-400/12 bg-[linear-gradient(180deg,rgba(8,15,30,0.97),rgba(4,8,20,0.95))] text-text-primary shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-2xl"
+            className="pointer-events-auto w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-accent/12 bg-base-900/97 text-text-primary shadow-2xl backdrop-blur-2xl"
             onPointerDown={markInteraction}
             onPointerEnter={markInteraction}
             initial={{ opacity: 0, y: 22, scale: 0.96 }}
@@ -832,14 +832,14 @@ export function TransferPopup() {
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
             <div
-              className="relative overflow-hidden border-b border-sky-400/8 px-3 py-2.5 cursor-move"
+              className="relative overflow-hidden border-b border-accent/8 px-3 py-2.5 cursor-move"
               onPointerDown={startPopupDrag}
             >
               <div
                 className="pointer-events-none absolute inset-0 opacity-50"
                 style={{
                   background:
-                    "radial-gradient(circle at top left, rgba(14,165,233,0.18), transparent 50%), radial-gradient(circle at top right, rgba(56,189,248,0.12), transparent 40%)"
+                    "radial-gradient(circle at top left, var(--color-accent-dim), transparent 50%), radial-gradient(circle at top right, var(--color-accent-glow), transparent 40%)"
                 }}
               />
 
@@ -847,7 +847,7 @@ export function TransferPopup() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <motion.span
-                      className="h-2 w-2 rounded-full bg-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.7)]"
+                      className="h-2 w-2 rounded-full bg-accent shadow-[0_0_14px_var(--color-accent-dim)]"
                       animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
                       transition={{ duration: 1.6, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
                     />
@@ -875,7 +875,7 @@ export function TransferPopup() {
                   <button
                     type="button"
                     onClick={() => setPanelOpen(false)}
-                    className="rounded border border-sky-400/12 bg-sky-500/6 px-2 py-0.5 text-[10px] text-sky-200/60 transition-colors hover:border-sky-400/25 hover:text-sky-100"
+                    className="rounded border border-accent/12 bg-sky-500/6 px-2 py-0.5 text-[10px] text-sky-200/60 transition-colors hover:border-accent/25 hover:text-sky-100"
                   >
                     Minimize
                   </button>
