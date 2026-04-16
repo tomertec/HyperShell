@@ -10,7 +10,7 @@ import {
 } from "@hypershell/db";
 
 import { createHostMonitor } from "./monitoring/hostMonitor";
-import { registerIpc, sessionManager } from "./ipc/registerIpc";
+import { disposeSessionRuntime, registerIpc, sessionManager } from "./ipc/registerIpc";
 import { performAutoBackup } from "./ipc/backupIpc";
 import { createAppMenu } from "./menu/createAppMenu";
 import { createTray } from "./tray/createTray";
@@ -118,7 +118,7 @@ const mainProcessLifecycle = createMainProcessLifecycle({
 
 async function bootstrap(): Promise<void> {
   createAppMenu();
-  performAutoBackup();
+  await performAutoBackup();
   await mainProcessLifecycle.bootstrap();
 
   if (!sessionRecoveryTimer) {
@@ -143,6 +143,7 @@ app.on("before-quit", () => {
     sessionRecoveryTimer = null;
   }
   getSavedSessionRepository()?.markAllGraceful();
+  disposeSessionRuntime();
   clearCredentialCache();
 });
 

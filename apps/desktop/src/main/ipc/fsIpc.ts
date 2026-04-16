@@ -116,7 +116,16 @@ async function assertPathAllowed(inputPath: string): Promise<string> {
 
   const normalizedPath = normalizeAbsolutePath(inputPath);
   const allowedRoots = await getAllowedRoots();
-  const canonicalTargetPath = await realpath(normalizedPath).catch(() => normalizedPath);
+  let canonicalTargetPath: string;
+  try {
+    canonicalTargetPath = await realpath(normalizedPath);
+  } catch {
+    // Path doesn't exist yet (e.g. rename target). Resolve the parent directory
+    // to prevent symlink escapes where a parent inside an allowed root points elsewhere.
+    const parentDir = path.dirname(normalizedPath);
+    const canonicalParent = await realpath(parentDir).catch(() => parentDir);
+    canonicalTargetPath = path.join(canonicalParent, path.basename(normalizedPath));
+  }
   const canonicalRoots = await Promise.all(
     allowedRoots.map(async (root) => {
       return realpath(root).catch(() => root);
@@ -309,8 +318,8 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
   ipcMain.handle(ipcChannels.fs.rename, async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = fsRenameRequestSchema.parse(rawRequest);
     const oldPath = await assertPathAllowed(request.oldPath);
-    await assertPathAllowed(request.newPath);
-    await fsRename(oldPath, request.newPath);
+    const newPath = await assertPathAllowed(request.newPath);
+    await fsRename(oldPath, newPath);
   });
 
   return () => {

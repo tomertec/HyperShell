@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createCommands, type CommandContext } from "./commandRegistry";
 
 function makeMockContext(): CommandContext {
@@ -75,5 +75,25 @@ describe("commandRegistry", () => {
     const commands = createCommands(ctx);
     const disconnect = commands.find((c) => c.id === "session.disconnect");
     expect(disconnect?.visible()).toBe(false);
+  });
+
+  it("restore backup command calls ctx.restoreBackup", () => {
+    const ctx = makeMockContext();
+    ctx.restoreBackup = vi.fn();
+    const commands = createCommands(ctx);
+    const restore = commands.find((c) => c.id === "backup.restore");
+    expect(restore).toBeDefined();
+    restore!.execute();
+    expect(ctx.restoreBackup).toHaveBeenCalledTimes(1);
+  });
+
+  it("create backup command calls ctx.createBackup", () => {
+    const ctx = makeMockContext();
+    ctx.createBackup = vi.fn();
+    const commands = createCommands(ctx);
+    const backup = commands.find((c) => c.id === "backup.create");
+    expect(backup).toBeDefined();
+    backup!.execute();
+    expect(ctx.createBackup).toHaveBeenCalledTimes(1);
   });
 });

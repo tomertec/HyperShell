@@ -24,6 +24,13 @@ const BACKUP_EXTENSION = ".db";
 const MAX_AUTO_BACKUPS = 5;
 const SQLITE_MAGIC = "SQLite format 3\0";
 
+type SqliteOnlineBackupDatabase = {
+  pragma(command: string): unknown;
+  exec(sql: string): unknown;
+  backup?: (destinationPath: string) => Promise<unknown>;
+  close(): void;
+};
+
 /**
  * Resolves the path to the HyperShell database file.
  * Mirrors the logic in hostsIpc.ts resolveDatabasePath().
@@ -38,6 +45,41 @@ export function getBackupDir(): string {
   const dir = path.join(app.getPath("appData"), "HyperShell", "backups");
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+function openSqliteDatabaseForBackup(dbPath: string): SqliteOnlineBackupDatabase {
+  const Database = require("better-sqlite3");
+  return new Database(dbPath, { fileMustExist: true }) as SqliteOnlineBackupDatabase;
+}
+
+async function createConsistentBackup(sourcePath: string, destinationPath: string): Promise<void> {
+  const resolvedSource = path.resolve(sourcePath);
+  const resolvedDestination = path.resolve(destinationPath);
+  const samePath = process.platform === "win32"
+    ? resolvedSource.toLowerCase() === resolvedDestination.toLowerCase()
+    : resolvedSource === resolvedDestination;
+  if (samePath) {
+    throw new Error("Backup destination must be different from the source database path");
+  }
+
+  if (existsSync(resolvedDestination)) {
+    unlinkSync(resolvedDestination);
+  }
+
+  const db = openSqliteDatabaseForBackup(resolvedSource);
+  try {
+    db.pragma("busy_timeout = 5000");
+
+    if (typeof db.backup === "function") {
+      await db.backup(resolvedDestination);
+      return;
+    }
+
+    const escapedDestination = resolvedDestination.replace(/'/g, "''");
+    db.exec(`VACUUM INTO '${escapedDestination}'`);
+  } finally {
+    db.close();
+  }
 }
 
 /** Generates a timestamped backup filename. */
@@ -117,7 +159,7 @@ export function rotateBackups(dir: string, maxKeep: number = MAX_AUTO_BACKUPS): 
  * Performs an auto-backup of the database on app startup.
  * Copies the DB to the backup directory and rotates old backups.
  */
-export function performAutoBackup(): void {
+export async function performAutoBackup(): Promise<void> {
   const dbPath = getDatabasePath();
   if (!existsSync(dbPath)) {
     return;
@@ -128,7 +170,7 @@ export function performAutoBackup(): void {
   const backupPath = path.join(backupDir, backupFileName);
 
   try {
-    copyFileSync(dbPath, backupPath);
+    await createConsistentBackup(dbPath, backupPath);
     console.log("[hypershell] Auto-backup created:", backupPath);
     rotateBackups(backupDir, MAX_AUTO_BACKUPS);
   } catch (error) {
@@ -161,7 +203,7 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
         throw new Error("Database file not found");
       }
 
-      copyFileSync(dbPath, parsed.filePath);
+      await createConsistentBackup(dbPath, parsed.filePath);
       const stats = statSync(parsed.filePath);
 
       return {
@@ -195,32 +237,68 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
         dbDir,
         `hypershell.restore.${Date.now()}.tmp`
       );
+      const rollbackPath = path.join(
+        dbDir,
+        `hypershell.rollback.${Date.now()}.tmp`
+      );
 
-      // Release any live SQLite handles before replacing the DB files.
-      closeSharedDatabase();
-
-      // Create a safety backup of the current DB before restoring
+      // Create a safety backup of the current DB before restoring.
       const backupDir = getBackupDir();
       const safetyBackupName = generateBackupFilename();
       const safetyBackupPath = path.join(backupDir, safetyBackupName);
       if (existsSync(dbPath)) {
-        copyFileSync(dbPath, safetyBackupPath);
+        await createConsistentBackup(dbPath, safetyBackupPath);
       }
 
+      // Release any live SQLite handles before replacing the DB files.
+      closeSharedDatabase();
+
+      let movedCurrentToRollback = false;
+      let restoreApplied = false;
       try {
         copyFileSync(parsed.filePath, restoreTempPath);
-        removeSqliteSidecars(dbPath);
-        if (existsSync(dbPath)) {
-          unlinkSync(dbPath);
+        if (!isValidSqliteFile(restoreTempPath)) {
+          throw new Error("Restore failed: copied backup is not a valid SQLite database");
         }
-        renameSync(restoreTempPath, dbPath);
         removeSqliteSidecars(dbPath);
+
+        if (existsSync(dbPath)) {
+          renameSync(dbPath, rollbackPath);
+          movedCurrentToRollback = true;
+        }
+
+        renameSync(restoreTempPath, dbPath);
+        restoreApplied = true;
+        removeSqliteSidecars(dbPath);
+      } catch (error) {
+        if (!restoreApplied && movedCurrentToRollback && existsSync(rollbackPath)) {
+          if (existsSync(dbPath)) {
+            try {
+              unlinkSync(dbPath);
+            } catch {
+              // Best effort cleanup before rollback restore.
+            }
+          }
+          try {
+            renameSync(rollbackPath, dbPath);
+          } catch {
+            // If rollback recovery fails, propagate the original restore error.
+          }
+        }
+        throw error;
       } finally {
         if (existsSync(restoreTempPath)) {
           try {
             unlinkSync(restoreTempPath);
           } catch {
             // Best effort temp cleanup.
+          }
+        }
+        if (restoreApplied && existsSync(rollbackPath)) {
+          try {
+            unlinkSync(rollbackPath);
+          } catch {
+            // Best effort rollback file cleanup.
           }
         }
       }

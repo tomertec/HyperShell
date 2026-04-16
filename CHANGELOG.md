@@ -22,6 +22,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 - **Hardcoded colors in HostsView, PortForwardProfileForm, TransferPopup, StatusBar** — inline styles with hex/rgba values converted to Tailwind theme token classes so they adapt to light/dark mode.
 - **CodeMirror editor respects app theme** — SFTP file editor uses default light theme when app is in light mode, oneDark when dark.
 - **Title bar overlay height reduced to 34px** — prevents the native overlay from covering the separator line at non-100% DPI scaling (e.g. 115%).
+- **SFTP host-key verification fails closed on probe errors** — when the host-key probe fails for non-verification reasons and no previously trusted fingerprints exist, the connection is now blocked instead of proceeding without verification.
+- **Local filesystem rename symlink escape** — `assertPathAllowed` now resolves the parent directory for non-existent targets (e.g. rename destinations), preventing symlinked parents from escaping allowed filesystem roots. The rename handler also uses the sanitized path instead of the raw request path.
+- **Restore Backup command-palette action wired up** — the "Restore Backup" command now performs the full restore flow (file dialog → confirmation → restore → toast feedback) instead of only opening the dialog.
+- **Network monitor runs immediate probe on startup** — `createNetworkMonitor` now probes connectivity immediately instead of assuming online, preventing `SessionManager` from burning reconnect attempts before the first interval probe detects a down network.
+- **Host-key verification extracted and tested** — `verifyHostKey` extracted from SFTP connect handler for direct unit testing. New tests cover probe-failure fail-closed, trusted-fingerprint fallback, new host detection, key-change detection, and matching trusted key. Network monitor tests cover immediate startup probe offline/online transitions. Command-palette tests verify backup restore/create commands invoke their callbacks.
+- **Network-aware reconnect wired in production** — desktop main process now creates `SessionManager` with a real `NetworkMonitor`, enabling `waiting_for_network` behavior and reconnect-on-connectivity-restore outside tests.
+- **Backup creation is now WAL-safe** — database backups no longer copy only the main `.db` file. Backup and auto-backup now use SQLite-consistent online backup semantics (`better-sqlite3` backup API with `VACUUM INTO` fallback) to avoid missing recent committed data in WAL mode.
+- **Backup restore is rollback-safe** — restore flow now performs a safer swap (`current -> rollback`, `restore-temp -> current`) and automatically restores the original database if replacement fails mid-operation, preventing a missing primary DB on error.
+- **Network probe race condition hardened** — `NetworkMonitor` now ignores stale out-of-order probe completions via a monotonic probe token so older async DNS results cannot overwrite newer connectivity state.
+- **Restore Backup UI command hardened** — restore command now catches dialog-stage failures too (not only restore IPC failures) and ignores concurrent restore attempts via an in-flight guard.
 
 ## [0.1.5] - 2026-04-13
 
