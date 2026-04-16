@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/) and this project uses [Semantic Versioning](https://semver.org/).
 
+## [0.1.6] - 2026-04-16
+
+- Merge feat/TF-15: GitHub integration test scaffold finalized.
+
 ## [Unreleased]
 
 ### Added
