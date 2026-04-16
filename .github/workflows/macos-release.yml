@@ -70,6 +70,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" --generate-notes --title "$TAG" || true
           DMG=$(find apps/desktop/release -name '*.dmg' | head -1)
           if [ -z "$DMG" ]; then
             echo "No DMG found, skipping upload"

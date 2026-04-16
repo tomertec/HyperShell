@@ -70,6 +70,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" --generate-notes --title "$TAG" || true
           for FILE in apps/desktop/release/*.{AppImage,deb}; do
             if [ -f "$FILE" ]; then
               echo "Uploading $FILE to release $TAG"
