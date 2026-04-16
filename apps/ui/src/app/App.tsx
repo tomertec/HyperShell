@@ -375,6 +375,7 @@ function MainApp() {
     host: HostRecord;
   } | null>(null);
   const tmuxProbeGenRef = useRef(0);
+  const backupRestoreInFlightRef = useRef(false);
   const [savedRecoverySessions, setSavedRecoverySessions] = useState<SavedSessionRecord[]>([]);
 
   const openTab = useStore(layoutStore, (s) => s.openTab);
@@ -1134,7 +1135,30 @@ function MainApp() {
           if (filePath) void window.hypershell?.backupCreate?.({ filePath });
         })();
       },
-      restoreBackup: () => void window.hypershell?.backupShowOpenDialog?.(),
+      restoreBackup: () => {
+        if (backupRestoreInFlightRef.current) {
+          return;
+        }
+        void (async () => {
+          backupRestoreInFlightRef.current = true;
+          try {
+            const filePath = await window.hypershell?.backupShowOpenDialog?.();
+            if (!filePath) return;
+            const confirmed = window.confirm(
+              "Restoring a backup will replace your current database. The app will need to restart. Continue?"
+            );
+            if (!confirmed) return;
+            const result = await window.hypershell?.backupRestore?.({ filePath });
+            if (result?.requiresRestart) {
+              toast.success("Database restored. Please restart the application.");
+            }
+          } catch (err) {
+            toast.error(`Restore failed: ${err instanceof Error ? err.message : String(err)}`);
+          } finally {
+            backupRestoreInFlightRef.current = false;
+          }
+        })();
+      },
       openKeyManager: () => setSettingsOpen(true),
       reloadWindow: () => window.location.reload(),
       openTunnelManager: () => useTunnelStore.getState().openPanel(),

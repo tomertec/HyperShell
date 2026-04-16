@@ -122,6 +122,61 @@ class HostKeyVerificationError extends Error {
   }
 }
 
+/** @internal Extracted for testability. */
+export interface HostFingerprintLookup {
+  findByHost(hostname: string, port: number): Array<{ fingerprint: string; isTrusted: boolean }>;
+  findByHostAndAlgorithm(hostname: string, port: number, algorithm: string): { id?: string; fingerprint: string; isTrusted: boolean } | undefined;
+  upsert(record: { id?: string; hostname: string; port: number; algorithm: string; fingerprint: string }): void;
+}
+
+/**
+ * Verifies a remote host key against known fingerprints.
+ * Throws on new/changed keys or when probe fails with no trusted fallback.
+ * @internal Exported for testing.
+ */
+export async function verifyHostKey(
+  hostname: string,
+  port: number,
+  fingerprintRepo: HostFingerprintLookup,
+  trustedFingerprints: string[],
+): Promise<void> {
+  try {
+    const { algorithm, fingerprint } = await probeHostKey(hostname, port);
+    const existing = fingerprintRepo.findByHostAndAlgorithm(hostname, port, algorithm);
+
+    if (!existing) {
+      throw new HostKeyVerificationError({
+        hostname, port, algorithm, fingerprint, verificationStatus: "new_host",
+      });
+    } else if (
+      existing.fingerprint.length !== fingerprint.length ||
+      !timingSafeEqual(Buffer.from(existing.fingerprint), Buffer.from(fingerprint))
+    ) {
+      throw new HostKeyVerificationError({
+        hostname, port, algorithm, fingerprint,
+        verificationStatus: "key_changed",
+        previousFingerprint: existing.fingerprint,
+      });
+    } else if (!existing.isTrusted) {
+      throw new HostKeyVerificationError({
+        hostname, port, algorithm, fingerprint, verificationStatus: "new_host",
+      });
+    }
+    // Key matches trusted fingerprint — update last_seen
+    fingerprintRepo.upsert({ id: existing.id, hostname, port, algorithm, fingerprint });
+  } catch (error) {
+    if (error instanceof HostKeyVerificationError) {
+      throw error;
+    }
+    if (trustedFingerprints.length === 0) {
+      throw new Error(
+        `Unable to verify host key for ${hostname}:${port} and no previously trusted fingerprints exist`
+      );
+    }
+    console.warn("[sftp] Host key probe failed, falling back to trusted fingerprints:", (error as Error).message);
+  }
+}
+
 export interface RegisterSftpIpcOptions {
   sessionManager: SessionManager;
   resolveConnectionOptions: (
@@ -268,58 +323,7 @@ export function registerSftpIpc(
       .filter((record) => record.isTrusted)
       .map((record) => record.fingerprint);
 
-    try {
-      const { algorithm, fingerprint } = await probeHostKey(hostname, port);
-      const existing = fingerprintRepo.findByHostAndAlgorithm(hostname, port, algorithm);
-
-      if (!existing) {
-          // First time seeing this host — require user approval
-          throw new HostKeyVerificationError({
-            hostname,
-            port,
-            algorithm,
-            fingerprint,
-            verificationStatus: "new_host",
-          });
-        } else if (
-          existing.fingerprint.length !== fingerprint.length ||
-          !timingSafeEqual(Buffer.from(existing.fingerprint), Buffer.from(fingerprint))
-        ) {
-          // Key has changed — possible MITM attack
-          throw new HostKeyVerificationError({
-            hostname,
-            port,
-            algorithm,
-            fingerprint,
-            verificationStatus: "key_changed",
-            previousFingerprint: existing.fingerprint,
-          });
-        } else if (!existing.isTrusted) {
-          // Key is known but not yet trusted
-          throw new HostKeyVerificationError({
-            hostname,
-            port,
-            algorithm,
-            fingerprint,
-            verificationStatus: "new_host",
-          });
-        }
-        // else: key matches trusted fingerprint — proceed
-        // Update last_seen
-        fingerprintRepo.upsert({
-          id: existing.id,
-          hostname,
-          port,
-          algorithm,
-          fingerprint,
-        });
-      } catch (error) {
-        if (error instanceof HostKeyVerificationError) {
-          throw error;
-        }
-        // If probe fails for network reasons, let the actual connect attempt handle it
-        console.warn("[sftp] Host key probe failed, proceeding with connect:", (error as Error).message);
-    }
+    await verifyHostKey(hostname, port, fingerprintRepo, trustedFingerprints);
 
     ensureBookmarkHost(hostId, connectOptions, hostsRepo);
 

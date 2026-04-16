@@ -25,6 +25,7 @@ export function createNetworkMonitor(
   const onlineListeners = new Set<() => void>();
   const offlineListeners = new Set<() => void>();
   let probeTimer: ReturnType<typeof setInterval> | null = null;
+  let latestProbeId = 0;
 
   function setOnline(value: boolean): void {
     if (value === online) return;
@@ -36,15 +37,19 @@ export function createNetworkMonitor(
   }
 
   async function probe(): Promise<void> {
+    const probeId = ++latestProbeId;
     try {
       await dns.resolve(probeHostname);
+      if (probeId !== latestProbeId) return;
       setOnline(true);
     } catch {
+      if (probeId !== latestProbeId) return;
       setOnline(false);
     }
   }
 
   if (probeIntervalMs > 0) {
+    void probe(); // Immediate probe to avoid optimistic online assumption burning reconnect attempts
     probeTimer = setInterval(probe, probeIntervalMs);
   }
 
@@ -64,6 +69,7 @@ export function createNetworkMonitor(
     },
 
     dispose() {
+      latestProbeId += 1;
       if (probeTimer) {
         clearInterval(probeTimer);
         probeTimer = null;

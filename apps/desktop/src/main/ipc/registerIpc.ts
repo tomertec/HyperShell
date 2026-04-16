@@ -18,8 +18,7 @@ import type {
   SftpConnectRequest,
   WriteSessionRequest
 } from "@hypershell/shared";
-import { createSessionManager } from "@hypershell/session-core";
-import { parseSshConfig } from "@hypershell/session-core";
+import { createNetworkMonitor, createSessionManager, parseSshConfig } from "@hypershell/session-core";
 import {
   registerHostIpc,
   getOrCreateHostsRepo,
@@ -209,12 +208,20 @@ const registeredChannels = [
   ipcChannels.app.setTheme,
 ] as const;
 
-export const sessionManager = createSessionManager();
+const networkMonitor = createNetworkMonitor({
+  probeIntervalMs: process.env.VITEST || process.env.NODE_ENV === "test" ? 0 : 10_000
+});
+export const sessionManager = createSessionManager({ networkMonitor });
 const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;
 let connectionHistoryRepository: ReturnType<typeof createConnectionHistoryRepositoryFromDatabase> | null = null;
 let hostEnvVarRepository: ReturnType<typeof createHostEnvVarRepositoryFromDatabase> | null = null;
 let hostFingerprintRepository: ReturnType<typeof createHostFingerprintRepositoryFromDatabase> | null = null;
+
+export function disposeSessionRuntime(): void {
+  sessionManager.destroyAll();
+  networkMonitor.dispose();
+}
 
 function getSessionRecorder(): SessionRecordingManager {
   if (!sessionRecorder) {
