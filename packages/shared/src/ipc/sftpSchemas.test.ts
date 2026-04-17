@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  fsDialogPathResponseSchema,
   fsListRequestSchema,
+  fsShowOpenDialogRequestSchema,
+  fsShowSaveDialogRequestSchema,
   sftpChmodRequestSchema,
   sftpConnectRequestSchema,
   sftpDragOutRequestSchema,
@@ -83,6 +86,28 @@ describe("SFTP schemas", () => {
   it("validates fs list request", () => {
     const result = fsListRequestSchema.safeParse({ path: "C:\\Users" });
     expect(result.success).toBe(true);
+  });
+
+  it("validates fs show-save-dialog request", () => {
+    const result = fsShowSaveDialogRequestSchema.safeParse({
+      defaultPath: "C:\\Users\\test\\file.txt",
+      filters: [{ name: "Text", extensions: ["txt"] }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates fs show-open-dialog request", () => {
+    const result = fsShowOpenDialogRequestSchema.safeParse({
+      title: "Open backup",
+      defaultPath: "C:\\Users\\test",
+      filters: [{ name: "DB", extensions: ["db"] }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("validates fs dialog path responses", () => {
+    expect(fsDialogPathResponseSchema.safeParse("C:\\Users\\test\\file.txt").success).toBe(true);
+    expect(fsDialogPathResponseSchema.safeParse(null).success).toBe(true);
   });
 });
 

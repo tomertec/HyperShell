@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import os from "node:os";
+import path from "node:path";
 
 import { buildScpCommand } from "./scpCommand";
 
@@ -85,7 +87,7 @@ describe("buildScpCommand", () => {
     expect(result.args[jIndex + 1]).toBe("bastion.example.com");
   });
 
-  it("always includes BatchMode=yes and StrictHostKeyChecking=no", () => {
+  it("always includes BatchMode=yes and StrictHostKeyChecking=accept-new", () => {
     const result = buildScpCommand({
       hostname: "any.host",
       direction: "upload",
@@ -97,12 +99,39 @@ describe("buildScpCommand", () => {
     const args = result.args;
     let foundBatchMode = false;
     let foundStrictHostKey = false;
+    let foundKnownHostsFile = false;
     for (let i = 0; i < args.length - 1; i++) {
       if (args[i] === "-o" && args[i + 1] === "BatchMode=yes") foundBatchMode = true;
-      if (args[i] === "-o" && args[i + 1] === "StrictHostKeyChecking=no") foundStrictHostKey = true;
+      if (args[i] === "-o" && args[i + 1] === "StrictHostKeyChecking=accept-new") foundStrictHostKey = true;
+      if (args[i] === "-o" && args[i + 1].startsWith("UserKnownHostsFile=")) foundKnownHostsFile = true;
     }
     expect(foundBatchMode).toBe(true);
     expect(foundStrictHostKey).toBe(true);
+    expect(foundKnownHostsFile).toBe(true);
+  });
+
+  it("uses default known_hosts path when no override is provided", () => {
+    const result = buildScpCommand({
+      hostname: "known.host",
+      direction: "download",
+      remotePath: "/tmp/x",
+      localPath: "/tmp/x"
+    });
+
+    const expected = `UserKnownHostsFile=${path.join(os.homedir(), ".ssh", "known_hosts")}`;
+    expect(result.args).toContain(expected);
+  });
+
+  it("uses custom known_hosts file when provided", () => {
+    const result = buildScpCommand({
+      hostname: "known.host",
+      knownHostsFile: "/tmp/custom_known_hosts",
+      direction: "download",
+      remotePath: "/tmp/x",
+      localPath: "/tmp/x"
+    });
+
+    expect(result.args).toContain("UserKnownHostsFile=/tmp/custom_known_hosts");
   });
 
   it("throws on invalid proxyJump format", () => {

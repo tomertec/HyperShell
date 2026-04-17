@@ -233,6 +233,28 @@ export const fsRenameRequestSchema = z.object({
 });
 export type FsRenameRequest = z.infer<typeof fsRenameRequestSchema>;
 
+export const fsDialogFilterSchema = z.object({
+  name: z.string(),
+  extensions: z.array(z.string()),
+});
+export type FsDialogFilter = z.infer<typeof fsDialogFilterSchema>;
+
+export const fsShowSaveDialogRequestSchema = z.object({
+  defaultPath: z.string().optional(),
+  filters: z.array(fsDialogFilterSchema).optional(),
+}).optional();
+export type FsShowSaveDialogRequest = z.infer<typeof fsShowSaveDialogRequestSchema>;
+
+export const fsShowOpenDialogRequestSchema = z.object({
+  title: z.string().optional(),
+  defaultPath: z.string().optional(),
+  filters: z.array(fsDialogFilterSchema).optional(),
+}).optional();
+export type FsShowOpenDialogRequest = z.infer<typeof fsShowOpenDialogRequestSchema>;
+
+export const fsDialogPathResponseSchema = z.string().nullable();
+export type FsDialogPathResponse = z.infer<typeof fsDialogPathResponseSchema>;
+
 export const sftpBookmarkSchema = z.object({
   id: z.string(),
   hostId: z.string(),

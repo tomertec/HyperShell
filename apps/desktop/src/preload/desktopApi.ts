@@ -11,6 +11,9 @@ import {
   fsListResponseSchema,
   fsPathRequestSchema,
   fsRenameRequestSchema,
+  fsShowSaveDialogRequestSchema,
+  fsShowOpenDialogRequestSchema,
+  fsDialogPathResponseSchema,
   closeSessionRequestSchema,
   savedSessionRecordSchema,
   ipcChannels,
@@ -1064,12 +1067,14 @@ export function createDesktopApi(
       return fsListSshKeysResponseSchema.parse(result);
     },
     async fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
-      const result = await ipcRenderer.invoke(ipcChannels.fs.showSaveDialog, options);
-      return result as string | null;
+      const parsed = fsShowSaveDialogRequestSchema.parse(options);
+      const result = await ipcRenderer.invoke(ipcChannels.fs.showSaveDialog, parsed);
+      return fsDialogPathResponseSchema.parse(result);
     },
     async fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
-      const result = await ipcRenderer.invoke(ipcChannels.fs.showOpenDialog, options);
-      return result as string | null;
+      const parsed = fsShowOpenDialogRequestSchema.parse(options);
+      const result = await ipcRenderer.invoke(ipcChannels.fs.showOpenDialog, parsed);
+      return fsDialogPathResponseSchema.parse(result);
     },
     async fsOpenItem(request: { path: string }): Promise<void> {
       const parsed = fsPathRequestSchema.parse(request);

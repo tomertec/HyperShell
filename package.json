@@ -21,7 +21,7 @@
     "release:manifest": "pnpm --filter @hypershell/desktop run release:manifest",
     "release:prepare": "node .tools/release/prepare-version-and-changelog.mjs",
     "rebuild:sqlite": "pnpm rebuild better-sqlite3",
-    "rebuild:sqlite:electron": "cd node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3 && npx node-gyp rebuild --target=34.5.8 --arch=x64 --dist-url=https://electronjs.org/headers"
+    "rebuild:sqlite:electron": "pnpm --filter @hypershell/desktop run rebuild:native"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

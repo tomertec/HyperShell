@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 - **SSH2 connection pool wired into runtime** — SFTP sessions now receive a shared main-process connection pool instance, and `connectionPool:stats` returns live pool metrics instead of a placeholder response.
 - **Desktop DB bootstrap now uses shared migration runner** — main-process host DB initialization now delegates to `@hypershell/db` `openDatabase(...)`, reducing duplicate bootstrap logic and centralizing schema setup behavior.
 - **Migration error handling tightened** — idempotent migration steps now ignore only known duplicate/already-exists cases and rethrow unexpected SQL errors.
+- **Electron renderer sandbox enabled for main/editor windows** — both BrowserWindow instances now set `webPreferences.sandbox = true` for stronger process isolation.
+- **`rebuild:sqlite:electron` script made version-agnostic** — replaced hardcoded pnpm store path with the desktop workspace native rebuild command.
 
 ### Fixed
 
@@ -43,6 +45,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 - **Backup restore is rollback-safe** — restore flow now performs a safer swap (`current -> rollback`, `restore-temp -> current`) and automatically restores the original database if replacement fails mid-operation, preventing a missing primary DB on error.
 - **Network probe race condition hardened** — `NetworkMonitor` now ignores stale out-of-order probe completions via a monotonic probe token so older async DNS results cannot overwrite newer connectivity state.
 - **Restore Backup UI command hardened** — restore command now catches dialog-stage failures too (not only restore IPC failures) and ignores concurrent restore attempts via an in-flight guard.
+- **SCP host-key verification no longer bypassed** — native `scp` transfers now use a real known-hosts file with `StrictHostKeyChecking=accept-new` instead of disabling verification (`StrictHostKeyChecking=no`, `/dev/null`).
+- **Filesystem dialog IPC now fully schema-validated** — `fsShowSaveDialog` and `fsShowOpenDialog` requests/responses are validated via shared Zod schemas in both preload and main process.
 
 ## [0.1.5] - 2026-04-13
 

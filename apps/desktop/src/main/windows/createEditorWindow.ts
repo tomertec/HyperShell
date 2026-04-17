@@ -28,6 +28,7 @@ export function createEditorWindow(options: CreateEditorWindowOptions): BrowserW
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
 

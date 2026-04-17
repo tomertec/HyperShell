@@ -1,4 +1,11 @@
-import { ipcChannels, fsListRequestSchema, fsPathRequestSchema, fsRenameRequestSchema } from "@hypershell/shared";
+import {
+  ipcChannels,
+  fsListRequestSchema,
+  fsPathRequestSchema,
+  fsRenameRequestSchema,
+  fsShowSaveDialogRequestSchema,
+  fsShowOpenDialogRequestSchema
+} from "@hypershell/shared";
 import type { FsEntry } from "@hypershell/shared";
 import { dialog, shell } from "electron";
 import type { IpcMainInvokeEvent } from "electron";
@@ -268,27 +275,20 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
   });
 
   ipcMain.handle(ipcChannels.fs.showSaveDialog, async (_event: IpcMainInvokeEvent, request: unknown) => {
-    const { defaultPath, filters } = (request ?? {}) as {
-      defaultPath?: string;
-      filters?: Array<{ name: string; extensions: string[] }>;
-    };
+    const parsed = fsShowSaveDialogRequestSchema.parse(request);
     const result = await dialog.showSaveDialog({
-      defaultPath,
-      filters,
+      defaultPath: parsed?.defaultPath,
+      filters: parsed?.filters,
     });
-    return result.canceled ? null : result.filePath;
+    return result.canceled ? null : result.filePath ?? null;
   });
 
   ipcMain.handle(ipcChannels.fs.showOpenDialog, async (_event: IpcMainInvokeEvent, request: unknown) => {
-    const { title, defaultPath, filters } = (request ?? {}) as {
-      title?: string;
-      defaultPath?: string;
-      filters?: Array<{ name: string; extensions: string[] }>;
-    };
+    const parsed = fsShowOpenDialogRequestSchema.parse(request);
     const result = await dialog.showOpenDialog({
-      title,
-      defaultPath,
-      filters,
+      title: parsed?.title,
+      defaultPath: parsed?.defaultPath,
+      filters: parsed?.filters,
       properties: ["openFile"],
     });
     return result.canceled ? null : result.filePaths[0] ?? null;

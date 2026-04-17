@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 export interface ScpCommandOptions {
@@ -6,6 +7,7 @@ export interface ScpCommandOptions {
   port?: number;
   username?: string;
   privateKeyPath?: string;
+  knownHostsFile?: string;
   proxyJump?: string;
   direction: "upload" | "download";
   remotePath: string;
@@ -30,12 +32,12 @@ export function buildScpCommand(options: ScpCommandOptions): ScpCommand {
   }
 
   const args: string[] = [];
+  const knownHostsFile = options.knownHostsFile ?? path.join(os.homedir(), ".ssh", "known_hosts");
 
   // Prevent interactive prompts — fail fast on auth issues
   args.push("-o", "BatchMode=yes");
-  // Host key already verified by ssh2 during SFTP connect
-  args.push("-o", "StrictHostKeyChecking=no");
-  args.push("-o", "UserKnownHostsFile=/dev/null");
+  args.push("-o", "StrictHostKeyChecking=accept-new");
+  args.push("-o", `UserKnownHostsFile=${knownHostsFile}`);
 
   if (options.port != null) {
     args.push("-P", String(options.port)); // SCP uses uppercase -P (not -p like ssh)
