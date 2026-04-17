@@ -1,4 +1,4 @@
-import { createHostsRepositoryFromDatabase } from "@hypershell/db";
+import { createHostsRepositoryFromDatabase, openDatabase } from "@hypershell/db";
 import type { HostInput, HostRecord } from "@hypershell/db";
 import {
   ipcChannels,
@@ -19,17 +19,6 @@ import {
   readFileSync,
   writeFileSync
 } from "node:fs";
-import initSchemaSql from "@hypershell/db/src/migrations/001_init.sql";
-import sftpBookmarksSql from "@hypershell/db/src/migrations/002_sftp_bookmarks.sql";
-import hostAuthFieldsSql from "@hypershell/db/src/migrations/003_host_auth_fields.sql";
-import advancedSshSql from "@hypershell/db/src/migrations/006_advanced_ssh.sql";
-import hostFingerprintsSql from "@hypershell/db/src/migrations/007_host_fingerprints.sql";
-import sessionRecordingsSql from "@hypershell/db/src/migrations/008_session_recordings.sql";
-import connectionHistorySql from "@hypershell/db/src/migrations/009_connection_history.sql";
-import savedSessionsSql from "@hypershell/db/src/migrations/010_saved_sessions.sql";
-import hostProfilesSql from "@hypershell/db/src/migrations/011_host_profiles.sql";
-import hostEnvVarsSql from "@hypershell/db/src/migrations/012_host_env_vars.sql";
-import tagsColorSql from "@hypershell/db/src/migrations/013_tags_color.sql";
 import {
   protectSecretStrict,
   revealSecretStrict,
@@ -207,122 +196,9 @@ function attachPasswordMetadata(host: HostRecord): HostRecord & {
 export function getOrCreateDatabase(): unknown {
   if (!sharedDb) {
     try {
-      const Database = require("better-sqlite3");
       const dbPath = resolveDatabasePath();
       console.log("[hypershell] Opening database at:", dbPath);
-      const db = new Database(dbPath);
-      db.pragma("journal_mode = WAL");
-      db.pragma("synchronous = NORMAL");
-      db.pragma("busy_timeout = 5000");
-      db.pragma("cache_size = -8000");
-      db.pragma("temp_store = MEMORY");
-      db.pragma("foreign_keys = ON");
-      db.exec(initSchemaSql);
-      db.exec(sftpBookmarksSql);
-      // Migration 003: add identity_file and auth fields to hosts table.
-      try { db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT"); } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("already exists") || msg.includes("duplicate column")) {
-          console.info("[hypershell] Migration 003 (identity_file): column already exists");
-        } else {
-          console.error("[hypershell] Migration 003 (identity_file) failed:", msg);
-        }
-      }
-      for (const statement of hostAuthFieldsSql.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
-        try { db.exec(statement); } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info("[hypershell] Migration 003 (auth fields): column already exists");
-          } else {
-            console.error("[hypershell] Migration 003 (auth fields) failed:", msg);
-          }
-        }
-      }
-      // Migration 004: add is_favorite column
-      try { db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0"); } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("already exists") || msg.includes("duplicate column")) {
-          console.info("[hypershell] Migration 004 (is_favorite): column already exists");
-        } else {
-          console.error("[hypershell] Migration 004 (is_favorite) failed:", msg);
-        }
-      }
-      // Migration 005: add sort_order and color columns
-      for (const stmt of [
-        "ALTER TABLE hosts ADD COLUMN sort_order INTEGER",
-        "ALTER TABLE host_groups ADD COLUMN sort_order INTEGER",
-        "ALTER TABLE hosts ADD COLUMN color TEXT"
-      ]) {
-        try { db.exec(stmt); } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info(`[hypershell] Migration 005: column already exists`);
-          } else {
-            console.error(`[hypershell] Migration 005 failed:`, msg);
-          }
-        }
-      }
-      // Migration 006: advanced SSH fields + host_port_forwards table
-      for (const stmt of advancedSshSql.split(";").map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
-        try { db.exec(stmt); } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info("[hypershell] Migration 006: column/table already exists");
-          } else {
-            console.error("[hypershell] Migration 006 failed:", msg);
-          }
-        }
-      }
-      // Migration 007: host fingerprints table
-      db.exec(hostFingerprintsSql);
-      // Migration 008: session recordings table
-      db.exec(sessionRecordingsSql);
-      // Migration 009: connection history table
-      db.exec(connectionHistorySql);
-      // Migration 010: saved session recovery table
-      db.exec(savedSessionsSql);
-      // Migration 011: host profiles + host_profile_id on hosts
-      for (const statement of hostProfilesSql
-        .split(";")
-        .map((s: string) => s.trim())
-        .filter((s: string) => s.length > 0)) {
-        try { db.exec(statement); } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          if (msg.includes("already exists") || msg.includes("duplicate column")) {
-            console.info("[hypershell] Migration 011: table/column already exists");
-          } else {
-            console.error("[hypershell] Migration 011 failed:", msg);
-          }
-        }
-      }
-      // Migration 012: host environment variables table
-      db.exec(hostEnvVarsSql);
-
-      // Migration 013: add color column for tags
-      try {
-        db.exec(tagsColorSql);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("already exists") || msg.includes("duplicate column")) {
-          console.info("[hypershell] Migration 013 (tags.color): column already exists");
-        } else {
-          console.error("[hypershell] Migration 013 (tags.color) failed:", msg);
-        }
-      }
-
-      // Migration 014: tmux detection toggle per host
-      try {
-        db.exec("ALTER TABLE hosts ADD COLUMN tmux_detect INTEGER NOT NULL DEFAULT 0");
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("already exists") || msg.includes("duplicate column")) {
-          console.info("[hypershell] Migration 014 (tmux_detect): column already exists");
-        } else {
-          console.error("[hypershell] Migration 014 (tmux_detect) failed:", msg);
-        }
-      }
-
-      sharedDb = db;
+      sharedDb = openDatabase(dbPath);
       console.log("[hypershell] Database initialized successfully");
     } catch (err) {
       console.error("[hypershell] Failed to initialize SQLite:", err);
@@ -618,7 +494,8 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
     const requestedAuthMethod = parsed.authMethod ?? "default";
     let nextAuthProfileId = existing?.authProfileId ?? null;
 
-    const trimmedPassword = parsed.password?.trim() ?? "";
+    const password = parsed.password ?? "";
+    const hasPasswordForSave = password.trim().length > 0;
     const savePassword = Boolean(parsed.savePassword);
     const clearSavedPassword = Boolean(parsed.clearSavedPassword);
 
@@ -629,7 +506,7 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       }
 
       if (savePassword) {
-        if (!trimmedPassword) {
+        if (!hasPasswordForSave) {
           throw new Error("Password is required when 'Save password' is enabled.");
         }
         try {
@@ -637,7 +514,7 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
             hostId: parsed.id,
             hostName: parsed.name,
             username: parsed.username ?? null,
-            password: trimmedPassword,
+            password,
             existingAuthProfileId: nextAuthProfileId
           });
         } catch (error) {

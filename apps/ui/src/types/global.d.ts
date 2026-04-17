@@ -31,6 +31,7 @@ import type {
   FsGetDrivesResponse,
   FsListRequest,
   FsListResponse,
+  FsPathRequest,
   GetSettingRequest,
   HostRecord,
   HostStatusTargetsRequest,
@@ -205,7 +206,7 @@ declare global {
       sftpBookmarksRemove?: (request: SftpBookmarkRemoveRequest) => Promise<void>;
       sftpBookmarksReorder?: (request: SftpBookmarkReorderRequest) => Promise<void>;
       fsList?: (request: FsListRequest) => Promise<FsListResponse>;
-      fsStat?: (request: FsListRequest) => Promise<FsEntry>;
+      fsStat?: (request: FsPathRequest) => Promise<FsEntry>;
       fsGetHome?: () => Promise<{ path: string }>;
       fsGetDrives?: () => Promise<FsGetDrivesResponse>;
       fsListSshKeys?: () => Promise<string[]>;

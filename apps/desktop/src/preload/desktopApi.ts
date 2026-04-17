@@ -95,6 +95,7 @@ import {
   type FsGetDrivesResponse,
   type FsListRequest,
   type FsListResponse,
+  type FsPathRequest,
   type HostRecord,
   type OpenSessionRequest,
   type OpenSessionResponse,
@@ -375,7 +376,7 @@ export interface DesktopApi {
   sftpBookmarksRemove(request: SftpBookmarkRemoveRequest): Promise<void>;
   sftpBookmarksReorder(request: SftpBookmarkReorderRequest): Promise<void>;
   fsList(request: FsListRequest): Promise<FsListResponse>;
-  fsStat(request: FsListRequest): Promise<FsEntry>;
+  fsStat(request: FsPathRequest): Promise<FsEntry>;
   fsGetHome(): Promise<{ path: string }>;
   fsGetDrives(): Promise<FsGetDrivesResponse>;
   fsListSshKeys(): Promise<string[]>;
@@ -1045,8 +1046,8 @@ export function createDesktopApi(
       const result = await ipcRenderer.invoke(ipcChannels.fs.list, parsed);
       return fsListResponseSchema.parse(result);
     },
-    async fsStat(request: FsListRequest): Promise<FsEntry> {
-      const parsed = fsListRequestSchema.parse(request);
+    async fsStat(request: FsPathRequest): Promise<FsEntry> {
+      const parsed = fsPathRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.fs.stat, parsed);
       return fsEntrySchema.parse(result);
     },

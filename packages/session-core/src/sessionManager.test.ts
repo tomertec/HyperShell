@@ -307,7 +307,7 @@ describe("sessionManager", () => {
     });
   });
 
-  it("resets reconnect attempts after a successful reconnect", () => {
+  it("resets reconnect attempts only after a stable reconnect window", () => {
     vi.useFakeTimers();
 
     const listeners: Array<((event: SessionTransportEvent) => void) | null> = [];
@@ -349,7 +349,64 @@ describe("sessionManager", () => {
     expect(transportCount).toBe(2);
 
     listeners[1]?.({ type: "status", sessionId: "s-reset-1", state: "connected" });
+    expect(manager.getSession("s-reset-1")?.reconnectAttempts).toBe(1);
+
+    vi.advanceTimersByTime(4_999);
+    expect(manager.getSession("s-reset-1")?.reconnectAttempts).toBe(1);
+
+    vi.advanceTimersByTime(1);
     expect(manager.getSession("s-reset-1")?.reconnectAttempts).toBe(0);
+
+    vi.useRealTimers();
+  });
+
+  it("keeps reconnect attempts when session exits before stability window", () => {
+    vi.useFakeTimers();
+
+    const listeners: Array<((event: SessionTransportEvent) => void) | null> = [];
+    let transportCount = 0;
+
+    const manager = createSessionManager({
+      sessionIdFactory: () => "s-reset-2",
+      createTransport() {
+        const transportIndex = transportCount;
+        transportCount += 1;
+        return {
+          write() {},
+          resize() {},
+          close() {},
+          onEvent(listener) {
+            listeners[transportIndex] = listener;
+            return () => {
+              listeners[transportIndex] = null;
+            };
+          }
+        };
+      }
+    });
+
+    manager.open({
+      transport: "ssh",
+      profileId: "host-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true,
+      maxReconnectAttempts: 3,
+      reconnectBaseInterval: 1
+    });
+
+    listeners[0]?.({ type: "exit", sessionId: "s-reset-2", exitCode: 1 });
+    expect(manager.getSession("s-reset-2")?.reconnectAttempts).toBe(1);
+
+    vi.advanceTimersByTime(1_000);
+    expect(transportCount).toBe(2);
+
+    listeners[1]?.({ type: "status", sessionId: "s-reset-2", state: "connected" });
+    listeners[1]?.({ type: "exit", sessionId: "s-reset-2", exitCode: 1 });
+    expect(manager.getSession("s-reset-2")?.reconnectAttempts).toBe(2);
+
+    vi.advanceTimersByTime(5_000);
+    expect(manager.getSession("s-reset-2")?.reconnectAttempts).toBe(2);
 
     vi.useRealTimers();
   });

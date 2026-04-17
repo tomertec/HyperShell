@@ -77,8 +77,11 @@ interface ManagedSession {
   unsubscribe: () => void;
   input: OpenSessionInput;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
+  reconnectStabilityTimer: ReturnType<typeof setTimeout> | null;
   networkOnlineUnsub: (() => void) | null;
 }
+
+const RECONNECT_STABILITY_WINDOW_MS = 5_000;
 
 function createNoopTransport(sessionId: string): TransportHandle {
   const listeners = new Set<(event: SessionTransportEvent) => void>();
@@ -170,13 +173,43 @@ export function createSessionManager(
     updater(session);
   }
 
+  function clearReconnectTimer(session: ManagedSession): void {
+    if (session.reconnectTimer === null) {
+      return;
+    }
+
+    clearTimeout(session.reconnectTimer);
+    session.reconnectTimer = null;
+  }
+
+  function clearReconnectStabilityTimer(session: ManagedSession): void {
+    if (session.reconnectStabilityTimer === null) {
+      return;
+    }
+
+    clearTimeout(session.reconnectStabilityTimer);
+    session.reconnectStabilityTimer = null;
+  }
+
   function handleEvent(sessionId: string, event: SessionTransportEvent): void {
     if (event.type === "status") {
       updateSession(sessionId, (session) => {
         session.snapshot.state = event.state;
         if (event.state === "connected") {
-          session.snapshot.reconnectAttempts = 0;
+          clearReconnectStabilityTimer(session);
+          session.reconnectStabilityTimer = setTimeout(() => {
+            const current = sessions.get(sessionId);
+            if (!current || current.snapshot.state !== "connected") {
+              return;
+            }
+
+            current.snapshot.reconnectAttempts = 0;
+            current.reconnectStabilityTimer = null;
+          }, RECONNECT_STABILITY_WINDOW_MS);
+          return;
         }
+
+        clearReconnectStabilityTimer(session);
       });
     }
 
@@ -193,6 +226,7 @@ export function createSessionManager(
     if (event.type === "exit") {
       const session = sessions.get(sessionId);
       if (session) {
+        clearReconnectStabilityTimer(session);
         const { snapshot, input } = session;
         const maxAttempts = input.maxReconnectAttempts ?? 5;
 
@@ -254,6 +288,8 @@ export function createSessionManager(
     const current = sessions.get(sessionId);
     if (!current) return;
 
+    clearReconnectStabilityTimer(current);
+
     const { input } = current;
     const newTransport = createTransport({
       sessionId,
@@ -312,6 +348,7 @@ export function createSessionManager(
         unsubscribe,
         input,
         reconnectTimer: null,
+        reconnectStabilityTimer: null,
         networkOnlineUnsub: null
       });
 
@@ -342,10 +379,8 @@ export function createSessionManager(
         return;
       }
 
-      if (session.reconnectTimer !== null) {
-        clearTimeout(session.reconnectTimer);
-        session.reconnectTimer = null;
-      }
+      clearReconnectTimer(session);
+      clearReconnectStabilityTimer(session);
       if (session.networkOnlineUnsub) {
         session.networkOnlineUnsub();
         session.networkOnlineUnsub = null;
@@ -360,10 +395,8 @@ export function createSessionManager(
 
     destroyAll(): void {
       for (const [sessionId, session] of sessions) {
-        if (session.reconnectTimer !== null) {
-          clearTimeout(session.reconnectTimer);
-          session.reconnectTimer = null;
-        }
+        clearReconnectTimer(session);
+        clearReconnectStabilityTimer(session);
         if (session.networkOnlineUnsub) {
           session.networkOnlineUnsub();
           session.networkOnlineUnsub = null;

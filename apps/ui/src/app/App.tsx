@@ -231,6 +231,8 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
     const savePassword = authMethod === "password" && host.savePassword;
     const clearSavedPassword =
       authMethod !== "password" || host.clearSavedPassword;
+    const password = host.password ?? "";
+    const hasPasswordForSave = password.trim().length > 0;
 
     const result = await window.hypershell.upsertHost({
       id: host.id,
@@ -258,8 +260,8 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
       tmuxDetect,
       savePassword,
       clearSavedPassword,
-      ...(savePassword && (host.password ?? "").trim()
-        ? { password: (host.password ?? "").trim() }
+      ...(savePassword && hasPasswordForSave
+        ? { password }
         : {})
     });
     return mapDbHostToUiHost(result as unknown as Record<string, unknown>);

@@ -3,6 +3,12 @@ import { readFileSync } from "node:fs";
 
 export type SqliteDatabase = InstanceType<typeof Database>;
 
+function isIgnorableMigrationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return normalized.includes("already exists") || normalized.includes("duplicate column");
+}
+
 export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
   const initSchemaSql = readFileSync(
     new URL("./migrations/001_init.sql", import.meta.url),
@@ -59,8 +65,10 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
   // already exists, which is expected on databases that ran a prior version.
   try {
     db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT");
-  } catch {
-    // Column already exists — safe to ignore.
+  } catch (error) {
+    if (!isIgnorableMigrationError(error)) {
+      throw error;
+    }
   }
   for (const statement of hostAuthFieldsSql
     .split(";")
@@ -68,16 +76,20 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     .filter((s) => s.length > 0)) {
     try {
       db.exec(statement);
-    } catch {
-      // Column already exists — safe to ignore.
+    } catch (error) {
+      if (!isIgnorableMigrationError(error)) {
+        throw error;
+      }
     }
   }
 
   // Migration 004: add is_favorite column to hosts table.
   try {
     db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0");
-  } catch {
-    // Column already exists — safe to ignore.
+  } catch (error) {
+    if (!isIgnorableMigrationError(error)) {
+      throw error;
+    }
   }
 
   // Migration 005: sort_order and color
@@ -86,12 +98,24 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     "ALTER TABLE host_groups ADD COLUMN sort_order INTEGER",
     "ALTER TABLE hosts ADD COLUMN color TEXT"
   ]) {
-    try { db.exec(stmt); } catch {}
+    try {
+      db.exec(stmt);
+    } catch (error) {
+      if (!isIgnorableMigrationError(error)) {
+        throw error;
+      }
+    }
   }
 
   // Migration 006: advanced SSH fields + host_port_forwards table
   for (const statement of advancedSshSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0)) {
-    try { db.exec(statement); } catch {}
+    try {
+      db.exec(statement);
+    } catch (error) {
+      if (!isIgnorableMigrationError(error)) {
+        throw error;
+      }
+    }
   }
 
   // Migration 007: host fingerprints table
@@ -117,8 +141,10 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     .filter((s) => s.length > 0)) {
     try {
       db.exec(statement);
-    } catch {
-      // Table/column already exists — safe to ignore.
+    } catch (error) {
+      if (!isIgnorableMigrationError(error)) {
+        throw error;
+      }
     }
   }
 
@@ -128,15 +154,19 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
   // Migration 012b: add color to tags (Task 2.10)
   try {
     db.exec("ALTER TABLE tags ADD COLUMN color TEXT");
-  } catch {
-    // Column already exists — safe to ignore.
+  } catch (error) {
+    if (!isIgnorableMigrationError(error)) {
+      throw error;
+    }
   }
 
   // Migration 014: tmux detection toggle per host
   try {
     db.exec("ALTER TABLE hosts ADD COLUMN tmux_detect INTEGER NOT NULL DEFAULT 0");
-  } catch {
-    // Column already exists — safe to ignore.
+  } catch (error) {
+    if (!isIgnorableMigrationError(error)) {
+      throw error;
+    }
   }
 
   return db;

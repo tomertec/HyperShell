@@ -46,10 +46,15 @@ import {
   type SftpWriteFileRequest,
   type KeyboardInteractiveRequest,
 } from "@hypershell/shared";
-import type { SessionManager, SftpConnectionOptions, KeyboardInteractiveCallback } from "@hypershell/session-core";
+import type {
+  SessionManager,
+  SftpConnectionOptions,
+  KeyboardInteractiveCallback,
+  Ssh2ConnectionPool,
+} from "@hypershell/session-core";
 import { createSyncEngine, probeHostKey, buildScpCommand } from "@hypershell/session-core";
 import { execFile } from "node:child_process";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { IpcMainInvokeEvent } from "electron";
 
 import type { IpcMainLike } from "./registerIpc";
@@ -192,6 +197,7 @@ export interface RegisterSftpIpcOptions {
   emitSyncEvent?: (event: SftpSyncEvent) => void;
   emitKeyboardInteractive?: (request: KeyboardInteractiveRequest) => void;
   db?: ReturnType<typeof openDatabase>;
+  connectionPool?: Ssh2ConnectionPool;
 }
 
 // Singletons created inside registerSftpIpc to avoid import-time side effects.
@@ -250,6 +256,13 @@ function normalizeTransferStatus(status: string): "queued" | "active" | "paused"
   }
 
   return "active";
+}
+
+function createDragOutTempFileName(fileName: string, cacheKey: string): string {
+  const extension = path.extname(fileName);
+  const stem = extension.length > 0 ? fileName.slice(0, -extension.length) : fileName;
+  const suffix = createHash("sha256").update(cacheKey).digest("hex").slice(0, 12);
+  return `${stem}-${suffix}${extension}`;
 }
 
 export function registerSftpIpc(
@@ -330,6 +343,7 @@ export function registerSftpIpc(
     const sftpSessionId = await sftpSessionManager.connect(hostId, connectOptions, {
       onKeyboardInteractive: createKeyboardInteractiveCallback(),
       trustedHostFingerprints: trustedFingerprints,
+      pool: options.connectionPool,
     });
     options.onConnected?.({
       sftpSessionId,
@@ -526,7 +540,9 @@ export function registerSftpIpc(
 
       const tempDir = path.join(app.getPath("temp"), "hypershell-drag");
       fs.mkdirSync(tempDir, { recursive: true });
-      tempPath = resolveSafeDragOutPath(tempDir, request.fileName);
+      const safeOriginalPath = resolveSafeDragOutPath(tempDir, request.fileName);
+      const uniqueFileName = createDragOutTempFileName(path.basename(safeOriginalPath), cacheKey);
+      tempPath = resolveSafeDragOutPath(tempDir, uniqueFileName);
 
       const connOpts = session.connectionOptions;
       const keyPath = connOpts.privateKeyPath ?? connOpts.fallbackKeyPaths?.[0];

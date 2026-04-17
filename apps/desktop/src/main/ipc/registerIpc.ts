@@ -18,7 +18,12 @@ import type {
   SftpConnectRequest,
   WriteSessionRequest
 } from "@hypershell/shared";
-import { createNetworkMonitor, createSessionManager, parseSshConfig } from "@hypershell/session-core";
+import {
+  createNetworkMonitor,
+  createSessionManager,
+  createSsh2ConnectionPool,
+  parseSshConfig,
+} from "@hypershell/session-core";
 import {
   registerHostIpc,
   getOrCreateHostsRepo,
@@ -212,6 +217,7 @@ const networkMonitor = createNetworkMonitor({
   probeIntervalMs: process.env.VITEST || process.env.NODE_ENV === "test" ? 0 : 10_000
 });
 export const sessionManager = createSessionManager({ networkMonitor });
+const ssh2ConnectionPool = createSsh2ConnectionPool();
 const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;
 let connectionHistoryRepository: ReturnType<typeof createConnectionHistoryRepositoryFromDatabase> | null = null;
@@ -220,6 +226,7 @@ let hostFingerprintRepository: ReturnType<typeof createHostFingerprintRepository
 
 export function disposeSessionRuntime(): void {
   sessionManager.destroyAll();
+  ssh2ConnectionPool.destroyAll();
   networkMonitor.dispose();
 }
 
@@ -1419,6 +1426,7 @@ export function registerIpc(
   const cleanupSftp = registerSftpIpc(ipcMain, {
     db: getDb() as SqliteDatabase,
     sessionManager: manager,
+    connectionPool: ssh2ConnectionPool,
     resolveConnectionOptions: (hostId, request) =>
       resolveSftpConnectionOptions(hostId, options, request),
     onConnected: ({ connectionOptions }) => {
@@ -1479,8 +1487,7 @@ export function registerIpc(
   });
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
-    // Pool stats will be wired up when the pool is created
-    return [];
+    return ssh2ConnectionPool.getStats();
   });
 
   const cleanupFs = registerFsIpc(ipcMain);
@@ -1496,6 +1503,7 @@ export function registerIpc(
     sessionErrorMessages.clear();
     recordedFailedAttemptSessions.clear();
     cleanupSftp();
+    ssh2ConnectionPool.destroyAll();
     cleanupFs();
     unregisterEditor();
     for (const channel of registeredChannels) {

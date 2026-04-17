@@ -20,12 +20,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 - **Host tag colors use CSS variables** — `.host-color-*` and `.color-swatch-*` classes now reference `--host-*` variables instead of hardcoded hex, enabling per-theme overrides.
 - **StatusBar moved to AppShell** — status bar now renders below the sidebar + main content row, spanning full window width with a continuous top border.
+- **SSH2 connection pool wired into runtime** — SFTP sessions now receive a shared main-process connection pool instance, and `connectionPool:stats` returns live pool metrics instead of a placeholder response.
+- **Desktop DB bootstrap now uses shared migration runner** — main-process host DB initialization now delegates to `@hypershell/db` `openDatabase(...)`, reducing duplicate bootstrap logic and centralizing schema setup behavior.
+- **Migration error handling tightened** — idempotent migration steps now ignore only known duplicate/already-exists cases and rethrow unexpected SQL errors.
 
 ### Fixed
 
 - **Hardcoded colors in HostsView, PortForwardProfileForm, TransferPopup, StatusBar** — inline styles with hex/rgba values converted to Tailwind theme token classes so they adapt to light/dark mode.
 - **CodeMirror editor respects app theme** — SFTP file editor uses default light theme when app is in light mode, oneDark when dark.
 - **Title bar overlay height reduced to 34px** — prevents the native overlay from covering the separator line at non-100% DPI scaling (e.g. 115%).
+- **SFTP drag-out cache filename collisions** — temp files now include a deterministic cache-key hash, preventing stale/wrong file reuse when different remote paths share the same basename.
+- **Password whitespace preservation** — host password handling no longer trims leading/trailing whitespace before persistence, avoiding authentication failures for credentials where spaces are significant.
+- **Reconnect attempt reset race** — reconnect counters now reset only after a stable connected window instead of immediately on optimistic status events, preventing reconnect loops from exhausting protections incorrectly.
+- **`fsStat` IPC contract alignment** — preload and renderer typings now use the path request schema/type for `fsStat`, matching main-process parsing behavior.
 - **SFTP host-key verification fails closed on probe errors** — when the host-key probe fails for non-verification reasons and no previously trusted fingerprints exist, the connection is now blocked instead of proceeding without verification.
 - **Local filesystem rename symlink escape** — `assertPathAllowed` now resolves the parent directory for non-existent targets (e.g. rename destinations), preventing symlinked parents from escaping allowed filesystem roots. The rename handler also uses the sanitized path instead of the raw request path.
 - **Restore Backup command-palette action wired up** — the "Restore Backup" command now performs the full restore flow (file dialog → confirmation → restore → toast feedback) instead of only opening the dialog.
