@@ -1,7 +1,9 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { resolveSafeDragOutPath, verifyHostKey, type HostFingerprintLookup } from "./sftpIpc";
+import { pruneDragOutCache, resolveSafeDragOutPath, verifyHostKey, type HostFingerprintLookup } from "./sftpIpc";
 
 const { mockProbeHostKey } = vi.hoisted(() => {
   const mockProbeHostKey = vi.fn();
@@ -22,6 +24,51 @@ describe("resolveSafeDragOutPath", () => {
   it("rejects traversal and path separator payloads", () => {
     expect(() => resolveSafeDragOutPath("/tmp/hypershell-drag", "../escape.txt")).toThrow(/invalid drag-out filename/i);
     expect(() => resolveSafeDragOutPath("/tmp/hypershell-drag", "nested/escape.txt")).toThrow(/invalid drag-out filename/i);
+  });
+});
+
+describe("pruneDragOutCache", () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hypershell-drag-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("removes files older than the TTL and keeps fresher ones", () => {
+    const now = Date.now();
+    const stale = path.join(tempDir, "stale.bin");
+    const fresh = path.join(tempDir, "fresh.bin");
+    fs.writeFileSync(stale, "old");
+    fs.writeFileSync(fresh, "new");
+    const staleTime = new Date(now - 48 * 60 * 60 * 1000);
+    fs.utimesSync(stale, staleTime, staleTime);
+
+    pruneDragOutCache(tempDir, 24 * 60 * 60 * 1000, now);
+
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(fs.existsSync(fresh)).toBe(true);
+  });
+
+  it("recursively removes stale directories", () => {
+    const now = Date.now();
+    const nested = path.join(tempDir, "remote-home");
+    fs.mkdirSync(path.join(nested, "sub"), { recursive: true });
+    fs.writeFileSync(path.join(nested, "sub", "file.txt"), "payload");
+    const staleTime = new Date(now - 48 * 60 * 60 * 1000);
+    fs.utimesSync(nested, staleTime, staleTime);
+
+    pruneDragOutCache(tempDir, 24 * 60 * 60 * 1000, now);
+
+    expect(fs.existsSync(nested)).toBe(false);
+  });
+
+  it("is a no-op when the temp dir is missing", () => {
+    const missing = path.join(tempDir, "does-not-exist");
+    expect(() => pruneDragOutCache(missing, 1_000)).not.toThrow();
   });
 });
 

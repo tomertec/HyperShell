@@ -265,6 +265,30 @@ function createDragOutTempFileName(fileName: string, cacheKey: string): string {
   return `${stem}-${suffix}${extension}`;
 }
 
+const DRAG_OUT_TEMP_DIR_NAME = "hypershell-drag";
+const DRAG_OUT_STARTUP_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const DRAG_OUT_POST_DRAG_DELAY_MS = 5 * 60 * 1000; // 5m
+
+export function pruneDragOutCache(tempDir: string, maxAgeMs: number, now = Date.now()): void {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(tempDir, { withFileTypes: true });
+  } catch {
+    return; // dir missing / unreadable — nothing to prune
+  }
+
+  for (const entry of entries) {
+    const target = path.join(tempDir, entry.name);
+    try {
+      const stats = fs.statSync(target);
+      if (now - stats.mtimeMs < maxAgeMs) continue;
+      fs.rmSync(target, { recursive: true, force: true });
+    } catch {
+      // best-effort — skip locked/in-use entries, next startup will retry
+    }
+  }
+}
+
 export function registerSftpIpc(
   ipcMain: IpcMainLike,
   options: RegisterSftpIpcOptions
@@ -281,6 +305,8 @@ export function registerSftpIpc(
 
   // Drag-out cache: pre-downloaded files keyed by "sessionId:remotePath"
   const dragCache = new Map<string, string>();
+  const dragTempDir = path.join(app.getPath("temp"), DRAG_OUT_TEMP_DIR_NAME);
+  pruneDragOutCache(dragTempDir, DRAG_OUT_STARTUP_TTL_MS);
 
   // Keyboard-interactive auth relay: pending requests keyed by requestId
   const pendingKbdInteractive = new Map<string, {
@@ -538,11 +564,10 @@ export function registerSftpIpc(
       const session = sftpSessionManager.getSession(request.sftpSessionId);
       if (!session) throw new Error(`SFTP session ${request.sftpSessionId} not found`);
 
-      const tempDir = path.join(app.getPath("temp"), "hypershell-drag");
-      fs.mkdirSync(tempDir, { recursive: true });
-      const safeOriginalPath = resolveSafeDragOutPath(tempDir, request.fileName);
+      fs.mkdirSync(dragTempDir, { recursive: true });
+      const safeOriginalPath = resolveSafeDragOutPath(dragTempDir, request.fileName);
       const uniqueFileName = createDragOutTempFileName(path.basename(safeOriginalPath), cacheKey);
-      tempPath = resolveSafeDragOutPath(tempDir, uniqueFileName);
+      tempPath = resolveSafeDragOutPath(dragTempDir, uniqueFileName);
 
       const connOpts = session.connectionOptions;
       const keyPath = connOpts.privateKeyPath ?? connOpts.fallbackKeyPaths?.[0];
@@ -590,6 +615,21 @@ export function registerSftpIpc(
       );
     }
     event.sender.startDrag({ file: tempPath, icon });
+
+    // The OS copies the file to the drop target shortly after startDrag resolves.
+    // Schedule a best-effort cleanup — if the file is still locked, the startup
+    // prune will catch it on next launch.
+    const pathToCleanup = tempPath;
+    setTimeout(() => {
+      try {
+        fs.rmSync(pathToCleanup, { recursive: true, force: true });
+      } catch {
+        // best-effort; leave for startup prune
+      }
+      if (dragCache.get(cacheKey) === pathToCleanup) {
+        dragCache.delete(cacheKey);
+      }
+    }, DRAG_OUT_POST_DRAG_DELAY_MS).unref();
 
     return { tempPath };
   };

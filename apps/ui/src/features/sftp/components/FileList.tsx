@@ -189,8 +189,9 @@ export function FileList({
       onSelect(new Set([entry.path]));
     }
 
-    // Pre-cache single file for drag-out (background download to temp)
-    if (sftpSessionId) {
+    // Pre-cache single file for drag-out (background download to temp).
+    // Skip directories — recursive SCP on selection can download GBs silently.
+    if (sftpSessionId && !entry.isDirectory) {
       void window.hypershell?.sftpDragOut?.({
         sftpSessionId,
         remotePath: entry.path,
