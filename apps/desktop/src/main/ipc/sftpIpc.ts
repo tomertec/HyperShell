@@ -1,7 +1,9 @@
 import { createHostsRepositoryFromDatabase, openDatabase, createSftpBookmarksRepository, createHostFingerprintRepositoryFromDatabase } from "@hypershell/db";
-import { app } from "electron";
+import { app, nativeImage } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import { pipeline } from "node:stream/promises";
+import { ZipFile } from "yazl";
 import {
   ipcChannels,
   sftpBookmarkListRequestSchema,
@@ -49,13 +51,13 @@ import {
 import type {
   SessionManager,
   SftpConnectionOptions,
+  SftpTransportHandle,
   KeyboardInteractiveCallback,
   Ssh2ConnectionPool,
 } from "@hypershell/session-core";
-import { createSyncEngine, probeHostKey, buildScpCommand } from "@hypershell/session-core";
-import { execFile } from "node:child_process";
+import { createSyncEngine, probeHostKey } from "@hypershell/session-core";
 import { createHash, timingSafeEqual } from "node:crypto";
-import type { IpcMainInvokeEvent } from "electron";
+import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 
 import type { IpcMainLike } from "./registerIpc";
 import { editorWindowManager } from "../windows/editorWindowManager";
@@ -265,9 +267,203 @@ function createDragOutTempFileName(fileName: string, cacheKey: string): string {
   return `${stem}-${suffix}${extension}`;
 }
 
+export interface SftpDragOutItem {
+  remotePath: string;
+  fileName: string;
+  isDirectory?: boolean;
+}
+
+export interface SftpDragOutSkippedEntry {
+  path: string;
+  reason: string;
+}
+
+export interface StageSftpDragOutItemOptions {
+  transport: Pick<SftpTransportHandle, "createReadStream" | "list">;
+  tempDir: string;
+  cacheKey: string;
+  archiveDirectory?: boolean;
+  item: SftpDragOutItem;
+}
+
+function isPermissionDeniedError(error: unknown): boolean {
+  const maybeError = error as { code?: unknown; message?: unknown };
+  return maybeError.code === 3 || /permission denied/i.test(String(maybeError.message ?? error));
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function stageRemoteFile(
+  transport: Pick<SftpTransportHandle, "createReadStream">,
+  remotePath: string,
+  localPath: string
+): Promise<void> {
+  await fs.promises.mkdir(path.dirname(localPath), { recursive: true });
+  await pipeline(transport.createReadStream(remotePath), fs.createWriteStream(localPath));
+}
+
+async function stageRemoteDirectory(
+  transport: Pick<SftpTransportHandle, "createReadStream" | "list">,
+  remotePath: string,
+  localPath: string,
+  options: {
+    skipPermissionDenied?: boolean;
+    isRoot?: boolean;
+    skippedEntries?: SftpDragOutSkippedEntry[];
+  } = {}
+): Promise<SftpDragOutSkippedEntry[]> {
+  const skippedEntries = options.skippedEntries ?? [];
+  await fs.promises.mkdir(localPath, { recursive: true });
+  let entries: Awaited<ReturnType<Pick<SftpTransportHandle, "list">["list"]>>;
+  try {
+    entries = await transport.list(remotePath);
+  } catch (error) {
+    if (options.skipPermissionDenied && !options.isRoot && isPermissionDeniedError(error)) {
+      skippedEntries.push({ path: remotePath, reason: getErrorMessage(error) });
+      return skippedEntries;
+    }
+    throw error;
+  }
+
+  for (const entry of entries) {
+    const childLocalPath = resolveSafeDragOutPath(localPath, entry.name);
+    if (entry.isDirectory) {
+      await stageRemoteDirectory(transport, entry.path, childLocalPath, {
+        skipPermissionDenied: options.skipPermissionDenied,
+        isRoot: false,
+        skippedEntries,
+      });
+      continue;
+    }
+
+    try {
+      await stageRemoteFile(transport, entry.path, childLocalPath);
+    } catch (error) {
+      if (options.skipPermissionDenied && isPermissionDeniedError(error)) {
+        skippedEntries.push({ path: entry.path, reason: getErrorMessage(error) });
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return skippedEntries;
+}
+
+async function writeSkippedEntriesManifest(
+  localDir: string,
+  skippedEntries: SftpDragOutSkippedEntry[]
+): Promise<void> {
+  if (skippedEntries.length === 0) return;
+
+  let manifestPath = resolveSafeDragOutPath(localDir, "HYPERSHELL_SKIPPED_FILES.txt");
+  for (let index = 2; fs.existsSync(manifestPath); index += 1) {
+    manifestPath = resolveSafeDragOutPath(localDir, `HYPERSHELL_SKIPPED_FILES_${index}.txt`);
+  }
+
+  const content = [
+    "Some remote items could not be included in this drag-out archive.",
+    "",
+    ...skippedEntries.map((entry) => `${entry.path}\t${entry.reason}`),
+    "",
+  ].join("\n");
+  await fs.promises.writeFile(manifestPath, content, "utf8");
+}
+
+async function addDirectoryToZip(
+  zipFile: ZipFile,
+  localDir: string,
+  metadataDir: string
+): Promise<void> {
+  const stats = await fs.promises.stat(localDir);
+  zipFile.addEmptyDirectory(`${metadataDir}/`, { mtime: stats.mtime });
+
+  const entries = await fs.promises.readdir(localDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const localPath = path.join(localDir, entry.name);
+    const metadataPath = path.posix.join(metadataDir, entry.name);
+
+    if (entry.isDirectory()) {
+      await addDirectoryToZip(zipFile, localPath, metadataPath);
+      continue;
+    }
+
+    zipFile.addFile(localPath, metadataPath, { compress: false });
+  }
+}
+
+export async function createZipFromDirectory(
+  sourceDir: string,
+  zipPath: string,
+  rootName: string
+): Promise<void> {
+  await fs.promises.rm(zipPath, { recursive: true, force: true });
+  await fs.promises.mkdir(path.dirname(zipPath), { recursive: true });
+
+  const zipFile = new ZipFile();
+  const output = fs.createWriteStream(zipPath);
+  const writeComplete = pipeline(zipFile.outputStream, output);
+
+  await addDirectoryToZip(zipFile, sourceDir, rootName);
+  zipFile.end();
+  await writeComplete;
+}
+
+export async function stageSftpDragOutItem({
+  transport,
+  tempDir,
+  cacheKey,
+  archiveDirectory,
+  item,
+}: StageSftpDragOutItemOptions): Promise<string> {
+  await fs.promises.mkdir(tempDir, { recursive: true });
+
+  const safeOriginalPath = resolveSafeDragOutPath(tempDir, item.fileName);
+  const safeOriginalName = path.basename(safeOriginalPath);
+  const uniqueFileName = createDragOutTempFileName(path.basename(safeOriginalPath), cacheKey);
+  const tempPath = resolveSafeDragOutPath(tempDir, uniqueFileName);
+
+  await fs.promises.rm(tempPath, { recursive: true, force: true });
+
+  if (item.isDirectory) {
+    const skippedEntries = await stageRemoteDirectory(transport, item.remotePath, tempPath, {
+      skipPermissionDenied: archiveDirectory,
+      isRoot: true,
+    });
+    if (archiveDirectory) {
+      await writeSkippedEntriesManifest(tempPath, skippedEntries);
+      const zipPath = `${tempPath}.zip`;
+      await createZipFromDirectory(tempPath, zipPath, safeOriginalName);
+      return zipPath;
+    }
+
+    return tempPath;
+  }
+
+  await stageRemoteFile(transport, item.remotePath, tempPath);
+  return tempPath;
+}
+
+export function shouldStartNativeDragOut(
+  request: { isDirectory?: boolean; prepareOnly?: boolean },
+  hadCachedTempPath: boolean
+): boolean {
+  if (request.prepareOnly) return false;
+  if (request.isDirectory && !hadCachedTempPath) return false;
+  return true;
+}
+
 const DRAG_OUT_TEMP_DIR_NAME = "hypershell-drag";
-const DRAG_OUT_STARTUP_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const DRAG_OUT_STARTUP_TTL_MS = 60 * 60 * 1000; // 1h — drag cache has no long-term value
 const DRAG_OUT_POST_DRAG_DELAY_MS = 5 * 60 * 1000; // 5m
+const DRAG_OUT_ICON_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAADklEQVQ4jWNgGAWDEwAAAhAAATHKfqoAAAAASUVORK5CYII=";
+
+function createDragOutIcon() {
+  return nativeImage.createFromBuffer(Buffer.from(DRAG_OUT_ICON_PNG_BASE64, "base64"));
+}
 
 export async function pruneDragOutCache(
   tempDir: string,
@@ -309,9 +505,35 @@ export function registerSftpIpc(
 
   // Drag-out cache: pre-downloaded files keyed by "sessionId:remotePath"
   const dragCache = new Map<string, string>();
+  const dragStageTasks = new Map<string, Promise<string>>();
   const dragTempDir = path.join(app.getPath("temp"), DRAG_OUT_TEMP_DIR_NAME);
   // Fire-and-forget — never block app startup on (potentially multi-GB) rm.
   void pruneDragOutCache(dragTempDir, DRAG_OUT_STARTUP_TTL_MS);
+
+  const stageDragOutItemOnce = (
+    cacheKey: string,
+    request: { sftpSessionId: string } & SftpDragOutItem
+  ): Promise<string> => {
+    let stageTask = dragStageTasks.get(cacheKey);
+    if (!stageTask) {
+      const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+      stageTask = stageSftpDragOutItem({
+        transport,
+        tempDir: dragTempDir,
+        cacheKey,
+        archiveDirectory: request.isDirectory,
+        item: request,
+      }).then((stagedPath) => {
+        dragCache.set(cacheKey, stagedPath);
+        return stagedPath;
+      }).finally(() => {
+        dragStageTasks.delete(cacheKey);
+      });
+      dragStageTasks.set(cacheKey, stageTask);
+    }
+
+    return stageTask;
+  };
 
   // Keyboard-interactive auth relay: pending requests keyed by requestId
   const pendingKbdInteractive = new Map<string, {
@@ -558,58 +780,76 @@ export function registerSftpIpc(
     return { syncs: syncEngine.list() };
   };
 
+  const scheduleDragOutCleanup = (cacheKey: string, tempPath: string, isDirectory?: boolean) => {
+    const pathsToCleanup = [tempPath];
+    if (isDirectory && tempPath.endsWith(".zip")) {
+      pathsToCleanup.push(tempPath.slice(0, -".zip".length));
+    }
+
+    setTimeout(() => {
+      for (const pathToCleanup of pathsToCleanup) {
+        try {
+          fs.rmSync(pathToCleanup, { recursive: true, force: true });
+        } catch {
+          // best-effort; leave for startup prune
+        }
+      }
+      if (dragCache.get(cacheKey) === tempPath) {
+        dragCache.delete(cacheKey);
+      }
+    }, DRAG_OUT_POST_DRAG_DELAY_MS).unref();
+  };
+
+  const startNativeDragOutFromCache = async (
+    sender: IpcMainEvent["sender"],
+    request: { isDirectory?: boolean; prepareOnly?: boolean },
+    cacheKey: string
+  ): Promise<string> => {
+    const tempPath = dragCache.get(cacheKey);
+    const hadCachedTempPath = Boolean(tempPath && fs.existsSync(tempPath));
+    if (!tempPath || !shouldStartNativeDragOut(request, hadCachedTempPath)) {
+      return "";
+    }
+
+    // Windows rejects startDrag with an empty/placeholder NativeImage. Ask
+    // the shell for the real icon of the staged file (e.g. the .zip icon) and
+    // fall back to the stub only if that fails.
+    let icon: Electron.NativeImage;
+    try {
+      icon = await app.getFileIcon(tempPath, { size: "small" });
+      if (icon.isEmpty()) throw new Error("empty icon");
+    } catch {
+      icon = createDragOutIcon();
+    }
+
+    sender.startDrag({ file: tempPath, icon });
+    scheduleDragOutCleanup(cacheKey, tempPath, request.isDirectory);
+    return tempPath;
+  };
+
   const handleDragOut = async (event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpDragOutRequestSchema.parse(rawRequest);
-
-    // Electron's startDrag({ file }) is unreliable for directories on Windows —
-    // large trees crash the renderer, and even small ones don't consistently
-    // land at the drop target. Skip drag-out for directories; internal
-    // SFTP-to-SFTP drag still works via the HTML5 dataTransfer path. Users
-    // who want to download a directory should use the transfer panel.
-    if (request.isDirectory) {
-      return { tempPath: "" };
-    }
 
     const cacheKey = `${request.sftpSessionId}:${request.remotePath}`;
 
     // Check cache first — file may have been pre-downloaded on selection
     let tempPath = dragCache.get(cacheKey);
+    const hadCachedTempPath = Boolean(tempPath && fs.existsSync(tempPath));
 
-    if (!tempPath || !fs.existsSync(tempPath)) {
-      const session = sftpSessionManager.getSession(request.sftpSessionId);
-      if (!session) throw new Error(`SFTP session ${request.sftpSessionId} not found`);
+    if (!hadCachedTempPath) {
+      const stageTask = stageDragOutItemOnce(cacheKey, request);
 
-      fs.mkdirSync(dragTempDir, { recursive: true });
-      const safeOriginalPath = resolveSafeDragOutPath(dragTempDir, request.fileName);
-      const uniqueFileName = createDragOutTempFileName(path.basename(safeOriginalPath), cacheKey);
-      tempPath = resolveSafeDragOutPath(dragTempDir, uniqueFileName);
-
-      const connOpts = session.connectionOptions;
-      const keyPath = connOpts.privateKeyPath ?? connOpts.fallbackKeyPaths?.[0];
-      const scpCmd = buildScpCommand({
-        hostname: connOpts.hostname,
-        port: connOpts.port,
-        username: connOpts.username,
-        privateKeyPath: keyPath,
-        proxyJump: connOpts.proxyJump,
-        direction: "download",
-        remotePath: request.remotePath,
-        localPath: tempPath,
-      });
-      if (request.isDirectory) {
-        scpCmd.args.unshift("-r");
+      if (request.isDirectory && !request.prepareOnly) {
+        void stageTask.catch((error) => {
+          console.warn("[sftp] Failed to stage drag-out item", error);
+        });
+        return { tempPath: "" };
       }
 
       try {
-        await new Promise<void>((resolve, reject) => {
-          execFile(scpCmd.command, scpCmd.args, { windowsHide: true }, (error) => {
-            if (error) reject(error);
-            else resolve();
-          });
-        });
-        dragCache.set(cacheKey, tempPath);
-      } catch {
-        // SCP failed (directory, permission denied, etc.) — skip caching
+        tempPath = await stageTask;
+      } catch (error) {
+        console.warn("[sftp] Failed to stage drag-out item", error);
         return { tempPath: "" };
       }
     }
@@ -619,34 +859,21 @@ export function registerSftpIpc(
       return { tempPath };
     }
 
-    // Initiate native OS drag from the cached temp file
-    let icon: Electron.NativeImage;
-    try {
-      icon = await app.getFileIcon(tempPath, { size: "small" });
-    } catch {
-      const { nativeImage } = await import("electron");
-      icon = nativeImage.createFromBuffer(
-        Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAADklEQVQ4jWNgGAWDEwAAAhAAATHKfqoAAAAASUVORK5CYII=", "base64")
-      );
+    if (!tempPath || !shouldStartNativeDragOut(request, hadCachedTempPath)) {
+      return { tempPath: tempPath ?? "" };
     }
-    event.sender.startDrag({ file: tempPath, icon });
 
-    // The OS copies the file to the drop target shortly after startDrag resolves.
-    // Schedule a best-effort cleanup — if the file is still locked, the startup
-    // prune will catch it on next launch.
-    const pathToCleanup = tempPath;
-    setTimeout(() => {
-      try {
-        fs.rmSync(pathToCleanup, { recursive: true, force: true });
-      } catch {
-        // best-effort; leave for startup prune
-      }
-      if (dragCache.get(cacheKey) === pathToCleanup) {
-        dragCache.delete(cacheKey);
-      }
-    }, DRAG_OUT_POST_DRAG_DELAY_MS).unref();
+    await startNativeDragOutFromCache(event.sender, request, cacheKey);
 
     return { tempPath };
+  };
+
+  const handleStartNativeDragOut = (event: IpcMainEvent, rawRequest: unknown) => {
+    const request = sftpDragOutRequestSchema.parse(rawRequest);
+    const cacheKey = `${request.sftpSessionId}:${request.remotePath}`;
+    void startNativeDragOutFromCache(event.sender, request, cacheKey).catch((error) => {
+      console.warn("[sftp] startNativeDragOut failed", error);
+    });
   };
 
   const handleKeyboardInteractiveResponse = async (
@@ -691,6 +918,7 @@ export function registerSftpIpc(
   ipcMain.handle(ipcChannels.sftp.syncStop, handleSyncStop);
   ipcMain.handle(ipcChannels.sftp.syncList, handleSyncList);
   ipcMain.handle(ipcChannels.sftp.dragOut, handleDragOut);
+  ipcMain.on?.(ipcChannels.sftp.startNativeDragOut, handleStartNativeDragOut);
 
   const unsubscribeSyncEvents = syncEngine.onEvent((event) => {
     options.emitSyncEvent?.(event);
@@ -790,5 +1018,6 @@ export function registerSftpIpc(
     for (const channel of Object.values(ipcChannels.sftp)) {
       ipcMain.removeHandler?.(channel);
     }
+    ipcMain.removeListener?.(ipcChannels.sftp.startNativeDragOut, handleStartNativeDragOut);
   };
 }

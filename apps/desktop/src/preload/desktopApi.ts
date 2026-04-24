@@ -296,6 +296,7 @@ import { z } from "zod";
 
 export interface PreloadIpcRenderer {
   invoke(channel: string, ...args: unknown[]): Promise<unknown>;
+  send(channel: string, ...args: unknown[]): void;
   on(
     channel: string,
     listener: (event: unknown, ...args: unknown[]) => void
@@ -405,6 +406,7 @@ export interface DesktopApi {
   sftpSyncList(): Promise<{ syncs: SftpSyncStatus[] }>;
   onSftpSyncEvent(listener: (event: SftpSyncEvent) => void): () => void;
   sftpDragOut(request: SftpDragOutRequest): Promise<SftpDragOutResponse>;
+  sftpStartNativeDragOut(request: SftpDragOutRequest): void;
   // Host port forwards
   hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]>;
   hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord>;
@@ -1398,6 +1400,10 @@ export function createDesktopApi(
       const parsed = sftpDragOutRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.sftp.dragOut, parsed);
       return sftpDragOutResponseSchema.parse(result);
+    },
+    sftpStartNativeDragOut(request: SftpDragOutRequest): void {
+      const parsed = sftpDragOutRequestSchema.parse(request);
+      ipcRenderer.send(ipcChannels.sftp.startNativeDragOut, parsed);
     },
     // Tmux detection
     async tmuxProbe(request: TmuxProbeRequest): Promise<TmuxProbeResponse> {
