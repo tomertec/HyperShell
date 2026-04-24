@@ -269,10 +269,14 @@ const DRAG_OUT_TEMP_DIR_NAME = "hypershell-drag";
 const DRAG_OUT_STARTUP_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const DRAG_OUT_POST_DRAG_DELAY_MS = 5 * 60 * 1000; // 5m
 
-export function pruneDragOutCache(tempDir: string, maxAgeMs: number, now = Date.now()): void {
+export async function pruneDragOutCache(
+  tempDir: string,
+  maxAgeMs: number,
+  now = Date.now()
+): Promise<void> {
   let entries: fs.Dirent[];
   try {
-    entries = fs.readdirSync(tempDir, { withFileTypes: true });
+    entries = await fs.promises.readdir(tempDir, { withFileTypes: true });
   } catch {
     return; // dir missing / unreadable — nothing to prune
   }
@@ -280,9 +284,9 @@ export function pruneDragOutCache(tempDir: string, maxAgeMs: number, now = Date.
   for (const entry of entries) {
     const target = path.join(tempDir, entry.name);
     try {
-      const stats = fs.statSync(target);
+      const stats = await fs.promises.stat(target);
       if (now - stats.mtimeMs < maxAgeMs) continue;
-      fs.rmSync(target, { recursive: true, force: true });
+      await fs.promises.rm(target, { recursive: true, force: true });
     } catch {
       // best-effort — skip locked/in-use entries, next startup will retry
     }
@@ -306,7 +310,8 @@ export function registerSftpIpc(
   // Drag-out cache: pre-downloaded files keyed by "sessionId:remotePath"
   const dragCache = new Map<string, string>();
   const dragTempDir = path.join(app.getPath("temp"), DRAG_OUT_TEMP_DIR_NAME);
-  pruneDragOutCache(dragTempDir, DRAG_OUT_STARTUP_TTL_MS);
+  // Fire-and-forget — never block app startup on (potentially multi-GB) rm.
+  void pruneDragOutCache(dragTempDir, DRAG_OUT_STARTUP_TTL_MS);
 
   // Keyboard-interactive auth relay: pending requests keyed by requestId
   const pendingKbdInteractive = new Map<string, {
@@ -555,6 +560,16 @@ export function registerSftpIpc(
 
   const handleDragOut = async (event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpDragOutRequestSchema.parse(rawRequest);
+
+    // Electron's startDrag({ file }) is unreliable for directories on Windows —
+    // large trees crash the renderer, and even small ones don't consistently
+    // land at the drop target. Skip drag-out for directories; internal
+    // SFTP-to-SFTP drag still works via the HTML5 dataTransfer path. Users
+    // who want to download a directory should use the transfer panel.
+    if (request.isDirectory) {
+      return { tempPath: "" };
+    }
+
     const cacheKey = `${request.sftpSessionId}:${request.remotePath}`;
 
     // Check cache first — file may have been pre-downloaded on selection

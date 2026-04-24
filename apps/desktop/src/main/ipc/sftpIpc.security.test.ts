@@ -38,7 +38,7 @@ describe("pruneDragOutCache", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("removes files older than the TTL and keeps fresher ones", () => {
+  it("removes files older than the TTL and keeps fresher ones", async () => {
     const now = Date.now();
     const stale = path.join(tempDir, "stale.bin");
     const fresh = path.join(tempDir, "fresh.bin");
@@ -47,13 +47,13 @@ describe("pruneDragOutCache", () => {
     const staleTime = new Date(now - 48 * 60 * 60 * 1000);
     fs.utimesSync(stale, staleTime, staleTime);
 
-    pruneDragOutCache(tempDir, 24 * 60 * 60 * 1000, now);
+    await pruneDragOutCache(tempDir, 24 * 60 * 60 * 1000, now);
 
     expect(fs.existsSync(stale)).toBe(false);
     expect(fs.existsSync(fresh)).toBe(true);
   });
 
-  it("recursively removes stale directories", () => {
+  it("recursively removes stale directories", async () => {
     const now = Date.now();
     const nested = path.join(tempDir, "remote-home");
     fs.mkdirSync(path.join(nested, "sub"), { recursive: true });
@@ -61,14 +61,14 @@ describe("pruneDragOutCache", () => {
     const staleTime = new Date(now - 48 * 60 * 60 * 1000);
     fs.utimesSync(nested, staleTime, staleTime);
 
-    pruneDragOutCache(tempDir, 24 * 60 * 60 * 1000, now);
+    await pruneDragOutCache(tempDir, 24 * 60 * 60 * 1000, now);
 
     expect(fs.existsSync(nested)).toBe(false);
   });
 
-  it("is a no-op when the temp dir is missing", () => {
+  it("is a no-op when the temp dir is missing", async () => {
     const missing = path.join(tempDir, "does-not-exist");
-    expect(() => pruneDragOutCache(missing, 1_000)).not.toThrow();
+    await expect(pruneDragOutCache(missing, 1_000)).resolves.toBeUndefined();
   });
 });
 
