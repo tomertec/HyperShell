@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-04-24
+
 ### Added
 
 - **Light theme** — professional light mode with muted cool-gray palette. Three-way toggle in Settings → Appearance: System (follows OS preference), Light, or Dark. Accent color adapts per mode (sky-400 dark / sky-600 light). Host tag colors shift for contrast on gray backgrounds. Native window controls update to match. Status bar spans full window width.
