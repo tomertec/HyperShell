@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { toast } from "sonner";
 
 import {
   formatFileSize,
@@ -120,6 +121,49 @@ export function FileList({
   // --- Mouse-drag range selection ---
   const dragSelectRef = useRef<{ startIndex: number } | null>(null);
   const didDragSelectRef = useRef(false);
+  const preparedNativeDragOutRef = useRef<Set<string>>(new Set());
+  const pendingNativeDragOutRef = useRef<Set<string>>(new Set());
+
+  const createNativeDragOutKey = useCallback(
+    (remotePath: string) => `${sftpSessionId ?? ""}:${remotePath}`,
+    [sftpSessionId]
+  );
+
+  const prepareNativeDirectoryDragOut = useCallback(
+    (entry: FileListEntry) => {
+      const dragOut = window.hypershell?.sftpDragOut;
+      if (!sftpSessionId || !dragOut || !entry.isDirectory) return;
+
+      const key = createNativeDragOutKey(entry.path);
+      if (preparedNativeDragOutRef.current.has(key) || pendingNativeDragOutRef.current.has(key)) {
+        return;
+      }
+
+      pendingNativeDragOutRef.current.add(key);
+      toast(`Preparing ${entry.name} for drag-out...`);
+
+      void dragOut({
+        sftpSessionId,
+        remotePath: entry.path,
+        fileName: entry.name,
+        isDirectory: true,
+        prepareOnly: true,
+      }).then((result) => {
+        if (!result.tempPath) {
+          toast.error(`Failed to prepare ${entry.name} for drag-out.`);
+          return;
+        }
+
+        preparedNativeDragOutRef.current.add(key);
+        toast.success(`${entry.name} is ready to drag out.`);
+      }).catch(() => {
+        toast.error(`Failed to prepare ${entry.name} for drag-out.`);
+      }).finally(() => {
+        pendingNativeDragOutRef.current.delete(key);
+      });
+    },
+    [createNativeDragOutKey, sftpSessionId]
+  );
 
   const handleRowMouseDown = useCallback(
     (index: number, entry: FileListEntry, event: MouseEvent) => {
@@ -188,17 +232,6 @@ export function FileList({
     } else {
       onSelect(new Set([entry.path]));
     }
-
-    // Pre-cache single file for drag-out (background download to temp)
-    if (sftpSessionId) {
-      void window.hypershell?.sftpDragOut?.({
-        sftpSessionId,
-        remotePath: entry.path,
-        fileName: entry.name,
-        isDirectory: entry.isDirectory,
-        prepareOnly: true,
-      }).catch(() => {});
-    }
   };
 
   const handleRowDoubleClick = (entry: FileListEntry) => {
@@ -212,6 +245,23 @@ export function FileList({
 
   const handleDragStart = (event: DragEvent<HTMLTableRowElement>, entry: FileListEntry) => {
     const paths = selection.has(entry.path) ? Array.from(selection) : [entry.path];
+
+    if (sftpSessionId && paths.length === 1 && entry.isDirectory) {
+      event.preventDefault();
+      const key = createNativeDragOutKey(paths[0]);
+      if (!preparedNativeDragOutRef.current.has(key)) {
+        prepareNativeDirectoryDragOut(entry);
+        return;
+      }
+
+      window.hypershell?.sftpStartNativeDragOut?.({
+        sftpSessionId,
+        remotePath: paths[0],
+        fileName: entry.name,
+        isDirectory: true,
+      });
+      return;
+    }
 
     // Always set internal data synchronously (for cross-pane drops)
     event.dataTransfer.effectAllowed = "copyMove";

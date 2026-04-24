@@ -278,6 +278,7 @@ declare global {
       backupList?: () => Promise<ListBackupsResponse>;
       backupShowOpenDialog?: () => Promise<string | null>;
       sftpDragOut?: (request: SftpDragOutRequest) => Promise<SftpDragOutResponse>;
+      sftpStartNativeDragOut?: (request: SftpDragOutRequest) => void;
       tmuxProbe?: (request: { hostId: string }) => Promise<{ sessions: Array<{ name: string; windowCount: number; createdAt: string; attached: boolean }> }>;
       setAppTheme?: (theme: "light" | "dark") => Promise<void>;
     };

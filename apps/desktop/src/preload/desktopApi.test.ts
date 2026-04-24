@@ -12,9 +12,11 @@ function createFakeIpcRenderer() {
   const invoke = vi.fn<
     (channel: string, ...args: unknown[]) => Promise<unknown>
   >(async (_channel, _request) => undefined);
+  const send = vi.fn<(channel: string, ...args: unknown[]) => void>();
 
   const ipcRenderer: PreloadIpcRenderer = {
     invoke,
+    send,
     on(channel, listener) {
       const current = listeners.get(channel) ?? new Set();
       current.add(listener);
@@ -28,6 +30,7 @@ function createFakeIpcRenderer() {
   return {
     ipcRenderer,
     invoke,
+    send,
     emit(channel: string, payload?: unknown) {
       for (const listener of listeners.get(channel) ?? []) {
         listener({}, payload);
@@ -123,6 +126,26 @@ describe("createDesktopApi", () => {
         rows: 40
       })
     ).rejects.toBeTruthy();
+  });
+
+  it("starts native SFTP drag-out over fire-and-forget IPC", () => {
+    const fake = createFakeIpcRenderer();
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    api.sftpStartNativeDragOut({
+      sftpSessionId: "sftp-1",
+      remotePath: "/home/user/project",
+      fileName: "project",
+      isDirectory: true,
+    });
+
+    expect(fake.send).toHaveBeenCalledWith(ipcChannels.sftp.startNativeDragOut, {
+      sftpSessionId: "sftp-1",
+      remotePath: "/home/user/project",
+      fileName: "project",
+      isDirectory: true,
+    });
+    expect(fake.invoke).not.toHaveBeenCalled();
   });
 
   it("guards session event listener payloads and catches listener exceptions", () => {

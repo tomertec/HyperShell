@@ -344,7 +344,7 @@ export interface RegisterIpcOptions {
 }
 
 export type IpcMainLike = Pick<IpcMain, "handle"> &
-  Partial<Pick<IpcMain, "removeHandler">>;
+  Partial<Pick<IpcMain, "on" | "removeHandler" | "removeListener">>;
 
 const APP_SETTINGS_KEY = "app.settings";
 const DEFAULT_CONNECTION_HISTORY_RETENTION_DAYS = 90;
