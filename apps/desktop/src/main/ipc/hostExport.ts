@@ -7,9 +7,12 @@ const CSV_FIELDS = [
 ] as const;
 
 function escapeCsv(value: unknown): string {
-  const str = String(value ?? "");
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
+  let str = String(value ?? "");
+  if (/^[=+\-@\t\r\n]/.test(str)) {
+    str = `'${str}`;
+  }
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, "\"\"")}"`;
   }
   return str;
 }

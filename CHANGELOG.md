@@ -47,6 +47,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 - **Restore Backup UI command hardened** — restore command now catches dialog-stage failures too (not only restore IPC failures) and ignores concurrent restore attempts via an in-flight guard.
 - **SCP host-key verification no longer bypassed** — native `scp` transfers now use a real known-hosts file with `StrictHostKeyChecking=accept-new` instead of disabling verification (`StrictHostKeyChecking=no`, `/dev/null`).
 - **Filesystem dialog IPC now fully schema-validated** — `fsShowSaveDialog` and `fsShowOpenDialog` requests/responses are validated via shared Zod schemas in both preload and main process.
+- **SSH key IPC filesystem scope hardened** — `sshKeys:generate`, `sshKeys:getFingerprint`, and `sshKeys:remove` now enforce `.ssh`-scoped paths; `sshKeys:convertPpk` now requires absolute non-device `.ppk` paths within user-safe roots.
+- **Backup destination policy enforced** — `backup:create` / `backup:restore` now require absolute non-device SQLite paths (`.db`/`.sqlite`/`.sqlite3`) within user-safe roots, while restore also accepts paths selected through the main-process backup open dialog.
+- **Path-root boundary checks hardened** — logging and recording export now use boundary-aware root containment checks instead of naive string-prefix matching, blocking sibling-prefix bypasses.
+- **CSV export formula injection mitigated** — host CSV export now neutralizes formula-leading cells (`=`, `+`, `-`, `@`) and control-character-prefixed formulas before escaping.
 
 ## [0.1.5] - 2026-04-13
 

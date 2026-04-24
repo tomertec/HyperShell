@@ -29,6 +29,11 @@ import {
   type DeleteRecordingResponse,
   type ExportRecordingResponse,
 } from "@hypershell/shared";
+import {
+  assertAbsolutePath,
+  assertNotWindowsDevicePath,
+  assertPathWithinAllowedRoots,
+} from "../security/pathPolicy";
 
 import type { IpcMainLike } from "./registerIpc";
 
@@ -66,22 +71,15 @@ function buildRecordingFileName(nowMs: number, id: string): string {
 }
 
 function assertSafeExportPath(filePath: string): string {
-  if (!path.isAbsolute(filePath)) {
-    throw new Error("Absolute path is required for recording export");
-  }
+  const resolved = assertAbsolutePath(filePath, "Absolute path is required for recording export");
+  assertNotWindowsDevicePath(resolved);
 
-  const resolved = path.resolve(filePath);
-  if (process.platform === "win32" && resolved.toLowerCase().startsWith("\\\\.")) {
-    throw new Error("Blocked device path");
-  }
-
-  const allowedRoots = [os.homedir(), os.tmpdir()].map((root) =>
-    path.resolve(root).toLowerCase()
+  const allowedRoots = [os.homedir(), os.tmpdir()].map((root) => path.resolve(root));
+  assertPathWithinAllowedRoots(
+    resolved,
+    allowedRoots,
+    "Recording export path must be within the user home or temp directory"
   );
-  const lower = resolved.toLowerCase();
-  if (!allowedRoots.some((root) => lower.startsWith(root))) {
-    throw new Error("Recording export path must be within the user home or temp directory");
-  }
 
   return resolved;
 }

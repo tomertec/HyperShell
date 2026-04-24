@@ -1,13 +1,30 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdirSync, writeFileSync, existsSync, rmSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+
+const electronMock = vi.hoisted(() => ({
+  openDialogResult: { canceled: true, filePaths: [] as string[] },
+  appPath: process.env.TEMP ?? process.env.TMP ?? "/tmp",
+}));
+
+vi.mock("electron", () => ({
+  app: { getPath: () => electronMock.appPath },
+  dialog: {
+    showOpenDialog: vi.fn(async () => electronMock.openDialogResult),
+  },
+}));
+
 import {
   generateBackupFilename,
   isValidSqliteFile,
   listBackupFiles,
   rotateBackups,
+  registerBackupIpc,
 } from "./backupIpc";
+import { ipcChannels } from "@hypershell/shared";
+
+type IpcHandler = (event: unknown, request: unknown) => unknown;
 
 function createTempDir(): string {
   const dir = path.join(tmpdir(), `hypershell-backup-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -154,5 +171,70 @@ describe("rotateBackups", () => {
     // The newest files by mtime should remain. Since we wrote them sequentially,
     // the last two written (04, 05) should remain.
     // But mtime might be the same on fast systems, so just check count.
+  });
+});
+
+describe("registerBackupIpc path policy", () => {
+  it("rejects create path outside allowed roots", async () => {
+    const handlers = new Map<string, IpcHandler>();
+    registerBackupIpc({
+      handle(channel: string, handler: IpcHandler) {
+        handlers.set(channel, handler);
+      },
+    } as never);
+
+    const createHandler = handlers.get(ipcChannels.backup.create);
+    if (!createHandler) {
+      throw new Error("Missing backup.create handler");
+    }
+
+    const home = path.resolve(homedir());
+    const outsidePath = path.join(path.dirname(home), `${path.basename(home)}-evil`, "backup.db");
+    await expect(
+      Promise.resolve(createHandler({}, { filePath: outsidePath }))
+    ).rejects.toThrow("Backup path must be within the user home, temp, or HyperShell backup directory");
+  });
+
+  it("rejects create path with non-sqlite extension", async () => {
+    const handlers = new Map<string, IpcHandler>();
+    registerBackupIpc({
+      handle(channel: string, handler: IpcHandler) {
+        handlers.set(channel, handler);
+      },
+    } as never);
+
+    const createHandler = handlers.get(ipcChannels.backup.create);
+    if (!createHandler) {
+      throw new Error("Missing backup.create handler");
+    }
+
+    const targetPath = path.join(homedir(), "backup.txt");
+    await expect(
+      Promise.resolve(createHandler({}, { filePath: targetPath }))
+    ).rejects.toThrow("Backup file must use a SQLite extension");
+  });
+
+  it("allows restore paths selected through the backup open dialog", async () => {
+    const handlers = new Map<string, IpcHandler>();
+    registerBackupIpc({
+      handle(channel: string, handler: IpcHandler) {
+        handlers.set(channel, handler);
+      },
+    } as never);
+
+    const showOpenDialogHandler = handlers.get(ipcChannels.backup.showOpenDialog);
+    const restoreHandler = handlers.get(ipcChannels.backup.restore);
+    if (!showOpenDialogHandler || !restoreHandler) {
+      throw new Error("Missing backup handlers");
+    }
+
+    const home = path.resolve(homedir());
+    const selectedPath = path.join(path.dirname(home), `${path.basename(home)}-external`, "selected.db");
+    electronMock.openDialogResult = { canceled: false, filePaths: [selectedPath] };
+
+    await expect(Promise.resolve(showOpenDialogHandler({}, {}))).resolves.toBe(path.resolve(selectedPath));
+    await expect(
+      Promise.resolve(restoreHandler({}, { filePath: selectedPath }))
+    ).rejects.toThrow("Backup file not found");
   });
 });

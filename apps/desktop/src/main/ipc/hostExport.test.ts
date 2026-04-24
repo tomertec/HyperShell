@@ -51,6 +51,26 @@ describe("host export", () => {
     expect(csv).toContain('"server, production"');
   });
 
+  it("neutralizes formula-like CSV cells", () => {
+    const dangerous = { ...sampleHost, name: "=cmd|' /C calc'!A0" };
+    const csv = exportHostsToCsv([dangerous]);
+    const lines = csv.split("\n");
+    expect(lines[1]).toContain("'=cmd|' /C calc'!A0");
+  });
+
+  it("neutralizes formula-like CSV cells after control characters", () => {
+    const dangerous = { ...sampleHost, name: "\t=cmd|' /C calc'!A0" };
+    const csv = exportHostsToCsv([dangerous]);
+    const lines = csv.split("\n");
+    expect(lines[1]).toMatch(/^'\t=cmd\|' \/C calc'!A0,/);
+  });
+
+  it("quotes CSV fields containing carriage returns", () => {
+    const hostWithCarriageReturn = { ...sampleHost, notes: "line one\rline two" };
+    const csv = exportHostsToCsv([hostWithCarriageReturn]);
+    expect(csv).toContain("\"line one\rline two\"");
+  });
+
   it("exports to SSH config format", () => {
     const config = exportHostsToSshConfig([{
       ...sampleHost,

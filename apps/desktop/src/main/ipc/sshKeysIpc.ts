@@ -10,16 +10,60 @@ import {
 import { convertPpkToOpenSsh } from "@hypershell/session-core";
 import { execFile } from "node:child_process";
 import { readdir, stat, unlink } from "node:fs/promises";
-import { join } from "node:path";
-import { homedir } from "node:os";
+import path, { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
 import { promisify } from "node:util";
 import type { IpcMainInvokeEvent } from "electron";
 import type { IpcMainLike } from "./registerIpc";
+import {
+  assertAbsolutePath,
+  assertNotWindowsDevicePath,
+  assertPathWithinAllowedRoots,
+} from "../security/pathPolicy";
 
 const execFileAsync = promisify(execFile);
 
 function sshDir(): string {
   return join(homedir(), ".ssh");
+}
+
+function assertSafeSshKeyName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === "." || trimmed === "..") {
+    throw new Error("SSH key name is required");
+  }
+  if (trimmed.includes(path.posix.sep) || trimmed.includes(path.win32.sep)) {
+    throw new Error("SSH key name cannot include path separators");
+  }
+  return trimmed;
+}
+
+function assertPathInSshDirectory(filePath: string): string {
+  const resolvedPath = assertAbsolutePath(filePath, "Absolute path is required for SSH key operations");
+  const allowedRoot = path.resolve(sshDir());
+  assertPathWithinAllowedRoots(
+    resolvedPath,
+    [allowedRoot],
+    "SSH key path must be within the ~/.ssh directory"
+  );
+  return resolvedPath;
+}
+
+function assertSafePpkPath(filePath: string): string {
+  const resolvedPath = assertAbsolutePath(filePath, "Absolute path is required for PPK conversion");
+  assertNotWindowsDevicePath(resolvedPath);
+
+  if (path.extname(resolvedPath).toLowerCase() !== ".ppk") {
+    throw new Error("PPK conversion requires a .ppk file");
+  }
+
+  const allowedRoots = [homedir(), tmpdir()].map((root) => path.resolve(root));
+  assertPathWithinAllowedRoots(
+    resolvedPath,
+    allowedRoots,
+    "PPK path must be within the user home or temp directory"
+  );
+  return resolvedPath;
 }
 
 function detectKeyTypeFromName(name: string): SshKeyInfo["type"] {
@@ -107,7 +151,8 @@ export function registerSshKeysIpc(ipcMain: IpcMainLike): void {
     ipcChannels.sshKeys.generate,
     async (_event: IpcMainInvokeEvent, request: unknown) => {
       const parsed = generateSshKeyRequestSchema.parse(request);
-      const keyPath = join(sshDir(), parsed.name);
+      const safeName = assertSafeSshKeyName(parsed.name);
+      const keyPath = assertPathInSshDirectory(join(sshDir(), safeName));
       const args = [
         "-t",
         parsed.type,
@@ -130,7 +175,8 @@ export function registerSshKeysIpc(ipcMain: IpcMainLike): void {
     ipcChannels.sshKeys.getFingerprint,
     async (_event: IpcMainInvokeEvent, request: unknown) => {
       const parsed = getFingerprintRequestSchema.parse(request);
-      const fingerprint = await getFingerprint(parsed.path);
+      const keyPath = assertPathInSshDirectory(parsed.path);
+      const fingerprint = await getFingerprint(keyPath);
       return { fingerprint };
     }
   );
@@ -139,9 +185,10 @@ export function registerSshKeysIpc(ipcMain: IpcMainLike): void {
     ipcChannels.sshKeys.remove,
     async (_event: IpcMainInvokeEvent, request: unknown) => {
       const parsed = removeSshKeyRequestSchema.parse(request);
-      await unlink(parsed.path);
+      const keyPath = assertPathInSshDirectory(parsed.path);
+      await unlink(keyPath);
       try {
-        await unlink(`${parsed.path}.pub`);
+        await unlink(`${keyPath}.pub`);
       } catch {
         // .pub may not exist
       }
@@ -153,7 +200,8 @@ export function registerSshKeysIpc(ipcMain: IpcMainLike): void {
     ipcChannels.sshKeys.convertPpk,
     async (_event: IpcMainInvokeEvent, request: unknown): Promise<ConvertPpkResponse> => {
       const parsed = convertPpkRequestSchema.parse(request);
-      return convertPpkToOpenSsh(parsed.ppkPath);
+      const ppkPath = assertSafePpkPath(parsed.ppkPath);
+      return convertPpkToOpenSsh(ppkPath);
     }
   );
 }

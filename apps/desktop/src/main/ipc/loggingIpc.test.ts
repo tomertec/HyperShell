@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createSessionLogger } from "./loggingIpc";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 describe("SessionLogger", () => {
@@ -56,5 +56,14 @@ describe("SessionLogger", () => {
   it("ignores data for non-logged sessions", () => {
     const logger = createSessionLogger();
     logger.onSessionData("no-session", "data");
+  });
+
+  it("rejects sibling-prefix paths outside allowed roots", () => {
+    const logger = createSessionLogger();
+    const home = path.resolve(homedir());
+    const outside = path.join(path.dirname(home), `${path.basename(home)}-evil`, "session.log");
+    expect(() => logger.start("sess-1", outside)).toThrow(
+      "Log path must be within the user home or temp directory"
+    );
   });
 });

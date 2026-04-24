@@ -15,14 +15,22 @@ import {
   statSync,
   unlinkSync,
 } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import type { IpcMainLike } from "./registerIpc";
 import { closeSharedDatabase } from "./hostsIpc";
+import {
+  assertAbsolutePath,
+  assertNotWindowsDevicePath,
+  assertPathWithinAllowedRoots,
+} from "../security/pathPolicy";
 
 const BACKUP_FILENAME_PREFIX = "hypershell-backup-";
 const BACKUP_EXTENSION = ".db";
 const MAX_AUTO_BACKUPS = 5;
 const SQLITE_MAGIC = "SQLite format 3\0";
+const ALLOWED_BACKUP_EXTENSIONS = new Set([".db", ".sqlite", ".sqlite3"]);
+const trustedDialogBackupPaths = new Set<string>();
 
 type SqliteOnlineBackupDatabase = {
   pragma(command: string): unknown;
@@ -50,6 +58,43 @@ export function getBackupDir(): string {
 function openSqliteDatabaseForBackup(dbPath: string): SqliteOnlineBackupDatabase {
   const Database = require("better-sqlite3");
   return new Database(dbPath, { fileMustExist: true }) as SqliteOnlineBackupDatabase;
+}
+
+function assertSafeBackupPath(
+  filePath: string,
+  options: { allowTrustedDialogSelection?: boolean } = {}
+): string {
+  const resolved = assertAbsolutePath(filePath, "Absolute path is required for backup files");
+  assertNotWindowsDevicePath(resolved);
+
+  const extension = path.extname(resolved).toLowerCase();
+  if (!ALLOWED_BACKUP_EXTENSIONS.has(extension)) {
+    throw new Error("Backup file must use a SQLite extension (.db, .sqlite, .sqlite3)");
+  }
+
+  if (options.allowTrustedDialogSelection && trustedDialogBackupPaths.has(resolved)) {
+    return resolved;
+  }
+
+  const allowedRoots = [homedir(), tmpdir(), getBackupDir()].map((root) => path.resolve(root));
+  assertPathWithinAllowedRoots(
+    resolved,
+    allowedRoots,
+    "Backup path must be within the user home, temp, or HyperShell backup directory"
+  );
+
+  return resolved;
+}
+
+function trustBackupPathFromDialog(filePath: string): string {
+  const resolved = assertAbsolutePath(filePath, "Absolute path is required for backup files");
+  assertNotWindowsDevicePath(resolved);
+  const extension = path.extname(resolved).toLowerCase();
+  if (!ALLOWED_BACKUP_EXTENSIONS.has(extension)) {
+    throw new Error("Backup file must use a SQLite extension (.db, .sqlite, .sqlite3)");
+  }
+  trustedDialogBackupPaths.add(resolved);
+  return resolved;
 }
 
 async function createConsistentBackup(sourcePath: string, destinationPath: string): Promise<void> {
@@ -198,16 +243,17 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
     async (_event: unknown, request: unknown) => {
       const parsed = createBackupRequestSchema.parse(request);
       const dbPath = getDatabasePath();
+      const safeDestinationPath = assertSafeBackupPath(parsed.filePath);
 
       if (!existsSync(dbPath)) {
         throw new Error("Database file not found");
       }
 
-      await createConsistentBackup(dbPath, parsed.filePath);
-      const stats = statSync(parsed.filePath);
+      await createConsistentBackup(dbPath, safeDestinationPath);
+      const stats = statSync(safeDestinationPath);
 
       return {
-        filePath: parsed.filePath,
+        filePath: safeDestinationPath,
         size: stats.size,
         createdAt: stats.mtime.toISOString(),
       };
@@ -218,12 +264,16 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
     ipcChannels.backup.restore,
     async (_event: unknown, request: unknown) => {
       const parsed = restoreBackupRequestSchema.parse(request);
+      const safeRestorePath = assertSafeBackupPath(parsed.filePath, {
+        allowTrustedDialogSelection: true,
+      });
+      trustedDialogBackupPaths.delete(safeRestorePath);
 
-      if (!existsSync(parsed.filePath)) {
+      if (!existsSync(safeRestorePath)) {
         throw new Error("Backup file not found");
       }
 
-      if (!isValidSqliteFile(parsed.filePath)) {
+      if (!isValidSqliteFile(safeRestorePath)) {
         throw new Error(
           "Invalid backup file: not a valid SQLite database"
         );
@@ -256,7 +306,7 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
       let movedCurrentToRollback = false;
       let restoreApplied = false;
       try {
-        copyFileSync(parsed.filePath, restoreTempPath);
+        copyFileSync(safeRestorePath, restoreTempPath);
         if (!isValidSqliteFile(restoreTempPath)) {
           throw new Error("Restore failed: copied backup is not a valid SQLite database");
         }
@@ -319,11 +369,14 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
       const result = await dialog.showOpenDialog({
         properties: ["openFile"],
         filters: [
-          { name: "SQLite Database", extensions: ["db"] },
-          { name: "All Files", extensions: ["*"] },
+          { name: "SQLite Database", extensions: ["db", "sqlite", "sqlite3"] },
         ],
       });
-      return result.canceled ? null : result.filePaths[0] ?? null;
+      if (result.canceled) {
+        return null;
+      }
+      const selectedPath = result.filePaths[0];
+      return selectedPath ? trustBackupPathFromDialog(selectedPath) : null;
     }
   );
 }
