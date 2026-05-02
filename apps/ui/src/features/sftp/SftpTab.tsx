@@ -171,11 +171,10 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
   useEffect(() => {
     const unsubscribe = window.hypershell?.onSftpEvent?.((event) => {
-      const hasTransfer = transferStore
-        .getState()
-        .transfers.some((transfer) => transfer.transferId === event.transferId);
-
       if (event.kind === "transfer-progress") {
+        const hasTransfer = transferStore
+          .getState()
+          .transfers.some((transfer) => transfer.transferId === event.transferId);
         if (!hasTransfer) {
           void refreshTransfers();
           return;
@@ -190,6 +189,9 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       }
 
       if (event.kind === "transfer-complete") {
+        const hasTransfer = transferStore
+          .getState()
+          .transfers.some((transfer) => transfer.transferId === event.transferId);
         if (hasTransfer) {
           transferStore.getState().updateTransfer(event.transferId, {
             status: event.status,

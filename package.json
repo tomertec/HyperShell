@@ -1,7 +1,7 @@
 {
   "name": "hypershell",
   "private": true,
-  "version": "0.1.8",
+  "version": "0.1.9",
   "packageManager": "pnpm@10.8.1",
   "workspaces": [
     "apps/*",
@@ -33,11 +33,14 @@
       "esbuild",
       "node-pty",
       "ssh2"
-    ]
+    ],
+    "overrides": {
+      "postcss": "^8.5.10"
+    }
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.8.3",
-    "vitest": "^3.1.2"
+    "vitest": "^3.2.4"
   }
 }

@@ -3,6 +3,7 @@ import { useStore } from "zustand";
 import { toast } from "sonner";
 import { useSnippetStore } from "./snippetStore";
 import { layoutStore } from "../layout/layoutStore";
+import { requestTerminalFocus } from "../terminal/terminalFocus";
 
 function SnippetForm({
   name,
@@ -106,10 +107,7 @@ export function SnippetsPanel() {
       return;
     }
     void window.hypershell?.writeSession?.({ sessionId: activeSessionId, data: body });
-    // Move focus back to the terminal so Enter goes to the session, not the button
-    (document.activeElement as HTMLElement | null)?.blur();
-    const termEl = document.querySelector<HTMLElement>(".xterm-helper-textarea");
-    termEl?.focus();
+    requestTerminalFocus(activeSessionId);
     toast.success("Snippet sent to terminal");
   };
 

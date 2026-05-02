@@ -32,20 +32,9 @@ import {
   keyboardInteractiveResponseSchema,
   type SftpEvent,
   type SftpSyncEvent,
-  type SftpDeleteRequest,
-  type SftpDisconnectRequest,
   type SftpConnectRequest,
-  type SftpListRequest,
-  type SftpMkdirRequest,
-  type SftpReadFileRequest,
-  type SftpRenameRequest,
-  type SftpStatRequest,
-  type SftpTransferCancelRequest,
   type SftpTransferPauseRequest,
-  type SftpTransferResolveConflictRequest,
   type SftpTransferResumeRequest,
-  type SftpTransferStartRequest,
-  type SftpWriteFileRequest,
   type KeyboardInteractiveRequest,
 } from "@hypershell/shared";
 import type {
@@ -61,8 +50,8 @@ import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 
 import type { IpcMainLike } from "./registerIpc";
 import { editorWindowManager } from "../windows/editorWindowManager";
-import { createSftpSessionManager, type SftpSessionManager } from "../sftp/sftpSessionManager";
-import { createTransferManager, type TransferManager } from "../sftp/transferManager";
+import { createSftpSessionManager } from "../sftp/sftpSessionManager";
+import { createTransferManager } from "../sftp/transferManager";
 import { createTransferManifest } from "../sftp/transferManifest";
 
 export function resolveSafeDragOutPath(tempDir: string, fileName: string): string {

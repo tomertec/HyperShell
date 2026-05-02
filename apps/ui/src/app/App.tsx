@@ -657,11 +657,12 @@ function MainApp() {
     async (host: HostRecord) => {
       // Tmux probe requires non-interactive auth (key-based or agent).
       // Password-only hosts can't authenticate a one-shot SSH command.
-      const canProbe = host.tmuxDetect && host.authMethod !== "password" && window.hypershell?.tmuxProbe;
+      const tmuxProbe = window.hypershell?.tmuxProbe;
+      const canProbe = host.tmuxDetect && host.authMethod !== "password" && tmuxProbe;
       if (canProbe) {
         const gen = ++tmuxProbeGenRef.current;
         try {
-          const result = await window.hypershell.tmuxProbe({ hostId: host.id });
+          const result = await tmuxProbe({ hostId: host.id });
           // If another probe was started while this one was in-flight, discard
           if (gen !== tmuxProbeGenRef.current) return;
           if (result.sessions.length > 0) {
@@ -1387,6 +1388,7 @@ function MainApp() {
               autoReconnect: false,
               reconnectMaxAttempts: 5,
               reconnectBaseInterval: 1,
+              tmuxDetect: false,
             }));
             setHosts((prev) => [...prev, ...newHosts]);
             for (const host of newHosts) {
@@ -1425,6 +1427,7 @@ function MainApp() {
               autoReconnect: false,
               reconnectMaxAttempts: 5,
               reconnectBaseInterval: 1,
+              tmuxDetect: false,
             }));
             setHosts((prev) => [...prev, ...newHosts]);
             for (const host of newHosts) {

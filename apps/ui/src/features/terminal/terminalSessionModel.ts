@@ -5,6 +5,7 @@ export type TerminalSessionState =
   | "connecting"
   | "connected"
   | "reconnecting"
+  | "waiting_for_network"
   | "disconnected"
   | "failed";
 

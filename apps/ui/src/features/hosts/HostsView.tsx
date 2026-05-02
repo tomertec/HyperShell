@@ -36,6 +36,7 @@ const demoHosts: HostRecord[] = [
     autoReconnect: false,
     reconnectMaxAttempts: 5,
     reconnectBaseInterval: 1,
+    tmuxDetect: false,
     notes: "Primary web server"
   },
   {
@@ -58,6 +59,7 @@ const demoHosts: HostRecord[] = [
     autoReconnect: false,
     reconnectMaxAttempts: 5,
     reconnectBaseInterval: 1,
+    tmuxDetect: false,
     notes: "Use for multi-hop access"
   }
 ];
@@ -148,6 +150,7 @@ export function HostsView() {
                 autoReconnect: false,
                 reconnectMaxAttempts: 5,
                 reconnectBaseInterval: 1,
+                tmuxDetect: false,
               }));
 
               return [...currentHosts, ...importedHosts];

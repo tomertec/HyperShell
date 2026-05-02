@@ -10,6 +10,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-05-02
+
+### Changed
+
+- **Dependency security updates** — upgraded Electron, electron-builder, Vite, and better-sqlite3, then refreshed the pnpm lockfile. Added a pnpm override for PostCSS so `pnpm audit --audit-level moderate` reports no known vulnerabilities.
+- **UI build now type-checks React code** — `@hypershell/ui` build runs `tsc --noEmit` before Vite, preventing renderer TypeScript regressions from passing CI/build gates.
+- **TypeScript dead-code checks enabled** — root compiler config now enables `noUnusedLocals` and `noUnusedParameters`; unused imports, stale helpers, and test-only dead code were removed across desktop, session-core, db, and UI workspaces.
+
+### Fixed
+
+- **Renderer URL allowlist tightened** — desktop renderer loading now allows only the exact packaged renderer file or the exact dev origin (`http://127.0.0.1:5173`), reducing preload API exposure risk.
+- **SFTP preload logging removed** — `sftpList` no longer logs file names or raw response samples during normal operation or validation failures.
+- **Renderer type-safety regressions fixed** — tmux detection, host import defaults, transfer event narrowing, terminal network state handling, tunnel store updates, host port-forward payloads, settings tests, and global app-version typing now pass strict UI type-checking.
+- **Terminal focus restored after tab and snippet actions** — switching terminal tabs now refits and focuses the visible xterm instance, and sending a snippet returns focus to the active terminal session so pressing Enter submits to the terminal instead of the snippets panel.
+
 ## [0.1.8] - 2026-04-24
 
 ## [0.1.7] - 2026-04-24

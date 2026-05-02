@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { createSsh2ConnectionPool } from "./ssh2ConnectionPool";
-import type { ResolvedAuth, Ssh2PoolTarget } from "./ssh2ConnectionPool";
+import type { Ssh2PoolTarget } from "./ssh2ConnectionPool";
 
 // Mock ssh2 Client
 vi.mock("ssh2", () => {
@@ -83,6 +83,7 @@ describe("ssh2ConnectionPool", () => {
     const pool = createSsh2ConnectionPool();
     const conn1 = await pool.acquire(makeTarget());
     const conn2 = await pool.acquire(makeTarget());
+    expect(conn2.connectionId).toBe(conn1.connectionId);
 
     pool.release(conn1.connectionId, conn1.consumerId);
     expect(pool.getStats()).toHaveLength(1);
@@ -128,6 +129,7 @@ describe("ssh2ConnectionPool", () => {
 
     // Acquire again before timeout
     const conn2 = await pool.acquire(makeTarget());
+    expect(conn2.connectionId).toBe(conn1.connectionId);
     vi.advanceTimersByTime(31000);
 
     // Connection should still be alive (idle timer was cancelled)

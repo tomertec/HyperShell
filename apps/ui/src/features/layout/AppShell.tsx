@@ -62,7 +62,7 @@ export function AppShell({ sidebar, children }: AppShellProps) {
                 <motion.span
                   className="inline-block w-[2px] h-[14px] bg-accent ml-0.5 rounded-full"
                   animate={{ opacity: [1, 1, 0, 0] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "steps(1)" }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear", times: [0, 0.5, 0.5, 1] }}
                 />
               </span>
             )}

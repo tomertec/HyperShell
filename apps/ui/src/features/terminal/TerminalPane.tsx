@@ -12,6 +12,7 @@ export interface TerminalPaneProps {
   profileId: string;
   sessionId?: string;
   autoConnect?: boolean;
+  isVisible?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   tmuxAttachTarget?: string;
   onSessionOpened?: (sessionId: string) => void;
@@ -22,6 +23,7 @@ export function TerminalPane({
   profileId,
   sessionId,
   autoConnect,
+  isVisible = true,
   telnetOptions,
   tmuxAttachTarget,
   onSessionOpened
@@ -39,12 +41,26 @@ export function TerminalPane({
     tmuxAttachTarget,
     onSessionOpened
   });
-  const { fit } = session;
+  const { fit, focusTerminal, terminal } = session;
 
   useEffect(() => {
     fit();
   }, [fit]);
 
+  useEffect(() => {
+    if (!isVisible || !terminal) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      fit();
+      focusTerminal();
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [fit, focusTerminal, isVisible, terminal]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">

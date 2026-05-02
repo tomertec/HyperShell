@@ -15,7 +15,7 @@ class FakeSocket extends EventEmitter implements SocketLike {
   public destroyed = false;
   public connectError: Error | null = null;
 
-  connect(port: number, host: string, callback: () => void): this {
+  connect(_port: number, _host: string, callback: () => void): this {
     if (this.connectError) {
       queueMicrotask(() => {
         this.emit("error", this.connectError);

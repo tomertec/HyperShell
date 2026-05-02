@@ -34,6 +34,7 @@ describe("settingsStore custom themes", () => {
         ...state.settings,
         debug: { authTracing: false },
         general: {
+          ...state.settings.general,
           showRecordingButton: true,
           showRestoreBanner: true,
           showSerialInSidebar: true,

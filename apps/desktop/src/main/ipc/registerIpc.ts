@@ -74,7 +74,6 @@ import {
 } from "../security/credentialCache";
 import {
   createHostEnvVarRepositoryFromDatabase,
-  createHostFingerprintRepositoryFromDatabase,
   createConnectionHistoryRepositoryFromDatabase,
   createGroupsRepository,
   createSerialProfilesRepository
@@ -222,7 +221,6 @@ const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;
 let connectionHistoryRepository: ReturnType<typeof createConnectionHistoryRepositoryFromDatabase> | null = null;
 let hostEnvVarRepository: ReturnType<typeof createHostEnvVarRepositoryFromDatabase> | null = null;
-let hostFingerprintRepository: ReturnType<typeof createHostFingerprintRepositoryFromDatabase> | null = null;
 
 export function disposeSessionRuntime(): void {
   sessionManager.destroyAll();
@@ -308,22 +306,6 @@ function getHostEnvVarRepository():
 
   hostEnvVarRepository = createHostEnvVarRepositoryFromDatabase(db);
   return hostEnvVarRepository;
-}
-
-function getHostFingerprintRepository():
-  | ReturnType<typeof createHostFingerprintRepositoryFromDatabase>
-  | null {
-  if (hostFingerprintRepository) {
-    return hostFingerprintRepository;
-  }
-
-  const db = getOrCreateDatabase() as SqliteDatabase | null;
-  if (!db) {
-    return null;
-  }
-
-  hostFingerprintRepository = createHostFingerprintRepositoryFromDatabase(db);
-  return hostFingerprintRepository;
 }
 
 const groupsRepo = createGroupsRepository();
@@ -922,15 +904,6 @@ async function resolveSftpConnectionOptions(
       }
     }
     return result;
-  };
-
-  const resolveIdentityFile = () => {
-    const all = resolveAllIdentityFiles();
-    if (all.length > 0) {
-      return all[0];
-    }
-
-    return undefined;
   };
 
   const resolveAgentPath = (): string | undefined => {

@@ -141,9 +141,9 @@ import type {
   SftpDragOutResponse,
 } from "@hypershell/shared";
 
-declare const __APP_VERSION__: string;
-
 declare global {
+  const __APP_VERSION__: string;
+
   interface Window {
     hypershell?: {
       openSession?: (request: OpenSessionRequest) => Promise<OpenSessionResponse>;

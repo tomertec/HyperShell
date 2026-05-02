@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createSnippetsRepositoryFromDatabase, type SnippetRecord } from "./snippetsRepository";
+import { createSnippetsRepositoryFromDatabase } from "./snippetsRepository";
 import { openDatabase, type SqliteDatabase } from "../index";
 
 describe("SnippetsRepository", () => {

@@ -448,14 +448,17 @@ export function HostForm({
 
   useEffect(() => {
     const currentHostId = hostId;
-    if (!currentHostId || !window.hypershell?.tagsGetHostTags) {
+    const tagsGetHostTags = window.hypershell?.tagsGetHostTags;
+    if (!currentHostId || !tagsGetHostTags) {
       return;
     }
+    const hostIdForLoad = currentHostId;
+    const getHostTagsForLoad = tagsGetHostTags;
     let cancelled = false;
     async function loadHostTags() {
       try {
-        const hostTags = await window.hypershell?.tagsGetHostTags?.({
-          hostId: currentHostId,
+        const hostTags = await getHostTagsForLoad({
+          hostId: hostIdForLoad,
         });
         if (cancelled || !hostTags) {
           return;
@@ -510,13 +513,16 @@ export function HostForm({
 
   useEffect(() => {
     const currentHostId = hostId;
-    if (!currentHostId || !window.hypershell?.listHostEnvVars) {
+    const listHostEnvVars = window.hypershell?.listHostEnvVars;
+    if (!currentHostId || !listHostEnvVars) {
       return;
     }
+    const hostIdForLoad = currentHostId;
+    const listHostEnvVarsForLoad = listHostEnvVars;
     let cancelled = false;
     async function loadHostEnvVars() {
       try {
-        const envVars = await window.hypershell?.listHostEnvVars?.({ hostId: currentHostId });
+        const envVars = await listHostEnvVarsForLoad({ hostId: hostIdForLoad });
         if (cancelled || !envVars) {
           return;
         }

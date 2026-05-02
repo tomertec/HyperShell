@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createSessionManager } from "./sessionManager";
 import { createNetworkMonitor } from "./networkMonitor";
@@ -221,7 +221,7 @@ describe("sessionManager", () => {
     let transportCount = 0;
 
     const manager = createSessionManager({
-      createTransport(request) {
+      createTransport() {
         transportCount++;
         return {
           write() {},
@@ -249,12 +249,9 @@ describe("sessionManager", () => {
 
     let transportCount = 0;
     const listeners = new Set<(event: SessionTransportEvent) => void>();
-    let capturedSessionId = "";
-
     const manager = createSessionManager({
       createTransport(request) {
         transportCount++;
-        capturedSessionId = request.sessionId;
         return {
           write() {},
           resize() {},
@@ -448,7 +445,7 @@ describe("network-aware reconnect", () => {
     const emitters: Array<(event: SessionTransportEvent) => void> = [];
     let callCount = 0;
 
-    function factory(request: OpenSessionRequest): TransportHandle {
+    function factory(_request: OpenSessionRequest): TransportHandle {
       callCount++;
       const listeners = new Set<(event: SessionTransportEvent) => void>();
       const transport: TransportHandle = {

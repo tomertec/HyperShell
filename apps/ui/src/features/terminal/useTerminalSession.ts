@@ -12,6 +12,11 @@ import { getTerminalOptions } from "./terminalTheme";
 import { getTerminalClipboardAction } from "./terminalClipboard";
 import { getTerminalFontSizeAction } from "./terminalFontSize";
 import {
+  TERMINAL_FOCUS_REQUEST_EVENT,
+  shouldHandleTerminalFocusRequest,
+  type TerminalFocusRequestDetail
+} from "./terminalFocus";
+import {
   createAsyncOperationGuard,
   mapSessionEvent,
   type TerminalSessionState
@@ -112,7 +117,7 @@ export function useTerminalSession(
       viewport.style.backgroundColor = background;
     }
 
-    const canvases = container.querySelectorAll(".xterm-screen canvas");
+    const canvases = Array.from(container.querySelectorAll(".xterm-screen canvas"));
     for (const canvas of canvases) {
       (canvas as HTMLCanvasElement).style.backgroundColor = background;
     }
@@ -330,7 +335,7 @@ export function useTerminalSession(
       container = containerRef.current;
       if (container) {
         instance.open(container);
-        applyTerminalBackground(opts.theme.background);
+        applyTerminalBackground(opts.theme?.background ?? "#07111f");
         try { addon.fit(); } catch { /* container may not have dimensions yet */ }
         instance.focus();
         instance.writeln("hypershell ready.");
@@ -581,7 +586,7 @@ export function useTerminalSession(
       scrollback: opts.scrollback,
       theme: opts.theme,
     });
-    applyTerminalBackground(opts.theme.background);
+    applyTerminalBackground(opts.theme?.background ?? "#07111f");
     if (needsRefit) fit();
   }, [applyTerminalBackground, terminalSettings, customThemes, fit]);
 
@@ -618,6 +623,24 @@ export function useTerminalSession(
       eventUnsubscribeRef.current = null;
     };
   }, [applySessionEvent]);
+
+  useEffect(() => {
+    const onFocusRequest = (event: Event) => {
+      const detail = (event as CustomEvent<TerminalFocusRequestDetail>).detail;
+      if (!shouldHandleTerminalFocusRequest(detail?.sessionId, sessionIdRef.current)) {
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        terminalRef.current?.focus();
+      });
+    };
+
+    window.addEventListener(TERMINAL_FOCUS_REQUEST_EVENT, onFocusRequest);
+    return () => {
+      window.removeEventListener(TERMINAL_FOCUS_REQUEST_EVENT, onFocusRequest);
+    };
+  }, []);
 
   useEffect(() => {
     const onResize = () => {

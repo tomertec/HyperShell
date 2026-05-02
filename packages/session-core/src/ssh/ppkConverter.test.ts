@@ -25,14 +25,6 @@ function mockExecFileSuccess(stdout: string) {
   );
 }
 
-function mockExecFileFailure(error: Error) {
-  (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-    (_cmd: string, _args: string[], callback: (err: Error | null) => void) => {
-      callback(error);
-    }
-  );
-}
-
 function mockExecFileSequence(results: Array<{ stdout?: string; error?: Error }>) {
   let callIndex = 0;
   (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(

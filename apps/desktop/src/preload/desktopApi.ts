@@ -900,37 +900,13 @@ export function createDesktopApi(
       const result = await ipcRenderer.invoke(ipcChannels.sftp.list, parsed);
       const strict = sftpListResponseSchema.safeParse(result);
       if (strict.success) {
-        console.log(
-          "[sftp-preload] sftpList strict parse ok:",
-          strict.data.entries.length,
-          strict.data.entries.length > 0 ? `(first: ${strict.data.entries[0].name})` : ""
-        );
         return strict.data;
       }
 
       const normalized = normalizeSftpListResponseShape(result);
       if (normalized) {
-        console.log(
-          "[sftp-preload] sftpList normalized fallback ok:",
-          normalized.entries.length,
-          normalized.entries.length > 0 ? `(first: ${normalized.entries[0].name})` : ""
-        );
         return normalized;
       }
-
-      const payload = asRecord(result);
-      const payloadEntries = payload?.entries;
-      const previewEntry = Array.isArray(result)
-        ? result[0]
-        : Array.isArray(payloadEntries)
-          ? payloadEntries[0]
-          : undefined;
-
-      console.error("[sftp-preload] Zod parse failed for sftpList response:", strict.error);
-      console.error(
-        "[sftp-preload] Raw result sample:",
-        JSON.stringify(previewEntry).slice(0, 200)
-      );
       throw strict.error;
     },
     async sftpStat(request: SftpStatRequest): Promise<SftpEntry> {

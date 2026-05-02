@@ -6,6 +6,7 @@ import { WelcomeScreen } from "../welcome";
 import { BroadcastBar, BroadcastButton } from "../broadcast/BroadcastBar";
 import { SftpTab } from "../sftp";
 import { TerminalPane } from "../terminal/TerminalPane";
+import { requestTerminalFocus } from "../terminal/terminalFocus";
 import { useTunnelStore } from "../tunnels/tunnelStore";
 import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
 import { useSnippetStore } from "../snippets/snippetStore";
@@ -85,6 +86,7 @@ function PaneView({
               profileId={tab.profileId ?? tab.sessionId}
               sessionId={tab.preopened ? tab.sessionId : undefined}
               autoConnect={!tab.preopened}
+              isVisible={isVisible}
               telnetOptions={tab.telnetOptions}
               tmuxAttachTarget={tab.tmuxAttachTarget}
               onSessionOpened={(sessionId) => {
@@ -202,7 +204,10 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
           <TabBar
             tabs={tabs}
             activeSessionId={activeSessionId}
-            onActivate={activateTab}
+            onActivate={(sessionId) => {
+              activateTab(sessionId);
+              requestTerminalFocus(sessionId);
+            }}
             onClose={closeTab}
             onReorder={(from, to) => layoutStore.getState().moveTab(from, to)}
           />

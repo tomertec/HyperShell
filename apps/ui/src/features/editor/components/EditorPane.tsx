@@ -100,7 +100,6 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
 
   // Reconfigure settings via compartments
   useEffect(() => {
-    const { settings } = storeRef.current.getState();
     const unsub = storeRef.current.subscribe((state, prev) => {
       const s = state.settings;
       const p = prev.settings;

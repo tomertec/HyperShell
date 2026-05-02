@@ -397,11 +397,10 @@ export function TransferPopup() {
 
   useEffect(() => {
     const unsubscribe = window.hypershell?.onSftpEvent?.((event) => {
-      const hasTransfer = transferStore
-        .getState()
-        .transfers.some((transfer) => transfer.transferId === event.transferId);
-
       if (event.kind === "transfer-progress") {
+        const hasTransfer = transferStore
+          .getState()
+          .transfers.some((transfer) => transfer.transferId === event.transferId);
         if (!hasTransfer) {
           void refreshTransfers();
           return;
@@ -424,6 +423,9 @@ export function TransferPopup() {
       }
 
       if (event.kind === "transfer-complete") {
+        const hasTransfer = transferStore
+          .getState()
+          .transfers.some((transfer) => transfer.transferId === event.transferId);
         setConflictIds((prev) => {
           if (!prev.has(event.transferId)) return prev;
           const next = new Set(prev);
@@ -683,7 +685,7 @@ export function TransferPopup() {
       await window.hypershell?.sftpTransferRetry?.({ transferId });
       toast.success("Transfer resumed");
     } catch (err) {
-      toast.error(`Resume failed: ${toErrorMessage(err)}`);
+      toast.error(toErrorMessage(err, "Resume failed"));
     } finally {
       setPendingOps((current) => { const next = new Map(current); next.delete(transferId); return next; });
       void refreshTransfers();

@@ -5,10 +5,10 @@ import { handleFileKeyDown, type FileKeyboardContext } from "./useFileKeyboard";
 function makeContext(overrides: Partial<FileKeyboardContext> = {}): FileKeyboardContext {
   return {
     entries: [
-      { name: "docs", path: "/docs", size: 0, modifiedAt: "", isDirectory: true },
-      { name: "src", path: "/src", size: 0, modifiedAt: "", isDirectory: true },
-      { name: "file.ts", path: "/file.ts", size: 100, modifiedAt: "", isDirectory: false },
-      { name: "readme.md", path: "/readme.md", size: 50, modifiedAt: "", isDirectory: false }
+      { name: "docs", path: "/docs", isDirectory: true },
+      { name: "src", path: "/src", isDirectory: true },
+      { name: "file.ts", path: "/file.ts", isDirectory: false },
+      { name: "readme.md", path: "/readme.md", isDirectory: false }
     ],
     cursorIndex: 0,
     selection: new Set<string>(),

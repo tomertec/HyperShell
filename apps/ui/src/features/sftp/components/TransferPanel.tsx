@@ -73,7 +73,7 @@ export function TransferPanel() {
       await window.hypershell?.sftpTransferRetry?.({ transferId });
       toast.success("Transfer resumed");
     } catch (err) {
-      toast.error(`Resume failed: ${toErrorMessage(err)}`);
+      toast.error(toErrorMessage(err, "Resume failed"));
     }
   };
 

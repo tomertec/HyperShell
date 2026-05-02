@@ -87,23 +87,25 @@ function persistSessionRecoverySnapshot(): void {
 }
 
 function getRendererUrl(): string {
+  const bundledRendererEntry = path.join(
+    import.meta.dirname,
+    "..",
+    "renderer",
+    "index.html"
+  );
   const rawUrl = process.env.SSHTERM_RENDERER_URL
     ?? (() => {
-      const bundledRendererEntry = path.join(
-        import.meta.dirname,
-        "..",
-        "renderer",
-        "index.html"
-      );
-
       if (existsSync(bundledRendererEntry)) {
         return pathToFileURL(bundledRendererEntry).toString();
       }
 
-      return "http://localhost:5173";
+      return "http://127.0.0.1:5173";
     })();
 
-  return assertAllowedRendererUrl(rawUrl).toString();
+  return assertAllowedRendererUrl(rawUrl, {
+    packagedRendererPath: bundledRendererEntry,
+    allowDevServer: !app.isPackaged,
+  }).toString();
 }
 
 const mainProcessLifecycle = createMainProcessLifecycle({
