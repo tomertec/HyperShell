@@ -28,9 +28,8 @@ pnpm ci:build
 pnpm ci:test
 pnpm ci:test:e2e
 
-# Windows release
+# Windows release (unsigned)
 pnpm release:windows:unsigned
-pnpm release:windows:signed
 ```
 
 **Important:** After changing main process or preload code, you must `pnpm --filter @hypershell/desktop build` and restart Electron. UI changes are picked up by Vite HMR automatically — unless Electron is loading the bundled renderer (delete `apps/desktop/dist/renderer/` to force Vite dev server in development).
