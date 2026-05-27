@@ -142,7 +142,7 @@ describe("updateStateSchema", () => {
 
 Run:
 ```bash
-pnpm --filter @hypershell/shared exec vitest run src/ipc/updateSchemas.test.ts
+pnpm exec vitest run packages/shared/src/ipc/updateSchemas.test.ts
 ```
 Expected: FAIL — cannot resolve `./updateSchemas`.
 
@@ -214,7 +214,7 @@ export * from "./ipc/updateSchemas";
 
 Run:
 ```bash
-pnpm --filter @hypershell/shared exec vitest run src/ipc/updateSchemas.test.ts
+pnpm exec vitest run packages/shared/src/ipc/updateSchemas.test.ts
 ```
 Expected: PASS (4 tests).
 
@@ -304,7 +304,7 @@ describe("parseLatestRelease", () => {
 
 Run:
 ```bash
-pnpm --filter @hypershell/desktop exec vitest run src/main/updates/updateLogic.test.ts
+pnpm exec vitest run apps/desktop/src/main/updates/updateLogic.test.ts
 ```
 Expected: FAIL — cannot resolve `./updateLogic`.
 
@@ -373,7 +373,7 @@ export function parseLatestRelease(payload: unknown): ParsedRelease | null {
 
 Run:
 ```bash
-pnpm --filter @hypershell/desktop exec vitest run src/main/updates/updateLogic.test.ts
+pnpm exec vitest run apps/desktop/src/main/updates/updateLogic.test.ts
 ```
 Expected: PASS (all describe blocks green).
 
@@ -548,7 +548,7 @@ describe("createUpdateService (darwin)", () => {
 
 Run:
 ```bash
-pnpm --filter @hypershell/desktop exec vitest run src/main/updates/updateService.test.ts
+pnpm exec vitest run apps/desktop/src/main/updates/updateService.test.ts
 ```
 Expected: FAIL — cannot resolve `./updateService`.
 
@@ -765,7 +765,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
 
 Run:
 ```bash
-pnpm --filter @hypershell/desktop exec vitest run src/main/updates/updateService.test.ts
+pnpm exec vitest run apps/desktop/src/main/updates/updateService.test.ts
 ```
 Expected: PASS (win32 + darwin describe blocks green).
 
@@ -934,7 +934,7 @@ Then in `bootstrap()`, after `await mainProcessLifecycle.bootstrap();` (line 124
 Run:
 ```bash
 pnpm --filter @hypershell/desktop build
-pnpm --filter @hypershell/desktop exec vitest run src/main/ipc/registerIpc.test.ts
+pnpm exec vitest run apps/desktop/src/main/ipc/registerIpc.test.ts
 ```
 Expected: build PASS; registerIpc tests PASS (the test mocks `electron` and uses `.toContain` for channels, so new channels do not break it).
 
@@ -1139,7 +1139,7 @@ describe("updateStore", () => {
 
 Run:
 ```bash
-pnpm --filter @hypershell/ui exec vitest run src/features/updates/updateStore.test.ts
+pnpm exec vitest run apps/ui/src/features/updates/updateStore.test.ts
 ```
 Expected: FAIL — cannot resolve `./updateStore`.
 
@@ -1219,7 +1219,7 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
 
 Run:
 ```bash
-pnpm --filter @hypershell/ui exec vitest run src/features/updates/updateStore.test.ts
+pnpm exec vitest run apps/ui/src/features/updates/updateStore.test.ts
 ```
 Expected: PASS (5 tests).
 
