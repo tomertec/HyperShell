@@ -64,6 +64,7 @@ import { registerSshManagerImportIpc } from "./sshManagerImportIpc";
 import { registerBackupIpc } from "./backupIpc";
 import { registerSessionRecoveryIpc } from "./sessionRecoveryIpc";
 import { registerTmuxIpc } from "./tmuxIpc";
+import { getUpdateService, setUpdateStateEmitter } from "../updates/updateService";
 import {
   createHostStatusService,
   type HostStatusTarget,
@@ -210,6 +211,11 @@ const registeredChannels = [
   ipcChannels.backup.showOpenDialog,
   ipcChannels.tmux.probe,
   ipcChannels.app.setTheme,
+  ipcChannels.update.check,
+  ipcChannels.update.download,
+  ipcChannels.update.install,
+  ipcChannels.update.openRelease,
+  ipcChannels.update.getState,
 ] as const;
 
 const networkMonitor = createNetworkMonitor({
@@ -319,6 +325,7 @@ export interface RegisterIpcOptions {
   emitSyncEvent?: (event: unknown) => void;
   emitKeyboardInteractive?: (event: unknown) => void;
   emitHostStatusEvent?: (event: unknown) => void;
+  emitUpdateState?: (state: unknown) => void;
   sessionManager?: SessionManager;
   db?: unknown;
   resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; password?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
@@ -1458,6 +1465,22 @@ export function registerIpc(
       // setTitleBarOverlay may not be available on all platforms
     }
   });
+
+  setUpdateStateEmitter((state) => {
+    options.emitUpdateState?.(state);
+  });
+
+  ipcMain.handle(ipcChannels.update.check, () =>
+    getUpdateService().check({ manual: true })
+  );
+  ipcMain.handle(ipcChannels.update.download, () => getUpdateService().download());
+  ipcMain.handle(ipcChannels.update.install, () => {
+    getUpdateService().install();
+  });
+  ipcMain.handle(ipcChannels.update.openRelease, () => {
+    getUpdateService().openRelease();
+  });
+  ipcMain.handle(ipcChannels.update.getState, () => getUpdateService().getState());
 
   ipcMain.handle(ipcChannels.connectionPool.stats, () => {
     return ssh2ConnectionPool.getStats();

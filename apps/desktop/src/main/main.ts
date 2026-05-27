@@ -11,6 +11,7 @@ import {
 
 import { createHostMonitor } from "./monitoring/hostMonitor";
 import { disposeSessionRuntime, registerIpc, sessionManager } from "./ipc/registerIpc";
+import { getUpdateService } from "./updates/updateService";
 import { performAutoBackup } from "./ipc/backupIpc";
 import { createAppMenu } from "./menu/createAppMenu";
 import { createTray } from "./tray/createTray";
@@ -122,6 +123,7 @@ async function bootstrap(): Promise<void> {
   createAppMenu();
   await performAutoBackup();
   await mainProcessLifecycle.bootstrap();
+  getUpdateService().start();
 
   if (!sessionRecoveryTimer) {
     sessionRecoveryTimer = setInterval(
