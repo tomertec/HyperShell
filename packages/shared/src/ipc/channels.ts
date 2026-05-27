@@ -214,6 +214,15 @@ export const appChannels = {
   setTheme: "app:set-theme",
 } as const;
 
+export const updateChannels = {
+  check: "updates:check",
+  download: "updates:download",
+  install: "updates:install",
+  openRelease: "updates:open-release",
+  getState: "updates:get-state",
+  state: "updates:state"
+} as const;
+
 export const ipcChannels = {
   session: sessionChannels,
   hosts: hostChannels,
@@ -242,4 +251,5 @@ export const ipcChannels = {
   backup: backupChannels,
   tmux: tmuxChannels,
   app: appChannels,
+  update: updateChannels,
 } as const;

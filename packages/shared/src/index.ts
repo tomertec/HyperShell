@@ -4,3 +4,4 @@ export * from "./ipc/channels";
 export * from "./ipc/contracts";
 export * from "./ipc/schemas";
 export * from "./ipc/sftpSchemas";
+export * from "./ipc/updateSchemas";
