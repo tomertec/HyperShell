@@ -93,7 +93,7 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "$TAG" --generate-notes --title "$TAG" || true
           cd apps/desktop/release
-          EXE=$(find . -name '*.exe' | head -1)
+          EXE=$(find . -maxdepth 1 -name '*.exe' | head -1)
           if [ -z "$EXE" ]; then
             echo "No installer found, skipping upload"
             exit 0
@@ -102,7 +102,7 @@ jobs:
           gh release upload "$TAG" "$EXE" --clobber
           # Upload auto-update metadata LAST so a polling client never sees
           # an advertised version before its installer asset exists.
-          gh release upload "$TAG" latest.yml --clobber || true
+          [ -f latest.yml ] && gh release upload "$TAG" latest.yml --clobber || true
           for BLOCKMAP in *.blockmap; do
             [ -e "$BLOCKMAP" ] && gh release upload "$TAG" "$BLOCKMAP" --clobber || true
           done

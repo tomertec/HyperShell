@@ -18,7 +18,7 @@ in the release notes for the first auto-update build.
 ## Release metadata
 
 The CI release jobs upload, in this order, to each GitHub Release:
-1. The installer (`*.exe` / `*.AppImage`)
+1. The installer (`*.exe` / `*.AppImage` / `*.deb`)
 2. `latest.yml` / `latest-linux.yml`
 3. `*.blockmap`
 
