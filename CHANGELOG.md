@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-27
+
+### Removed
+
+- **Unused Windows code-signing tooling** — dropped the now-dead signed packaging scripts and the signing-environment verifier, since release builds are unsigned as of 0.2.3.
+
 ## [0.2.3] - 2026-05-27
 
 ### Changed
