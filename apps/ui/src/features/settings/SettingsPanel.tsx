@@ -334,6 +334,8 @@ function UpdatesSection() {
     }
   }
 
+  const status = statusLine();
+
   return (
     <div className="grid gap-6">
       <div>
@@ -344,19 +346,21 @@ function UpdatesSection() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm text-text-primary">Current version</div>
-              <div className="text-xs text-text-muted">v{currentVersion}</div>
+              <div className="text-xs text-text-muted">
+                {update ? `v${currentVersion}` : currentVersion}
+              </div>
             </div>
             <button
               type="button"
               onClick={() => void check()}
               disabled={checking}
-              className="rounded border border-border px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-base-600 disabled:opacity-50"
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-base-600 disabled:opacity-50"
             >
               {checking ? "Checking…" : "Check for updates"}
             </button>
           </div>
-          {statusLine() ? (
-            <div className="text-xs text-text-muted">{statusLine()}</div>
+          {status ? (
+            <div className="text-xs text-text-muted">{status}</div>
           ) : null}
           {update?.lastCheckedAt ? (
             <div className="text-xs text-text-muted">
