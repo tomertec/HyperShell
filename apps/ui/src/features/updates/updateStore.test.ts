@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useUpdateStore, shouldShowBanner } from "./updateStore";
 
@@ -7,8 +7,12 @@ describe("updateStore", () => {
     useUpdateStore.setState({ update: null, dismissedVersion: null });
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("stores pushed state", () => {
-    useUpdateStore.getState().setState({
+    useUpdateStore.getState().applyState({
       status: "available",
       currentVersion: "0.1.9",
       availableVersion: "0.2.0"
@@ -17,7 +21,7 @@ describe("updateStore", () => {
   });
 
   it("records the dismissed version", () => {
-    useUpdateStore.getState().setState({
+    useUpdateStore.getState().applyState({
       status: "available",
       currentVersion: "0.1.9",
       availableVersion: "0.2.0"
@@ -36,6 +40,12 @@ describe("updateStore", () => {
     expect(
       shouldShowBanner(
         { status: "downloaded", currentVersion: "0.1.9", availableVersion: "0.2.0" },
+        null
+      )
+    ).toBe(true);
+    expect(
+      shouldShowBanner(
+        { status: "manual-available", currentVersion: "0.1.9", availableVersion: "0.2.0" },
         null
       )
     ).toBe(true);
@@ -61,5 +71,19 @@ describe("updateStore", () => {
         "0.2.0"
       )
     ).toBe(true);
+  });
+
+  it("refresh() loads state from the bridge", async () => {
+    vi.stubGlobal("window", {
+      hypershell: {
+        getUpdateState: async () => ({
+          status: "available",
+          currentVersion: "0.1.9",
+          availableVersion: "0.2.0"
+        })
+      }
+    });
+    await useUpdateStore.getState().refresh();
+    expect(useUpdateStore.getState().update?.availableVersion).toBe("0.2.0");
   });
 });

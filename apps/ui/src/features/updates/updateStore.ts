@@ -4,7 +4,7 @@ import type { UpdateState } from "@hypershell/shared";
 interface UpdateStoreState {
   update: UpdateState | null;
   dismissedVersion: string | null;
-  setState: (state: UpdateState) => void;
+  applyState: (state: UpdateState) => void;
   dismiss: () => void;
   refresh: () => Promise<void>;
   check: () => Promise<void>;
@@ -38,28 +38,48 @@ export function shouldShowBanner(
 export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
   update: null,
   dismissedVersion: null,
-  setState(state) {
+  applyState(state) {
     set({ update: state });
   },
   dismiss() {
     set({ dismissedVersion: get().update?.availableVersion ?? null });
   },
   async refresh() {
-    const state = await window.hypershell?.getUpdateState?.();
-    if (state) {
-      set({ update: state });
+    try {
+      const state = await window.hypershell?.getUpdateState?.();
+      if (state) {
+        set({ update: state });
+      }
+    } catch {
+      /* ignore */
     }
   },
   async check() {
-    await window.hypershell?.checkForUpdates?.();
+    try {
+      await window.hypershell?.checkForUpdates?.();
+    } catch {
+      /* ignore */
+    }
   },
   async download() {
-    await window.hypershell?.downloadUpdate?.();
+    try {
+      await window.hypershell?.downloadUpdate?.();
+    } catch {
+      /* ignore */
+    }
   },
   async install() {
-    await window.hypershell?.installUpdate?.();
+    try {
+      await window.hypershell?.installUpdate?.();
+    } catch {
+      /* ignore */
+    }
   },
   async openRelease() {
-    await window.hypershell?.openUpdateRelease?.();
+    try {
+      await window.hypershell?.openUpdateRelease?.();
+    } catch {
+      /* ignore */
+    }
   }
 }));
