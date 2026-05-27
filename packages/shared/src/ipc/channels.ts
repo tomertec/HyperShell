@@ -220,7 +220,7 @@ export const updateChannels = {
   install: "updates:install",
   openRelease: "updates:open-release",
   getState: "updates:get-state",
-  state: "updates:state"
+  state: "updates:state",
 } as const;
 
 export const ipcChannels = {
