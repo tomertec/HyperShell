@@ -1,15 +1,14 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useStore } from "zustand";
 
 import { shouldShowBanner, useUpdateStore } from "./updateStore";
 
 export function UpdateBanner() {
-  const update = useStore(useUpdateStore, (s) => s.update);
-  const dismissedVersion = useStore(useUpdateStore, (s) => s.dismissedVersion);
-  const dismiss = useStore(useUpdateStore, (s) => s.dismiss);
-  const download = useStore(useUpdateStore, (s) => s.download);
-  const install = useStore(useUpdateStore, (s) => s.install);
-  const openRelease = useStore(useUpdateStore, (s) => s.openRelease);
+  const update = useUpdateStore((s) => s.update);
+  const dismissedVersion = useUpdateStore((s) => s.dismissedVersion);
+  const dismiss = useUpdateStore((s) => s.dismiss);
+  const download = useUpdateStore((s) => s.download);
+  const install = useUpdateStore((s) => s.install);
+  const openRelease = useUpdateStore((s) => s.openRelease);
 
   const visible = shouldShowBanner(update, dismissedVersion);
 
