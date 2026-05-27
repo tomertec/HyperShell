@@ -77,3 +77,11 @@ jobs:
               gh release upload "$TAG" "$FILE" --clobber
             fi
           done
+          # Upload auto-update metadata LAST so a polling client never sees
+          # an advertised version before its installer asset exists.
+          if [ -f apps/desktop/release/latest-linux.yml ]; then
+            gh release upload "$TAG" apps/desktop/release/latest-linux.yml --clobber || true
+          fi
+          for BLOCKMAP in apps/desktop/release/*.blockmap; do
+            [ -e "$BLOCKMAP" ] && gh release upload "$TAG" "$BLOCKMAP" --clobber || true
+          done

@@ -60,6 +60,7 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 
 ### For DevOps / Releases
 - [Build & Release](./build-and-release.md) — Build commands, packaging, CI/CD
+- [Auto-Update](./auto-update.md) — electron-updater setup, bootstrap caveat, metadata upload order
 - [Troubleshooting](./troubleshooting.md) — Common issues and fixes
 
 ## Feature Matrix
