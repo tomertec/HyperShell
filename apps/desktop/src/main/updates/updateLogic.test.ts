@@ -17,6 +17,7 @@ describe("isNewerVersion", () => {
   it("is true when candidate is greater", () => {
     expect(isNewerVersion("0.1.9", "0.2.0")).toBe(true);
     expect(isNewerVersion("0.1.9", "1.0.0")).toBe(true);
+    expect(isNewerVersion("0.1.9", "0.1.10")).toBe(true);
   });
 
   it("is false when candidate is equal or older", () => {
