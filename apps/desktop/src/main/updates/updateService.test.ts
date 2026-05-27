@@ -92,6 +92,34 @@ describe("createUpdateService (win32)", () => {
     expect(updater.checkForUpdates).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  it("download() sets downloading(0%) then delegates to the updater", async () => {
+    const { service, updater, states } = setup();
+    await service.download();
+    expect(updater.downloadUpdate).toHaveBeenCalledTimes(1);
+    expect(states.some((s) => s.status === "downloading" && s.progressPercent === 0)).toBe(true);
+  });
+
+  it("download() emits error when downloadUpdate rejects", async () => {
+    const { updater } = createFakeUpdater();
+    (updater.downloadUpdate as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("disk full"));
+    const states: UpdateState[] = [];
+    const service = createUpdateService({
+      platform: "win32",
+      isPackaged: true,
+      getVersion: () => "0.1.9",
+      emit: (s) => states.push(s),
+      getUpdater: () => updater
+    });
+    await service.download();
+    expect(states.at(-1)).toMatchObject({ status: "error", error: "disk full" });
+  });
+
+  it("install() calls quitAndInstall", () => {
+    const { service, updater } = setup();
+    service.install();
+    expect(updater.quitAndInstall).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("createUpdateService (darwin)", () => {
@@ -139,5 +167,53 @@ describe("createUpdateService (darwin)", () => {
 
     await service.check({ manual: true });
     expect(states.at(-1)?.status).toBe("up-to-date");
+  });
+
+  it("does not stay on 'checking' after a silent (auto) failure", async () => {
+    const service = createUpdateService({
+      platform: "darwin",
+      isPackaged: true,
+      getVersion: () => "0.1.9",
+      emit: () => {},
+      fetchFn: (async () => {
+        throw new Error("offline");
+      }) as unknown as typeof fetch,
+      releaseApiUrl: "https://example/api"
+    });
+    await service.check({ manual: false });
+    expect(service.getState().status).not.toBe("checking");
+  });
+
+  it("emits error on a manual failure (non-ok response)", async () => {
+    const states: UpdateState[] = [];
+    const service = createUpdateService({
+      platform: "darwin",
+      isPackaged: true,
+      getVersion: () => "0.1.9",
+      emit: (s) => states.push(s),
+      fetchFn: (async () => ({ ok: false, status: 403 })) as unknown as typeof fetch,
+      releaseApiUrl: "https://example/api"
+    });
+    await service.check({ manual: true });
+    expect(states.at(-1)?.status).toBe("error");
+  });
+
+  it("openRelease() opens the stored release url", async () => {
+    const opened: string[] = [];
+    const service = createUpdateService({
+      platform: "darwin",
+      isPackaged: true,
+      getVersion: () => "0.1.9",
+      emit: () => {},
+      fetchFn: (async () => ({
+        ok: true,
+        json: async () => ({ tag_name: "v0.3.0", html_url: "https://example/r/0.3.0" })
+      })) as unknown as typeof fetch,
+      releaseApiUrl: "https://example/api",
+      openExternal: (url) => opened.push(url)
+    });
+    await service.check({ manual: true });
+    service.openRelease();
+    expect(opened).toEqual(["https://example/r/0.3.0"]);
   });
 });

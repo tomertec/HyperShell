@@ -75,7 +75,7 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
     });
     instance.on("update-downloaded", (info) => {
       const version = (info as { version?: string } | undefined)?.version;
-      setStatus("downloaded", { availableVersion: version });
+      setStatus("downloaded", { availableVersion: version, progressPercent: undefined });
     });
     instance.on("error", (error) => {
       const message = error instanceof Error ? error.message : String(error ?? "update error");
@@ -101,13 +101,15 @@ export function createUpdateService(deps: UpdateServiceDeps): UpdateService {
       return;
     }
 
-    setStatus("checking");
+    if (manual) {
+      setStatus("checking");
+    }
     try {
       const response = await fetchFn(url, {
         headers: { Accept: "application/vnd.github+json" }
       });
-      if (!("ok" in response) || !response.ok) {
-        throw new Error(`GitHub API responded ${("status" in response) ? response.status : "error"}`);
+      if (!response.ok) {
+        throw new Error(`GitHub API responded ${response.status}`);
       }
       const payload = await response.json();
       const release = parseLatestRelease(payload);
