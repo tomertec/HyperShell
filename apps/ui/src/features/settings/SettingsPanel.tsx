@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useStore } from "zustand";
 import {
   MAX_CREDENTIAL_CACHE_TTL_MINUTES,
@@ -16,6 +16,7 @@ import { terminalThemes } from "../terminal/terminalTheme";
 import { ThemeEditor } from "./ThemeEditor";
 import { SshKeyManager } from "../ssh-keys/SshKeyManager";
 import { BackupRestorePanel } from "./BackupRestorePanel";
+import { useUpdateStore } from "../updates/updateStore";
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-base-900 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 hover:border-border-bright";
@@ -48,7 +49,7 @@ function formatThemeName(key: string): string {
     .trim();
 }
 
-type SettingsCategory = "general" | "security" | "terminal" | "appearance" | "ssh-keys" | "backup" | "import";
+type SettingsCategory = "general" | "security" | "terminal" | "appearance" | "ssh-keys" | "backup" | "import" | "updates";
 
 const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }[] = [
   {
@@ -136,6 +137,21 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
         <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M3 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "updates",
+    label: "Updates",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M8 3v5l3 2M8 1a7 7 0 1 0 7 7"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },
@@ -277,6 +293,76 @@ function GeneralSection() {
               onChange={() => void updateGeneral({ enableTelnet: !enableTelnet })}
             />
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UpdatesSection() {
+  const update = useUpdateStore((s) => s.update);
+  const check = useUpdateStore((s) => s.check);
+  const refresh = useUpdateStore((s) => s.refresh);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const currentVersion = update?.currentVersion ?? "—";
+  const checking = update?.status === "checking";
+
+  function statusLine(): string {
+    if (!update) {
+      return "";
+    }
+    switch (update.status) {
+      case "checking":
+        return "Checking for updates…";
+      case "available":
+      case "manual-available":
+        return `Update available: v${update.availableVersion}`;
+      case "downloading":
+        return `Downloading: ${update.progressPercent ?? 0}%`;
+      case "downloaded":
+        return `Update v${update.availableVersion} ready to install`;
+      case "up-to-date":
+        return "You're on the latest version.";
+      case "error":
+        return `Couldn't check — ${update.error ?? "try again"}`;
+      default:
+        return "";
+    }
+  }
+
+  return (
+    <div className="grid gap-6">
+      <div>
+        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+          Application Updates
+        </h3>
+        <div className="grid gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Current version</div>
+              <div className="text-xs text-text-muted">v{currentVersion}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void check()}
+              disabled={checking}
+              className="rounded border border-border px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-base-600 disabled:opacity-50"
+            >
+              {checking ? "Checking…" : "Check for updates"}
+            </button>
+          </div>
+          {statusLine() ? (
+            <div className="text-xs text-text-muted">{statusLine()}</div>
+          ) : null}
+          {update?.lastCheckedAt ? (
+            <div className="text-xs text-text-muted">
+              Last checked: {new Date(update.lastCheckedAt).toLocaleString()}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -732,6 +818,7 @@ export function SettingsPanel({ onImportSshConfig, onImportPutty, onImportSshMan
         {activeCategory === "ssh-keys" && <SshKeyManager />}
         {activeCategory === "backup" && <BackupRestorePanel />}
         {activeCategory === "import" && <ImportSection onImportSshConfig={onImportSshConfig} onImportPutty={onImportPutty} onImportSshManager={onImportSshManager} />}
+        {activeCategory === "updates" && <UpdatesSection />}
       </div>
     </div>
   );
