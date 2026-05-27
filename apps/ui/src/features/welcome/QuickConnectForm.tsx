@@ -104,13 +104,13 @@ export function QuickConnectForm({
               className={inputClass}
               autoFocus
             />
-            <div className="flex gap-2">
+            <div className="grid grid-cols-[6rem_1fr] gap-2">
               <input
                 type="text"
                 placeholder="Port"
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
-                className={`${inputClass} w-24 shrink-0`}
+                className={inputClass}
               />
               <input
                 type="text"

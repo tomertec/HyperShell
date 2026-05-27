@@ -11,3 +11,30 @@ test("quick connect opens from keyboard shortcut", async ({ page }) => {
     page.getByRole("dialog", { name: /quick connect/i })
   ).toBeVisible();
 });
+
+test("welcome SSH quick connect shows username input inside the form", async ({ page }) => {
+  await page.goto("/");
+  await page.getByText("Click to connect").click();
+
+  const hostInput = page.getByPlaceholder("Hostname or IP address");
+  const portInput = page.getByPlaceholder("Port");
+  const usernameInput = page.getByPlaceholder("Username");
+
+  await expect(hostInput).toBeVisible();
+  await expect(portInput).toBeVisible();
+  await expect(usernameInput).toBeVisible();
+
+  const hostBox = await hostInput.boundingBox();
+  const portBox = await portInput.boundingBox();
+  const usernameBox = await usernameInput.boundingBox();
+
+  expect(hostBox).not.toBeNull();
+  expect(portBox).not.toBeNull();
+  expect(usernameBox).not.toBeNull();
+
+  expect(usernameBox!.x).toBeGreaterThan(portBox!.x + portBox!.width);
+  expect(usernameBox!.x + usernameBox!.width).toBeLessThanOrEqual(
+    hostBox!.x + hostBox!.width + 2
+  );
+  expect(usernameBox!.width).toBeGreaterThan(100);
+});
