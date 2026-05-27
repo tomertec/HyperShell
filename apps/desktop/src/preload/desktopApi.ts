@@ -291,6 +291,8 @@ import {
   type RestoreBackupRequest,
   type RestoreBackupResponse,
   type ListBackupsResponse,
+  updateStateSchema,
+  type UpdateState,
 } from "@hypershell/shared";
 import { z } from "zod";
 
@@ -461,6 +463,13 @@ export interface DesktopApi {
   tmuxProbe(request: TmuxProbeRequest): Promise<TmuxProbeResponse>;
   // App theme
   setAppTheme(theme: "light" | "dark"): Promise<void>;
+  // Auto-update
+  checkForUpdates(): Promise<void>;
+  downloadUpdate(): Promise<void>;
+  installUpdate(): Promise<void>;
+  openUpdateRelease(): Promise<void>;
+  getUpdateState(): Promise<UpdateState>;
+  onUpdateState(listener: (state: UpdateState) => void): () => void;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -1390,6 +1399,46 @@ export function createDesktopApi(
     // App theme
     async setAppTheme(theme: "light" | "dark"): Promise<void> {
       await ipcRenderer.invoke(ipcChannels.app.setTheme, theme);
+    },
+    // Auto-update
+    async checkForUpdates(): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.update.check);
+    },
+    async downloadUpdate(): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.update.download);
+    },
+    async installUpdate(): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.update.install);
+    },
+    async openUpdateRelease(): Promise<void> {
+      await ipcRenderer.invoke(ipcChannels.update.openRelease);
+    },
+    async getUpdateState(): Promise<UpdateState> {
+      const raw = await ipcRenderer.invoke(ipcChannels.update.getState);
+      return updateStateSchema.parse(raw);
+    },
+    onUpdateState(listener: (state: UpdateState) => void): () => void {
+      assertListener(listener, "onUpdateState");
+
+      const wrappedListener = (_event: unknown, payload: unknown) => {
+        const parsed = updateStateSchema.safeParse(payload);
+        if (!parsed.success) {
+          logger.warn?.("Ignored invalid update state payload from IPC", parsed.error);
+          return;
+        }
+
+        try {
+          listener(parsed.data);
+        } catch (error) {
+          logger.error?.("Update state listener threw", error);
+        }
+      };
+
+      ipcRenderer.on(ipcChannels.update.state, wrappedListener);
+
+      return () => {
+        ipcRenderer.removeListener(ipcChannels.update.state, wrappedListener);
+      };
     },
   };
 }

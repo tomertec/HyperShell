@@ -139,6 +139,7 @@ import type {
   ListBackupsResponse,
   SftpDragOutRequest,
   SftpDragOutResponse,
+  UpdateState,
 } from "@hypershell/shared";
 
 declare global {
@@ -281,6 +282,12 @@ declare global {
       sftpStartNativeDragOut?: (request: SftpDragOutRequest) => void;
       tmuxProbe?: (request: { hostId: string }) => Promise<{ sessions: Array<{ name: string; windowCount: number; createdAt: string; attached: boolean }> }>;
       setAppTheme?: (theme: "light" | "dark") => Promise<void>;
+      checkForUpdates?: () => Promise<void>;
+      downloadUpdate?: () => Promise<void>;
+      installUpdate?: () => Promise<void>;
+      openUpdateRelease?: () => Promise<void>;
+      getUpdateState?: () => Promise<UpdateState>;
+      onUpdateState?: (listener: (state: UpdateState) => void) => () => void;
     };
   }
 }
