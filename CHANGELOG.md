@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-27
+
 ### Fixed
 
 - **Welcome quick-connect username field visible** — SSH quick connect on the main welcome screen now lays out the port and username fields in fixed/flexible columns so the username input no longer overflows out of view.
