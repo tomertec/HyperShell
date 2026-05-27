@@ -49,6 +49,8 @@ import { CommandPalette } from "../features/command-palette/CommandPalette";
 import { useCommandPaletteStore } from "../features/command-palette/commandPaletteStore";
 import { createCommands, type CommandContext } from "../features/command-palette/commandRegistry";
 import { useTunnelStore } from "../features/tunnels/tunnelStore";
+import { UpdateBanner } from "../features/updates/UpdateBanner";
+import { useUpdateStore } from "../features/updates/updateStore";
 
 
 function normalizeHostEnvVars(
@@ -496,6 +498,18 @@ function MainApp() {
       unsubscribe?.();
     };
   }, [refreshConnectionHistorySummary]);
+
+  useEffect(() => {
+    const store = useUpdateStore.getState();
+    void store.refresh();
+
+    if (!window.hypershell?.onUpdateState) {
+      return;
+    }
+    return window.hypershell.onUpdateState((state) => {
+      useUpdateStore.getState().applyState(state);
+    });
+  }, []);
 
   // Auto-save workspace on window close
   useEffect(() => {
@@ -1594,6 +1608,8 @@ function MainApp() {
       />
 
       <TransferPopup />
+
+      <UpdateBanner />
 
       <Toaster
         position="bottom-right"
