@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Windows auto-update no longer stalls after download** — set `win.verifyUpdateCodeSignature: false` in the electron-builder config. With the self-signed certificate, `Get-AuthenticodeSignature` reports a non-`Valid` status (untrusted root), so electron-updater rejected the downloaded installer before reaching "Restart & install". Disabling the publisher-signature check lets the update install; downloads remain HTTPS-fetched and sha512-verified against `latest.yml`. Note: the currently-installed build still verifies, so one new build must be installed manually as a fresh bootstrap; releases after it update automatically.
+
 ## [0.2.1] - 2026-05-27
 
 ### Fixed

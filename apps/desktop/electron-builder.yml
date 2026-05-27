@@ -14,6 +14,10 @@ directories:
   output: release
 win:
   icon: build/icon.ico
+  # Self-signed cert is not chained to a trusted root, so Get-AuthenticodeSignature
+  # reports Status != Valid and electron-updater rejects the update before checking
+  # publisherName. Skip the publisher-signature check; downloads stay HTTPS + sha512-verified.
+  verifyUpdateCodeSignature: false
   target:
     - target: nsis
       arch:
