@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Changed
+
+- **Windows installers are no longer code-signed** — release builds now ship unsigned, consistent with the macOS builds. Windows SmartScreen may show an "unknown publisher" prompt on first install; in-app auto-update is unaffected (downloads remain HTTPS-fetched and sha512-verified against `latest.yml`).
+
 ## [0.2.2] - 2026-05-27
 
 ### Fixed
