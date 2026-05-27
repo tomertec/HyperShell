@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Added
+
+- **In-app auto-update via GitHub Releases** — HyperShell now checks GitHub Releases on launch and roughly every 4 hours, and can update itself. On **Windows and Linux** it updates in-app (notify + one-click): a dismissible banner offers Download → progress → **Restart & install**, backed by `electron-updater` (Authenticode publisher verification on Windows, sha512 verification of the AppImage on Linux). On **macOS** (unsigned builds) the banner instead links to the release page for a manual download. A new **Settings → Updates** section shows the current version, a manual "Check for updates" button, and the last-checked time. Release builds now publish `latest.yml` / `latest-linux.yml` + `.blockmap` metadata to each GitHub Release (uploaded after the installer to avoid a race). See [`docs/auto-update.md`](docs/auto-update.md) — note the one-time bootstrap caveat: the **first** auto-update-enabled release must be installed manually; every release after it updates automatically.
+
 ## [0.1.9] - 2026-05-02
 
 ### Changed
