@@ -22,6 +22,7 @@ const common = {
   },
   external: [
     "electron",
+    "electron-updater",
     "better-sqlite3",
     "node-pty",
     "serialport",

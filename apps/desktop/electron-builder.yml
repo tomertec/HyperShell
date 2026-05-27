@@ -71,4 +71,7 @@ extraResources:
     to: assets
     filter:
       - "**/*"
-publish: null
+publish:
+  provider: github
+  owner: tomertec
+  repo: HyperShell

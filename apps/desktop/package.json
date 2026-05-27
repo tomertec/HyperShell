@@ -31,6 +31,7 @@
     "@hypershell/session-core": "workspace:*",
     "@hypershell/shared": "workspace:*",
     "better-sqlite3": "^12.9.0",
+    "electron-updater": "^6.3.9",
     "node-pty": "^1.0.0",
     "serialport": "^12.0.0",
     "ssh2": "^1.17.0",
