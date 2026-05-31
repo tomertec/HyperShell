@@ -1,9 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorState as CMState, Compartment } from "@codemirror/state";
 import { EditorView, basicSetup } from "codemirror";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { search, openSearchPanel } from "@codemirror/search";
+import { search, openSearchPanel, gotoLine } from "@codemirror/search";
 import { indentUnit } from "@codemirror/language";
+import { undo, redo, selectAll, undoDepth, redoDepth } from "@codemirror/commands";
+import { ContextMenu } from "../../../components/ContextMenu";
+import { buildEditorContextActions } from "./editorContextActions";
 import { getLanguageExtension } from "../../sftp/utils/languageDetect";
 import { FONT_SIZE_MIN, FONT_SIZE_MAX } from "./editorConstants";
 import type { EditorState } from "../stores/editorStore";
@@ -13,9 +16,11 @@ interface EditorPaneProps {
   store: StoreApi<EditorState>;
   tabId: string;
   content: string;
+  onSave: () => void;
+  canSave: boolean;
 }
 
-export function EditorPane({ store, tabId, content }: EditorPaneProps) {
+export function EditorPane({ store, tabId, content, onSave, canSave }: EditorPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const wrapCompartment = useRef(new Compartment());
@@ -25,6 +30,17 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
 
   const storeRef = useRef(store);
   storeRef.current = store;
+
+  const [menu, setMenu] = useState<
+    | {
+        x: number;
+        y: number;
+        hasSelection: boolean;
+        canUndo: boolean;
+        canRedo: boolean;
+      }
+    | null
+  >(null);
 
   // Create editor on mount
   useEffect(() => {
@@ -152,11 +168,103 @@ export function EditorPane({ store, tabId, content }: EditorPaneProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const openContextMenu = (e: React.MouseEvent) => {
+    const view = viewRef.current;
+    if (!view) return;
+    e.preventDefault();
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      hasSelection: !view.state.selection.main.empty,
+      canUndo: undoDepth(view.state) > 0,
+      canRedo: redoDepth(view.state) > 0,
+    });
+  };
+
+  const copySelection = async () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const { from, to } = view.state.selection.main;
+    if (from === to) return;
+    await navigator.clipboard?.writeText(view.state.sliceDoc(from, to));
+  };
+
+  const handlers = {
+    onCut: () => {
+      const view = viewRef.current;
+      if (!view) return;
+      const { from, to } = view.state.selection.main;
+      if (from === to) return;
+      void copySelection().then(() => {
+        view.dispatch({ changes: { from, to, insert: "" } });
+        view.focus();
+      });
+    },
+    onCopy: () => {
+      void copySelection();
+    },
+    onPaste: () => {
+      const view = viewRef.current;
+      if (!view || !navigator.clipboard?.readText) return;
+      void navigator.clipboard.readText().then((text) => {
+        if (!text) return;
+        const { from, to } = view.state.selection.main;
+        view.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor: from + text.length },
+        });
+        view.focus();
+      });
+    },
+    onSelectAll: () => {
+      const view = viewRef.current;
+      if (!view) return;
+      selectAll(view);
+      view.focus();
+    },
+    onUndo: () => {
+      const view = viewRef.current;
+      if (view) { undo(view); view.focus(); }
+    },
+    onRedo: () => {
+      const view = viewRef.current;
+      if (view) { redo(view); view.focus(); }
+    },
+    onFind: () => {
+      const view = viewRef.current;
+      if (view) openSearchPanel(view);
+    },
+    onGotoLine: () => {
+      const view = viewRef.current;
+      if (view) gotoLine(view);
+    },
+    onSave,
+  };
+
   return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0 overflow-hidden"
-      style={{ fontFamily: "'IBM Plex Mono', monospace" }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        onContextMenu={openContextMenu}
+        className="absolute inset-0 overflow-hidden"
+        style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+      />
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          actions={buildEditorContextActions(
+            {
+              hasSelection: menu.hasSelection,
+              canUndo: menu.canUndo,
+              canRedo: menu.canRedo,
+              canSave,
+            },
+            handlers
+          )}
+          onClose={() => setMenu(null)}
+        />
+      )}
+    </>
   );
 }
