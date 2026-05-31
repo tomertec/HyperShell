@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { EditorState as CMState, Compartment } from "@codemirror/state";
 import { EditorView, basicSetup } from "codemirror";
 import { oneDark } from "@codemirror/theme-one-dark";
@@ -195,26 +196,30 @@ export function EditorPane({ store, tabId, content, onSave, canSave }: EditorPan
       if (!view) return;
       const { from, to } = view.state.selection.main;
       if (from === to) return;
-      void copySelection().then(() => {
-        view.dispatch({ changes: { from, to, insert: "" } });
-        view.focus();
-      });
+      void copySelection()
+        .then(() => {
+          view.dispatch({ changes: { from, to, insert: "" } });
+          view.focus();
+        })
+        .catch(() => toast.error("Failed to copy to clipboard"));
     },
     onCopy: () => {
-      void copySelection();
+      copySelection().catch(() => toast.error("Failed to copy to clipboard"));
     },
     onPaste: () => {
       const view = viewRef.current;
       if (!view || !navigator.clipboard?.readText) return;
-      void navigator.clipboard.readText().then((text) => {
-        if (!text) return;
-        const { from, to } = view.state.selection.main;
-        view.dispatch({
-          changes: { from, to, insert: text },
-          selection: { anchor: from + text.length },
-        });
-        view.focus();
-      });
+      void navigator.clipboard.readText()
+        .then((text) => {
+          if (!text) return;
+          const { from, to } = view.state.selection.main;
+          view.dispatch({
+            changes: { from, to, insert: text },
+            selection: { anchor: from + text.length },
+          });
+          view.focus();
+        })
+        .catch(() => toast.error("Failed to read clipboard"));
     },
     onSelectAll: () => {
       const view = viewRef.current;
