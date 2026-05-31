@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Added
+
+- **Editor right-click context menu** — right-clicking inside the SFTP file editor now opens a context menu with the standard editing actions: Cut, Copy, Paste, Select All, Undo, Redo, Find / Replace, Go to Line, and Save. Cut/Copy disable when there is no selection and Undo/Redo/Save disable when unavailable, reflecting editor state at the moment of the click. Clipboard failures surface as toast notifications.
+
 ## [0.2.4] - 2026-05-27
 
 ### Removed

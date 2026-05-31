@@ -197,6 +197,8 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
                 store={store}
                 tabId={activeTab.id}
                 content={activeTab.content}
+                onSave={() => void handleSave()}
+                canSave={Boolean(activeTab.dirty) && !saving && !sessionDisconnected}
               />
             </Suspense>
           )
