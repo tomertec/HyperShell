@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+// Valid environment variable name: leading letter/underscore, then alphanumerics/underscores.
+// Shared by the host form, the host env-var repository, and the SSH PTY transport.
+export const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+// Auto-reconnect defaults applied when a host record / open-session request omits them.
+// The schema fields stay .optional() (undefined means "fall back"), so these are the
+// single source of truth for the fallback value across the DB, IPC, and UI layers.
+export const DEFAULT_RECONNECT_MAX_ATTEMPTS = 5;
+export const DEFAULT_RECONNECT_BASE_INTERVAL = 1;
+
 export const transportSchema = z.enum(["ssh", "serial", "sftp", "telnet"]);
 
 export const sessionStateSchema = z.enum([

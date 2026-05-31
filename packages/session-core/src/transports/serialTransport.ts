@@ -1,4 +1,5 @@
 import { SerialPort } from "serialport";
+import { toErrorMessage as toSharedErrorMessage } from "@hypershell/shared";
 
 import type {
   OpenSessionRequest,
@@ -91,15 +92,7 @@ export interface CreateSerialTransportDeps {
 }
 
 function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  if (typeof error === "string" && error.length > 0) {
-    return error;
-  }
-
-  return "Unknown serial transport error";
+  return toSharedErrorMessage(error, "Unknown serial transport error");
 }
 
 export function createSerialTransport(

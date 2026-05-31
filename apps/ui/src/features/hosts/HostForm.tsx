@@ -1,6 +1,13 @@
 import { useEffect, useId, useMemo, useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { HostEnvVarRecord, HostProfileRecord, TagRecord } from "@hypershell/shared";
+import {
+  ENV_VAR_NAME_REGEX,
+  DEFAULT_RECONNECT_BASE_INTERVAL,
+  DEFAULT_RECONNECT_MAX_ATTEMPTS,
+  isValidHostname,
+  isValidPort
+} from "@hypershell/shared";
 import { HostPortForwardList } from "./HostPortForwardList";
 import { OpPickerModal } from "./OpPickerModal";
 import { HostProfileManagerDialog } from "./HostProfileManagerDialog";
@@ -9,24 +16,7 @@ import { inputClasses } from "../../lib/formStyles";
 
 // --- Validation helpers ---
 
-const hostnameRegex =
-  /^(?:localhost|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)$/;
-
-const ipv4Regex =
-  /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
-
-const ipv6Regex = /^\[?[0-9a-fA-F:]+\]?$/;
-export const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-function isValidHostname(value: string): boolean {
-  if (!value.trim()) return false;
-  const v = value.trim();
-  return hostnameRegex.test(v) || ipv4Regex.test(v) || ipv6Regex.test(v);
-}
-
-function isValidPort(port: number): boolean {
-  return Number.isInteger(port) && port >= 1 && port <= 65535;
-}
+export { ENV_VAR_NAME_REGEX };
 
 function isIdentityFilePathSuspicious(path: string): string | null {
   if (!path) return null; // empty = "Auto-detect", fine
@@ -121,8 +111,8 @@ const defaultValue: HostFormValue = {
   proxyJumpHostIds: "",
   keepAliveInterval: "",
   autoReconnect: false,
-  reconnectMaxAttempts: 5,
-  reconnectBaseInterval: 1,
+  reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+  reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
   password: "",
   savePassword: true,
   clearSavedPassword: false,
@@ -1075,7 +1065,7 @@ export function HostForm({
                 min={1}
                 max={50}
                 value={value.reconnectMaxAttempts}
-                onChange={(e) => setValue({ ...value, reconnectMaxAttempts: Number(e.target.value) || 5 })}
+                onChange={(e) => setValue({ ...value, reconnectMaxAttempts: Number(e.target.value) || DEFAULT_RECONNECT_MAX_ATTEMPTS })}
                 className={inputClasses}
               />
             </label>
@@ -1088,7 +1078,7 @@ export function HostForm({
                   min={1}
                   max={60}
                   value={value.reconnectBaseInterval}
-                  onChange={(e) => setValue({ ...value, reconnectBaseInterval: Number(e.target.value) || 1 })}
+                  onChange={(e) => setValue({ ...value, reconnectBaseInterval: Number(e.target.value) || DEFAULT_RECONNECT_BASE_INTERVAL })}
                   className={inputClasses}
                 />
                 <span className="text-xs text-text-muted shrink-0">sec</span>

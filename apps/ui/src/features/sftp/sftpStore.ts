@@ -88,6 +88,26 @@ function moveHistory(
   };
 }
 
+function navigateHistory(
+  state: SftpStoreState,
+  pane: SftpPane,
+  offset: number
+): SftpStoreState | Partial<SftpStoreState> {
+  const isLocal = pane === "local";
+  const moved = moveHistory(
+    isLocal ? state.localHistory : state.remoteHistory,
+    isLocal ? state.localHistoryIndex : state.remoteHistoryIndex,
+    offset
+  );
+  if (!moved) {
+    return state;
+  }
+
+  return isLocal
+    ? { localPath: moved.path, localHistoryIndex: moved.historyIndex }
+    : { remotePath: moved.path, remoteHistoryIndex: moved.historyIndex };
+}
+
 export function createSftpStore(sftpSessionId: string): StoreApi<SftpStoreState> {
   return createStore<SftpStoreState>()((set) => ({
     sftpSessionId,
@@ -180,71 +200,9 @@ export function createSftpStore(sftpSessionId: string): StoreApi<SftpStoreState>
         error: { ...state.error, [pane]: error }
       })),
 
-    back: (pane) =>
-      set((state) => {
-        if (pane === "local") {
-          const moved = moveHistory(
-            state.localHistory,
-            state.localHistoryIndex,
-            -1
-          );
-          if (!moved) {
-            return state;
-          }
+    back: (pane) => set((state) => navigateHistory(state, pane, -1)),
 
-          return {
-            localPath: moved.path,
-            localHistoryIndex: moved.historyIndex
-          };
-        }
-
-        const moved = moveHistory(
-          state.remoteHistory,
-          state.remoteHistoryIndex,
-          -1
-        );
-        if (!moved) {
-          return state;
-        }
-
-        return {
-          remotePath: moved.path,
-          remoteHistoryIndex: moved.historyIndex
-        };
-      }),
-
-    forward: (pane) =>
-      set((state) => {
-        if (pane === "local") {
-          const moved = moveHistory(
-            state.localHistory,
-            state.localHistoryIndex,
-            1
-          );
-          if (!moved) {
-            return state;
-          }
-
-          return {
-            localPath: moved.path,
-            localHistoryIndex: moved.historyIndex
-          };
-        }
-
-        const moved = moveHistory(
-          state.remoteHistory,
-          state.remoteHistoryIndex,
-          1
-        );
-        if (!moved) {
-          return state;
-        }
-
-        return {
-          remotePath: moved.path,
-          remoteHistoryIndex: moved.historyIndex
-        };
-      })
+    forward: (pane) => set((state) => navigateHistory(state, pane, 1))
   }));
 }
 

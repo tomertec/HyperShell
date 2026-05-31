@@ -29,6 +29,7 @@ import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
 import { TransferPopup } from "../features/sftp/components/TransferPopup";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
+import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
 import type {
   ConnectionHistoryRecord,
   SavedSessionRecord,
@@ -98,9 +99,9 @@ function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
     autoReconnect: Boolean(h.autoReconnect ?? false),
     tmuxDetect: Boolean(h.tmuxDetect ?? false),
     reconnectMaxAttempts:
-      h.reconnectMaxAttempts == null ? 5 : Number(h.reconnectMaxAttempts),
+      h.reconnectMaxAttempts == null ? DEFAULT_RECONNECT_MAX_ATTEMPTS : Number(h.reconnectMaxAttempts),
     reconnectBaseInterval:
-      h.reconnectBaseInterval == null ? 1 : Number(h.reconnectBaseInterval),
+      h.reconnectBaseInterval == null ? DEFAULT_RECONNECT_BASE_INTERVAL : Number(h.reconnectBaseInterval),
     password: "",
     savePassword: false,
     clearSavedPassword: false,
@@ -216,8 +217,8 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
     const proxyJump = host.proxyJump ?? "";
     const proxyJumpHostIds = host.proxyJumpHostIds ?? "";
     const autoReconnect = host.autoReconnect ?? false;
-    const reconnectMaxAttempts = host.reconnectMaxAttempts ?? 5;
-    const reconnectBaseInterval = host.reconnectBaseInterval ?? 1;
+    const reconnectMaxAttempts = host.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS;
+    const reconnectBaseInterval = host.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL;
     const tmuxDetect = host.tmuxDetect ?? false;
 
     const keepAliveSource =
@@ -1400,8 +1401,8 @@ function MainApp() {
               proxyJumpHostIds: "",
               keepAliveInterval: "",
               autoReconnect: false,
-              reconnectMaxAttempts: 5,
-              reconnectBaseInterval: 1,
+              reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+              reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
               tmuxDetect: false,
             }));
             setHosts((prev) => [...prev, ...newHosts]);
@@ -1439,8 +1440,8 @@ function MainApp() {
               proxyJumpHostIds: "",
               keepAliveInterval: "",
               autoReconnect: false,
-              reconnectMaxAttempts: 5,
-              reconnectBaseInterval: 1,
+              reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+              reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
               tmuxDetect: false,
             }));
             setHosts((prev) => [...prev, ...newHosts]);

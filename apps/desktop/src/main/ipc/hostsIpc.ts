@@ -5,6 +5,8 @@ import {
   upsertHostRequestSchema,
   removeHostRequestSchema,
   reorderHostsRequestSchema,
+  DEFAULT_RECONNECT_BASE_INTERVAL,
+  DEFAULT_RECONNECT_MAX_ATTEMPTS,
   type UpsertHostRequest,
   type RemoveHostRequest,
   type ReorderHostsRequest
@@ -289,8 +291,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           proxyJumpHostIds: item?.proxyJumpHostIds == null ? null : String(item.proxyJumpHostIds),
           keepAliveInterval: item?.keepAliveInterval == null ? null : Number(item.keepAliveInterval),
           autoReconnect: Boolean(item?.autoReconnect ?? false),
-          reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? 5),
-          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? 1),
+          reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS),
+          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL),
           tmuxDetect: Boolean(item?.tmuxDetect ?? false)
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
@@ -326,8 +328,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         proxyJumpHostIds: input.proxyJumpHostIds ?? null,
         keepAliveInterval: input.keepAliveInterval ?? null,
         autoReconnect: input.autoReconnect ?? false,
-        reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
+        reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
+        reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
         tmuxDetect: input.tmuxDetect ?? false
       };
 
@@ -552,8 +554,8 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       proxyJumpHostIds: parsed.proxyJumpHostIds ?? null,
       keepAliveInterval: parsed.keepAliveInterval ?? null,
       autoReconnect: parsed.autoReconnect ?? false,
-      reconnectMaxAttempts: parsed.reconnectMaxAttempts ?? 5,
-      reconnectBaseInterval: parsed.reconnectBaseInterval ?? 1,
+      reconnectMaxAttempts: parsed.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
+      reconnectBaseInterval: parsed.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
       tmuxDetect: parsed.tmuxDetect ?? false
     });
     return attachPasswordMetadata(persistedHost);

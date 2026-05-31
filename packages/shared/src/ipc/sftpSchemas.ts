@@ -155,7 +155,11 @@ export const transferJobSchema = z.object({
   bytesTransferred: z.number(),
   totalBytes: z.number(),
   speed: z.number(),
-  error: z.string().optional()
+  error: z.string().optional(),
+  // True when the current failed/paused state was caused by an explicit user
+  // cancel or pause (vs. a genuine transfer error). Lets the UI distinguish
+  // user-initiated stops without parsing the human-facing error message.
+  userInitiated: z.boolean().optional()
 });
 export type TransferJob = z.infer<typeof transferJobSchema>;
 

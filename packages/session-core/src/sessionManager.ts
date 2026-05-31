@@ -8,6 +8,7 @@ import type {
   TelnetConnectionOptions,
   TransportHandle
 } from "./transports/transportEvents";
+import { DEFAULT_RECONNECT_BASE_INTERVAL } from "@hypershell/shared";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { createSerialTransport } from "./transports/serialTransport";
@@ -269,7 +270,7 @@ export function createSessionManager(
               listener({ type: "status", sessionId, state: "reconnecting" });
             }
 
-            const baseMs = (snapshot.reconnectBaseInterval ?? 1) * 1000;
+            const baseMs = (snapshot.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL) * 1000;
             const delay = Math.min(baseMs * Math.pow(2, snapshot.reconnectAttempts - 1), 30000);
             session.reconnectTimer = setTimeout(() => {
               attemptReconnect(sessionId);
@@ -324,7 +325,7 @@ export function createSessionManager(
         state: "connecting",
         autoReconnect: input.autoReconnect ?? false,
         reconnectAttempts: 0,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? 1
+        reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL
       };
 
       const transport = createTransport({

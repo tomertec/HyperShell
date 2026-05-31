@@ -7,7 +7,9 @@ import {
   openSessionRequestSchema,
   resizeSessionRequestSchema,
   setSignalsRequestSchema,
-  writeSessionRequestSchema
+  writeSessionRequestSchema,
+  DEFAULT_RECONNECT_BASE_INTERVAL,
+  DEFAULT_RECONNECT_MAX_ATTEMPTS
 } from "@hypershell/shared";
 import type { HostStatsResponse } from "@hypershell/shared";
 import type {
@@ -634,8 +636,10 @@ async function openSessionHandler(
     serialOptions,
     telnetOptions,
     autoReconnect: parsed.autoReconnect ?? Boolean(resolvedHost?.autoReconnect),
-    maxReconnectAttempts: parsed.reconnectMaxAttempts ?? resolvedHost?.reconnectMaxAttempts ?? 5,
-    reconnectBaseInterval: parsed.reconnectBaseInterval ?? resolvedHost?.reconnectBaseInterval ?? 1,
+    maxReconnectAttempts:
+      parsed.reconnectMaxAttempts ?? resolvedHost?.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
+    reconnectBaseInterval:
+      parsed.reconnectBaseInterval ?? resolvedHost?.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
   };
 
   if (parsed.transport === "ssh") {

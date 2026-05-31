@@ -6,6 +6,7 @@ import {
   SshConfigImportDialog,
   type SshConfigImportItem
 } from "./SshConfigImportDialog";
+import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
 
 export type HostRecord = HostFormValue & {
   id: string;
@@ -34,8 +35,8 @@ const demoHosts: HostRecord[] = [
     proxyJumpHostIds: "",
     keepAliveInterval: "",
     autoReconnect: false,
-    reconnectMaxAttempts: 5,
-    reconnectBaseInterval: 1,
+    reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+    reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
     tmuxDetect: false,
     notes: "Primary web server"
   },
@@ -57,8 +58,8 @@ const demoHosts: HostRecord[] = [
     proxyJumpHostIds: "",
     keepAliveInterval: "",
     autoReconnect: false,
-    reconnectMaxAttempts: 5,
-    reconnectBaseInterval: 1,
+    reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+    reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
     tmuxDetect: false,
     notes: "Use for multi-hop access"
   }
@@ -148,8 +149,8 @@ export function HostsView() {
                 proxyJumpHostIds: "",
                 keepAliveInterval: "",
                 autoReconnect: false,
-                reconnectMaxAttempts: 5,
-                reconnectBaseInterval: 1,
+                reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+                reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
                 tmuxDetect: false,
               }));
 

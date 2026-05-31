@@ -1,4 +1,6 @@
 export * from "./version";
+export * from "./errors";
+export * from "./validation";
 export * from "./auth/authSchemas";
 export * from "./ipc/channels";
 export * from "./ipc/contracts";

@@ -186,6 +186,12 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
           speed: event.speed,
           status: event.status
         });
+        // The structured `userInitiated` flag rides only in the full job snapshot,
+        // not in the progress event. Refetch on pause so the paused-by-user state
+        // resolves deterministically (mirrors the transfer-complete refetch below).
+        if (event.status === "paused") {
+          void refreshTransfers();
+        }
       }
 
       if (event.kind === "transfer-complete") {

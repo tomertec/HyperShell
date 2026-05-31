@@ -36,6 +36,7 @@ import {
   type SftpTransferPauseRequest,
   type SftpTransferResumeRequest,
   type KeyboardInteractiveRequest,
+  toErrorMessage,
 } from "@hypershell/shared";
 import type {
   SessionManager,
@@ -280,10 +281,6 @@ function isPermissionDeniedError(error: unknown): boolean {
   return maybeError.code === 3 || /permission denied/i.test(String(maybeError.message ?? error));
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function stageRemoteFile(
   transport: Pick<SftpTransportHandle, "createReadStream">,
   remotePath: string,
@@ -310,7 +307,7 @@ async function stageRemoteDirectory(
     entries = await transport.list(remotePath);
   } catch (error) {
     if (options.skipPermissionDenied && !options.isRoot && isPermissionDeniedError(error)) {
-      skippedEntries.push({ path: remotePath, reason: getErrorMessage(error) });
+      skippedEntries.push({ path: remotePath, reason: toErrorMessage(error) });
       return skippedEntries;
     }
     throw error;
@@ -331,7 +328,7 @@ async function stageRemoteDirectory(
       await stageRemoteFile(transport, entry.path, childLocalPath);
     } catch (error) {
       if (options.skipPermissionDenied && isPermissionDeniedError(error)) {
-        skippedEntries.push({ path: entry.path, reason: getErrorMessage(error) });
+        skippedEntries.push({ path: entry.path, reason: toErrorMessage(error) });
         continue;
       }
       throw error;

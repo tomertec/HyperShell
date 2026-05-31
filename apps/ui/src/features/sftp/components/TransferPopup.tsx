@@ -110,13 +110,11 @@ function sortTransfers(left: TransferStoreTransfer, right: TransferStoreTransfer
 }
 
 function isCancelledByUser(transfer: TransferStoreTransfer): boolean {
-  return transfer.status === "failed"
-    && (transfer.error ?? "").toLowerCase().includes("cancelled by user");
+  return transfer.status === "failed" && transfer.userInitiated === true;
 }
 
 function isPausedByUser(transfer: TransferStoreTransfer): boolean {
-  return transfer.status === "paused"
-    && (transfer.error ?? "").toLowerCase().includes("paused by user");
+  return transfer.status === "paused" && transfer.userInitiated === true;
 }
 
 function TransferGlyph({
@@ -412,6 +410,12 @@ export function TransferPopup() {
           speed: event.speed,
           status: event.status
         });
+        // The structured `userInitiated` flag rides only in the full job snapshot,
+        // not in the progress event. Refetch on pause so the paused-by-user badge
+        // resolves deterministically (mirrors the transfer-complete refetch below).
+        if (event.status === "paused") {
+          void refreshTransfers();
+        }
         return;
       }
 

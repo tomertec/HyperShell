@@ -1,3 +1,7 @@
+import {
+  DEFAULT_RECONNECT_BASE_INTERVAL,
+  DEFAULT_RECONNECT_MAX_ATTEMPTS
+} from "@hypershell/shared";
 import type { SqliteDatabase } from "../index";
 import { openDatabase } from "../index";
 
@@ -101,8 +105,8 @@ function mapRow(row: HostRow): HostRecord {
     proxyJumpHostIds: row.proxy_jump_host_ids ?? null,
     keepAliveInterval: row.keep_alive_interval ?? null,
     autoReconnect: Boolean(row.auto_reconnect),
-    reconnectMaxAttempts: row.reconnect_max_attempts ?? 5,
-    reconnectBaseInterval: row.reconnect_base_interval ?? 1,
+    reconnectMaxAttempts: row.reconnect_max_attempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
+    reconnectBaseInterval: row.reconnect_base_interval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
     tmuxDetect: Boolean(row.tmux_detect),
   };
 }
@@ -207,8 +211,8 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         proxyJumpHostIds: input.proxyJumpHostIds ?? null,
         keepAliveInterval: input.keepAliveInterval ?? null,
         autoReconnect: input.autoReconnect ? 1 : 0,
-        reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
+        reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
+        reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
         tmuxDetect: input.tmuxDetect ? 1 : 0,
       };
 
@@ -269,8 +273,8 @@ function createInMemoryHostsRepository() {
         proxyJumpHostIds: input.proxyJumpHostIds ?? null,
         keepAliveInterval: input.keepAliveInterval ?? null,
         autoReconnect: input.autoReconnect ?? false,
-        reconnectMaxAttempts: input.reconnectMaxAttempts ?? 5,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? 1,
+        reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
+        reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
         tmuxDetect: input.tmuxDetect ?? false,
       };
 

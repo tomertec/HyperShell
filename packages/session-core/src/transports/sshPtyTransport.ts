@@ -3,6 +3,7 @@ import type {
   SessionTransportEvent,
   TransportHandle
 } from "./transportEvents";
+import { ENV_VAR_NAME_REGEX, toErrorMessage as toSharedErrorMessage } from "@hypershell/shared";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
@@ -145,18 +146,8 @@ function getDefaultSpawnPty(): SshPtySpawn {
 }
 
 function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  if (typeof error === "string" && error.length > 0) {
-    return error;
-  }
-
-  return "Unknown PTY error";
+  return toSharedErrorMessage(error, "Unknown PTY error");
 }
-
-const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function buildPtyEnv(
   baseEnv: NodeJS.ProcessEnv,

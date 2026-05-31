@@ -36,6 +36,13 @@ export type LayoutState = {
   moveTab: (fromIndex: number, toIndex: number) => void;
 };
 
+function equalPaneSizes(count: number): number[] {
+  const equalSize = Math.round(100 / count);
+  return Array.from({ length: count }, (_, i) =>
+    i < count - 1 ? equalSize : 100 - equalSize * (count - 1)
+  );
+}
+
 export function createLayoutStore() {
   let paneCounter = 1;
 
@@ -121,10 +128,7 @@ export function createLayoutStore() {
         paneCounter++;
         const newPaneId = `pane-${paneCounter}`;
         const nextPanes = [...state.panes, { paneId: newPaneId, sessionId }];
-        const equalSize = Math.round(100 / nextPanes.length);
-        const sizes = nextPanes.map((_, i) =>
-          i < nextPanes.length - 1 ? equalSize : 100 - equalSize * (nextPanes.length - 1)
-        );
+        const sizes = equalPaneSizes(nextPanes.length);
         return {
           panes: nextPanes,
           activePaneId: newPaneId,
@@ -137,10 +141,7 @@ export function createLayoutStore() {
       set((state) => {
         if (state.panes.length <= 1) return state;
         const nextPanes = state.panes.filter((p) => p.paneId !== paneId);
-        const equalSize = Math.round(100 / nextPanes.length);
-        const sizes = nextPanes.map((_, i) =>
-          i < nextPanes.length - 1 ? equalSize : 100 - equalSize * (nextPanes.length - 1)
-        );
+        const sizes = equalPaneSizes(nextPanes.length);
         return {
           panes: nextPanes,
           activePaneId:

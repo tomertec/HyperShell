@@ -121,6 +121,7 @@ export function createTransferManager(
   function emitCancelledComplete(job: ManagedTransferJob): void {
     job.status = "failed";
     job.error = "Cancelled by user";
+    job.userInitiated = true;
     emit({
       kind: "transfer-complete",
       transferId: job.transferId,
@@ -294,6 +295,7 @@ export function createTransferManager(
       if (!transport) {
         nextJob.status = "failed";
         nextJob.error = "SFTP transport unavailable";
+        nextJob.userInitiated = false;
         emit({
           kind: "transfer-complete",
           transferId: nextJob.transferId,
@@ -331,6 +333,7 @@ export function createTransferManager(
           if (pausedByUser.has(nextJob.transferId)) {
             nextJob.status = "paused";
             nextJob.error = "Paused by user";
+            nextJob.userInitiated = true;
             nextJob.speed = 0;
             emit({
               kind: "transfer-progress",
@@ -354,6 +357,7 @@ export function createTransferManager(
           if (isConnectionLoss) {
             nextJob.status = "interrupted";
             nextJob.error = errorMsg;
+            nextJob.userInitiated = false;
             emit({
               kind: "transfer-complete",
               transferId: nextJob.transferId,
@@ -375,6 +379,7 @@ export function createTransferManager(
 
           nextJob.status = "failed";
           nextJob.error = error instanceof Error ? error.message : String(error);
+          nextJob.userInitiated = false;
           emit({
             kind: "transfer-complete",
             transferId: nextJob.transferId,
@@ -1018,6 +1023,7 @@ export function createTransferManager(
         pausedByUser.delete(targetId);
         target.status = "failed";
         target.error = "Cancelled by user";
+        target.userInitiated = true;
         emit({
           kind: "transfer-complete",
           transferId: targetId,
@@ -1036,6 +1042,7 @@ export function createTransferManager(
         pending?.reject(new Error("Cancelled by user"));
         target.status = "failed";
         target.error = "Cancelled by user";
+        target.userInitiated = true;
         emit({
           kind: "transfer-complete",
           transferId: targetId,
@@ -1056,6 +1063,7 @@ export function createTransferManager(
         if (target.status !== "completed" && target.status !== "failed") {
           target.status = "failed";
           target.error = "Cancelled by user";
+          target.userInitiated = true;
           emit({
             kind: "transfer-complete",
             transferId: targetId,
@@ -1089,6 +1097,7 @@ export function createTransferManager(
         pausedByUser.add(targetId);
         target.status = "paused";
         target.error = "Paused by user";
+        target.userInitiated = true;
         target.speed = 0;
         emit({
           kind: "transfer-progress",
@@ -1105,6 +1114,7 @@ export function createTransferManager(
         if (!pendingConflicts.has(targetId)) {
           pausedByUser.add(targetId);
           target.error = "Paused by user";
+          target.userInitiated = true;
           target.speed = 0;
         }
         continue;
@@ -1112,6 +1122,7 @@ export function createTransferManager(
 
       pausedByUser.add(targetId);
       target.error = "Paused by user";
+      target.userInitiated = true;
       target.abortController?.abort();
       // abort() fires the signal synchronously, but the promise .catch() handler
       // that sets the job to "paused" runs as a microtask — after pause() returns.
@@ -1155,6 +1166,7 @@ export function createTransferManager(
       target.status = "queued";
       target.speed = 0;
       delete target.error;
+      target.userInitiated = false;
       emit({
         kind: "transfer-progress",
         transferId: targetId,

@@ -14,6 +14,7 @@ import path from "node:path";
 import os from "node:os";
 
 import type { IpcMainLike } from "./registerIpc";
+import { isPathWithinRoot } from "../security/pathPolicy";
 
 function readEnv(primary: string, fallback?: string): string | undefined {
   const primaryValue = process.env[primary];
@@ -72,23 +73,6 @@ function normalizeAbsolutePath(inputPath: string): string {
   }
 
   return resolved;
-}
-
-function toComparablePath(inputPath: string): string {
-  return process.platform === "win32" ? inputPath.toLowerCase() : inputPath;
-}
-
-function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
-  const comparableTarget = toComparablePath(targetPath);
-  const comparableRoot = toComparablePath(rootPath);
-  if (comparableTarget === comparableRoot) {
-    return true;
-  }
-
-  const withSep = comparableRoot.endsWith(path.sep)
-    ? comparableRoot
-    : `${comparableRoot}${path.sep}`;
-  return comparableTarget.startsWith(withSep);
 }
 
 async function getAllowedRoots(): Promise<string[]> {

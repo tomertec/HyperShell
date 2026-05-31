@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { ENV_VAR_NAME_REGEX } from "@hypershell/shared";
 import type { SqliteDatabase } from "../index";
 
 export type HostEnvVarRecord = {
@@ -29,8 +30,6 @@ type HostEnvVarRow = {
   sort_order: number | null;
   created_at: string;
 };
-
-const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function mapRow(row: HostEnvVarRow): HostEnvVarRecord {
   return {
