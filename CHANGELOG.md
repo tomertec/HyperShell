@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-06
+
 ### Added
 
 - **App themes** — Settings → Appearance now offers 15 full-application color themes that re-skin the entire UI chrome (sidebar, tabs, panels, dialogs), grouped into **Dark** and **Light** with a "Follow system" option. Dark: HyperShell, Catppuccin Mocha / Macchiato / Frappé, Nord, Dracula, Tokyo Night, Cherry, Ocean, Amber, Mint. Light: HyperShell Light, Latte, Rosé Pine Dawn, Gruvbox Light. Each theme defines the complete CSS-variable palette (via a `data-theme` id plus a `data-variant` light/dark attribute that drives the editor and selection styling), so light themes never inherit dark values. The terminal color scheme remains an independent picker. The previous System/Light/Dark toggle is replaced — existing `appearance.themeMode` settings migrate automatically (light → HyperShell Light, dark → HyperShell, system → Follow system).
