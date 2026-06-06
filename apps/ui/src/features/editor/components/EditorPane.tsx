@@ -53,7 +53,7 @@ export function EditorPane({ store, tabId, content, onSave, canSave }: EditorPan
     const originalContent = tab.originalContent;
     const updateTab = storeRef.current.getState().updateTab;
 
-    const isLight = document.documentElement.dataset.theme === "light";
+    const isLight = document.documentElement.dataset.variant === "light";
 
     const extensions = [
       basicSetup,

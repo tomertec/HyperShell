@@ -32,10 +32,12 @@ export interface SecuritySettings {
   credentialCacheTtlMinutes: number;
 }
 
+/** Legacy coarse mode — kept only for migrating persisted settings. */
 export type ThemeMode = "system" | "light" | "dark";
 
 export interface AppearanceSettings {
-  themeMode: ThemeMode;
+  /** App-chrome theme id (see appThemes.ts) or "system" to follow the OS. */
+  appTheme: string;
 }
 
 export interface AppSettings {
@@ -129,8 +131,27 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
 };
 
 const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
-  themeMode: "system",
+  appTheme: "system",
 };
+
+/**
+ * Map a persisted appearance object to the current shape. Older builds stored
+ * `themeMode: "system" | "light" | "dark"`; translate those to theme ids.
+ */
+function migrateAppearance(
+  parsed: Partial<AppearanceSettings> & { themeMode?: ThemeMode }
+): AppearanceSettings {
+  if (typeof parsed.appTheme === "string") {
+    return { appTheme: parsed.appTheme };
+  }
+  if (parsed.themeMode === "light") {
+    return { appTheme: "default-light" };
+  }
+  if (parsed.themeMode === "dark") {
+    return { appTheme: "default" };
+  }
+  return { appTheme: "system" };
+}
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
   terminal: DEFAULT_TERMINAL_SETTINGS,
@@ -196,10 +217,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
               ...DEFAULT_SECURITY_SETTINGS,
               ...(parsed.security ?? {})
             },
-            appearance: {
-              ...DEFAULT_APPEARANCE_SETTINGS,
-              ...(parsed.appearance ?? {}),
-            },
+            appearance: migrateAppearance(parsed.appearance ?? {}),
             customThemes: parsed.customThemes ?? {}
           };
           merged.terminal.fontSize = clampTerminalFontSize(merged.terminal.fontSize);

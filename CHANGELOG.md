@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Added
+
+- **App themes** — Settings → Appearance now offers 15 full-application color themes that re-skin the entire UI chrome (sidebar, tabs, panels, dialogs), grouped into **Dark** and **Light** with a "Follow system" option. Dark: HyperShell, Catppuccin Mocha / Macchiato / Frappé, Nord, Dracula, Tokyo Night, Cherry, Ocean, Amber, Mint. Light: HyperShell Light, Latte, Rosé Pine Dawn, Gruvbox Light. Each theme defines the complete CSS-variable palette (via a `data-theme` id plus a `data-variant` light/dark attribute that drives the editor and selection styling), so light themes never inherit dark values. The terminal color scheme remains an independent picker. The previous System/Light/Dark toggle is replaced — existing `appearance.themeMode` settings migrate automatically (light → HyperShell Light, dark → HyperShell, system → Follow system).
+
+### Changed
+
+- **Update notification moved into the sidebar footer** — the floating bottom-center update banner is removed. The footer version label is now update-aware: when an update is available, `HyperShell>_ v{version}` morphs — via a terminal-style character-decode animation — into a clickable `Update>_ vX.Y.Z` prompt that keeps the `>_` logo motif. Clicking runs the action directly (download → `Downloading>_ NN%` with a thin accent progress underline → `Restart>_ ready` to install; manual updates open the release page). The notification is frameless and matches the logo styling; the footer Settings button is vertically centered on the same line.
+
 ## [0.2.5] - 2026-05-31
 
 ### Added

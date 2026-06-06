@@ -125,3 +125,45 @@ describe("settingsStore custom themes", () => {
     expect(savedValue.security.credentialCacheTtlMinutes).toBe(42);
   });
 });
+
+describe("settingsStore appearance migration", () => {
+  beforeEach(() => {
+    mockSshterm.getSetting.mockReset();
+    mockSshterm.updateSetting.mockReset();
+    mockSshterm.updateSetting.mockResolvedValue({ key: "app.settings", value: "{}" });
+  });
+
+  async function loadWith(appearance: unknown): Promise<string> {
+    mockSshterm.getSetting.mockResolvedValue({
+      key: "app.settings",
+      value: JSON.stringify({ appearance }),
+    });
+    await settingsStore.getState().load();
+    return settingsStore.getState().settings.appearance.appTheme;
+  }
+
+  it("migrates legacy themeMode 'light' to the light default theme", async () => {
+    expect(await loadWith({ themeMode: "light" })).toBe("default-light");
+  });
+
+  it("migrates legacy themeMode 'dark' to the dark default theme", async () => {
+    expect(await loadWith({ themeMode: "dark" })).toBe("default");
+  });
+
+  it("migrates legacy themeMode 'system' to system", async () => {
+    expect(await loadWith({ themeMode: "system" })).toBe("system");
+  });
+
+  it("preserves an already-migrated appTheme id", async () => {
+    expect(await loadWith({ appTheme: "mocha" })).toBe("mocha");
+  });
+
+  it("defaults to system when appearance is absent", async () => {
+    mockSshterm.getSetting.mockResolvedValue({
+      key: "app.settings",
+      value: JSON.stringify({}),
+    });
+    await settingsStore.getState().load();
+    expect(settingsStore.getState().settings.appearance.appTheme).toBe("system");
+  });
+});

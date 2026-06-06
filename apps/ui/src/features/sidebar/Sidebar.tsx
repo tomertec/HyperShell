@@ -6,6 +6,7 @@ import { settingsStore } from "../settings/settingsStore";
 import { SidebarHostList } from "./SidebarHostList";
 import { SidebarSerialList } from "./SidebarSerialList";
 import { SidebarSection } from "./SidebarSection";
+import { SidebarUpdateLabel } from "../updates/SidebarUpdateLabel";
 
 export interface SidebarProps {
   hosts: HostRecord[];
@@ -265,10 +266,10 @@ export function Sidebar({
         </div>
       )}
 
-      <div className={`${restoreCount ? "" : "mt-auto "}border-t border-border px-3 pt-3 pb-2 flex items-end justify-between`}>
+      <div className={`${restoreCount ? "" : "mt-auto "}border-t border-border px-3 pt-3 pb-2 flex items-center justify-between`}>
         <button
           onClick={onOpenSettings}
-          className="flex items-center gap-2 px-1 py-0.5 rounded text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"
+          className="-ml-1 flex items-center gap-2 px-2 py-1 rounded-md text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"
           title="Settings"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -289,7 +290,7 @@ export function Sidebar({
           </svg>
           <span className="text-xs font-bold tracking-wide">Settings</span>
         </button>
-        <div className="text-[10px] text-text-muted/60 tracking-wide select-none" style={{ fontFamily: "'JetBrains Mono', monospace" }}>HyperShell<span className="text-accent/50">&gt;_</span> v{__APP_VERSION__}</div>
+        <SidebarUpdateLabel version={__APP_VERSION__} />
       </div>
     </div>
   );

@@ -27,6 +27,7 @@ import { SessionRecoveryDialog } from "../features/sessions/SessionRecoveryDialo
 import { Sidebar } from "../features/sidebar/Sidebar";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
+import { appThemeVariant, resolveAppTheme } from "../features/settings/appThemes";
 import { TransferPopup } from "../features/sftp/components/TransferPopup";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
@@ -50,7 +51,6 @@ import { CommandPalette } from "../features/command-palette/CommandPalette";
 import { useCommandPaletteStore } from "../features/command-palette/commandPaletteStore";
 import { createCommands, type CommandContext } from "../features/command-palette/commandRegistry";
 import { useTunnelStore } from "../features/tunnels/tunnelStore";
-import { UpdateBanner } from "../features/updates/UpdateBanner";
 import { useUpdateStore } from "../features/updates/updateStore";
 
 
@@ -312,28 +312,26 @@ function serializeCurrentLayout() {
 }
 
 function useAppTheme() {
-  const themeMode = useStore(settingsStore, (s) => s.settings.appearance.themeMode);
+  const appTheme = useStore(settingsStore, (s) => s.settings.appearance.appTheme);
 
   useEffect(() => {
     function apply() {
-      let resolved: "light" | "dark";
-      if (themeMode === "system") {
-        resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      } else {
-        resolved = themeMode;
-      }
-      document.documentElement.dataset.theme = resolved;
-      window.hypershell?.setAppTheme?.(resolved);
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const id = resolveAppTheme(appTheme, prefersDark);
+      const variant = appThemeVariant(id);
+      document.documentElement.dataset.theme = id;
+      document.documentElement.dataset.variant = variant;
+      window.hypershell?.setAppTheme?.(variant);
     }
 
     apply();
 
-    if (themeMode === "system") {
+    if (appTheme === "system") {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       mq.addEventListener("change", apply);
       return () => mq.removeEventListener("change", apply);
     }
-  }, [themeMode]);
+  }, [appTheme]);
 }
 
 function MainApp() {
@@ -1609,8 +1607,6 @@ function MainApp() {
       />
 
       <TransferPopup />
-
-      <UpdateBanner />
 
       <Toaster
         position="bottom-right"

@@ -44,7 +44,7 @@
   --host-pink: #f472b6;
 }
 
-html[data-theme="light"] {
+html[data-theme="default-light"] {
   /* Surfaces — layered cool grays with clear depth hierarchy
      chrome (800) is the mid-gray shell; surface is content canvas;
      900 is lighter for input wells / active tabs that need to stand out */
@@ -96,16 +96,552 @@ html[data-theme="light"] {
   --host-pink: #db2777;
 }
 
-html[data-theme="light"] ::selection {
+/* ── Catppuccin Mocha (dark) ───────────────────────────────────────────── */
+html[data-theme="mocha"] {
+  --color-surface: #1e1e2e;
+  --color-base-950: #11111b;
+  --color-base-900: #181825;
+  --color-base-800: #1e1e2e;
+  --color-base-750: #25253a;
+  --color-base-700: #313244;
+  --color-base-600: #45475a;
+  --color-base-500: #585b70;
+
+  --color-text-primary: #cdd6f4;
+  --color-text-secondary: #a6adc8;
+  --color-text-muted: #7f849c;
+
+  --color-border: rgba(205, 214, 244, 0.10);
+  --color-border-bright: rgba(205, 214, 244, 0.20);
+
+  --color-accent: #cba6f7;
+  --color-accent-dim: rgba(203, 166, 247, 0.30);
+  --color-accent-glow: rgba(203, 166, 247, 0.15);
+
+  --color-success: #a6e3a1;
+  --color-success-glow: rgba(166, 227, 161, 0.25);
+  --color-warning: #f9e2af;
+  --color-danger: #f38ba8;
+  --color-info: #89b4fa;
+
+  --terminal-frame-line: rgba(203, 166, 247, 0.30);
+  --terminal-frame-glow: rgba(203, 166, 247, 0.10);
+
+  --host-red: #f38ba8;
+  --host-orange: #fab387;
+  --host-yellow: #f9e2af;
+  --host-green: #a6e3a1;
+  --host-blue: #89b4fa;
+  --host-cyan: #94e2d5;
+  --host-purple: #cba6f7;
+  --host-pink: #f5c2e7;
+}
+
+/* ── Nord (dark) ───────────────────────────────────────────────────────── */
+html[data-theme="nord"] {
+  --color-surface: #2e3440;
+  --color-base-950: #242933;
+  --color-base-900: #2a2f3a;
+  --color-base-800: #2e3440;
+  --color-base-750: #353c4a;
+  --color-base-700: #3b4252;
+  --color-base-600: #434c5e;
+  --color-base-500: #4c566a;
+
+  --color-text-primary: #eceff4;
+  --color-text-secondary: #d8dee9;
+  --color-text-muted: #7b88a1;
+
+  --color-border: rgba(216, 222, 233, 0.10);
+  --color-border-bright: rgba(216, 222, 233, 0.20);
+
+  --color-accent: #88c0d0;
+  --color-accent-dim: rgba(136, 192, 208, 0.30);
+  --color-accent-glow: rgba(136, 192, 208, 0.15);
+
+  --color-success: #a3be8c;
+  --color-success-glow: rgba(163, 190, 140, 0.25);
+  --color-warning: #ebcb8b;
+  --color-danger: #bf616a;
+  --color-info: #81a1c1;
+
+  --terminal-frame-line: rgba(136, 192, 208, 0.30);
+  --terminal-frame-glow: rgba(136, 192, 208, 0.10);
+
+  --host-red: #bf616a;
+  --host-orange: #d08770;
+  --host-yellow: #ebcb8b;
+  --host-green: #a3be8c;
+  --host-blue: #81a1c1;
+  --host-cyan: #88c0d0;
+  --host-purple: #b48ead;
+  --host-pink: #c895bf;
+}
+
+/* ── Dracula (dark) ────────────────────────────────────────────────────── */
+html[data-theme="dracula"] {
+  --color-surface: #282a36;
+  --color-base-950: #1d1e26;
+  --color-base-900: #21222c;
+  --color-base-800: #282a36;
+  --color-base-750: #2f313f;
+  --color-base-700: #383a4a;
+  --color-base-600: #44475a;
+  --color-base-500: #565872;
+
+  --color-text-primary: #f8f8f2;
+  --color-text-secondary: #c8cadb;
+  --color-text-muted: #6272a4;
+
+  --color-border: rgba(248, 248, 242, 0.10);
+  --color-border-bright: rgba(248, 248, 242, 0.20);
+
+  --color-accent: #bd93f9;
+  --color-accent-dim: rgba(189, 147, 249, 0.30);
+  --color-accent-glow: rgba(189, 147, 249, 0.15);
+
+  --color-success: #50fa7b;
+  --color-success-glow: rgba(80, 250, 123, 0.25);
+  --color-warning: #f1fa8c;
+  --color-danger: #ff5555;
+  --color-info: #8be9fd;
+
+  --terminal-frame-line: rgba(189, 147, 249, 0.30);
+  --terminal-frame-glow: rgba(189, 147, 249, 0.10);
+
+  --host-red: #ff5555;
+  --host-orange: #ffb86c;
+  --host-yellow: #f1fa8c;
+  --host-green: #50fa7b;
+  --host-blue: #8be9fd;
+  --host-cyan: #8be9fd;
+  --host-purple: #bd93f9;
+  --host-pink: #ff79c6;
+}
+
+/* ── Tokyo Night (dark) ────────────────────────────────────────────────── */
+html[data-theme="tokyo-night"] {
+  --color-surface: #1a1b26;
+  --color-base-950: #16161e;
+  --color-base-900: #1a1b26;
+  --color-base-800: #1f2335;
+  --color-base-750: #24283b;
+  --color-base-700: #292e42;
+  --color-base-600: #3b4261;
+  --color-base-500: #545c7e;
+
+  --color-text-primary: #c0caf5;
+  --color-text-secondary: #a9b1d6;
+  --color-text-muted: #565f89;
+
+  --color-border: rgba(192, 202, 245, 0.10);
+  --color-border-bright: rgba(192, 202, 245, 0.20);
+
+  --color-accent: #7aa2f7;
+  --color-accent-dim: rgba(122, 162, 247, 0.30);
+  --color-accent-glow: rgba(122, 162, 247, 0.15);
+
+  --color-success: #9ece6a;
+  --color-success-glow: rgba(158, 206, 106, 0.25);
+  --color-warning: #e0af68;
+  --color-danger: #f7768e;
+  --color-info: #bb9af7;
+
+  --terminal-frame-line: rgba(122, 162, 247, 0.30);
+  --terminal-frame-glow: rgba(122, 162, 247, 0.10);
+
+  --host-red: #f7768e;
+  --host-orange: #ff9e64;
+  --host-yellow: #e0af68;
+  --host-green: #9ece6a;
+  --host-blue: #7aa2f7;
+  --host-cyan: #7dcfff;
+  --host-purple: #bb9af7;
+  --host-pink: #f7a8c4;
+}
+
+/* ── Catppuccin Latte (light) ──────────────────────────────────────────── */
+html[data-theme="latte"] {
+  --color-surface: #eff1f5;
+  --color-base-950: #dce0e8;
+  --color-base-900: #e6e9ef;
+  --color-base-800: #eff1f5;
+  --color-base-750: #e6e9ef;
+  --color-base-700: #ccd0da;
+  --color-base-600: #bcc0cc;
+  --color-base-500: #9ca0b0;
+
+  --color-text-primary: #4c4f69;
+  --color-text-secondary: #5c5f77;
+  --color-text-muted: #7c7f93;
+
+  --color-border: rgba(76, 79, 105, 0.12);
+  --color-border-bright: rgba(76, 79, 105, 0.22);
+
+  --color-accent: #8839ef;
+  --color-accent-dim: rgba(136, 57, 239, 0.15);
+  --color-accent-glow: rgba(136, 57, 239, 0.08);
+
+  --color-success: #40a02b;
+  --color-success-glow: rgba(64, 160, 43, 0.12);
+  --color-warning: #df8e1d;
+  --color-danger: #d20f39;
+  --color-info: #8839ef;
+
+  --terminal-frame-line: rgba(76, 79, 105, 0.18);
+  --terminal-frame-glow: rgba(76, 79, 105, 0.06);
+  --tw-shadow-color: rgba(0, 0, 0, 0.06);
+
+  --host-red: #d20f39;
+  --host-orange: #fe640b;
+  --host-yellow: #df8e1d;
+  --host-green: #40a02b;
+  --host-blue: #1e66f5;
+  --host-cyan: #179299;
+  --host-purple: #8839ef;
+  --host-pink: #ea76cb;
+}
+
+/* ── Gruvbox Light (light) ─────────────────────────────────────────────── */
+html[data-theme="gruvbox-light"] {
+  --color-surface: #fbf1c7;
+  --color-base-950: #d5c4a1;
+  --color-base-900: #f9f5d7;
+  --color-base-800: #fbf1c7;
+  --color-base-750: #f2e5bc;
+  --color-base-700: #ebdbb2;
+  --color-base-600: #d5c4a1;
+  --color-base-500: #bdae93;
+
+  --color-text-primary: #282828;
+  --color-text-secondary: #504945;
+  --color-text-muted: #7c6f64;
+
+  --color-border: rgba(40, 40, 40, 0.14);
+  --color-border-bright: rgba(40, 40, 40, 0.24);
+
+  --color-accent: #af3a03;
+  --color-accent-dim: rgba(175, 58, 3, 0.15);
+  --color-accent-glow: rgba(175, 58, 3, 0.08);
+
+  --color-success: #79740e;
+  --color-success-glow: rgba(121, 116, 14, 0.12);
+  --color-warning: #b57614;
+  --color-danger: #9d0006;
+  --color-info: #8f3f71;
+
+  --terminal-frame-line: rgba(40, 40, 40, 0.18);
+  --terminal-frame-glow: rgba(40, 40, 40, 0.06);
+  --tw-shadow-color: rgba(0, 0, 0, 0.06);
+
+  --host-red: #9d0006;
+  --host-orange: #af3a03;
+  --host-yellow: #b57614;
+  --host-green: #79740e;
+  --host-blue: #076678;
+  --host-cyan: #427b58;
+  --host-purple: #8f3f71;
+  --host-pink: #b16286;
+}
+
+/* ── Catppuccin Macchiato (dark) ───────────────────────────────────────── */
+html[data-theme="macchiato"] {
+  --color-surface: #24273a;
+  --color-base-950: #181926;
+  --color-base-900: #1e2030;
+  --color-base-800: #24273a;
+  --color-base-750: #2c2f44;
+  --color-base-700: #363a4f;
+  --color-base-600: #494d64;
+  --color-base-500: #5b6078;
+
+  --color-text-primary: #cad3f5;
+  --color-text-secondary: #a5adcb;
+  --color-text-muted: #8087a2;
+
+  --color-border: rgba(202, 211, 245, 0.10);
+  --color-border-bright: rgba(202, 211, 245, 0.20);
+
+  --color-accent: #8aadf4;
+  --color-accent-dim: rgba(138, 173, 244, 0.30);
+  --color-accent-glow: rgba(138, 173, 244, 0.15);
+
+  --color-success: #a6da95;
+  --color-success-glow: rgba(166, 218, 149, 0.25);
+  --color-warning: #eed49f;
+  --color-danger: #ed8796;
+  --color-info: #c6a0f6;
+
+  --terminal-frame-line: rgba(138, 173, 244, 0.30);
+  --terminal-frame-glow: rgba(138, 173, 244, 0.10);
+
+  --host-red: #ed8796;
+  --host-orange: #f5a97f;
+  --host-yellow: #eed49f;
+  --host-green: #a6da95;
+  --host-blue: #8aadf4;
+  --host-cyan: #8bd5ca;
+  --host-purple: #c6a0f6;
+  --host-pink: #f5bde6;
+}
+
+/* ── Catppuccin Frappé (dark) ──────────────────────────────────────────── */
+html[data-theme="frappe"] {
+  --color-surface: #303446;
+  --color-base-950: #232634;
+  --color-base-900: #292c3c;
+  --color-base-800: #303446;
+  --color-base-750: #383c4f;
+  --color-base-700: #414559;
+  --color-base-600: #51576d;
+  --color-base-500: #626880;
+
+  --color-text-primary: #c6d0f5;
+  --color-text-secondary: #a5adce;
+  --color-text-muted: #838ba7;
+
+  --color-border: rgba(198, 208, 245, 0.10);
+  --color-border-bright: rgba(198, 208, 245, 0.20);
+
+  --color-accent: #8caaee;
+  --color-accent-dim: rgba(140, 170, 238, 0.30);
+  --color-accent-glow: rgba(140, 170, 238, 0.15);
+
+  --color-success: #a6d189;
+  --color-success-glow: rgba(166, 209, 137, 0.25);
+  --color-warning: #e5c890;
+  --color-danger: #e78284;
+  --color-info: #ca9ee6;
+
+  --terminal-frame-line: rgba(140, 170, 238, 0.30);
+  --terminal-frame-glow: rgba(140, 170, 238, 0.10);
+
+  --host-red: #e78284;
+  --host-orange: #ef9f76;
+  --host-yellow: #e5c890;
+  --host-green: #a6d189;
+  --host-blue: #8caaee;
+  --host-cyan: #81c8be;
+  --host-purple: #ca9ee6;
+  --host-pink: #f4b8e4;
+}
+
+/* ── Cherry (dark) ─────────────────────────────────────────────────────── */
+html[data-theme="cherry"] {
+  --color-surface: #18141a;
+  --color-base-950: #100c12;
+  --color-base-900: #151117;
+  --color-base-800: #1d1820;
+  --color-base-750: #241e28;
+  --color-base-700: #2e2633;
+  --color-base-600: #3d3343;
+  --color-base-500: #4f4456;
+
+  --color-text-primary: #f3e9ef;
+  --color-text-secondary: #c9b6c3;
+  --color-text-muted: #8c7a87;
+
+  --color-border: rgba(243, 233, 239, 0.10);
+  --color-border-bright: rgba(243, 233, 239, 0.20);
+
+  --color-accent: #e84a5f;
+  --color-accent-dim: rgba(232, 74, 95, 0.30);
+  --color-accent-glow: rgba(232, 74, 95, 0.15);
+
+  --color-success: #5fd0a0;
+  --color-success-glow: rgba(95, 208, 160, 0.25);
+  --color-warning: #f0b35b;
+  --color-danger: #ff5c7a;
+  --color-info: #c98bdb;
+
+  --terminal-frame-line: rgba(232, 74, 95, 0.30);
+  --terminal-frame-glow: rgba(232, 74, 95, 0.10);
+
+  --host-red: #e84a5f;
+  --host-orange: #f0905b;
+  --host-yellow: #f0b35b;
+  --host-green: #5fd0a0;
+  --host-blue: #5a9eea;
+  --host-cyan: #57c7c7;
+  --host-purple: #c98bdb;
+  --host-pink: #f06fa0;
+}
+
+/* ── Ocean (dark) ──────────────────────────────────────────────────────── */
+html[data-theme="ocean"] {
+  --color-surface: #0d1b2a;
+  --color-base-950: #081320;
+  --color-base-900: #0b1828;
+  --color-base-800: #102234;
+  --color-base-750: #142a40;
+  --color-base-700: #1b3651;
+  --color-base-600: #244766;
+  --color-base-500: #325b80;
+
+  --color-text-primary: #e3eefb;
+  --color-text-secondary: #adc4dc;
+  --color-text-muted: #6f8aa6;
+
+  --color-border: rgba(227, 238, 251, 0.10);
+  --color-border-bright: rgba(227, 238, 251, 0.20);
+
+  --color-accent: #4a9eea;
+  --color-accent-dim: rgba(74, 158, 234, 0.30);
+  --color-accent-glow: rgba(74, 158, 234, 0.15);
+
+  --color-success: #43c6ac;
+  --color-success-glow: rgba(67, 198, 172, 0.25);
+  --color-warning: #f0b95b;
+  --color-danger: #f0697a;
+  --color-info: #7aa2f7;
+
+  --terminal-frame-line: rgba(74, 158, 234, 0.30);
+  --terminal-frame-glow: rgba(74, 158, 234, 0.10);
+
+  --host-red: #f0697a;
+  --host-orange: #f0935b;
+  --host-yellow: #f0b95b;
+  --host-green: #43c6ac;
+  --host-blue: #4a9eea;
+  --host-cyan: #38c0d4;
+  --host-purple: #9d8df0;
+  --host-pink: #f072b6;
+}
+
+/* ── Amber (dark) ──────────────────────────────────────────────────────── */
+html[data-theme="amber"] {
+  --color-surface: #1a1710;
+  --color-base-950: #120f09;
+  --color-base-900: #17130c;
+  --color-base-800: #1f1b12;
+  --color-base-750: #262117;
+  --color-base-700: #322b1d;
+  --color-base-600: #433a28;
+  --color-base-500: #564b36;
+
+  --color-text-primary: #f5ecdc;
+  --color-text-secondary: #cdbfa6;
+  --color-text-muted: #8c8069;
+
+  --color-border: rgba(245, 236, 220, 0.10);
+  --color-border-bright: rgba(245, 236, 220, 0.20);
+
+  --color-accent: #e0a740;
+  --color-accent-dim: rgba(224, 167, 64, 0.30);
+  --color-accent-glow: rgba(224, 167, 64, 0.15);
+
+  --color-success: #b5c75a;
+  --color-success-glow: rgba(181, 199, 90, 0.25);
+  --color-warning: #e0c040;
+  --color-danger: #e8714a;
+  --color-info: #d6a85f;
+
+  --terminal-frame-line: rgba(224, 167, 64, 0.30);
+  --terminal-frame-glow: rgba(224, 167, 64, 0.10);
+
+  --host-red: #e8714a;
+  --host-orange: #e08f40;
+  --host-yellow: #e0c040;
+  --host-green: #b5c75a;
+  --host-blue: #6fa8c7;
+  --host-cyan: #5ec7b5;
+  --host-purple: #c08fd0;
+  --host-pink: #e08fb0;
+}
+
+/* ── Mint (dark) ───────────────────────────────────────────────────────── */
+html[data-theme="mint"] {
+  --color-surface: #0f1a16;
+  --color-base-950: #0a1310;
+  --color-base-900: #0d1814;
+  --color-base-800: #12211c;
+  --color-base-750: #172a23;
+  --color-base-700: #1f372e;
+  --color-base-600: #29483d;
+  --color-base-500: #385c4e;
+
+  --color-text-primary: #e4f5ee;
+  --color-text-secondary: #aecfc2;
+  --color-text-muted: #6f9686;
+
+  --color-border: rgba(228, 245, 238, 0.10);
+  --color-border-bright: rgba(228, 245, 238, 0.20);
+
+  --color-accent: #3fbf8f;
+  --color-accent-dim: rgba(63, 191, 143, 0.30);
+  --color-accent-glow: rgba(63, 191, 143, 0.15);
+
+  --color-success: #4fd09a;
+  --color-success-glow: rgba(79, 208, 154, 0.25);
+  --color-warning: #e0c45b;
+  --color-danger: #f0697a;
+  --color-info: #5ec7c7;
+
+  --terminal-frame-line: rgba(63, 191, 143, 0.30);
+  --terminal-frame-glow: rgba(63, 191, 143, 0.10);
+
+  --host-red: #f0697a;
+  --host-orange: #f0935b;
+  --host-yellow: #e0c45b;
+  --host-green: #3fbf8f;
+  --host-blue: #5a9eea;
+  --host-cyan: #43c6c6;
+  --host-purple: #9d8df0;
+  --host-pink: #f072b6;
+}
+
+/* ── Rosé Pine Dawn (light) ────────────────────────────────────────────── */
+html[data-theme="rose-pine-dawn"] {
+  --color-surface: #faf4ed;
+  --color-base-950: #dfdad9;
+  --color-base-900: #fffaf3;
+  --color-base-800: #faf4ed;
+  --color-base-750: #f4ede8;
+  --color-base-700: #f2e9e1;
+  --color-base-600: #dfdad9;
+  --color-base-500: #cecacd;
+
+  --color-text-primary: #575279;
+  --color-text-secondary: #797593;
+  --color-text-muted: #9893a5;
+
+  --color-border: rgba(87, 82, 121, 0.12);
+  --color-border-bright: rgba(87, 82, 121, 0.22);
+
+  --color-accent: #907aa9;
+  --color-accent-dim: rgba(144, 122, 169, 0.15);
+  --color-accent-glow: rgba(144, 122, 169, 0.08);
+
+  --color-success: #56949f;
+  --color-success-glow: rgba(86, 148, 159, 0.14);
+  --color-warning: #ea9d34;
+  --color-danger: #b4637a;
+  --color-info: #907aa9;
+
+  --terminal-frame-line: rgba(87, 82, 121, 0.18);
+  --terminal-frame-glow: rgba(87, 82, 121, 0.06);
+  --tw-shadow-color: rgba(0, 0, 0, 0.05);
+
+  --host-red: #b4637a;
+  --host-orange: #c9892b;
+  --host-yellow: #ea9d34;
+  --host-green: #56949f;
+  --host-blue: #286983;
+  --host-cyan: #56949f;
+  --host-purple: #907aa9;
+  --host-pink: #d7827e;
+}
+
+html[data-variant="light"] ::selection {
   background: rgba(2, 132, 199, 0.20);
   color: inherit;
 }
 
-html[data-theme="light"] ::-webkit-scrollbar-thumb {
+html[data-variant="light"] ::-webkit-scrollbar-thumb {
   background: rgba(15, 23, 42, 0.10);
 }
 
-html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+html[data-variant="light"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(15, 23, 42, 0.22);
 }
 

@@ -9,9 +9,9 @@ import {
   MIN_TERMINAL_LETTER_SPACING,
   MIN_TERMINAL_LINE_HEIGHT,
   MIN_TERMINAL_FONT_SIZE,
-  settingsStore,
-  ThemeMode
+  settingsStore
 } from "./settingsStore";
+import { APP_THEMES } from "./appThemes";
 import { terminalThemes } from "../terminal/terminalTheme";
 import { ThemeEditor } from "./ThemeEditor";
 import { SshKeyManager } from "../ssh-keys/SshKeyManager";
@@ -592,15 +592,47 @@ function TerminalSection() {
   );
 }
 
+function AppThemeOption({
+  id,
+  label,
+  swatch,
+  active,
+  onSelect,
+}: {
+  id: string;
+  label: string;
+  swatch: string;
+  active: boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(id)}
+      className={[
+        "flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all duration-150",
+        active
+          ? "border-accent/60 bg-accent/10 text-text-primary"
+          : "border-border bg-base-900 text-text-secondary hover:border-border-bright hover:text-text-primary",
+      ].join(" ")}
+    >
+      <span
+        className="h-4 w-4 shrink-0 rounded-full border border-border-bright"
+        style={{ background: swatch }}
+      />
+      <span className="text-xs font-medium">{label}</span>
+    </button>
+  );
+}
+
 function AppearanceSection() {
-  const themeMode = useStore(settingsStore, (s) => s.settings.appearance.themeMode);
+  const appTheme = useStore(settingsStore, (s) => s.settings.appearance.appTheme);
   const updateAppearance = useStore(settingsStore, (s) => s.updateAppearance);
 
-  const modes: { value: ThemeMode; label: string }[] = [
-    { value: "system", label: "System" },
-    { value: "light", label: "Light" },
-    { value: "dark", label: "Dark" },
-  ];
+  const select = (id: string) => void updateAppearance({ appTheme: id });
+  const followSystem = appTheme === "system";
+  const darkThemes = APP_THEMES.filter((t) => t.variant === "dark");
+  const lightThemes = APP_THEMES.filter((t) => t.variant === "light");
 
   return (
     <div className="grid gap-6">
@@ -608,21 +640,57 @@ function AppearanceSection() {
         <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
           App Theme
         </h3>
-        <div className="inline-flex rounded-lg border border-border p-0.5 bg-base-900">
-          {modes.map((m) => (
-            <button
-              key={m.value}
-              type="button"
-              onClick={() => void updateAppearance({ themeMode: m.value })}
-              className={[
-                "px-4 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
-                themeMode === m.value
-                  ? "bg-accent text-white shadow-sm"
-                  : "text-text-secondary hover:text-text-primary",
-              ].join(" ")}
-            >
-              {m.label}
-            </button>
+
+        <button
+          type="button"
+          onClick={() => select("system")}
+          className={[
+            "mb-4 flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all duration-150",
+            followSystem
+              ? "border-accent/60 bg-accent/10 text-text-primary"
+              : "border-border bg-base-900 text-text-secondary hover:border-border-bright hover:text-text-primary",
+          ].join(" ")}
+        >
+          <span
+            className={[
+              "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+              followSystem ? "border-accent bg-accent" : "border-border-bright",
+            ].join(" ")}
+          >
+            {followSystem && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+          </span>
+          <span className="text-xs font-medium">Follow system (auto light/dark)</span>
+        </button>
+
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+          Dark
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {darkThemes.map((t) => (
+            <AppThemeOption
+              key={t.id}
+              id={t.id}
+              label={t.label}
+              swatch={t.swatch}
+              active={!followSystem && appTheme === t.id}
+              onSelect={select}
+            />
+          ))}
+        </div>
+
+        <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+          Light
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {lightThemes.map((t) => (
+            <AppThemeOption
+              key={t.id}
+              id={t.id}
+              label={t.label}
+              swatch={t.swatch}
+              active={!followSystem && appTheme === t.id}
+              onSelect={select}
+            />
           ))}
         </div>
       </div>
