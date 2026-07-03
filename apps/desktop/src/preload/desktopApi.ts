@@ -17,8 +17,6 @@ import {
   ipcChannels,
   getSettingRequestSchema,
   updateSettingRequestSchema,
-  upsertSerialProfileRequestSchema,
-  removeSerialProfileRequestSchema,
   hostPortForwardRecordSchema,
   type FsEntry,
   type FsGetDrivesResponse,
@@ -28,15 +26,9 @@ import {
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
-  type SerialProfileRecord,
-  type UpsertSerialProfileRequest,
-  type RemoveSerialProfileRequest,
-  type SerialPortInfo,
   saveWorkspaceRequestSchema,
   loadWorkspaceRequestSchema,
   removeWorkspaceRequestSchema,
-  serialPortInfoSchema,
-  serialProfileRecordSchema,
   settingRecordSchema,
   workspaceLayoutSchema,
   workspaceRecordSchema,
@@ -144,16 +136,13 @@ import { createHostsApi, type HostsApi } from "./api/hostsApi";
 import { createSftpApi, type SftpApi } from "./api/sftpApi";
 import { createGroupsTagsApi, type GroupsTagsApi } from "./api/groupsTagsApi";
 import { createHostProfilesApi, type HostProfilesApi } from "./api/hostProfilesApi";
+import { createSerialApi, type SerialApi } from "./api/serialApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  listSerialProfiles(): Promise<SerialProfileRecord[]>;
-  upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord>;
-  removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void>;
-  listSerialPorts(): Promise<SerialPortInfo[]>;
   fsList(request: FsListRequest): Promise<FsListResponse>;
   fsStat(request: FsPathRequest): Promise<FsEntry>;
   fsGetHome(): Promise<{ path: string }>;
@@ -238,8 +227,6 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const serialProfileRecordArraySchema = z.array(serialProfileRecordSchema);
-const serialPortInfoArraySchema = z.array(serialPortInfoSchema);
 const fsGetHomeResponseSchema = z.object({ path: z.string() });
 const fsListSshKeysResponseSchema = z.array(z.string());
 const workspaceSaveResponseSchema = z.object({ success: z.boolean() });
@@ -263,6 +250,7 @@ export function createDesktopApi(
     ...createSftpApi(ipcRenderer, logger),
     ...createGroupsTagsApi(ipcRenderer, logger),
     ...createHostProfilesApi(ipcRenderer, logger),
+    ...createSerialApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -272,23 +260,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    async listSerialProfiles(): Promise<SerialProfileRecord[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.list);
-      return serialProfileRecordArraySchema.parse(result);
-    },
-    async upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord> {
-      const parsed = upsertSerialProfileRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.upsert, parsed);
-      return serialProfileRecordSchema.parse(result);
-    },
-    async removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void> {
-      const parsed = removeSerialProfileRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.serialProfiles.remove, parsed);
-    },
-    async listSerialPorts(): Promise<SerialPortInfo[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.listPorts);
-      return serialPortInfoArraySchema.parse(result);
     },
     async fsList(request: FsListRequest): Promise<FsListResponse> {
       const parsed = fsListRequestSchema.parse(request);
