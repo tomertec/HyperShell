@@ -15,9 +15,6 @@ import {
   fsShowOpenDialogRequestSchema,
   fsDialogPathResponseSchema,
   ipcChannels,
-  upsertHostRequestSchema,
-  removeHostRequestSchema,
-  reorderHostsRequestSchema,
   getSettingRequestSchema,
   updateSettingRequestSchema,
   upsertGroupRequestSchema,
@@ -59,32 +56,14 @@ import {
   sftpTransferRetryRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
-  hostRecordSchema,
-  hostStatusTargetsRequestSchema,
-  hostStatusEventSchema,
   hostProfileRecordSchema,
   hostEnvVarRecordSchema,
   hostPortForwardRecordSchema,
-  importSshConfigResponseSchema,
-  scanPuttyResponseSchema,
-  scanSshManagerResponseSchema,
-  importSshManagerRequestSchema,
-  importSshManagerResponseSchema,
-  type ScanPuttyResponse,
-  type ScanSshManagerResponse,
-  type ImportSshManagerRequest,
-  type ImportSshManagerResponse,
-  type HostStatusTargetsRequest,
-  type HostStatusEvent,
   type FsEntry,
   type FsGetDrivesResponse,
   type FsListRequest,
   type FsListResponse,
   type FsPathRequest,
-  type HostRecord,
-  type ReorderHostsRequest,
-  type RemoveHostRequest,
-  type UpsertHostRequest,
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
@@ -197,11 +176,6 @@ import {
   connectionHistoryRecordSchema,
   connectionHistoryListByHostRequestSchema,
   connectionHistoryListRecentRequestSchema,
-  exportHostsRequestSchema,
-  hostFingerprintRecordSchema,
-  hostFingerprintLookupRequestSchema,
-  hostFingerprintTrustRequestSchema,
-  hostFingerprintRemoveRequestSchema,
   tmuxProbeRequestSchema,
   tmuxProbeResponseSchema,
   type SnippetRecord,
@@ -225,11 +199,6 @@ import {
   type ConnectionHistoryRecord,
   type ConnectionHistoryListByHostRequest,
   type ConnectionHistoryListRecentRequest,
-  type ExportHostsRequest,
-  type HostFingerprintRecord,
-  type HostFingerprintLookupRequest,
-  type HostFingerprintTrustRequest,
-  type HostFingerprintRemoveRequest,
   type TmuxProbeRequest,
   type TmuxProbeResponse,
   keyboardInteractiveRequestSchema,
@@ -270,22 +239,13 @@ import {
 import { z } from "zod";
 import type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 import { createSessionApi, type SessionApi } from "./api/sessionApi";
+import { createHostsApi, type HostsApi } from "./api/hostsApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi {
-  listHosts(): Promise<HostRecord[]>;
-  setHostStatusTargets(request: HostStatusTargetsRequest): Promise<void>;
-  onHostStatus(listener: (event: HostStatusEvent) => void): () => void;
-  upsertHost(request: UpsertHostRequest): Promise<HostRecord>;
-  removeHost(request: RemoveHostRequest): Promise<void>;
-  reorderHosts(request: ReorderHostsRequest): Promise<{ success: boolean }>;
+export interface DesktopApi extends SessionApi, HostsApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }>;
-  scanPuttySessions(): Promise<ScanPuttyResponse>;
-  scanSshManager(): Promise<ScanSshManagerResponse>;
-  importSshManager(request: ImportSshManagerRequest): Promise<ImportSshManagerResponse>;
   listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>>;
   upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }>;
   removeGroup(request: RemoveGroupRequest): Promise<void>;
@@ -391,12 +351,6 @@ export interface DesktopApi extends SessionApi {
   connectionHistoryListRecent(
     request?: ConnectionHistoryListRecentRequest
   ): Promise<ConnectionHistoryRecord[]>;
-  // Host export
-  exportHosts(request: ExportHostsRequest): Promise<{ exported: number }>;
-  // Host fingerprint verification
-  hostFingerprintLookup(request: HostFingerprintLookupRequest): Promise<HostFingerprintRecord | null>;
-  hostFingerprintTrust(request: HostFingerprintTrustRequest): Promise<HostFingerprintRecord>;
-  hostFingerprintRemove(request: HostFingerprintRemoveRequest): Promise<void>;
   // Keyboard-interactive auth (2FA)
   onKeyboardInteractive(listener: (request: KeyboardInteractiveRequest) => void): () => void;
   keyboardInteractiveRespond(response: KeyboardInteractiveResponse): Promise<void>;
@@ -566,8 +520,6 @@ function normalizeSftpListResponseShape(value: unknown): SftpListResponse | null
   return { entries };
 }
 
-const hostRecordArraySchema = z.array(hostRecordSchema);
-const reorderHostsResponseSchema = z.object({ success: z.boolean() });
 const groupRecordArraySchema = z.array(groupRecordSchema);
 const tagRecordArraySchema = z.array(tagRecordSchema);
 const hostProfileRecordArraySchema = z.array(hostProfileRecordSchema);
@@ -597,51 +549,7 @@ export function createDesktopApi(
 ): DesktopApi {
   return {
     ...createSessionApi(ipcRenderer, logger),
-    async listHosts(): Promise<HostRecord[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.hosts.list);
-      return hostRecordArraySchema.parse(result);
-    },
-    async setHostStatusTargets(request: HostStatusTargetsRequest): Promise<void> {
-      const parsed = hostStatusTargetsRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.hosts.setStatusTargets, parsed);
-    },
-    onHostStatus(listener: (event: HostStatusEvent) => void): () => void {
-      assertListener(listener, "onHostStatus");
-
-      const wrappedListener = (_event: unknown, payload: unknown) => {
-        const parsed = hostStatusEventSchema.safeParse(payload);
-        if (!parsed.success) {
-          logger.warn?.("Ignored invalid host status payload from IPC", parsed.error);
-          return;
-        }
-
-        try {
-          listener(parsed.data);
-        } catch (error) {
-          logger.error?.("Host status listener threw", error);
-        }
-      };
-
-      ipcRenderer.on(ipcChannels.hosts.status, wrappedListener);
-
-      return () => {
-        ipcRenderer.removeListener(ipcChannels.hosts.status, wrappedListener);
-      };
-    },
-    async upsertHost(request: UpsertHostRequest): Promise<HostRecord> {
-      const parsed = upsertHostRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hosts.upsert, parsed);
-      return hostRecordSchema.parse(result);
-    },
-    async removeHost(request: RemoveHostRequest): Promise<void> {
-      const parsed = removeHostRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.hosts.remove, parsed);
-    },
-    async reorderHosts(request: ReorderHostsRequest): Promise<{ success: boolean }> {
-      const parsed = reorderHostsRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hosts.reorder, parsed);
-      return reorderHostsResponseSchema.parse(result);
-    },
+    ...createHostsApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -651,23 +559,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    async importSshConfig(): Promise<{ imported: number; hosts: HostRecord[] }> {
-      const result = await ipcRenderer.invoke(ipcChannels.hosts.importSshConfig);
-      return importSshConfigResponseSchema.parse(result);
-    },
-    async scanPuttySessions(): Promise<ScanPuttyResponse> {
-      const result = await ipcRenderer.invoke(ipcChannels.hosts.scanPutty);
-      return scanPuttyResponseSchema.parse(result);
-    },
-    async scanSshManager(): Promise<ScanSshManagerResponse> {
-      const result = await ipcRenderer.invoke(ipcChannels.hosts.scanSshManager);
-      return scanSshManagerResponseSchema.parse(result);
-    },
-    async importSshManager(request: ImportSshManagerRequest): Promise<ImportSshManagerResponse> {
-      const parsed = importSshManagerRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hosts.importSshManager, parsed);
-      return importSshManagerResponseSchema.parse(result);
     },
     async listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>> {
       const result = await ipcRenderer.invoke(ipcChannels.groups.list);
@@ -1167,24 +1058,6 @@ export function createDesktopApi(
         connectionHistoryListRecentRequestSchema.parse(request ?? {})
       );
       return connectionHistoryRecordArraySchema.parse(raw);
-    },
-    // Host export
-    async exportHosts(request: ExportHostsRequest): Promise<{ exported: number }> {
-      const raw = await ipcRenderer.invoke(ipcChannels.hosts.exportHosts, exportHostsRequestSchema.parse(request));
-      return z.object({ exported: z.number() }).parse(raw);
-    },
-    // Host fingerprint verification
-    async hostFingerprintLookup(request: HostFingerprintLookupRequest): Promise<HostFingerprintRecord | null> {
-      const raw = await ipcRenderer.invoke(ipcChannels.hostFingerprint.lookup, hostFingerprintLookupRequestSchema.parse(request));
-      if (!raw) return null;
-      return hostFingerprintRecordSchema.parse(raw);
-    },
-    async hostFingerprintTrust(request: HostFingerprintTrustRequest): Promise<HostFingerprintRecord> {
-      const raw = await ipcRenderer.invoke(ipcChannels.hostFingerprint.trust, hostFingerprintTrustRequestSchema.parse(request));
-      return hostFingerprintRecordSchema.parse(raw);
-    },
-    async hostFingerprintRemove(request: HostFingerprintRemoveRequest): Promise<void> {
-      await ipcRenderer.invoke(ipcChannels.hostFingerprint.remove, hostFingerprintRemoveRequestSchema.parse(request));
     },
     onKeyboardInteractive(listener: (request: KeyboardInteractiveRequest) => void): () => void {
       assertListener(listener, "onKeyboardInteractive");
