@@ -14,8 +14,11 @@ export function createSubscription<T>(
   logger: PreloadLogger,
   channel: string,
   name: string,
+  label?: string,
   schema?: ZodType<T>,
 ) {
+  const diagnosticName = label ?? name;
+
   return (listener: (payload: T) => void) => {
     assertListener(listener, name);
 
@@ -23,14 +26,14 @@ export function createSubscription<T>(
       if (schema) {
         const parsed = schema.safeParse(payload);
         if (!parsed.success) {
-          logger.warn?.(`Ignored invalid ${name} payload from IPC`, parsed.error);
+          logger.warn?.(`Ignored invalid ${diagnosticName} payload from IPC`, parsed.error);
           return;
         }
 
         try {
           listener(parsed.data);
         } catch (error) {
-          logger.error?.(`${name} listener threw`, error);
+          logger.error?.(`${diagnosticName} listener threw`, error);
         }
         return;
       }
@@ -38,7 +41,7 @@ export function createSubscription<T>(
       try {
         listener(payload as T);
       } catch (error) {
-        logger.error?.(`${name} listener threw`, error);
+        logger.error?.(`${diagnosticName} listener threw`, error);
       }
     };
 

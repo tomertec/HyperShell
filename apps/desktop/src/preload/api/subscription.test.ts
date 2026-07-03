@@ -19,7 +19,7 @@ describe("createSubscription", () => {
   it("delivers a schema-valid payload to the listener", () => {
     const ipc = fakeIpc();
     const listener = vi.fn();
-    const sub = createSubscription(ipc, logger, "chan", "onThing", z.object({ n: z.number() }));
+    const sub = createSubscription(ipc, logger, "chan", "onThing", undefined, z.object({ n: z.number() }));
     sub(listener);
     ipc.emit("chan", { n: 5 });
     expect(listener).toHaveBeenCalledWith({ n: 5 });
@@ -28,10 +28,30 @@ describe("createSubscription", () => {
   it("drops (warns, no throw) on an invalid payload", () => {
     const ipc = fakeIpc();
     const listener = vi.fn();
-    createSubscription(ipc, logger, "chan", "onThing", z.object({ n: z.number() }))(listener);
+    createSubscription(ipc, logger, "chan", "onThing", undefined, z.object({ n: z.number() }))(listener);
     ipc.emit("chan", { n: "nope" });
     expect(listener).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalled();
+  });
+
+  it("uses the label (not the method name) in the invalid-payload warn message when provided", () => {
+    const ipc = fakeIpc();
+    const listener = vi.fn();
+    createSubscription(ipc, logger, "chan", "onThing", "SFTP event", z.object({ n: z.number() }))(listener);
+    ipc.emit("chan", { n: "nope" });
+    const lastWarnMessage = (logger.warn as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+    expect(lastWarnMessage).toContain("SFTP event");
+    expect(lastWarnMessage).not.toContain("onThing");
+  });
+
+  it("falls back to the method name in diagnostic messages when no label is provided", () => {
+    const ipc = fakeIpc();
+    createSubscription(ipc, logger, "chan", "onThing")(() => {
+      throw new Error("boom");
+    });
+    ipc.emit("chan", {});
+    const lastErrorMessage = (logger.error as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+    expect(lastErrorMessage).toContain("onThing");
   });
 
   it("passes payload through untouched when no schema is given", () => {
