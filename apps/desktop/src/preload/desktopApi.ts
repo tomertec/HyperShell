@@ -36,8 +36,6 @@ import {
   type RestoreBackupRequest,
   type RestoreBackupResponse,
   type ListBackupsResponse,
-  updateStateSchema,
-  type UpdateState,
 } from "@hypershell/shared";
 import { z } from "zod";
 import type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
@@ -53,10 +51,11 @@ import { createSshKeysApi, type SshKeysApi } from "./api/sshKeysApi";
 import { createPortForwardApi, type PortForwardApi } from "./api/portForwardApi";
 import { createRecordingApi, type RecordingApi } from "./api/recordingApi";
 import { createSettingsApi, type SettingsApi } from "./api/settingsApi";
+import { createUpdateApi, type UpdateApi } from "./api/updateApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi, RecordingApi, SettingsApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi, RecordingApi, SettingsApi, UpdateApi {
   // 1Password
   opListVaults(): Promise<OpListVaultsResponse>;
   opListItems(request: OpListItemsRequest): Promise<OpListItemsResponse>;
@@ -78,13 +77,6 @@ export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi
   tmuxProbe(request: TmuxProbeRequest): Promise<TmuxProbeResponse>;
   // App theme
   setAppTheme(theme: "light" | "dark"): Promise<void>;
-  // Auto-update
-  checkForUpdates(): Promise<void>;
-  downloadUpdate(): Promise<void>;
-  installUpdate(): Promise<void>;
-  openUpdateRelease(): Promise<void>;
-  getUpdateState(): Promise<UpdateState>;
-  onUpdateState(listener: (state: UpdateState) => void): () => void;
 }
 
 function assertListener(value: unknown, methodName: string): asserts value is Function {
@@ -112,6 +104,7 @@ export function createDesktopApi(
     ...createPortForwardApi(ipcRenderer, logger),
     ...createRecordingApi(ipcRenderer, logger),
     ...createSettingsApi(ipcRenderer, logger),
+    ...createUpdateApi(ipcRenderer, logger),
     // 1Password
     async opListVaults(): Promise<OpListVaultsResponse> {
       const result = await ipcRenderer.invoke(ipcChannels.op.listVaults);
@@ -207,46 +200,6 @@ export function createDesktopApi(
     // App theme
     async setAppTheme(theme: "light" | "dark"): Promise<void> {
       await ipcRenderer.invoke(ipcChannels.app.setTheme, theme);
-    },
-    // Auto-update
-    async checkForUpdates(): Promise<void> {
-      await ipcRenderer.invoke(ipcChannels.update.check);
-    },
-    async downloadUpdate(): Promise<void> {
-      await ipcRenderer.invoke(ipcChannels.update.download);
-    },
-    async installUpdate(): Promise<void> {
-      await ipcRenderer.invoke(ipcChannels.update.install);
-    },
-    async openUpdateRelease(): Promise<void> {
-      await ipcRenderer.invoke(ipcChannels.update.openRelease);
-    },
-    async getUpdateState(): Promise<UpdateState> {
-      const raw = await ipcRenderer.invoke(ipcChannels.update.getState);
-      return updateStateSchema.parse(raw);
-    },
-    onUpdateState(listener: (state: UpdateState) => void): () => void {
-      assertListener(listener, "onUpdateState");
-
-      const wrappedListener = (_event: unknown, payload: unknown) => {
-        const parsed = updateStateSchema.safeParse(payload);
-        if (!parsed.success) {
-          logger.warn?.("Ignored invalid update state payload from IPC", parsed.error);
-          return;
-        }
-
-        try {
-          listener(parsed.data);
-        } catch (error) {
-          logger.error?.("Update state listener threw", error);
-        }
-      };
-
-      ipcRenderer.on(ipcChannels.update.state, wrappedListener);
-
-      return () => {
-        ipcRenderer.removeListener(ipcChannels.update.state, wrappedListener);
-      };
     },
   };
 }
