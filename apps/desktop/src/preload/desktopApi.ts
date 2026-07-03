@@ -5,12 +5,6 @@ import {
   restoreBackupResponseSchema,
   listBackupsResponseSchema,
   ipcChannels,
-  getSettingRequestSchema,
-  updateSettingRequestSchema,
-  type GetSettingRequest,
-  type UpdateSettingRequest,
-  type SettingRecord,
-  settingRecordSchema,
   opListVaultsResponseSchema,
   opListItemsRequestSchema,
   opListItemsResponseSchema,
@@ -58,12 +52,11 @@ import { createWorkspaceApi, type WorkspaceApi } from "./api/workspaceApi";
 import { createSshKeysApi, type SshKeysApi } from "./api/sshKeysApi";
 import { createPortForwardApi, type PortForwardApi } from "./api/portForwardApi";
 import { createRecordingApi, type RecordingApi } from "./api/recordingApi";
+import { createSettingsApi, type SettingsApi } from "./api/settingsApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi, RecordingApi {
-  getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
-  updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi, RecordingApi, SettingsApi {
   // 1Password
   opListVaults(): Promise<OpListVaultsResponse>;
   opListItems(request: OpListItemsRequest): Promise<OpListItemsResponse>;
@@ -118,16 +111,7 @@ export function createDesktopApi(
     ...createSshKeysApi(ipcRenderer, logger),
     ...createPortForwardApi(ipcRenderer, logger),
     ...createRecordingApi(ipcRenderer, logger),
-    async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
-      const parsed = getSettingRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
-      return result === null ? null : settingRecordSchema.parse(result);
-    },
-    async updateSetting(request: UpdateSettingRequest): Promise<SettingRecord> {
-      const parsed = updateSettingRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
-      return settingRecordSchema.parse(result);
-    },
+    ...createSettingsApi(ipcRenderer, logger),
     // 1Password
     async opListVaults(): Promise<OpListVaultsResponse> {
       const result = await ipcRenderer.invoke(ipcChannels.op.listVaults);
