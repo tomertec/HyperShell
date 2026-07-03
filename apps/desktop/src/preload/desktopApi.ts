@@ -295,24 +295,9 @@ import {
   type UpdateState,
 } from "@hypershell/shared";
 import { z } from "zod";
+import type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface PreloadIpcRenderer {
-  invoke(channel: string, ...args: unknown[]): Promise<unknown>;
-  send(channel: string, ...args: unknown[]): void;
-  on(
-    channel: string,
-    listener: (event: unknown, ...args: unknown[]) => void
-  ): void;
-  removeListener(
-    channel: string,
-    listener: (event: unknown, ...args: unknown[]) => void
-  ): void;
-}
-
-export interface PreloadLogger {
-  warn?: (...args: unknown[]) => void;
-  error?: (...args: unknown[]) => void;
-}
+export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
 export interface DesktopApi {
   openSession(request: OpenSessionRequest): Promise<OpenSessionResponse>;
