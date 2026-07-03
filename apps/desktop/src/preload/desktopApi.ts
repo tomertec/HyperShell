@@ -30,47 +30,11 @@ import {
   snippetRecordSchema,
   upsertSnippetRequestSchema,
   removeSnippetRequestSchema,
-  startLoggingRequestSchema,
-  stopLoggingRequestSchema,
-  getLoggingStateRequestSchema,
-  loggingStateResponseSchema,
-  startRecordingRequestSchema,
-  stopRecordingRequestSchema,
-  getRecordingStateRequestSchema,
-  recordingStateResponseSchema,
-  deleteRecordingRequestSchema,
-  deleteRecordingResponseSchema,
-  getRecordingFramesRequestSchema,
-  recordingFramesResponseSchema,
-  exportRecordingRequestSchema,
-  exportRecordingResponseSchema,
-  sessionRecordingRecordSchema,
-  connectionHistoryRecordSchema,
-  connectionHistoryListByHostRequestSchema,
-  connectionHistoryListRecentRequestSchema,
   tmuxProbeRequestSchema,
   tmuxProbeResponseSchema,
   type SnippetRecord,
   type UpsertSnippetRequest,
   type RemoveSnippetRequest,
-  type StartLoggingRequest,
-  type StopLoggingRequest,
-  type GetLoggingStateRequest,
-  type LoggingStateResponse,
-  type StartRecordingRequest,
-  type StopRecordingRequest,
-  type GetRecordingStateRequest,
-  type RecordingStateResponse,
-  type SessionRecordingRecord,
-  type DeleteRecordingRequest,
-  type DeleteRecordingResponse,
-  type GetRecordingFramesRequest,
-  type RecordingFramesResponse,
-  type ExportRecordingRequest,
-  type ExportRecordingResponse,
-  type ConnectionHistoryRecord,
-  type ConnectionHistoryListByHostRequest,
-  type ConnectionHistoryListRecentRequest,
   type TmuxProbeRequest,
   type TmuxProbeResponse,
   type CreateBackupRequest,
@@ -93,10 +57,11 @@ import { createFsApi, type FsApi } from "./api/fsApi";
 import { createWorkspaceApi, type WorkspaceApi } from "./api/workspaceApi";
 import { createSshKeysApi, type SshKeysApi } from "./api/sshKeysApi";
 import { createPortForwardApi, type PortForwardApi } from "./api/portForwardApi";
+import { createRecordingApi, type RecordingApi } from "./api/recordingApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi, RecordingApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
   // 1Password
@@ -111,23 +76,6 @@ export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi
   snippetsList(): Promise<SnippetRecord[]>;
   snippetsUpsert(request: UpsertSnippetRequest): Promise<SnippetRecord>;
   snippetsRemove(request: RemoveSnippetRequest): Promise<void>;
-  // Session logging
-  loggingStart(request: StartLoggingRequest): Promise<void>;
-  loggingStop(request: StopLoggingRequest): Promise<void>;
-  loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse>;
-  recordingStart(request: StartRecordingRequest): Promise<SessionRecordingRecord>;
-  recordingStop(request: StopRecordingRequest): Promise<SessionRecordingRecord | null>;
-  recordingGetState(request: GetRecordingStateRequest): Promise<RecordingStateResponse>;
-  recordingList(): Promise<SessionRecordingRecord[]>;
-  recordingDelete(request: DeleteRecordingRequest): Promise<DeleteRecordingResponse>;
-  recordingGetFrames(request: GetRecordingFramesRequest): Promise<RecordingFramesResponse>;
-  recordingExport(request: ExportRecordingRequest): Promise<ExportRecordingResponse>;
-  connectionHistoryListByHost(
-    request: ConnectionHistoryListByHostRequest
-  ): Promise<ConnectionHistoryRecord[]>;
-  connectionHistoryListRecent(
-    request?: ConnectionHistoryListRecentRequest
-  ): Promise<ConnectionHistoryRecord[]>;
   // Database backup & restore
   backupCreate(request: CreateBackupRequest): Promise<CreateBackupResponse>;
   backupRestore(request: RestoreBackupRequest): Promise<RestoreBackupResponse>;
@@ -154,8 +102,6 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const connectionHistoryRecordArraySchema = z.array(connectionHistoryRecordSchema);
-
 export function createDesktopApi(
   ipcRenderer: PreloadIpcRenderer,
   logger: PreloadLogger = console
@@ -171,6 +117,7 @@ export function createDesktopApi(
     ...createWorkspaceApi(ipcRenderer, logger),
     ...createSshKeysApi(ipcRenderer, logger),
     ...createPortForwardApi(ipcRenderer, logger),
+    ...createRecordingApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -246,67 +193,6 @@ export function createDesktopApi(
     },
     async snippetsRemove(request: RemoveSnippetRequest): Promise<void> {
       await ipcRenderer.invoke(ipcChannels.snippets.remove, removeSnippetRequestSchema.parse(request));
-    },
-    // Session logging
-    async loggingStart(request: StartLoggingRequest): Promise<void> {
-      await ipcRenderer.invoke(ipcChannels.logging.start, startLoggingRequestSchema.parse(request));
-    },
-    async loggingStop(request: StopLoggingRequest): Promise<void> {
-      await ipcRenderer.invoke(ipcChannels.logging.stop, stopLoggingRequestSchema.parse(request));
-    },
-    async loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse> {
-      const raw = await ipcRenderer.invoke(ipcChannels.logging.getState, getLoggingStateRequestSchema.parse(request));
-      return loggingStateResponseSchema.parse(raw);
-    },
-    // Session recording
-    async recordingStart(request: StartRecordingRequest): Promise<SessionRecordingRecord> {
-      const raw = await ipcRenderer.invoke(ipcChannels.recording.start, startRecordingRequestSchema.parse(request));
-      return sessionRecordingRecordSchema.parse(raw);
-    },
-    async recordingStop(request: StopRecordingRequest): Promise<SessionRecordingRecord | null> {
-      const raw = await ipcRenderer.invoke(ipcChannels.recording.stop, stopRecordingRequestSchema.parse(request));
-      if (raw === null || raw === undefined) {
-        return null;
-      }
-      return sessionRecordingRecordSchema.parse(raw);
-    },
-    async recordingGetState(request: GetRecordingStateRequest): Promise<RecordingStateResponse> {
-      const raw = await ipcRenderer.invoke(ipcChannels.recording.getState, getRecordingStateRequestSchema.parse(request));
-      return recordingStateResponseSchema.parse(raw);
-    },
-    async recordingList(): Promise<SessionRecordingRecord[]> {
-      const raw = await ipcRenderer.invoke(ipcChannels.recording.list);
-      return z.array(sessionRecordingRecordSchema).parse(raw);
-    },
-    async recordingDelete(request: DeleteRecordingRequest): Promise<DeleteRecordingResponse> {
-      const raw = await ipcRenderer.invoke(ipcChannels.recording.delete, deleteRecordingRequestSchema.parse(request));
-      return deleteRecordingResponseSchema.parse(raw);
-    },
-    async recordingGetFrames(request: GetRecordingFramesRequest): Promise<RecordingFramesResponse> {
-      const raw = await ipcRenderer.invoke(ipcChannels.recording.getFrames, getRecordingFramesRequestSchema.parse(request));
-      return recordingFramesResponseSchema.parse(raw);
-    },
-    async recordingExport(request: ExportRecordingRequest): Promise<ExportRecordingResponse> {
-      const raw = await ipcRenderer.invoke(ipcChannels.recording.export, exportRecordingRequestSchema.parse(request));
-      return exportRecordingResponseSchema.parse(raw);
-    },
-    async connectionHistoryListByHost(
-      request: ConnectionHistoryListByHostRequest
-    ): Promise<ConnectionHistoryRecord[]> {
-      const raw = await ipcRenderer.invoke(
-        ipcChannels.connectionHistory.listByHost,
-        connectionHistoryListByHostRequestSchema.parse(request)
-      );
-      return connectionHistoryRecordArraySchema.parse(raw);
-    },
-    async connectionHistoryListRecent(
-      request?: ConnectionHistoryListRecentRequest
-    ): Promise<ConnectionHistoryRecord[]> {
-      const raw = await ipcRenderer.invoke(
-        ipcChannels.connectionHistory.listRecent,
-        connectionHistoryListRecentRequestSchema.parse(request ?? {})
-      );
-      return connectionHistoryRecordArraySchema.parse(raw);
     },
     // Database backup & restore
     async backupCreate(request: CreateBackupRequest): Promise<CreateBackupResponse> {
