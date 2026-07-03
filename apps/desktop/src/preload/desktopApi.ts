@@ -17,12 +17,6 @@ import {
   ipcChannels,
   getSettingRequestSchema,
   updateSettingRequestSchema,
-  upsertGroupRequestSchema,
-  removeGroupRequestSchema,
-  upsertTagRequestSchema,
-  removeTagRequestSchema,
-  getHostTagsRequestSchema,
-  setHostTagsRequestSchema,
   upsertHostProfileRequestSchema,
   removeHostProfileRequestSchema,
   listHostEnvVarsRequestSchema,
@@ -40,13 +34,6 @@ import {
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
-  type UpsertGroupRequest,
-  type RemoveGroupRequest,
-  type TagRecord,
-  type UpsertTagRequest,
-  type RemoveTagRequest,
-  type GetHostTagsRequest,
-  type SetHostTagsRequest,
   type HostProfileRecord,
   type UpsertHostProfileRequest,
   type RemoveHostProfileRequest,
@@ -63,8 +50,6 @@ import {
   serialPortInfoSchema,
   serialProfileRecordSchema,
   settingRecordSchema,
-  groupRecordSchema,
-  tagRecordSchema,
   workspaceLayoutSchema,
   workspaceRecordSchema,
   sshKeyInfoSchema,
@@ -169,20 +154,13 @@ import type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 import { createSessionApi, type SessionApi } from "./api/sessionApi";
 import { createHostsApi, type HostsApi } from "./api/hostsApi";
 import { createSftpApi, type SftpApi } from "./api/sftpApi";
+import { createGroupsTagsApi, type GroupsTagsApi } from "./api/groupsTagsApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>>;
-  upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }>;
-  removeGroup(request: RemoveGroupRequest): Promise<void>;
-  listTags(): Promise<TagRecord[]>;
-  upsertTag(request: UpsertTagRequest): Promise<TagRecord>;
-  removeTag(request: RemoveTagRequest): Promise<void>;
-  tagsGetHostTags(request: GetHostTagsRequest): Promise<TagRecord[]>;
-  tagsSetHostTags(request: SetHostTagsRequest): Promise<TagRecord[]>;
   listHostProfiles(): Promise<HostProfileRecord[]>;
   upsertHostProfile(request: UpsertHostProfileRequest): Promise<HostProfileRecord>;
   removeHostProfile(request: RemoveHostProfileRequest): Promise<void>;
@@ -278,8 +256,6 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const groupRecordArraySchema = z.array(groupRecordSchema);
-const tagRecordArraySchema = z.array(tagRecordSchema);
 const hostProfileRecordArraySchema = z.array(hostProfileRecordSchema);
 const hostEnvVarRecordArraySchema = z.array(hostEnvVarRecordSchema);
 const serialProfileRecordArraySchema = z.array(serialProfileRecordSchema);
@@ -305,6 +281,7 @@ export function createDesktopApi(
     ...createSessionApi(ipcRenderer, logger),
     ...createHostsApi(ipcRenderer, logger),
     ...createSftpApi(ipcRenderer, logger),
+    ...createGroupsTagsApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -314,42 +291,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    async listGroups(): Promise<Array<{ id: string; name: string; description: string | null }>> {
-      const result = await ipcRenderer.invoke(ipcChannels.groups.list);
-      return groupRecordArraySchema.parse(result);
-    },
-    async upsertGroup(request: UpsertGroupRequest): Promise<{ id: string; name: string; description: string | null }> {
-      const parsed = upsertGroupRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.groups.upsert, parsed);
-      return groupRecordSchema.parse(result);
-    },
-    async removeGroup(request: RemoveGroupRequest): Promise<void> {
-      const parsed = removeGroupRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.groups.remove, parsed);
-    },
-    async listTags(): Promise<TagRecord[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.tags.list);
-      return tagRecordArraySchema.parse(result);
-    },
-    async upsertTag(request: UpsertTagRequest): Promise<TagRecord> {
-      const parsed = upsertTagRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.tags.upsert, parsed);
-      return tagRecordSchema.parse(result);
-    },
-    async removeTag(request: RemoveTagRequest): Promise<void> {
-      const parsed = removeTagRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.tags.remove, parsed);
-    },
-    async tagsGetHostTags(request: GetHostTagsRequest): Promise<TagRecord[]> {
-      const parsed = getHostTagsRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.tags.getHostTags, parsed);
-      return tagRecordArraySchema.parse(result);
-    },
-    async tagsSetHostTags(request: SetHostTagsRequest): Promise<TagRecord[]> {
-      const parsed = setHostTagsRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.tags.setHostTags, parsed);
-      return tagRecordArraySchema.parse(result);
     },
     async listHostProfiles(): Promise<HostProfileRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.hostProfiles.list);
