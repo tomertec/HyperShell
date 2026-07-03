@@ -14,21 +14,10 @@ import {
   fsShowSaveDialogRequestSchema,
   fsShowOpenDialogRequestSchema,
   fsDialogPathResponseSchema,
-  closeSessionRequestSchema,
-  savedSessionRecordSchema,
   ipcChannels,
-  openSessionRequestSchema,
-  openSessionResponseSchema,
-  resizeSessionRequestSchema,
-  sessionClearSavedStateResponseSchema,
-  sessionEventSchema,
-  sessionLoadSavedStateResponseSchema,
-  sessionSaveStateRequestSchema,
-  sessionSaveStateResponseSchema,
   upsertHostRequestSchema,
   removeHostRequestSchema,
   reorderHostsRequestSchema,
-  writeSessionRequestSchema,
   getSettingRequestSchema,
   updateSettingRequestSchema,
   upsertGroupRequestSchema,
@@ -70,9 +59,6 @@ import {
   sftpTransferRetryRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
-  setSignalsRequestSchema,
-  hostStatsRequestSchema,
-  hostStatsResponseSchema,
   hostRecordSchema,
   hostStatusTargetsRequestSchema,
   hostStatusEventSchema,
@@ -88,29 +74,17 @@ import {
   type ScanSshManagerResponse,
   type ImportSshManagerRequest,
   type ImportSshManagerResponse,
-  type HostStatsRequest,
-  type HostStatsResponse,
   type HostStatusTargetsRequest,
   type HostStatusEvent,
-  type CloseSessionRequest,
-  type SessionClearSavedStateResponse,
   type FsEntry,
   type FsGetDrivesResponse,
   type FsListRequest,
   type FsListResponse,
   type FsPathRequest,
   type HostRecord,
-  type OpenSessionRequest,
-  type OpenSessionResponse,
   type ReorderHostsRequest,
   type RemoveHostRequest,
-  type ResizeSessionRequest,
-  type SessionEvent,
-  type SessionSaveStateRequest,
-  type SessionSaveStateResponse,
-  type SavedSessionRecord,
   type UpsertHostRequest,
-  type WriteSessionRequest,
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
@@ -131,7 +105,6 @@ import {
   type UpsertSerialProfileRequest,
   type RemoveSerialProfileRequest,
   type SerialPortInfo,
-  type SetSignalsRequest,
   type SftpEntry,
   type SftpBookmark,
   type SftpBookmarkListRequest,
@@ -296,21 +269,11 @@ import {
 } from "@hypershell/shared";
 import { z } from "zod";
 import type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
+import { createSessionApi, type SessionApi } from "./api/sessionApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi {
-  openSession(request: OpenSessionRequest): Promise<OpenSessionResponse>;
-  resizeSession(request: ResizeSessionRequest): Promise<void>;
-  writeSession(request: WriteSessionRequest): Promise<void>;
-  closeSession(request: CloseSessionRequest): Promise<void>;
-  sessionSaveState(
-    request: SessionSaveStateRequest
-  ): Promise<SessionSaveStateResponse>;
-  sessionLoadSavedState(): Promise<SavedSessionRecord[]>;
-  sessionClearSavedState(): Promise<SessionClearSavedStateResponse>;
-  onSessionEvent(listener: (event: SessionEvent) => void): () => void;
-  onQuickConnect(listener: () => void): () => void;
+export interface DesktopApi extends SessionApi {
   listHosts(): Promise<HostRecord[]>;
   setHostStatusTargets(request: HostStatusTargetsRequest): Promise<void>;
   onHostStatus(listener: (event: HostStatusEvent) => void): () => void;
@@ -342,8 +305,6 @@ export interface DesktopApi {
   upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord>;
   removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void>;
   listSerialPorts(): Promise<SerialPortInfo[]>;
-  setSessionSignals(request: SetSignalsRequest): Promise<void>;
-  getHostStats(request: HostStatsRequest): Promise<HostStatsResponse>;
   sftpConnect(request: SftpConnectRequest): Promise<SftpConnectResponse>;
   sftpDisconnect(request: SftpDisconnectRequest): Promise<void>;
   sftpList(request: SftpListRequest): Promise<SftpListResponse>;
@@ -628,7 +589,6 @@ const sftpSyncListResponseSchema = z.object({ syncs: z.array(sftpSyncStatusSchem
 const hostPortForwardRecordArraySchema = z.array(hostPortForwardRecordSchema);
 const connectionPoolStatsArraySchema = z.array(connectionPoolStatsSchema);
 const connectionHistoryRecordArraySchema = z.array(connectionHistoryRecordSchema);
-const savedSessionRecordArraySchema = z.array(savedSessionRecordSchema);
 const booleanResponseSchema = z.boolean();
 
 export function createDesktopApi(
@@ -636,88 +596,7 @@ export function createDesktopApi(
   logger: PreloadLogger = console
 ): DesktopApi {
   return {
-    async openSession(request: OpenSessionRequest): Promise<OpenSessionResponse> {
-      const parsedRequest = openSessionRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(
-        ipcChannels.session.open,
-        parsedRequest
-      );
-      return openSessionResponseSchema.parse(result);
-    },
-    async resizeSession(request: ResizeSessionRequest): Promise<void> {
-      const parsedRequest = resizeSessionRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.session.resize, parsedRequest);
-    },
-    async writeSession(request: WriteSessionRequest): Promise<void> {
-      const parsedRequest = writeSessionRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.session.write, parsedRequest);
-    },
-    async closeSession(request: CloseSessionRequest): Promise<void> {
-      const parsedRequest = closeSessionRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.session.close, parsedRequest);
-    },
-    async sessionSaveState(
-      request: SessionSaveStateRequest
-    ): Promise<SessionSaveStateResponse> {
-      const parsedRequest = sessionSaveStateRequestSchema.parse(request);
-      const raw = await ipcRenderer.invoke(
-        ipcChannels.session.saveState,
-        parsedRequest
-      );
-      return sessionSaveStateResponseSchema.parse(raw);
-    },
-    async sessionLoadSavedState(): Promise<SavedSessionRecord[]> {
-      const raw = await ipcRenderer.invoke(ipcChannels.session.loadSavedState);
-      const parsed = sessionLoadSavedStateResponseSchema.parse(raw);
-      return savedSessionRecordArraySchema.parse(parsed.sessions);
-    },
-    async sessionClearSavedState(): Promise<SessionClearSavedStateResponse> {
-      const raw = await ipcRenderer.invoke(ipcChannels.session.clearSavedState);
-      return sessionClearSavedStateResponseSchema.parse(raw);
-    },
-    onSessionEvent(listener: (event: SessionEvent) => void): () => void {
-      assertListener(listener, "onSessionEvent");
-
-      const wrappedListener = (_event: unknown, payload: unknown) => {
-        const parsed = sessionEventSchema.safeParse(payload);
-        if (!parsed.success) {
-          logger.warn?.(
-            "Ignored invalid session event payload from IPC",
-            parsed.error
-          );
-          return;
-        }
-
-        try {
-          listener(parsed.data);
-        } catch (error) {
-          logger.error?.("Session event listener threw", error);
-        }
-      };
-
-      ipcRenderer.on(ipcChannels.session.event, wrappedListener);
-
-      return () => {
-        ipcRenderer.removeListener(ipcChannels.session.event, wrappedListener);
-      };
-    },
-    onQuickConnect(listener: () => void): () => void {
-      assertListener(listener, "onQuickConnect");
-
-      const wrappedListener = () => {
-        try {
-          listener();
-        } catch (error) {
-          logger.error?.("Quick Connect listener threw", error);
-        }
-      };
-
-      ipcRenderer.on(ipcChannels.tray.quickConnect, wrappedListener);
-
-      return () => {
-        ipcRenderer.removeListener(ipcChannels.tray.quickConnect, wrappedListener);
-      };
-    },
+    ...createSessionApi(ipcRenderer, logger),
     async listHosts(): Promise<HostRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.hosts.list);
       return hostRecordArraySchema.parse(result);
@@ -867,18 +746,6 @@ export function createDesktopApi(
     async listSerialPorts(): Promise<SerialPortInfo[]> {
       const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.listPorts);
       return serialPortInfoArraySchema.parse(result);
-    },
-    async setSessionSignals(request: SetSignalsRequest): Promise<void> {
-      const parsed = setSignalsRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.session.setSignals, parsed);
-    },
-    async getHostStats(request: HostStatsRequest): Promise<HostStatsResponse> {
-      const parsedRequest = hostStatsRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(
-        ipcChannels.session.hostStats,
-        parsedRequest
-      );
-      return hostStatsResponseSchema.parse(result);
     },
     async sftpConnect(request: SftpConnectRequest): Promise<SftpConnectResponse> {
       const parsed = sftpConnectRequestSchema.parse(request);
