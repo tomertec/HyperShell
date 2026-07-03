@@ -14,10 +14,10 @@
   },
   "dependencies": {
     "@hypershell/shared": "workspace:*",
-    "node-pty": "^1.0.0",
+    "node-pty": "^1.1.0",
     "serialport": "^12.0.0",
     "ssh2": "^1.17.0",
-    "zod": "^3.24.1"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/ssh2": "^1.15.5"
