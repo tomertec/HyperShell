@@ -12,12 +12,7 @@ import {
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
-  saveWorkspaceRequestSchema,
-  loadWorkspaceRequestSchema,
-  removeWorkspaceRequestSchema,
   settingRecordSchema,
-  workspaceLayoutSchema,
-  workspaceRecordSchema,
   sshKeyInfoSchema,
   generateSshKeyRequestSchema,
   removeSshKeyRequestSchema,
@@ -90,11 +85,6 @@ import {
   type ConnectionHistoryListRecentRequest,
   type TmuxProbeRequest,
   type TmuxProbeResponse,
-  type SaveWorkspaceRequest,
-  type LoadWorkspaceRequest,
-  type RemoveWorkspaceRequest,
-  type WorkspaceLayout,
-  type WorkspaceRecord,
   type SshKeyInfo,
   type GenerateSshKeyRequest,
   type RemoveSshKeyRequest,
@@ -124,18 +114,13 @@ import { createGroupsTagsApi, type GroupsTagsApi } from "./api/groupsTagsApi";
 import { createHostProfilesApi, type HostProfilesApi } from "./api/hostProfilesApi";
 import { createSerialApi, type SerialApi } from "./api/serialApi";
 import { createFsApi, type FsApi } from "./api/fsApi";
+import { createWorkspaceApi, type WorkspaceApi } from "./api/workspaceApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }>;
-  workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null>;
-  workspaceList(): Promise<WorkspaceRecord[]>;
-  workspaceRemove(request: RemoveWorkspaceRequest): Promise<void>;
-  workspaceSaveLast(layout: WorkspaceLayout): Promise<void>;
-  workspaceLoadLast(): Promise<WorkspaceRecord | null>;
   sshKeysList(): Promise<SshKeyInfo[]>;
   sshKeysGenerate(request: GenerateSshKeyRequest): Promise<{ path: string }>;
   sshKeysGetFingerprint(request: GetFingerprintRequest): Promise<{ fingerprint: string | null }>;
@@ -203,9 +188,6 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const workspaceSaveResponseSchema = z.object({ success: z.boolean() });
-const workspaceRecordNullableSchema = workspaceRecordSchema.nullable();
-const workspaceRecordArraySchema = z.array(workspaceRecordSchema);
 const sshKeyInfoArraySchema = z.array(sshKeyInfoSchema);
 const sshKeysGenerateResponseSchema = z.object({ path: z.string() });
 const sshFingerprintResponseSchema = z.object({ fingerprint: z.string().nullable() });
@@ -226,6 +208,7 @@ export function createDesktopApi(
     ...createHostProfilesApi(ipcRenderer, logger),
     ...createSerialApi(ipcRenderer, logger),
     ...createFsApi(ipcRenderer, logger),
+    ...createWorkspaceApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -235,32 +218,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    async workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }> {
-      const parsed = saveWorkspaceRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.workspace.save, parsed);
-      return workspaceSaveResponseSchema.parse(result);
-    },
-    async workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null> {
-      const parsed = loadWorkspaceRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.workspace.load, parsed);
-      return workspaceRecordNullableSchema.parse(result);
-    },
-    async workspaceList(): Promise<WorkspaceRecord[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.workspace.list);
-      return workspaceRecordArraySchema.parse(result);
-    },
-    async workspaceRemove(request: RemoveWorkspaceRequest): Promise<void> {
-      const parsed = removeWorkspaceRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.workspace.remove, parsed);
-    },
-    async workspaceSaveLast(layout: WorkspaceLayout): Promise<void> {
-      const parsed = workspaceLayoutSchema.parse(layout);
-      await ipcRenderer.invoke(ipcChannels.workspace.saveLast, parsed);
-    },
-    async workspaceLoadLast(): Promise<WorkspaceRecord | null> {
-      const result = await ipcRenderer.invoke(ipcChannels.workspace.loadLast);
-      return workspaceRecordNullableSchema.parse(result);
     },
     async sshKeysList(): Promise<SshKeyInfo[]> {
       const result = await ipcRenderer.invoke(ipcChannels.sshKeys.list);
