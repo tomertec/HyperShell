@@ -17,14 +17,8 @@ import {
   ipcChannels,
   getSettingRequestSchema,
   updateSettingRequestSchema,
-  upsertHostProfileRequestSchema,
-  removeHostProfileRequestSchema,
-  listHostEnvVarsRequestSchema,
-  replaceHostEnvVarsRequestSchema,
   upsertSerialProfileRequestSchema,
   removeSerialProfileRequestSchema,
-  hostProfileRecordSchema,
-  hostEnvVarRecordSchema,
   hostPortForwardRecordSchema,
   type FsEntry,
   type FsGetDrivesResponse,
@@ -34,12 +28,6 @@ import {
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
-  type HostProfileRecord,
-  type UpsertHostProfileRequest,
-  type RemoveHostProfileRequest,
-  type HostEnvVarRecord,
-  type ListHostEnvVarsRequest,
-  type ReplaceHostEnvVarsRequest,
   type SerialProfileRecord,
   type UpsertSerialProfileRequest,
   type RemoveSerialProfileRequest,
@@ -155,19 +143,13 @@ import { createSessionApi, type SessionApi } from "./api/sessionApi";
 import { createHostsApi, type HostsApi } from "./api/hostsApi";
 import { createSftpApi, type SftpApi } from "./api/sftpApi";
 import { createGroupsTagsApi, type GroupsTagsApi } from "./api/groupsTagsApi";
+import { createHostProfilesApi, type HostProfilesApi } from "./api/hostProfilesApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  listHostProfiles(): Promise<HostProfileRecord[]>;
-  upsertHostProfile(request: UpsertHostProfileRequest): Promise<HostProfileRecord>;
-  removeHostProfile(request: RemoveHostProfileRequest): Promise<void>;
-  listHostEnvVars(request: ListHostEnvVarsRequest): Promise<HostEnvVarRecord[]>;
-  replaceHostEnvVars(
-    request: ReplaceHostEnvVarsRequest
-  ): Promise<HostEnvVarRecord[]>;
   listSerialProfiles(): Promise<SerialProfileRecord[]>;
   upsertSerialProfile(request: UpsertSerialProfileRequest): Promise<SerialProfileRecord>;
   removeSerialProfile(request: RemoveSerialProfileRequest): Promise<void>;
@@ -256,8 +238,6 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const hostProfileRecordArraySchema = z.array(hostProfileRecordSchema);
-const hostEnvVarRecordArraySchema = z.array(hostEnvVarRecordSchema);
 const serialProfileRecordArraySchema = z.array(serialProfileRecordSchema);
 const serialPortInfoArraySchema = z.array(serialPortInfoSchema);
 const fsGetHomeResponseSchema = z.object({ path: z.string() });
@@ -282,6 +262,7 @@ export function createDesktopApi(
     ...createHostsApi(ipcRenderer, logger),
     ...createSftpApi(ipcRenderer, logger),
     ...createGroupsTagsApi(ipcRenderer, logger),
+    ...createHostProfilesApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -291,31 +272,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    async listHostProfiles(): Promise<HostProfileRecord[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.hostProfiles.list);
-      return hostProfileRecordArraySchema.parse(result);
-    },
-    async upsertHostProfile(request: UpsertHostProfileRequest): Promise<HostProfileRecord> {
-      const parsed = upsertHostProfileRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hostProfiles.upsert, parsed);
-      return hostProfileRecordSchema.parse(result);
-    },
-    async removeHostProfile(request: RemoveHostProfileRequest): Promise<void> {
-      const parsed = removeHostProfileRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.hostProfiles.remove, parsed);
-    },
-    async listHostEnvVars(request: ListHostEnvVarsRequest): Promise<HostEnvVarRecord[]> {
-      const parsed = listHostEnvVarsRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hostEnvVars.list, parsed);
-      return hostEnvVarRecordArraySchema.parse(result);
-    },
-    async replaceHostEnvVars(
-      request: ReplaceHostEnvVarsRequest
-    ): Promise<HostEnvVarRecord[]> {
-      const parsed = replaceHostEnvVarsRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hostEnvVars.replace, parsed);
-      return hostEnvVarRecordArraySchema.parse(result);
     },
     async listSerialProfiles(): Promise<SerialProfileRecord[]> {
       const result = await ipcRenderer.invoke(ipcChannels.serialProfiles.list);
