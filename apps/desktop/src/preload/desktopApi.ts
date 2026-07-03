@@ -13,12 +13,6 @@ import {
   type UpdateSettingRequest,
   type SettingRecord,
   settingRecordSchema,
-  sshKeyInfoSchema,
-  generateSshKeyRequestSchema,
-  removeSshKeyRequestSchema,
-  getFingerprintRequestSchema,
-  convertPpkRequestSchema,
-  convertPpkResponseSchema,
   listHostPortForwardsRequestSchema,
   upsertHostPortForwardRequestSchema,
   removeHostPortForwardRequestSchema,
@@ -85,12 +79,6 @@ import {
   type ConnectionHistoryListRecentRequest,
   type TmuxProbeRequest,
   type TmuxProbeResponse,
-  type SshKeyInfo,
-  type GenerateSshKeyRequest,
-  type RemoveSshKeyRequest,
-  type GetFingerprintRequest,
-  type ConvertPpkRequest,
-  type ConvertPpkResponse,
   type HostPortForwardRecord,
   type UpsertHostPortForwardRequest,
   type ListHostPortForwardsRequest,
@@ -115,17 +103,13 @@ import { createHostProfilesApi, type HostProfilesApi } from "./api/hostProfilesA
 import { createSerialApi, type SerialApi } from "./api/serialApi";
 import { createFsApi, type FsApi } from "./api/fsApi";
 import { createWorkspaceApi, type WorkspaceApi } from "./api/workspaceApi";
+import { createSshKeysApi, type SshKeysApi } from "./api/sshKeysApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  sshKeysList(): Promise<SshKeyInfo[]>;
-  sshKeysGenerate(request: GenerateSshKeyRequest): Promise<{ path: string }>;
-  sshKeysGetFingerprint(request: GetFingerprintRequest): Promise<{ fingerprint: string | null }>;
-  sshKeysRemove(request: RemoveSshKeyRequest): Promise<void>;
-  sshKeysConvertPpk(request: ConvertPpkRequest): Promise<ConvertPpkResponse>;
   // Host port forwards
   hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]>;
   hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord>;
@@ -188,9 +172,6 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const sshKeyInfoArraySchema = z.array(sshKeyInfoSchema);
-const sshKeysGenerateResponseSchema = z.object({ path: z.string() });
-const sshFingerprintResponseSchema = z.object({ fingerprint: z.string().nullable() });
 const hostPortForwardRecordArraySchema = z.array(hostPortForwardRecordSchema);
 const connectionPoolStatsArraySchema = z.array(connectionPoolStatsSchema);
 const connectionHistoryRecordArraySchema = z.array(connectionHistoryRecordSchema);
@@ -209,6 +190,7 @@ export function createDesktopApi(
     ...createSerialApi(ipcRenderer, logger),
     ...createFsApi(ipcRenderer, logger),
     ...createWorkspaceApi(ipcRenderer, logger),
+    ...createSshKeysApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -218,29 +200,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    async sshKeysList(): Promise<SshKeyInfo[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.list);
-      return sshKeyInfoArraySchema.parse(result);
-    },
-    async sshKeysGenerate(request: GenerateSshKeyRequest): Promise<{ path: string }> {
-      const parsed = generateSshKeyRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.generate, parsed);
-      return sshKeysGenerateResponseSchema.parse(result);
-    },
-    async sshKeysGetFingerprint(request: GetFingerprintRequest): Promise<{ fingerprint: string | null }> {
-      const parsed = getFingerprintRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.getFingerprint, parsed);
-      return sshFingerprintResponseSchema.parse(result);
-    },
-    async sshKeysRemove(request: RemoveSshKeyRequest): Promise<void> {
-      const parsed = removeSshKeyRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.sshKeys.remove, parsed);
-    },
-    async sshKeysConvertPpk(request: ConvertPpkRequest): Promise<ConvertPpkResponse> {
-      const parsed = convertPpkRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.sshKeys.convertPpk, parsed);
-      return convertPpkResponseSchema.parse(result);
     },
     // Host port forwards
     async hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]> {
