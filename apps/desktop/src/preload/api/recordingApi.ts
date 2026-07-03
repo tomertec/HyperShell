@@ -41,6 +41,7 @@ import { z } from "zod";
 import type { PreloadIpcRenderer, PreloadLogger } from "./types";
 
 export interface RecordingApi {
+  // Session logging
   loggingStart(request: StartLoggingRequest): Promise<void>;
   loggingStop(request: StopLoggingRequest): Promise<void>;
   loggingGetState(request: GetLoggingStateRequest): Promise<LoggingStateResponse>;

@@ -7,6 +7,7 @@ import { createSubscription } from "./subscription";
 import type { PreloadIpcRenderer, PreloadLogger } from "./types";
 
 export interface UpdateApi {
+  // Auto-update
   checkForUpdates(): Promise<void>;
   downloadUpdate(): Promise<void>;
   installUpdate(): Promise<void>;
@@ -20,6 +21,7 @@ export function createUpdateApi(
   logger: PreloadLogger
 ): UpdateApi {
   return {
+    // Auto-update
     async checkForUpdates(): Promise<void> {
       await ipcRenderer.invoke(ipcChannels.update.check);
     },

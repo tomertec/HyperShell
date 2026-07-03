@@ -17,10 +17,12 @@ import { z } from "zod";
 import type { PreloadIpcRenderer, PreloadLogger } from "./types";
 
 export interface PortForwardApi {
+  // Host port forwards
   hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]>;
   hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord>;
   hostPortForwardRemove(request: RemoveHostPortForwardRequest): Promise<boolean>;
   hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void>;
+  // Connection pool
   connectionPoolStats(): Promise<ConnectionPoolStats[]>;
 }
 
@@ -33,6 +35,7 @@ export function createPortForwardApi(
   _logger: PreloadLogger
 ): PortForwardApi {
   return {
+    // Host port forwards
     async hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]> {
       const parsed = listHostPortForwardsRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.list, parsed);
