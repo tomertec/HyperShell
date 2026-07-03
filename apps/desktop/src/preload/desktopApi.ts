@@ -5,24 +5,10 @@ import {
   restoreBackupRequestSchema,
   restoreBackupResponseSchema,
   listBackupsResponseSchema,
-  fsEntrySchema,
-  fsGetDrivesResponseSchema,
-  fsListRequestSchema,
-  fsListResponseSchema,
-  fsPathRequestSchema,
-  fsRenameRequestSchema,
-  fsShowSaveDialogRequestSchema,
-  fsShowOpenDialogRequestSchema,
-  fsDialogPathResponseSchema,
   ipcChannels,
   getSettingRequestSchema,
   updateSettingRequestSchema,
   hostPortForwardRecordSchema,
-  type FsEntry,
-  type FsGetDrivesResponse,
-  type FsListRequest,
-  type FsListResponse,
-  type FsPathRequest,
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
@@ -137,23 +123,13 @@ import { createSftpApi, type SftpApi } from "./api/sftpApi";
 import { createGroupsTagsApi, type GroupsTagsApi } from "./api/groupsTagsApi";
 import { createHostProfilesApi, type HostProfilesApi } from "./api/hostProfilesApi";
 import { createSerialApi, type SerialApi } from "./api/serialApi";
+import { createFsApi, type FsApi } from "./api/fsApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  fsList(request: FsListRequest): Promise<FsListResponse>;
-  fsStat(request: FsPathRequest): Promise<FsEntry>;
-  fsGetHome(): Promise<{ path: string }>;
-  fsGetDrives(): Promise<FsGetDrivesResponse>;
-  fsListSshKeys(): Promise<string[]>;
-  fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
-  fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
-  fsOpenItem(request: { path: string }): Promise<void>;
-  fsShowInFolder(request: { path: string }): Promise<void>;
-  fsTrash(request: { path: string }): Promise<void>;
-  fsRename(request: { oldPath: string; newPath: string }): Promise<void>;
   workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }>;
   workspaceLoad(request: LoadWorkspaceRequest): Promise<WorkspaceRecord | null>;
   workspaceList(): Promise<WorkspaceRecord[]>;
@@ -227,8 +203,6 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const fsGetHomeResponseSchema = z.object({ path: z.string() });
-const fsListSshKeysResponseSchema = z.array(z.string());
 const workspaceSaveResponseSchema = z.object({ success: z.boolean() });
 const workspaceRecordNullableSchema = workspaceRecordSchema.nullable();
 const workspaceRecordArraySchema = z.array(workspaceRecordSchema);
@@ -251,6 +225,7 @@ export function createDesktopApi(
     ...createGroupsTagsApi(ipcRenderer, logger),
     ...createHostProfilesApi(ipcRenderer, logger),
     ...createSerialApi(ipcRenderer, logger),
+    ...createFsApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -260,54 +235,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    async fsList(request: FsListRequest): Promise<FsListResponse> {
-      const parsed = fsListRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.fs.list, parsed);
-      return fsListResponseSchema.parse(result);
-    },
-    async fsStat(request: FsPathRequest): Promise<FsEntry> {
-      const parsed = fsPathRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.fs.stat, parsed);
-      return fsEntrySchema.parse(result);
-    },
-    async fsGetHome(): Promise<{ path: string }> {
-      const result = await ipcRenderer.invoke(ipcChannels.fs.getHome);
-      return fsGetHomeResponseSchema.parse(result);
-    },
-    async fsGetDrives(): Promise<FsGetDrivesResponse> {
-      const result = await ipcRenderer.invoke(ipcChannels.fs.getDrives);
-      return fsGetDrivesResponseSchema.parse(result);
-    },
-    async fsListSshKeys(): Promise<string[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.fs.listSshKeys);
-      return fsListSshKeysResponseSchema.parse(result);
-    },
-    async fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
-      const parsed = fsShowSaveDialogRequestSchema.parse(options);
-      const result = await ipcRenderer.invoke(ipcChannels.fs.showSaveDialog, parsed);
-      return fsDialogPathResponseSchema.parse(result);
-    },
-    async fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null> {
-      const parsed = fsShowOpenDialogRequestSchema.parse(options);
-      const result = await ipcRenderer.invoke(ipcChannels.fs.showOpenDialog, parsed);
-      return fsDialogPathResponseSchema.parse(result);
-    },
-    async fsOpenItem(request: { path: string }): Promise<void> {
-      const parsed = fsPathRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.fs.openItem, parsed);
-    },
-    async fsShowInFolder(request: { path: string }): Promise<void> {
-      const parsed = fsPathRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.fs.showInFolder, parsed);
-    },
-    async fsTrash(request: { path: string }): Promise<void> {
-      const parsed = fsPathRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.fs.trash, parsed);
-    },
-    async fsRename(request: { oldPath: string; newPath: string }): Promise<void> {
-      const parsed = fsRenameRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.fs.rename, parsed);
     },
     async workspaceSave(request: SaveWorkspaceRequest): Promise<{ success: boolean }> {
       const parsed = saveWorkspaceRequestSchema.parse(request);
