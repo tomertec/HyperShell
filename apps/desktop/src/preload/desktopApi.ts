@@ -1,5 +1,4 @@
 import {
-  connectionPoolStatsSchema,
   createBackupRequestSchema,
   createBackupResponseSchema,
   restoreBackupRequestSchema,
@@ -8,15 +7,10 @@ import {
   ipcChannels,
   getSettingRequestSchema,
   updateSettingRequestSchema,
-  hostPortForwardRecordSchema,
   type GetSettingRequest,
   type UpdateSettingRequest,
   type SettingRecord,
   settingRecordSchema,
-  listHostPortForwardsRequestSchema,
-  upsertHostPortForwardRequestSchema,
-  removeHostPortForwardRequestSchema,
-  reorderHostPortForwardsRequestSchema,
   opListVaultsResponseSchema,
   opListItemsRequestSchema,
   opListItemsResponseSchema,
@@ -79,12 +73,6 @@ import {
   type ConnectionHistoryListRecentRequest,
   type TmuxProbeRequest,
   type TmuxProbeResponse,
-  type HostPortForwardRecord,
-  type UpsertHostPortForwardRequest,
-  type ListHostPortForwardsRequest,
-  type RemoveHostPortForwardRequest,
-  type ReorderHostPortForwardsRequest,
-  type ConnectionPoolStats,
   type CreateBackupRequest,
   type CreateBackupResponse,
   type RestoreBackupRequest,
@@ -104,19 +92,13 @@ import { createSerialApi, type SerialApi } from "./api/serialApi";
 import { createFsApi, type FsApi } from "./api/fsApi";
 import { createWorkspaceApi, type WorkspaceApi } from "./api/workspaceApi";
 import { createSshKeysApi, type SshKeysApi } from "./api/sshKeysApi";
+import { createPortForwardApi, type PortForwardApi } from "./api/portForwardApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi {
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi {
   getSetting(request: GetSettingRequest): Promise<SettingRecord | null>;
   updateSetting(request: UpdateSettingRequest): Promise<SettingRecord>;
-  // Host port forwards
-  hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]>;
-  hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord>;
-  hostPortForwardRemove(request: RemoveHostPortForwardRequest): Promise<boolean>;
-  hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void>;
-  // Connection pool
-  connectionPoolStats(): Promise<ConnectionPoolStats[]>;
   // 1Password
   opListVaults(): Promise<OpListVaultsResponse>;
   opListItems(request: OpListItemsRequest): Promise<OpListItemsResponse>;
@@ -172,10 +154,7 @@ function assertListener(value: unknown, methodName: string): asserts value is Fu
   throw new TypeError(`${methodName} listener must be a function`);
 }
 
-const hostPortForwardRecordArraySchema = z.array(hostPortForwardRecordSchema);
-const connectionPoolStatsArraySchema = z.array(connectionPoolStatsSchema);
 const connectionHistoryRecordArraySchema = z.array(connectionHistoryRecordSchema);
-const booleanResponseSchema = z.boolean();
 
 export function createDesktopApi(
   ipcRenderer: PreloadIpcRenderer,
@@ -191,6 +170,7 @@ export function createDesktopApi(
     ...createFsApi(ipcRenderer, logger),
     ...createWorkspaceApi(ipcRenderer, logger),
     ...createSshKeysApi(ipcRenderer, logger),
+    ...createPortForwardApi(ipcRenderer, logger),
     async getSetting(request: GetSettingRequest): Promise<SettingRecord | null> {
       const parsed = getSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.get, parsed);
@@ -200,31 +180,6 @@ export function createDesktopApi(
       const parsed = updateSettingRequestSchema.parse(request);
       const result = await ipcRenderer.invoke(ipcChannels.settings.update, parsed);
       return settingRecordSchema.parse(result);
-    },
-    // Host port forwards
-    async hostPortForwardList(request: ListHostPortForwardsRequest): Promise<HostPortForwardRecord[]> {
-      const parsed = listHostPortForwardsRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.list, parsed);
-      return hostPortForwardRecordArraySchema.parse(result);
-    },
-    async hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord> {
-      const parsed = upsertHostPortForwardRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.upsert, parsed);
-      return hostPortForwardRecordSchema.parse(result);
-    },
-    async hostPortForwardRemove(request: RemoveHostPortForwardRequest): Promise<boolean> {
-      const parsed = removeHostPortForwardRequestSchema.parse(request);
-      const result = await ipcRenderer.invoke(ipcChannels.hostPortForward.remove, parsed);
-      return booleanResponseSchema.parse(result);
-    },
-    async hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void> {
-      const parsed = reorderHostPortForwardsRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.hostPortForward.reorder, parsed);
-    },
-    // Connection pool stats
-    async connectionPoolStats(): Promise<ConnectionPoolStats[]> {
-      const result = await ipcRenderer.invoke(ipcChannels.connectionPool.stats);
-      return connectionPoolStatsArraySchema.parse(result);
     },
     // 1Password
     async opListVaults(): Promise<OpListVaultsResponse> {
