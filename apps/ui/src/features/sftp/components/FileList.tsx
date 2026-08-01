@@ -321,6 +321,8 @@ export function FileList({
 
   const resizeHandle = (col: "size" | "modified" | "perms") => (
     <span
+      role="separator"
+      aria-orientation="vertical"
       className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-accent/50"
       onMouseDown={(e) => handleResizeStart(col, e)}
     />

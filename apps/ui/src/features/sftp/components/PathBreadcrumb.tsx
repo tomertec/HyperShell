@@ -112,6 +112,7 @@ export const PathBreadcrumb = forwardRef<PathBreadcrumbHandle, PathBreadcrumbPro
             setEditValue(path);
           }}
           className="w-full rounded bg-base-800 px-1.5 py-0.5 text-text-primary outline-none ring-1 ring-accent/50"
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- focuses the field the user just opened this editor to fill
           autoFocus
         />
       </div>

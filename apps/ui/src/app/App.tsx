@@ -29,6 +29,7 @@ import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
 import { appThemeVariant, resolveAppTheme } from "../features/settings/appThemes";
 import { TransferPopup } from "../features/sftp/components/TransferPopup";
+import { startTransferEventCoordinator } from "../features/sftp/transferEventCoordinator";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
 import type {
@@ -321,7 +322,7 @@ function useAppTheme() {
       const variant = appThemeVariant(id);
       document.documentElement.dataset.theme = id;
       document.documentElement.dataset.variant = variant;
-      window.hypershell?.setAppTheme?.(variant);
+      void window.hypershell?.setAppTheme?.(variant);
     }
 
     apply();
@@ -392,6 +393,10 @@ function MainApp() {
   const isBroadcastEnabled = useStore(broadcastStore, (s) => s.enabled);
   const setBroadcastTargets = useStore(broadcastStore, (s) => s.setTargets);
   const rememberSession = useStore(sessionRecoveryStore, (s) => s.remember);
+
+  // One transfer-event listener for the whole app — SFTP tabs and the transfer
+  // popup subscribe to it instead of the IPC bridge.
+  useEffect(() => startTransferEventCoordinator(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1194,8 +1199,8 @@ function MainApp() {
             activeSessionHostIds={activeSessionHostIds}
             connectingHostIds={connectingHostIds}
             lastConnectedAtByHostId={lastConnectedAtByHostId}
-            onConnectHost={connectHost}
-            onOpenSftpHost={openSftpHost}
+            onConnectHost={(host) => { void connectHost(host); }}
+            onOpenSftpHost={(host) => { void openSftpHost(host); }}
             onOpenConnectionHistory={(host) => setConnectionHistoryHost(host)}
             onEditHost={(host) => { setEditingHost(host); setHostModalOpen(true); }}
             onNewHost={() => { setEditingHost(null); setHostModalOpen(true); }}
@@ -1234,7 +1239,7 @@ function MainApp() {
             if (sp) connectSerial(sp);
           } else {
             const host = hosts.find((h) => h.id === profile.id);
-            if (host) connectHost(host);
+            if (host) void connectHost(host);
           }
         }}
       />

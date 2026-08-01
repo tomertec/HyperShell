@@ -114,13 +114,13 @@ export function HostsView() {
           Import SSH Config
         </button>
         <button
-          onClick={() => handleExport("json")}
+          onClick={() => { void handleExport("json"); }}
           className="mt-3 ml-2 rounded-[10px] border border-border-bright bg-base-700/70 text-text-secondary px-3 py-2 cursor-pointer"
         >
           Export JSON
         </button>
         <button
-          onClick={() => handleExport("csv")}
+          onClick={() => { void handleExport("csv"); }}
           className="mt-3 ml-2 rounded-[10px] border border-border-bright bg-base-700/70 text-text-secondary px-3 py-2 cursor-pointer"
         >
           Export CSV

@@ -783,14 +783,16 @@ export function HostForm({
               />
               <button
                 type="button"
-                onClick={async () => {
-                  const filePath = await window.hypershell?.fsShowOpenDialog?.({
-                    title: "Select SSH Key File",
-                    filters: [{ name: "All Files", extensions: ["*"] }],
-                  });
-                  if (filePath) {
-                    setValue({ ...value, identityFile: filePath });
-                  }
+                onClick={() => {
+                  void (async () => {
+                    const filePath = await window.hypershell?.fsShowOpenDialog?.({
+                      title: "Select SSH Key File",
+                      filters: [{ name: "All Files", extensions: ["*"] }],
+                    });
+                    if (filePath) {
+                      setValue({ ...value, identityFile: filePath });
+                    }
+                  })();
                 }}
                 className="shrink-0 rounded-md border border-border bg-base-800 px-2.5 hover:bg-base-700 text-text-muted hover:text-text-primary transition-colors"
                 title="Browse for key file"

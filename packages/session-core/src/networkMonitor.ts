@@ -50,7 +50,7 @@ export function createNetworkMonitor(
 
   if (probeIntervalMs > 0) {
     void probe(); // Immediate probe to avoid optimistic online assumption burning reconnect attempts
-    probeTimer = setInterval(probe, probeIntervalMs);
+    probeTimer = setInterval(() => { void probe(); }, probeIntervalMs);
   }
 
   return {

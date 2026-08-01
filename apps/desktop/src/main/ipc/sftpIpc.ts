@@ -63,6 +63,7 @@ export function resolveSafeDragOutPath(tempDir: string, fileName: string): strin
 
   const baseName = path.basename(trimmed);
   const hasPathSeparators = trimmed.includes(path.posix.sep) || trimmed.includes(path.win32.sep);
+  // eslint-disable-next-line no-control-regex -- rejecting control characters is the purpose of this check
   const hasControlChars = /[\0-\x1f]/.test(trimmed);
   if (hasPathSeparators || hasControlChars || baseName !== trimmed || baseName === "." || baseName === "..") {
     throw new Error("Invalid drag-out filename");
@@ -167,7 +168,8 @@ export async function verifyHostKey(
     }
     if (trustedFingerprints.length === 0) {
       throw new Error(
-        `Unable to verify host key for ${hostname}:${port} and no previously trusted fingerprints exist`
+        `Unable to verify host key for ${hostname}:${port} and no previously trusted fingerprints exist`,
+        { cause: error }
       );
     }
     console.warn("[sftp] Host key probe failed, falling back to trusted fingerprints:", (error as Error).message);
@@ -975,6 +977,7 @@ export function registerSftpIpc(
 
       options.emitSftpEvent?.({
         kind: "transfer-complete",
+        sftpSessionId: event.sftpSessionId,
         transferId: event.transferId,
         status: event.status,
         error: event.error

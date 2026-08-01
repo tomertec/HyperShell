@@ -39,18 +39,6 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
   const [selectedVault, setSelectedVault] = useState<VaultEntry | null>(null);
   const [selectedItem, setSelectedItem] = useState<ItemEntry | null>(null);
 
-  // Reset state when modal opens
-  useEffect(() => {
-    if (open) {
-      setStep("vaults");
-      setSearch("");
-      setError(null);
-      setSelectedVault(null);
-      setSelectedItem(null);
-      loadVaults();
-    }
-  }, [open]);
-
   const loadVaults = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -90,18 +78,30 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     }
   }, []);
 
+  // Reset state when modal opens
+  useEffect(() => {
+    if (open) {
+      setStep("vaults");
+      setSearch("");
+      setError(null);
+      setSelectedVault(null);
+      setSelectedItem(null);
+      void loadVaults();
+    }
+  }, [open, loadVaults]);
+
   const handleVaultSelect = (vault: VaultEntry) => {
     setSelectedVault(vault);
     setStep("items");
     setSearch("");
-    loadItems(vault.id);
+    void loadItems(vault.id);
   };
 
   const handleItemSelect = (item: ItemEntry) => {
     setSelectedItem(item);
     setStep("fields");
     setSearch("");
-    loadFields(item.id);
+    void loadFields(item.id);
   };
 
   const handleFieldSelect = (field: FieldEntry) => {
@@ -171,6 +171,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter..."
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- focuses the field the user just opened this modal to fill
           autoFocus
           className="w-full rounded-md border border-border bg-base-900 px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:border-accent focus:outline-none"
         />

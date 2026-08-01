@@ -36,6 +36,7 @@ type LogSession = {
   bytesWritten: number;
 };
 
+// eslint-disable-next-line no-control-regex -- stripping ANSI escapes is the purpose of this pattern
 const ANSI_ESCAPE_RE = /\x1b\[[0-9;]*[a-zA-Z]/g;
 
 export function createSessionLogger() {

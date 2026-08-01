@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { UpdateState } from "@hypershell/shared";
-import { resolveUpdateMode } from "./SidebarUpdateLabel";
+import { buildInstallConfirmMessage, resolveUpdateMode } from "./SidebarUpdateLabel";
 
 const base = (over: Partial<UpdateState>): UpdateState => ({
   status: "idle",
@@ -54,5 +54,21 @@ describe("resolveUpdateMode", () => {
       label: "Restart>_ ready",
       action: "install",
     });
+  });
+});
+
+describe("buildInstallConfirmMessage", () => {
+  it("names the version being installed", () => {
+    expect(buildInstallConfirmMessage("0.2.6")).toContain("v0.2.6");
+  });
+
+  it("states that the build is unsigned so the user can judge the source", () => {
+    expect(buildInstallConfirmMessage("0.2.6")).toContain("unsigned");
+  });
+
+  it("falls back to a generic phrase when the version is unknown", () => {
+    const message = buildInstallConfirmMessage(undefined);
+    expect(message).toContain("the downloaded update");
+    expect(message).not.toContain("vundefined");
   });
 });

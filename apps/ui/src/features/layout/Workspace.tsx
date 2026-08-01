@@ -47,6 +47,9 @@ function PaneView({
       : null;
 
   return (
+    // Redundant pointer shortcut: panes are reachable by focus and the
+    // Ctrl+Shift+[ / ] pane-navigation shortcuts.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
       className={`h-full min-h-0 min-w-0 border-l border-border/40 first:border-l-0 relative ${
         isActive ? "shadow-[inset_0_1px_0_rgba(56,189,248,0.22)]" : ""

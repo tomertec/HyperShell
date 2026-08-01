@@ -48,7 +48,7 @@ export function buildScpCommand(options: ScpCommandOptions): ScpCommand {
   }
 
   if (options.proxyJump) {
-    if (!/^[\w.@:,[\]\-]+$/.test(options.proxyJump)) {
+    if (!/^[\w.@:,[\]-]+$/.test(options.proxyJump)) {
       throw new Error("Invalid proxyJump format");
     }
     args.push("-J", options.proxyJump);

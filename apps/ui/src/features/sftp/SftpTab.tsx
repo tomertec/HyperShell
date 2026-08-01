@@ -3,6 +3,7 @@ import { useStore } from "zustand";
 
 import type { SftpEntry, TransferJob } from "@hypershell/shared";
 import { getSftpStore, disposeSftpStore } from "./sftpStore";
+import { refreshTransfers, subscribeToDirectoryInvalidation } from "./transferEventCoordinator";
 import { transferStore } from "./transferStore";
 import { toErrorMessage } from "./utils/errorUtils";
 import { getParentPath, joinRemotePath } from "./utils/fileUtils";
@@ -136,19 +137,6 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     error: null
   });
 
-  const refreshTransfers = useCallback(async () => {
-    try {
-      const response = await window.hypershell?.sftpTransferList?.();
-      if (!response) {
-        return;
-      }
-
-      transferStore.getState().setTransfers(response.transfers);
-    } catch {
-      // Ignore polling errors for now.
-    }
-  }, []);
-
   const refreshRemoteDirectory = useCallback(async () => {
     const sftpList = window.hypershell?.sftpList;
     if (!sftpList) {
@@ -169,58 +157,14 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     }
   }, [store]);
 
+  // Transfer events are owned by the application-level coordinator; this tab
+  // only reacts when a transfer for *its* session lands on disk.
   useEffect(() => {
-    const unsubscribe = window.hypershell?.onSftpEvent?.((event) => {
-      if (event.kind === "transfer-progress") {
-        const hasTransfer = transferStore
-          .getState()
-          .transfers.some((transfer) => transfer.transferId === event.transferId);
-        if (!hasTransfer) {
-          void refreshTransfers();
-          return;
-        }
-
-        transferStore.getState().updateTransfer(event.transferId, {
-          bytesTransferred: event.bytesTransferred,
-          totalBytes: event.totalBytes,
-          speed: event.speed,
-          status: event.status
-        });
-        // The structured `userInitiated` flag rides only in the full job snapshot,
-        // not in the progress event. Refetch on pause so the paused-by-user state
-        // resolves deterministically (mirrors the transfer-complete refetch below).
-        if (event.status === "paused") {
-          void refreshTransfers();
-        }
-      }
-
-      if (event.kind === "transfer-complete") {
-        const hasTransfer = transferStore
-          .getState()
-          .transfers.some((transfer) => transfer.transferId === event.transferId);
-        if (hasTransfer) {
-          transferStore.getState().updateTransfer(event.transferId, {
-            status: event.status,
-            error: event.error
-          });
-        }
-        void refreshTransfers();
-
-        if (event.status === "completed") {
-          void refreshRemoteDirectory().catch(() => {});
-          void refreshLocalDirectory();
-        }
-      }
+    return subscribeToDirectoryInvalidation(sftpSessionId, () => {
+      void refreshRemoteDirectory().catch(() => {});
+      void refreshLocalDirectory();
     });
-
-    return () => {
-      unsubscribe?.();
-    };
-  }, [refreshLocalDirectory, refreshRemoteDirectory, refreshTransfers]);
-
-  useEffect(() => {
-    void refreshTransfers();
-  }, [refreshTransfers]);
+  }, [refreshLocalDirectory, refreshRemoteDirectory, sftpSessionId]);
 
   useEffect(() => {
     return () => {
@@ -239,7 +183,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
         const operations = await Promise.all(
           localPaths.map(async (localPath) => {
-            let isDirectory = false;
+            let isDirectory: boolean;
 
             try {
               const stat = await window.hypershell?.fsStat?.({ path: localPath });
@@ -273,7 +217,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         store.getState().setError("remote", toErrorMessage(error, "Failed to start upload"));
       }
     },
-    [refreshTransfers, sftpSessionId, store]
+    [sftpSessionId, store]
   );
 
   const handleDownload = useCallback(
@@ -339,7 +283,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         store.getState().setError("local", toErrorMessage(error, "Failed to start download"));
       }
     },
-    [refreshTransfers, sftpSessionId, store]
+    [sftpSessionId, store]
   );
 
   const handleRename = useCallback(
@@ -573,7 +517,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       <SftpToolbar
         store={store}
         hostId={hostId}
-        onDisconnect={handleDisconnect}
+        onDisconnect={() => { void handleDisconnect(); }}
         filterText={filterText}
         onFilterChange={handleFilterChange}
         filterMatchCount={filterMatchCount}
@@ -589,17 +533,17 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
       <SftpDualPane
         store={store}
-        onUpload={handleUpload}
-        onDownload={handleDownload}
+        onUpload={(localPaths, remoteTargetPath) => { void handleUpload(localPaths, remoteTargetPath); }}
+        onDownload={(remotePaths, localTargetPath) => { void handleDownload(remotePaths, localTargetPath); }}
         onEdit={(remotePath: string) => {
           void window.hypershell?.editorOpen?.({ sftpSessionId, remotePath });
         }}
-        onProperties={handleProperties}
+        onProperties={(entryPath) => { void handleProperties(entryPath); }}
         onRename={handleRename}
         onDelete={handleDelete}
         onMkdir={handleMkdir}
         onBookmark={handleBookmark}
-        onRefresh={handleRefresh}
+        onRefresh={() => { void handleRefresh(); }}
         filterInputRef={filterInputRef}
       />
 
@@ -630,7 +574,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         label="Enter a new name:"
         defaultValue={renameDialog.oldName}
         confirmLabel="Rename"
-        onConfirm={handleRenameConfirm}
+        onConfirm={(newName) => { void handleRenameConfirm(newName); }}
         onCancel={() => setRenameDialog({ open: false, path: "", oldName: "" })}
       />
 
@@ -640,7 +584,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         message={`Delete ${deleteDialog.paths.length} item(s)? This cannot be undone.`}
         confirmLabel="Delete"
         variant="danger"
-        onConfirm={handleDeleteConfirm}
+        onConfirm={() => { void handleDeleteConfirm(); }}
         onCancel={() => setDeleteDialog({ open: false, paths: [] })}
       />
 
@@ -650,7 +594,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         label="Folder name:"
         placeholder="my-folder"
         confirmLabel="Create"
-        onConfirm={handleMkdirConfirm}
+        onConfirm={(name) => { void handleMkdirConfirm(name); }}
         onCancel={() => setMkdirDialog(false)}
       />
 
@@ -660,7 +604,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         label="Bookmark name:"
         defaultValue={bookmarkDialog.defaultName}
         confirmLabel="Save"
-        onConfirm={handleBookmarkConfirm}
+        onConfirm={(name) => { void handleBookmarkConfirm(name); }}
         onCancel={() => setBookmarkDialog({ open: false, path: "", defaultName: "" })}
       />
     </div>

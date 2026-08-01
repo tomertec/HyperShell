@@ -83,7 +83,7 @@ describe("commandRegistry", () => {
     const commands = createCommands(ctx);
     const restore = commands.find((c) => c.id === "backup.restore");
     expect(restore).toBeDefined();
-    restore!.execute();
+    void restore!.execute();
     expect(ctx.restoreBackup).toHaveBeenCalledTimes(1);
   });
 
@@ -93,7 +93,7 @@ describe("commandRegistry", () => {
     const commands = createCommands(ctx);
     const backup = commands.find((c) => c.id === "backup.create");
     expect(backup).toBeDefined();
-    backup!.execute();
+    void backup!.execute();
     expect(ctx.createBackup).toHaveBeenCalledTimes(1);
   });
 });

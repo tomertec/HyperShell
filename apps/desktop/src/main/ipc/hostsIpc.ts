@@ -522,7 +522,8 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
         } catch (error) {
           if (error instanceof SecureStorageUnavailableError) {
             throw new Error(
-              "Secure storage is unavailable. Unlock your OS keychain and try again."
+              "Secure storage is unavailable. Unlock your OS keychain and try again.",
+              { cause: error }
             );
           }
           throw error;

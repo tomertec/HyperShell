@@ -699,7 +699,7 @@ async function resolveSftpConnectionOptions(
   );
 
   const sshConfigPath = path.join(homedir(), ".ssh", "config");
-  let sshConfigHosts: ReturnType<typeof parseSshConfig>["hosts"] = [];
+  let sshConfigHosts: ReturnType<typeof parseSshConfig>["hosts"];
   try {
     const sshConfigContent = readFileSync(sshConfigPath, "utf8");
     sshConfigHosts = parseSshConfig(sshConfigContent).hosts;
@@ -1359,7 +1359,7 @@ export function registerIpc(
     }
     const repo = getOrCreateHostsRepo();
     const hosts = repo.list();
-    let content = "";
+    let content: string;
     switch (parsed.format) {
       case "json":
         content = exportHostsToJson(hosts);

@@ -34,7 +34,7 @@ export function SessionRecoveryDialog({
   onDismiss,
 }: SessionRecoveryDialogProps) {
   return (
-    <Modal open={open} onClose={onDismiss} title="Restore Previous Sessions">
+    <Modal open={open} onClose={() => { void onDismiss(); }} title="Restore Previous Sessions">
       <div className="grid gap-4">
         <p className="text-xs text-text-muted">
           HyperShell detected sessions from an ungraceful shutdown. Restore the

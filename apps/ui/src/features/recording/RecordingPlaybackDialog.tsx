@@ -38,7 +38,7 @@ export function RecordingPlaybackDialog({
   const [cursor, setCursor] = useState(0);
   const [speed, setSpeed] = useState<number>(1);
 
-  const frames = payload?.frames ?? [];
+  const frames = useMemo(() => payload?.frames ?? [], [payload]);
   const recordingTitle = payload?.recording.title ?? "Playback";
   const totalDuration = useMemo(() => formatDurationFromFrames(frames), [frames]);
 

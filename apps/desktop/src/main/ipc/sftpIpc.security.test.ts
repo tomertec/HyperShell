@@ -271,6 +271,7 @@ describe("stageSftpDragOutItem", () => {
       }),
       createReadStream: vi.fn((remotePath: string) => {
         if (remotePath === "/home/user/project/secret.txt") {
+          // eslint-disable-next-line require-yield -- the mock stream fails before it can emit
           return Readable.from((async function* () {
             throw permissionDenied;
           })());

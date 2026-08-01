@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import type { TransferJobStatus } from "@hypershell/shared";
 import { settingsStore } from "../../settings/settingsStore";
+import { refreshTransfers, subscribeToTransferEvents } from "../transferEventCoordinator";
 import { transferStore, type TransferStoreTransfer } from "../transferStore";
 import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
@@ -376,82 +377,24 @@ export function TransferPopup() {
   const [lastInteractionAt, setLastInteractionAt] = useState(() => Date.now());
   const popupContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const refreshTransfers = useCallback(async () => {
-    try {
-      const response = await window.hypershell?.sftpTransferList?.();
-      if (!response) {
-        return;
-      }
-
-      transferStore.getState().setTransfers(response.transfers);
-    } catch {
-      // Ignore polling failures and wait for the next cycle.
-    }
-  }, []);
-
+  // Store updates and transfer-list refetches are owned by the app-level
+  // coordinator; the popup only tracks which transfers are awaiting a conflict
+  // decision, which is local UI state.
   useEffect(() => {
-    void refreshTransfers();
-  }, [refreshTransfers]);
-
-  useEffect(() => {
-    const unsubscribe = window.hypershell?.onSftpEvent?.((event) => {
-      if (event.kind === "transfer-progress") {
-        const hasTransfer = transferStore
-          .getState()
-          .transfers.some((transfer) => transfer.transferId === event.transferId);
-        if (!hasTransfer) {
-          void refreshTransfers();
-          return;
-        }
-
-        transferStore.getState().updateTransfer(event.transferId, {
-          bytesTransferred: event.bytesTransferred,
-          totalBytes: event.totalBytes,
-          speed: event.speed,
-          status: event.status
-        });
-        // The structured `userInitiated` flag rides only in the full job snapshot,
-        // not in the progress event. Refetch on pause so the paused-by-user badge
-        // resolves deterministically (mirrors the transfer-complete refetch below).
-        if (event.status === "paused") {
-          void refreshTransfers();
-        }
-        return;
-      }
-
+    return subscribeToTransferEvents((event) => {
       if (event.kind === "transfer-conflict") {
         setConflictIds((prev) => new Set(prev).add(event.transferId));
-        transferStore.getState().setPanelOpen(true);
-        void refreshTransfers();
         return;
       }
 
-      if (event.kind === "transfer-complete") {
-        const hasTransfer = transferStore
-          .getState()
-          .transfers.some((transfer) => transfer.transferId === event.transferId);
-        setConflictIds((prev) => {
-          if (!prev.has(event.transferId)) return prev;
-          const next = new Set(prev);
-          next.delete(event.transferId);
-          return next;
-        });
-        if (hasTransfer) {
-          transferStore.getState().updateTransfer(event.transferId, {
-            status: event.status,
-            error: event.error
-          });
-        }
-        // Directory parent jobs can complete before child jobs are known to the UI.
-        // Refreshing here pulls newly enqueued child jobs immediately.
-        void refreshTransfers();
-      }
+      setConflictIds((prev) => {
+        if (!prev.has(event.transferId)) return prev;
+        const next = new Set(prev);
+        next.delete(event.transferId);
+        return next;
+      });
     });
-
-    return () => {
-      unsubscribe?.();
-    };
-  }, [refreshTransfers]);
+  }, []);
 
   const { runningTransfers, queuedTransfers, pausedTransfers, recentTransfers } = useMemo(() => {
     const running: TransferStoreTransfer[] = [];
@@ -495,7 +438,7 @@ export function TransferPopup() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [panelOpen, recentTransfers.length, refreshTransfers, runningTransfers.length, usePopupTransferMonitor]);
+  }, [panelOpen, recentTransfers.length, runningTransfers.length, usePopupTransferMonitor]);
 
   useEffect(() => {
     if (recentTransfers.length === 0) {
@@ -642,7 +585,7 @@ export function TransferPopup() {
       setPendingOps((current) => { const next = new Map(current); next.delete(transferId); return next; });
       void refreshTransfers();
     }
-  }, [refreshTransfers]);
+  }, []);
 
   const pauseTransfer = useCallback(async (transferId: string) => {
     const pause = window.hypershell?.sftpTransferPause;
@@ -661,7 +604,7 @@ export function TransferPopup() {
       setPendingOps((current) => { const next = new Map(current); next.delete(transferId); return next; });
       void refreshTransfers();
     }
-  }, [refreshTransfers]);
+  }, []);
 
   const resumeTransfer = useCallback(async (transferId: string) => {
     const resume = window.hypershell?.sftpTransferResume;
@@ -680,7 +623,7 @@ export function TransferPopup() {
       setPendingOps((current) => { const next = new Map(current); next.delete(transferId); return next; });
       void refreshTransfers();
     }
-  }, [refreshTransfers]);
+  }, []);
 
   const retryTransfer = useCallback(async (transferId: string) => {
     setPendingOps((current) => new Map(current).set(transferId, "retry"));
@@ -694,7 +637,7 @@ export function TransferPopup() {
       setPendingOps((current) => { const next = new Map(current); next.delete(transferId); return next; });
       void refreshTransfers();
     }
-  }, [refreshTransfers]);
+  }, []);
 
   const resolveConflict = useCallback(
     (transferId: string, resolution: "overwrite" | "skip" | "rename", applyToAll: boolean) => {
@@ -719,7 +662,7 @@ export function TransferPopup() {
         }
       })();
     },
-    [refreshTransfers]
+    []
   );
 
   const cancelAllTransfers = useCallback(async () => {
@@ -768,7 +711,7 @@ export function TransferPopup() {
       return next;
     });
     void refreshTransfers();
-  }, [refreshTransfers]);
+  }, []);
 
   const totalSpeed = useMemo(
     () =>

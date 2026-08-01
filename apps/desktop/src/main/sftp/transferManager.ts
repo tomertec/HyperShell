@@ -19,6 +19,7 @@ export type TransferEvent =
     }
   | {
       kind: "transfer-complete";
+      sftpSessionId: string;
       transferId: string;
       status: "completed" | "failed";
       error?: string;
@@ -124,6 +125,7 @@ export function createTransferManager(
     job.userInitiated = true;
     emit({
       kind: "transfer-complete",
+      sftpSessionId: job.sftpSessionId,
       transferId: job.transferId,
       status: "failed",
       error: job.error
@@ -298,6 +300,7 @@ export function createTransferManager(
         nextJob.userInitiated = false;
         emit({
           kind: "transfer-complete",
+          sftpSessionId: nextJob.sftpSessionId,
           transferId: nextJob.transferId,
           status: "failed",
           error: nextJob.error
@@ -320,6 +323,7 @@ export function createTransferManager(
           nextJob.status = "completed";
           emit({
             kind: "transfer-complete",
+            sftpSessionId: nextJob.sftpSessionId,
             transferId: nextJob.transferId,
             status: "completed"
           });
@@ -360,6 +364,7 @@ export function createTransferManager(
             nextJob.userInitiated = false;
             emit({
               kind: "transfer-complete",
+              sftpSessionId: nextJob.sftpSessionId,
               transferId: nextJob.transferId,
               status: "failed",
               error: nextJob.error
@@ -371,6 +376,7 @@ export function createTransferManager(
             nextJob.status = "completed";
             emit({
               kind: "transfer-complete",
+              sftpSessionId: nextJob.sftpSessionId,
               transferId: nextJob.transferId,
               status: "completed"
             });
@@ -382,6 +388,7 @@ export function createTransferManager(
           nextJob.userInitiated = false;
           emit({
             kind: "transfer-complete",
+            sftpSessionId: nextJob.sftpSessionId,
             transferId: nextJob.transferId,
             status: "failed",
             error: nextJob.error
@@ -1026,6 +1033,7 @@ export function createTransferManager(
         target.userInitiated = true;
         emit({
           kind: "transfer-complete",
+          sftpSessionId: target.sftpSessionId,
           transferId: targetId,
           status: "failed",
           error: target.error
@@ -1045,6 +1053,7 @@ export function createTransferManager(
         target.userInitiated = true;
         emit({
           kind: "transfer-complete",
+          sftpSessionId: target.sftpSessionId,
           transferId: targetId,
           status: "failed",
           error: target.error
@@ -1066,6 +1075,7 @@ export function createTransferManager(
           target.userInitiated = true;
           emit({
             kind: "transfer-complete",
+            sftpSessionId: target.sftpSessionId,
             transferId: targetId,
             status: "failed",
             error: target.error

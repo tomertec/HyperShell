@@ -199,8 +199,13 @@ export function SftpDualPane({
   }, []);
 
   return (
+    // The application role exists precisely so this region owns its own
+    // keyboard handling.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       ref={containerRef}
+      role="application"
+      aria-label="SFTP file browser"
       className="flex min-h-0 flex-1 overflow-hidden outline-none"
       tabIndex={0}
       onKeyDown={handleKeyDown}

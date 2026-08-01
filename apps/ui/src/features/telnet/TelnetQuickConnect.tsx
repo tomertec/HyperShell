@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface TelnetQuickConnectProps {
@@ -20,6 +20,7 @@ export function TelnetQuickConnect({
   onClose,
   onConnect,
 }: TelnetQuickConnectProps) {
+  const fieldId = useId();
   const [hostname, setHostname] = useState("");
   const [port, setPort] = useState("23");
   const [mode, setMode] = useState<"telnet" | "raw">("telnet");
@@ -84,6 +85,7 @@ export function TelnetQuickConnect({
                 value={hostname}
                 onChange={(e) => setHostname(e.target.value)}
                 className={inputClass}
+                // eslint-disable-next-line jsx-a11y/no-autofocus -- focuses the field the user just opened this dialog to fill
                 autoFocus
               />
 
@@ -158,10 +160,14 @@ export function TelnetQuickConnect({
                     className="overflow-hidden"
                   >
                     <div className="flex flex-col gap-2 pt-1">
-                      <label className="text-[10px] text-text-muted block">
+                      <label
+                        className="text-[10px] text-text-muted block"
+                        htmlFor={`${fieldId}-terminalType`}
+                      >
                         Terminal Type
                       </label>
                       <input
+                        id={`${fieldId}-terminalType`}
                         type="text"
                         value={terminalType}
                         onChange={(e) => setTerminalType(e.target.value)}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import type { SftpSyncStatus, SftpSyncEvent } from "@hypershell/shared";
 
 export interface SyncPanelProps {
@@ -11,6 +11,7 @@ export interface SyncPanelProps {
 type SyncDirection = "local-to-remote" | "remote-to-local" | "bidirectional";
 
 export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: SyncPanelProps) {
+  const fieldId = useId();
   const [syncLocalPath, setSyncLocalPath] = useState(localPath);
   const [syncRemotePath, setSyncRemotePath] = useState(remotePath);
   const [direction, setDirection] = useState<SyncDirection>("local-to-remote");
@@ -108,8 +109,9 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
       </div>
 
       <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-        <label className="py-0.5 text-text-secondary">Local</label>
+        <label className="py-0.5 text-text-secondary" htmlFor={`${fieldId}-local`}>Local</label>
         <input
+          id={`${fieldId}-local`}
           type="text"
           value={syncLocalPath}
           onChange={(e) => setSyncLocalPath(e.target.value)}
@@ -117,8 +119,9 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
           placeholder="Local directory path"
         />
 
-        <label className="py-0.5 text-text-secondary">Remote</label>
+        <label className="py-0.5 text-text-secondary" htmlFor={`${fieldId}-remote`}>Remote</label>
         <input
+          id={`${fieldId}-remote`}
           type="text"
           value={syncRemotePath}
           onChange={(e) => setSyncRemotePath(e.target.value)}
@@ -126,8 +129,9 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
           placeholder="Remote directory path"
         />
 
-        <label className="py-0.5 text-text-secondary">Direction</label>
+        <label className="py-0.5 text-text-secondary" htmlFor={`${fieldId}-direction`}>Direction</label>
         <select
+          id={`${fieldId}-direction`}
           value={direction}
           onChange={(e) => setDirection(e.target.value as SyncDirection)}
           className="rounded bg-base-800 px-1.5 py-0.5 text-xs text-text-primary outline-none focus:border focus:border-accent/50"
@@ -137,8 +141,9 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
           <option value="bidirectional">{directionLabel("bidirectional")}</option>
         </select>
 
-        <label className="py-0.5 text-text-secondary">Exclude</label>
+        <label className="py-0.5 text-text-secondary" htmlFor={`${fieldId}-exclude`}>Exclude</label>
         <input
+          id={`${fieldId}-exclude`}
           type="text"
           value={excludePatterns}
           onChange={(e) => setExcludePatterns(e.target.value)}

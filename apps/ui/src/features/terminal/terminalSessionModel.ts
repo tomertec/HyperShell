@@ -42,6 +42,38 @@ export function createAsyncOperationGuard(): AsyncOperationGuard {
   };
 }
 
+export interface ConnectAttemptResult {
+  sessionId: string;
+  state: TerminalSessionState;
+}
+
+export interface ResolveConnectAttemptInput {
+  openSession: () => Promise<ConnectAttemptResult>;
+  /** True once the pane unmounted or a newer attempt superseded this one. */
+  isStale: () => boolean;
+  closeSession: (sessionId: string) => void;
+}
+
+/**
+ * Runs one openSession() attempt and hands the result back only while the
+ * caller still wants it. If the pane unmounted or a newer attempt superseded
+ * this one while the promise was in flight, the main process has already
+ * created a session that no UI will ever own — close it instead of leaking a
+ * live SSH/serial/telnet connection with no way to control it.
+ */
+export async function resolveConnectAttempt(
+  input: ResolveConnectAttemptInput
+): Promise<ConnectAttemptResult | null> {
+  const result = await input.openSession();
+
+  if (input.isStale()) {
+    input.closeSession(result.sessionId);
+    return null;
+  }
+
+  return result;
+}
+
 export function mapSessionEvent(
   currentSessionId: string | null,
   event: SessionEvent

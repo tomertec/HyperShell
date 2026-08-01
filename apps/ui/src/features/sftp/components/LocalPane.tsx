@@ -318,6 +318,8 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col ${isActive ? "border-t-2 border-accent" : "border-t-2 border-transparent"}`}
+      role="group"
+      aria-label="Local files"
       onMouseDown={onActivate}
       onContextMenu={(event) => handleContextMenu(event)}
     >
@@ -367,7 +369,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         label="Enter a new name:"
         defaultValue={renameDialog.oldName}
         confirmLabel="Rename"
-        onConfirm={handleRenameConfirm}
+        onConfirm={(newName) => { void handleRenameConfirm(newName); }}
         onCancel={() => setRenameDialog({ open: false, path: "", oldName: "" })}
       />
 
@@ -377,7 +379,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         message={`Move ${deleteDialog.paths.length} item${deleteDialog.paths.length === 1 ? "" : "s"} to Recycle Bin?`}
         confirmLabel="Delete"
         variant="danger"
-        onConfirm={handleDeleteConfirm}
+        onConfirm={() => { void handleDeleteConfirm(); }}
         onCancel={() => setDeleteDialog({ open: false, paths: [] })}
       />
     </div>

@@ -45,6 +45,8 @@ export function PaneResizeHandle({ direction, onResize, onResizeEnd }: PaneResiz
 
   return (
     <div
+      role="separator"
+      aria-orientation={isHorizontal ? "vertical" : "horizontal"}
       onMouseDown={onMouseDown}
       className={[
         "relative flex-shrink-0 group",

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import type { UpdateState } from "@hypershell/shared";
 
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { useUpdateStore } from "./updateStore";
 
 export type UpdateMode =
@@ -34,6 +35,16 @@ export function resolveUpdateMode(update: UpdateState | null): UpdateMode {
     default:
       return { kind: "version" };
   }
+}
+
+/**
+ * Copy for the install confirmation. HyperShell ships unsigned, so Windows and
+ * endpoint AV cannot verify the publisher of the installer we are about to run
+ * elevated — name the version and say so, and let the user decide.
+ */
+export function buildInstallConfirmMessage(version: string | undefined): string {
+  const target = version ? `v${version}` : "the downloaded update";
+  return `HyperShell will close and install ${target}. This build is unsigned, so Windows cannot verify its publisher.`;
 }
 
 const SCRAMBLE_CHARS = "!<>-_\\/[]{}=+*^?#abcdef0123456789";
@@ -120,6 +131,7 @@ export function SidebarUpdateLabel({ version }: { version: string }) {
   const download = useUpdateStore((s) => s.download);
   const install = useUpdateStore((s) => s.install);
   const openRelease = useUpdateStore((s) => s.openRelease);
+  const [confirmingInstall, setConfirmingInstall] = useState(false);
 
   const mode = resolveUpdateMode(update);
   const versionLabel = `HyperShell>_ v${version}`;
@@ -133,7 +145,7 @@ export function SidebarUpdateLabel({ version }: { version: string }) {
   const activate = () => {
     if (mode.kind === "available") void download();
     else if (mode.kind === "manual") void openRelease();
-    else if (mode.kind === "downloaded") void install();
+    else if (mode.kind === "downloaded") setConfirmingInstall(true);
   };
 
   return (
@@ -176,6 +188,18 @@ export function SidebarUpdateLabel({ version }: { version: string }) {
           />
         ) : null}
       </motion.div>
+      <ConfirmDialog
+        open={confirmingInstall}
+        title="Install update?"
+        message={buildInstallConfirmMessage(update?.availableVersion)}
+        confirmLabel="Restart & install"
+        cancelLabel="Not now"
+        onConfirm={() => {
+          setConfirmingInstall(false);
+          void install();
+        }}
+        onCancel={() => setConfirmingInstall(false)}
+      />
     </div>
   );
 }

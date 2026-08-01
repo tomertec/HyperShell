@@ -10,8 +10,9 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "test": "vitest run",
-    "lint": "pnpm -r --if-present lint",
+    "lint": "eslint .",
     "ci:build": "pnpm build",
+    "ci:lint": "pnpm lint",
     "ci:test": "pnpm test",
     "ci:test:e2e": "pnpm --filter @hypershell/ui run test:e2e",
     "release:windows:unsigned": "pnpm --filter @hypershell/desktop run package:win:unsigned",
@@ -38,8 +39,14 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.2",
+    "eslint": "^10.8.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.8.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^3.2.6"
   }
 }

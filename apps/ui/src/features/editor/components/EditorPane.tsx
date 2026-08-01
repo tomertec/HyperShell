@@ -144,7 +144,6 @@ export function EditorPane({ store, tabId, content, onSave, canSave }: EditorPan
       }
     });
     return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId]);
 
   // Keyboard shortcuts — stable handler, no re-registration on settings change

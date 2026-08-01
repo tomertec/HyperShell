@@ -267,6 +267,8 @@ export function RemotePane({
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col ${isActive ? "border-t-2 border-accent" : "border-t-2 border-transparent"}`}
+      role="group"
+      aria-label="Remote files"
       onMouseDown={onActivate}
       onContextMenu={(event) => handleContextMenu(event)}
     >

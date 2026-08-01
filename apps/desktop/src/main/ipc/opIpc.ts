@@ -19,7 +19,8 @@ async function runOp(args: string[]): Promise<string> {
   } catch (err: unknown) {
     if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
       throw new Error(
-        "1Password CLI (op) not found. Install it from https://1password.com/downloads/command-line/"
+        "1Password CLI (op) not found. Install it from https://1password.com/downloads/command-line/",
+        { cause: err }
       );
     }
     throw err;

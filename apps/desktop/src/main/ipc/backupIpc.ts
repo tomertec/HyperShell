@@ -15,6 +15,7 @@ import {
   statSync,
   unlinkSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import type { IpcMainLike } from "./registerIpc";
@@ -32,12 +33,39 @@ const SQLITE_MAGIC = "SQLite format 3\0";
 const ALLOWED_BACKUP_EXTENSIONS = new Set([".db", ".sqlite", ".sqlite3"]);
 const trustedDialogBackupPaths = new Set<string>();
 
+/**
+ * Tables a restore candidate must contain to be a HyperShell database.
+ * Deliberately a small core subset — later migrations add tables that older
+ * (but still restorable) backups legitimately lack.
+ */
+const REQUIRED_TABLES = ["hosts", "host_groups", "app_settings"];
+
+/**
+ * `packages/db` applies idempotent DDL on every open and never writes
+ * `PRAGMA user_version`, so every database this build produces reports 0.
+ * A higher value means the file came from a newer schema (or another app)
+ * that this build cannot be trusted to read.
+ */
+const MAX_SUPPORTED_USER_VERSION = 0;
+
+// `require` is injected by the esbuild banner in the bundled main process, but
+// not when these modules are loaded directly (tests). Bind it explicitly so the
+// native module resolves in both.
+const requireNative = createRequire(import.meta.url);
+
 type SqliteOnlineBackupDatabase = {
-  pragma(command: string): unknown;
+  pragma(command: string, options?: { simple?: boolean }): unknown;
   exec(sql: string): unknown;
+  prepare(sql: string): { all(): unknown[] };
   backup?: (destinationPath: string) => Promise<unknown>;
   close(): void;
 };
+
+export interface SqliteBackupValidation {
+  valid: boolean;
+  /** Human-readable failure cause. Present only when `valid` is false. */
+  reason?: string;
+}
 
 /**
  * Resolves the path to the HyperShell database file.
@@ -56,8 +84,16 @@ export function getBackupDir(): string {
 }
 
 function openSqliteDatabaseForBackup(dbPath: string): SqliteOnlineBackupDatabase {
-  const Database = require("better-sqlite3");
+  const Database = requireNative("better-sqlite3");
   return new Database(dbPath, { fileMustExist: true }) as SqliteOnlineBackupDatabase;
+}
+
+function openSqliteDatabaseReadOnly(dbPath: string): SqliteOnlineBackupDatabase {
+  const Database = requireNative("better-sqlite3");
+  return new Database(dbPath, {
+    readonly: true,
+    fileMustExist: true,
+  }) as SqliteOnlineBackupDatabase;
 }
 
 function assertSafeBackupPath(
@@ -134,10 +170,10 @@ export function generateBackupFilename(date: Date = new Date()): string {
 }
 
 /**
- * Validates that the first 16 bytes of a file match the SQLite magic string.
- * Returns true if the file is a valid SQLite database.
+ * Cheap first pass: the first 16 bytes must match the SQLite magic string.
+ * Passing this proves nothing about the contents — see `validateSqliteBackup`.
  */
-export function isValidSqliteFile(filePath: string): boolean {
+export function hasSqliteHeader(filePath: string): boolean {
   try {
     const fd = readFileSync(filePath, { encoding: null });
     if (fd.length < 16) {
@@ -147,6 +183,86 @@ export function isValidSqliteFile(filePath: string): boolean {
     return header === SQLITE_MAGIC;
   } catch {
     return false;
+  }
+}
+
+function toFailureReason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function readQuickCheckResult(db: SqliteOnlineBackupDatabase): string {
+  const rows = db.pragma("quick_check") as unknown;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "no result";
+  }
+
+  const first = rows[0];
+  if (typeof first === "string") {
+    return first;
+  }
+  if (first && typeof first === "object") {
+    const [value] = Object.values(first as Record<string, unknown>);
+    return String(value);
+  }
+
+  return String(first);
+}
+
+/**
+ * Fully validates a restore candidate before it is allowed to replace the live
+ * database: the file must open as SQLite, pass `PRAGMA quick_check`, report a
+ * schema version this build understands, and contain the core HyperShell
+ * tables. A header-correct but structurally corrupt file fails here.
+ */
+export function validateSqliteBackup(filePath: string): SqliteBackupValidation {
+  if (!hasSqliteHeader(filePath)) {
+    return { valid: false, reason: "file does not start with a SQLite header" };
+  }
+
+  let db: SqliteOnlineBackupDatabase;
+  try {
+    db = openSqliteDatabaseReadOnly(filePath);
+  } catch (error) {
+    return { valid: false, reason: `database could not be opened (${toFailureReason(error)})` };
+  }
+
+  try {
+    const quickCheck = readQuickCheckResult(db);
+    if (quickCheck.toLowerCase() !== "ok") {
+      return { valid: false, reason: `integrity check failed (${quickCheck})` };
+    }
+
+    const userVersion = Number(db.pragma("user_version", { simple: true }));
+    if (!Number.isInteger(userVersion) || userVersion > MAX_SUPPORTED_USER_VERSION) {
+      return {
+        valid: false,
+        reason: `unsupported schema version ${userVersion} (expected at most ${MAX_SUPPORTED_USER_VERSION})`,
+      };
+    }
+
+    const tableRows = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all() as Array<{ name?: unknown }>;
+    const presentTables = new Set(
+      tableRows.map((row) => String(row?.name ?? ""))
+    );
+    const missingTables = REQUIRED_TABLES.filter((table) => !presentTables.has(table));
+    if (missingTables.length > 0) {
+      return {
+        valid: false,
+        reason: `missing required tables: ${missingTables.join(", ")}`,
+      };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, reason: `database could not be read (${toFailureReason(error)})` };
+  } finally {
+    try {
+      db.close();
+    } catch {
+      // Best effort — the handle is read-only and about to be discarded.
+    }
   }
 }
 
@@ -273,9 +389,10 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
         throw new Error("Backup file not found");
       }
 
-      if (!isValidSqliteFile(safeRestorePath)) {
+      const candidateValidation = validateSqliteBackup(safeRestorePath);
+      if (!candidateValidation.valid) {
         throw new Error(
-          "Invalid backup file: not a valid SQLite database"
+          `Invalid backup file: ${candidateValidation.reason ?? "not a valid HyperShell database"}`
         );
       }
 
@@ -307,8 +424,13 @@ export function registerBackupIpc(ipcMain: IpcMainLike): void {
       let restoreApplied = false;
       try {
         copyFileSync(safeRestorePath, restoreTempPath);
-        if (!isValidSqliteFile(restoreTempPath)) {
-          throw new Error("Restore failed: copied backup is not a valid SQLite database");
+        const copyValidation = validateSqliteBackup(restoreTempPath);
+        if (!copyValidation.valid) {
+          throw new Error(
+            `Restore failed: copied backup is not a valid HyperShell database (${
+              copyValidation.reason ?? "unknown reason"
+            })`
+          );
         }
         removeSqliteSidecars(dbPath);
 

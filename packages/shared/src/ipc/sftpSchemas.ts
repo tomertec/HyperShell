@@ -199,6 +199,9 @@ export const sftpEventSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("transfer-complete"),
+    // Lets the renderer route directory invalidation to the one SFTP tab that
+    // owns this transfer instead of refreshing every open tab.
+    sftpSessionId: z.string(),
     transferId: z.string(),
     status: z.enum(["completed", "failed"]),
     error: z.string().optional()

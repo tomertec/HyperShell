@@ -260,7 +260,7 @@ describe("sessionManager", () => {
             listeners.add(listener);
             // Emit exit immediately on first transport creation
             if (transportCount === 1) {
-              Promise.resolve().then(() => {
+              void Promise.resolve().then(() => {
                 for (const l of listeners) {
                   l({ type: "exit", sessionId: request.sessionId, exitCode: 1 });
                 }

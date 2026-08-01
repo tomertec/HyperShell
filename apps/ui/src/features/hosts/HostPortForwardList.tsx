@@ -99,7 +99,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
                 <span className="text-[10px] text-green-400 border border-green-500/30 bg-green-500/10 px-1 rounded">auto</span>
               )}
               <button type="button" onClick={() => handleEdit(fwd)} className="text-text-muted hover:text-text-primary text-xs ml-1">edit</button>
-              <button type="button" onClick={() => handleDelete(fwd.id)} className="text-text-muted hover:text-red-400 text-xs">del</button>
+              <button type="button" onClick={() => { void handleDelete(fwd.id); }} className="text-text-muted hover:text-red-400 text-xs">del</button>
             </div>
           ))}
         </div>
@@ -162,7 +162,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={handleSave}
+              onClick={() => { void handleSave(); }}
               className="text-xs px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/30 text-accent hover:bg-accent/25"
             >
               {editId ? "Update" : "Add"}

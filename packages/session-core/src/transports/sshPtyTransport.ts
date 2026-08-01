@@ -78,7 +78,7 @@ export function buildSshArgs(profile: SshConnectionProfile): string[] {
   }
 
   if (profile.proxyJump) {
-    if (!/^[\w.@:,[\]\-]+$/.test(profile.proxyJump)) {
+    if (!/^[\w.@:,[\]-]+$/.test(profile.proxyJump)) {
       throw new Error("Invalid proxyJump format");
     }
     args.push("-J", profile.proxyJump);
@@ -167,6 +167,8 @@ function buildPtyEnv(
   return merged;
 }
 
+// Matching control characters is the entire purpose of these patterns.
+/* eslint-disable no-control-regex */
 function normalizePromptText(value: string): string {
   return value
     // CSI/OSC/escape sequences that can wrap prompts.
@@ -176,6 +178,7 @@ function normalizePromptText(value: string): string {
     // Keep tabs/newlines/carriage returns/spaces; drop other controls.
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
 }
+/* eslint-enable no-control-regex */
 
 function isPasswordPrompt(value: string): boolean {
   return /\b(?:password|passphrase|verification code|security code|otp)\b[^:\r\n]{0,120}:\s*$/i.test(

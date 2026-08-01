@@ -23,7 +23,16 @@ export function TunnelList() {
       {activeForwards.map((fwd) => (
         <div
           key={fwd.id}
+          role="button"
+          tabIndex={0}
+          aria-pressed={fwd.id === selectedForwardId}
           onClick={() => selectForward(fwd.id === selectedForwardId ? null : fwd.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              selectForward(fwd.id === selectedForwardId ? null : fwd.id);
+            }
+          }}
           className={`flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer text-sm transition-all duration-100 ${
             fwd.id === selectedForwardId
               ? "bg-accent/10 border border-accent/20"
@@ -39,7 +48,7 @@ export function TunnelList() {
             {fwd.protocol !== "dynamic" && fwd.remoteHost && ` → ${fwd.remoteHost}:${fwd.remotePort ?? ""}`}
           </span>
           <button
-            onClick={(e) => { e.stopPropagation(); handleStop(fwd.id); }}
+            onClick={(e) => { e.stopPropagation(); void handleStop(fwd.id); }}
             className="ml-auto text-xs text-text-muted hover:text-red-400 transition-colors shrink-0"
           >
             Stop

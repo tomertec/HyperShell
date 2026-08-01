@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createAsyncOperationGuard,
-  mapSessionEvent
+  mapSessionEvent,
+  resolveConnectAttempt
 } from "./terminalSessionModel";
 
 describe("mapSessionEvent", () => {
@@ -76,5 +77,90 @@ describe("createAsyncOperationGuard", () => {
 
     expect(guard.isCurrent(first)).toBe(false);
     expect(guard.isCurrent(guard.issueToken())).toBe(false);
+  });
+});
+
+describe("resolveConnectAttempt", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  it("returns the session when the attempt is still current", async () => {
+    const closeSession = vi.fn();
+
+    await expect(
+      resolveConnectAttempt({
+        openSession: async () => ({ sessionId: "session-a", state: "connected" }),
+        isStale: () => false,
+        closeSession
+      })
+    ).resolves.toEqual({ sessionId: "session-a", state: "connected" });
+
+    expect(closeSession).not.toHaveBeenCalled();
+  });
+
+  it("closes the session when the pane unmounted while openSession was in flight", async () => {
+    const pending = deferred<{ sessionId: string; state: "connected" }>();
+    const closeSession = vi.fn();
+    const guard = createAsyncOperationGuard();
+    const attemptId = guard.issueToken();
+    let mounted = true;
+
+    const attempt = resolveConnectAttempt({
+      openSession: () => pending.promise,
+      isStale: () => !mounted || !guard.isCurrent(attemptId),
+      closeSession
+    });
+
+    // Pane unmounts (and the cleanup invalidates the guard) before the
+    // main process finishes opening the session.
+    mounted = false;
+    guard.invalidate();
+    pending.resolve({ sessionId: "session-a", state: "connected" });
+
+    await expect(attempt).resolves.toBeNull();
+    expect(closeSession).toHaveBeenCalledWith("session-a");
+  });
+
+  it("closes the session when a newer attempt superseded it", async () => {
+    const pending = deferred<{ sessionId: string; state: "connected" }>();
+    const closeSession = vi.fn();
+    const guard = createAsyncOperationGuard();
+    const attemptId = guard.issueToken();
+
+    const attempt = resolveConnectAttempt({
+      openSession: () => pending.promise,
+      isStale: () => !guard.isCurrent(attemptId),
+      closeSession
+    });
+
+    // A second connect() (or a disconnect()) issues a newer token first.
+    guard.issueToken();
+    pending.resolve({ sessionId: "session-a", state: "connected" });
+
+    await expect(attempt).resolves.toBeNull();
+    expect(closeSession).toHaveBeenCalledWith("session-a");
+  });
+
+  it("propagates openSession failures without closing anything", async () => {
+    const closeSession = vi.fn();
+
+    await expect(
+      resolveConnectAttempt({
+        openSession: async () => {
+          throw new Error("permission denied");
+        },
+        isStale: () => true,
+        closeSession
+      })
+    ).rejects.toThrow("permission denied");
+
+    expect(closeSession).not.toHaveBeenCalled();
   });
 });

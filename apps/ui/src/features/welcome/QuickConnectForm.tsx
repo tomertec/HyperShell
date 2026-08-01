@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useId } from "react";
 import { TransportToggle, type TransportMode } from "./TransportToggle";
 
 interface QuickConnectFormProps {
@@ -32,6 +32,7 @@ export function QuickConnectForm({
   onConnectSerial,
   onCancel,
 }: QuickConnectFormProps) {
+  const fieldId = useId();
   const [mode, setMode] = useState<TransportMode>("ssh");
 
   // SSH fields
@@ -102,6 +103,7 @@ export function QuickConnectForm({
               value={host}
               onChange={(e) => setHost(e.target.value)}
               className={inputClass}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- focuses the field the user just opened this form to fill
               autoFocus
             />
             <div className="grid grid-cols-[6rem_1fr] gap-2">
@@ -202,30 +204,30 @@ export function QuickConnectForm({
                   <div className="flex flex-col gap-3 pt-1">
                     <div className="flex gap-2">
                       <div className="flex-1">
-                        <label className="text-[10px] text-text-muted mb-1 block">Data bits</label>
-                        <select value={dataBits} onChange={(e) => setDataBits(e.target.value)} className={selectClass}>
+                        <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-dataBits`}>Data bits</label>
+                        <select id={`${fieldId}-dataBits`} value={dataBits} onChange={(e) => setDataBits(e.target.value)} className={selectClass}>
                           {[5, 6, 7, 8].map((v) => <option key={v} value={v}>{v}</option>)}
                         </select>
                       </div>
                       <div className="flex-1">
-                        <label className="text-[10px] text-text-muted mb-1 block">Stop bits</label>
-                        <select value={stopBits} onChange={(e) => setStopBits(e.target.value)} className={selectClass}>
+                        <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-stopBits`}>Stop bits</label>
+                        <select id={`${fieldId}-stopBits`} value={stopBits} onChange={(e) => setStopBits(e.target.value)} className={selectClass}>
                           {[1, 2].map((v) => <option key={v} value={v}>{v}</option>)}
                         </select>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <div className="flex-1">
-                        <label className="text-[10px] text-text-muted mb-1 block">Parity</label>
-                        <select value={parity} onChange={(e) => setParity(e.target.value as typeof parity)} className={selectClass}>
+                        <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-parity`}>Parity</label>
+                        <select id={`${fieldId}-parity`} value={parity} onChange={(e) => setParity(e.target.value as typeof parity)} className={selectClass}>
                           <option value="none">None</option>
                           <option value="even">Even</option>
                           <option value="odd">Odd</option>
                         </select>
                       </div>
                       <div className="flex-1">
-                        <label className="text-[10px] text-text-muted mb-1 block">Flow control</label>
-                        <select value={flowControl} onChange={(e) => setFlowControl(e.target.value as typeof flowControl)} className={selectClass}>
+                        <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-flowControl`}>Flow control</label>
+                        <select id={`${fieldId}-flowControl`} value={flowControl} onChange={(e) => setFlowControl(e.target.value as typeof flowControl)} className={selectClass}>
                           <option value="none">None</option>
                           <option value="rtscts">RTS/CTS</option>
                           <option value="xonxoff">XON/XOFF</option>

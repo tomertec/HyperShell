@@ -110,7 +110,7 @@ export function HostKeyVerificationDialog({
                 ? "rounded-lg bg-danger/15 border border-danger/30 px-5 py-2 text-sm font-medium text-danger hover:bg-danger/25 hover:border-danger/40 disabled:opacity-60"
                 : "rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40 disabled:opacity-60"
             }
-            onClick={handleTrust}
+            onClick={() => { void handleTrust(); }}
             disabled={confirming}
           >
             {isKeyChanged ? "Trust New Key" : "Trust & Connect"}

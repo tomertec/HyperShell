@@ -54,7 +54,7 @@ export function TunnelForm({ onSubmit, onCancel }: TunnelFormProps) {
         )}
       </div>
       <div className="flex gap-2 mt-1">
-        <button onClick={handleStart} className="text-xs px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/30 text-accent hover:bg-accent/25 transition-colors">Start</button>
+        <button onClick={() => { void handleStart(); }} className="text-xs px-3 py-1.5 rounded-lg bg-accent/15 border border-accent/30 text-accent hover:bg-accent/25 transition-colors">Start</button>
         <button onClick={onCancel} className="text-xs px-3 py-1.5 rounded-lg bg-surface border border-border text-text-muted hover:text-text-primary transition-colors">Cancel</button>
       </div>
     </div>

@@ -19,6 +19,7 @@ import {
 import {
   createAsyncOperationGuard,
   mapSessionEvent,
+  resolveConnectAttempt,
   type TerminalSessionState
 } from "./terminalSessionModel";
 
@@ -255,9 +256,10 @@ export function useTerminalSession(
   }, [setStateSafe, input.tmuxAttachTarget]);
 
   useEffect(() => {
+    const asyncOperationGuard = asyncOperationGuardRef.current;
     return () => {
       mountedRef.current = false;
-      asyncOperationGuardRef.current.invalidate();
+      asyncOperationGuard.invalidate();
       pendingSessionEventsRef.current = [];
 
       // Clean up event listener if still active
@@ -440,6 +442,11 @@ export function useTerminalSession(
       setTerminal(null);
       setSearchAddon(null);
     };
+    // `terminalSettings` / `customThemes` are read here only to seed the
+    // initial xterm options. Listing them would tear down and rebuild the
+    // terminal on every settings change; the effect below applies live updates
+    // to the existing instance instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     applyTerminalBackground,
     decreaseFontSize,
@@ -450,9 +457,12 @@ export function useTerminalSession(
     writeClipboardText
   ]);
 
+  const onSessionOpened = input.onSessionOpened;
+
   const connect = useCallback(async (): Promise<void> => {
     const instance = terminalRef.current;
-    if (!instance || !window.hypershell?.openSession) {
+    const openSession = window.hypershell?.openSession;
+    if (!instance || !openSession) {
       return;
     }
 
@@ -461,23 +471,31 @@ export function useTerminalSession(
     try {
       const cols = instance.cols || 120;
       const rows = instance.rows || 40;
-      const result = await window.hypershell.openSession({
-        transport: input.transport,
-        profileId: input.profileId,
-        cols,
-        rows,
-        ...(input.telnetOptions ? { telnetOptions: input.telnetOptions } : {})
+      const result = await resolveConnectAttempt({
+        openSession: () =>
+          openSession({
+            transport: input.transport,
+            profileId: input.profileId,
+            cols,
+            rows,
+            ...(input.telnetOptions ? { telnetOptions: input.telnetOptions } : {})
+          }),
+        isStale: () =>
+          !mountedRef.current ||
+          !asyncOperationGuardRef.current.isCurrent(attemptId),
+        closeSession: (sessionId) => {
+          window.hypershell?.closeSession?.({ sessionId })?.catch((error) => {
+            logAsyncError("closeSession for stale connect attempt failed", error);
+          });
+        }
       });
 
-      if (
-        !mountedRef.current ||
-        !asyncOperationGuardRef.current.isCurrent(attemptId)
-      ) {
+      if (!result) {
         return;
       }
 
       sessionIdRef.current = result.sessionId;
-      input.onSessionOpened?.(result.sessionId);
+      onSessionOpened?.(result.sessionId);
       // Only apply the IPC result state if the event listener hasn't
       // already advanced past it (e.g. "connected" arrived before the
       // openSession promise resolved).
@@ -506,7 +524,7 @@ export function useTerminalSession(
     }
   }, [
     applySessionEvent,
-    input.onSessionOpened,
+    onSessionOpened,
     input.profileId,
     input.telnetOptions,
     input.transport,

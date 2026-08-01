@@ -102,9 +102,9 @@ export function useSessionStats(
     };
 
     // Initial fetch after 2 seconds (let session stabilize)
-    const initialTimeout = setTimeout(fetchStats, 2000);
+    const initialTimeout = setTimeout(() => { void fetchStats(); }, 2000);
     // Then poll every 15 seconds
-    const interval = setInterval(fetchStats, 15000);
+    const interval = setInterval(() => { void fetchStats(); }, 15000);
 
     return () => {
       cancelled = true;

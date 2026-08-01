@@ -111,6 +111,7 @@ function SortableTab({
       >
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabStateColors[sessionState ?? ""] ?? "bg-gray-400"}`} />
         <span className="truncate">{tab.title}</span>
+        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- nested inside the tab <button>, so it cannot be a button; keyboard users close the tab with Ctrl+Shift+W */}
         <span
           onClick={(e) => {
             e.stopPropagation();
