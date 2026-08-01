@@ -12,10 +12,12 @@
 
 From repo root:
 
-1. Build and package unsigned Windows installer:
+1. Verify the committed versions (and the tag, on a `v*` ref) agree:
+   `pnpm release:verify-tag`
+2. Build and package the Windows installer:
    `pnpm release:windows:unsigned`
-2. Build and package signed Windows installer:
-   `pnpm release:windows:signed`
+   The installer is signed automatically when the signing environment variables
+   below are set; there is no separate signed script.
 3. Generate artifact checksums and manifest:
    `pnpm release:manifest`
 
@@ -23,7 +25,7 @@ Generated artifacts are written to `apps/desktop/release`.
 
 ## Signing Configuration
 
-Before running the signed flow, set these environment variables in the Windows shell session:
+To sign, set these environment variables in the Windows shell session before packaging:
 
 - `CSC_LINK` (or `WIN_CSC_LINK`): absolute path or base64 source for the certificate
 - `CSC_KEY_PASSWORD` (or `WIN_CSC_KEY_PASSWORD`): certificate password
@@ -33,7 +35,7 @@ PowerShell example:
 ```powershell
 $env:CSC_LINK = "C:\\certs\\hypershell-release.pfx"
 $env:CSC_KEY_PASSWORD = "<certificate-password>"
-pnpm release:windows:signed
+pnpm release:windows:unsigned
 ```
 
 ## Validation

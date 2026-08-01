@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm ci:lint
+
       - name: Workspace build
         run: pnpm ci:build
 
@@ -41,6 +44,51 @@ jobs:
 
       - name: Playwright smoke
         run: pnpm ci:test:e2e
+
+  # The browser suite above runs the renderer in Chromium against the Vite dev
+  # server, so it cannot see the preload bridge, IPC schema enforcement, native
+  # modules, window security, or on-disk database behaviour. This job boots the
+  # real Electron shell against a throwaway data directory and covers those.
+  electron-e2e:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Produces dist/main, dist/preload, and the bundled dist/renderer that the
+      # packaged app loads — the Electron suite runs against exactly that.
+      - name: Build desktop bundle
+        run: pnpm --filter @hypershell/desktop run build:bundle
+
+      - name: Rebuild native modules for Electron
+        run: pnpm --filter @hypershell/desktop rebuild:native
+
+      - name: Electron E2E
+        run: pnpm ci:test:e2e:electron
+
+      - name: Upload Electron E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-e2e-results
+          path: apps/desktop/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
 
   windows-build:
     runs-on: windows-latest

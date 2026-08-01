@@ -32,11 +32,19 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # Fails before anything is built or published if the tag disagrees with the
+      # versions committed at this ref.
+      - name: Verify tag matches package versions
+        run: node .tools/release/verify-tag-version.mjs --ref-name "${{ github.ref_name }}"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
         run: pnpm --filter @hypershell/ui exec playwright install chromium
+
+      - name: Lint
+        run: pnpm ci:lint
 
       - name: Workspace build
         run: pnpm ci:build

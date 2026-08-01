@@ -15,11 +15,13 @@
     "ci:lint": "pnpm lint",
     "ci:test": "pnpm test",
     "ci:test:e2e": "pnpm --filter @hypershell/ui run test:e2e",
+    "ci:test:e2e:electron": "pnpm --filter @hypershell/desktop run test:e2e",
     "release:windows:unsigned": "pnpm --filter @hypershell/desktop run package:win:unsigned",
     "release:mac:unsigned": "pnpm --filter @hypershell/desktop run package:mac:unsigned",
     "release:linux:unsigned": "pnpm --filter @hypershell/desktop run package:linux:unsigned",
     "release:manifest": "pnpm --filter @hypershell/desktop run release:manifest",
     "release:prepare": "node .tools/release/prepare-version-and-changelog.mjs",
+    "release:verify-tag": "node .tools/release/verify-tag-version.mjs",
     "rebuild:sqlite": "pnpm rebuild better-sqlite3",
     "rebuild:sqlite:electron": "pnpm --filter @hypershell/desktop run rebuild:native"
   },

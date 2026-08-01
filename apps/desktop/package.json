@@ -23,7 +23,11 @@
     "release:manifest": "node ../../.tools/release/write-release-manifest.mjs --artifacts-dir release",
     "start": "electron .",
     "start:native": "pnpm run rebuild:native && electron .",
-    "test": "vitest"
+    "test": "vitest",
+    "test:e2e": "playwright test --config playwright.electron.config.ts",
+    "test:e2e:headed": "playwright test --config playwright.electron.config.ts --headed",
+    "pretest:e2e:full": "pnpm run build:bundle && pnpm run rebuild:native",
+    "test:e2e:full": "pnpm run test:e2e"
   },
   "dependencies": {
     "@hypershell/db": "workspace:^",
@@ -38,6 +42,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/yazl": "^3.3.1",
     "electron": "^39.8.10",
     "electron-builder": "^26.15.3",

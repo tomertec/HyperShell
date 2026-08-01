@@ -32,11 +32,19 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      # Fails before anything is built or published if the tag disagrees with the
+      # versions committed at this ref.
+      - name: Verify tag matches package versions
+        run: node .tools/release/verify-tag-version.mjs --ref-name "${{ github.ref_name }}"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
         run: pnpm --filter @hypershell/ui exec playwright install chromium
+
+      - name: Lint
+        run: pnpm ci:lint
 
       - name: Workspace build
         run: pnpm ci:build
@@ -49,6 +57,14 @@ jobs:
 
       - name: Rebuild native modules for Electron
         run: pnpm --filter @hypershell/desktop rebuild:native
+
+      # Boots the real shell (preload bridge, IPC schemas, SQLite, windows)
+      # against a throwaway data directory before anything is packaged.
+      - name: Build desktop bundle
+        run: pnpm --filter @hypershell/desktop run build:bundle
+
+      - name: Electron E2E
+        run: pnpm ci:test:e2e:electron
 
       - name: Package Windows release (unsigned)
         run: pnpm release:windows:unsigned

@@ -18,9 +18,11 @@
    - `pnpm ci:build`
    - `pnpm ci:test`
    - `pnpm ci:test:e2e`
-2. Package installer:
-   - unsigned: `pnpm release:windows:unsigned`
-   - signed: `pnpm release:windows:signed`
+   - `pnpm release:verify-tag` (all workspace versions in lockstep; when
+     `GITHUB_REF_NAME`/`--ref-name` is a `v*` tag, that the tag matches too)
+2. Package installer with `pnpm release:windows:unsigned`. The same command
+   produces a signed installer when `CSC_LINK` and `CSC_KEY_PASSWORD` are set —
+   there is no separate signed script.
 3. Create artifact manifest + checksums:
    - `pnpm release:manifest`
 4. Execute manual smoke checklist in [windows-smoke-checklist.md](../testing/windows-smoke-checklist.md).

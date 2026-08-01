@@ -27,6 +27,7 @@ function SnippetForm({
         placeholder="Name"
         value={name}
         onChange={(e) => onNameChange(e.target.value)}
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- focuses the field the user just opened this editor to fill
         autoFocus
       />
       <textarea
@@ -120,6 +121,10 @@ export function SnippetsPanel() {
   return (
     <div
       aria-hidden={!isOpen}
+      // aria-hidden alone leaves the panel's buttons in the tab order while it
+      // is slid off-screen — focus lands on controls no one can see. inert
+      // removes them from focus and the a11y tree together.
+      inert={!isOpen}
       className={`absolute right-0 top-0 h-full w-80 z-30 flex flex-col bg-base-900 border-l border-border shadow-xl transition-[transform,opacity] duration-200 ease-out ${
         isOpen
           ? "translate-x-0 opacity-100 pointer-events-auto"

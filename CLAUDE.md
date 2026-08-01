@@ -104,8 +104,15 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 ## Testing
 
 - **Unit tests:** Vitest 3.1 — test files live next to source as `*.test.ts(x)`. Root `vitest.config.ts` runs all workspaces.
-- **E2E tests:** Playwright in `apps/ui/tests/` — headless Chromium, 30s timeout, auto-starts Vite dev server.
-- **CI:** GitHub Actions (`.github/workflows/pr-gates.yml`) gates PRs on build + unit + Playwright.
+- **Browser E2E:** Playwright in `apps/ui/tests/` — headless Chromium, 30s timeout, auto-starts Vite dev server. Fast feedback on renderer behaviour and accessibility (`accessibility.spec.ts` runs axe). It cannot see anything below the renderer.
+- **Electron E2E:** Playwright in `apps/desktop/tests/` via `playwright.electron.config.ts` — boots the real shell to cover what Chromium cannot: preload bridge availability, IPC schema enforcement, native modules, renderer/Node isolation, SQLite persistence across restarts, editor-window creation, and a full session lifecycle against a local TCP echo server.
+  ```bash
+  pnpm --filter @hypershell/desktop run build:bundle   # dist/main + dist/preload + dist/renderer
+  pnpm --filter @hypershell/desktop rebuild:native     # better-sqlite3 etc. against Electron's ABI
+  pnpm ci:test:e2e:electron
+  ```
+  Every test runs against a fresh temp directory via `HYPERSHELL_DATA_DIR` (see `apps/desktop/src/main/appDataDir.ts`). That override exists because the database lives under `appData/HyperShell`, which Electron's `--user-data-dir` switch does **not** move — without it a test run would mutate your real hosts.
+- **CI:** GitHub Actions (`.github/workflows/pr-gates.yml`) gates PRs on build + unit + browser Playwright + a Windows `electron-e2e` job.
 
 ## Key Conventions
 

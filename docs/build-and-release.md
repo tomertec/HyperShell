@@ -32,11 +32,10 @@ The desktop main process is bundled with esbuild as ESM. Native modules (`better
 ## Packaging
 
 ```bash
-# Unsigned Windows installer (for dev/testing)
+# Windows installer. Produces a signed installer when CSC_LINK and
+# CSC_KEY_PASSWORD are set in the shell, unsigned otherwise — there is no
+# separate signed script.
 pnpm release:windows:unsigned
-
-# Signed Windows installer (for distribution)
-pnpm release:windows:signed
 
 # macOS DMG (unsigned)
 pnpm release:mac:unsigned
@@ -74,14 +73,17 @@ Verify signing environment: `.tools/desktop/verify-signing-env.mjs`
 # 1. Bump version and update changelog
 pnpm release:prepare
 
-# 2. Build and package
-pnpm build
-pnpm release:windows:signed
+# 2. Verify the working tree agrees with the version you are about to tag
+pnpm release:verify-tag
 
-# 3. Generate release manifest (checksums)
+# 3. Build and package (set CSC_LINK/CSC_KEY_PASSWORD first to sign)
+pnpm build
+pnpm release:windows:unsigned
+
+# 4. Generate release manifest (checksums)
 pnpm release:manifest
 
-# 4. Tag and push
+# 5. Tag and push
 git tag v<version>
 git push origin v<version>
 ```

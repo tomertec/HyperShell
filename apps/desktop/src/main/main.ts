@@ -1,3 +1,7 @@
+// Side-effect import: must run before any module that reads an Electron app
+// path. Applies the HYPERSHELL_DATA_DIR override used by the E2E suite.
+import "./appDataDir";
+
 import { app, ipcMain, powerMonitor } from "electron";
 import { existsSync } from "node:fs";
 import path from "node:path";

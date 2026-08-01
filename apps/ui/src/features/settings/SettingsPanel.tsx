@@ -157,12 +157,26 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: React.ReactNode }
   },
 ];
 
-function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+/**
+ * `label` is required: a bare role="switch" with no accessible name is
+ * announced as an unnamed control. Pass the same text as the visible row title
+ * so the accessible name matches what is on screen.
+ */
+function ToggleSwitch({
+  checked,
+  onChange,
+  label
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
       onClick={onChange}
       className={[
         "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 focus:ring-offset-base-900",
@@ -203,6 +217,7 @@ function GeneralSection() {
               <div className="text-xs text-text-muted">Show the recording button in terminal panes</div>
             </div>
             <ToggleSwitch
+              label="Session Recording Button"
               checked={showRecordingButton}
               onChange={() => void updateGeneral({ showRecordingButton: !showRecordingButton })}
             />
@@ -214,6 +229,7 @@ function GeneralSection() {
               <div className="text-xs text-text-muted">Show "Restore sessions from last session" on startup</div>
             </div>
             <ToggleSwitch
+              label="Session Restore Prompt"
               checked={showRestoreBanner}
               onChange={() => void updateGeneral({ showRestoreBanner: !showRestoreBanner })}
             />
@@ -225,6 +241,7 @@ function GeneralSection() {
               <div className="text-xs text-text-muted">Show serial profiles in the hosts sidebar list</div>
             </div>
             <ToggleSwitch
+              label="Serial Section in Sidebar"
               checked={showSerialInSidebar}
               onChange={() => void updateGeneral({ showSerialInSidebar: !showSerialInSidebar })}
             />
@@ -236,6 +253,7 @@ function GeneralSection() {
               <div className="text-xs text-text-muted">Ask for confirmation before closing with active sessions</div>
             </div>
             <ToggleSwitch
+              label="Confirm on Close"
               checked={confirmOnClose}
               onChange={() => void updateGeneral({ confirmOnClose: !confirmOnClose })}
             />
@@ -254,6 +272,7 @@ function GeneralSection() {
               </div>
             </div>
             <ToggleSwitch
+              label="Popup SFTP Transfer Monitor"
               checked={usePopupTransferMonitor}
               onChange={() =>
                 void updateGeneral({ usePopupTransferMonitor: !usePopupTransferMonitor })
@@ -269,6 +288,7 @@ function GeneralSection() {
               </div>
             </div>
             <ToggleSwitch
+              label="Auto-Hide Completed Transfers"
               checked={autoHideCompletedTransfers}
               onChange={() =>
                 void updateGeneral({ autoHideCompletedTransfers: !autoHideCompletedTransfers })
@@ -289,6 +309,7 @@ function GeneralSection() {
               </div>
             </div>
             <ToggleSwitch
+              label="Enable Telnet / Raw TCP"
               checked={enableTelnet}
               onChange={() => void updateGeneral({ enableTelnet: !enableTelnet })}
             />
@@ -391,6 +412,7 @@ function SecuritySection() {
               </div>
             </div>
             <ToggleSwitch
+              label="Credential Cache"
               checked={credentialCacheEnabled}
               onChange={() =>
                 void updateSecurity({ credentialCacheEnabled: !credentialCacheEnabled })

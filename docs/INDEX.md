@@ -130,6 +130,6 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 | Bundler (main) | esbuild | 0.25.12 |
 | Bundler (UI) | Vite | 6.3.5 |
 | Unit tests | Vitest | 3.1.2 |
-| E2E tests | Playwright | 1.54.1 |
+| E2E tests (browser + Electron) | Playwright | 1.54.1 |
 | Packaging | electron-builder | 26.0.12 |
 | Package manager | pnpm | 10.8.1 |
