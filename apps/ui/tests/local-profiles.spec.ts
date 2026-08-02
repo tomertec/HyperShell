@@ -93,6 +93,32 @@ test("the new-tab menu lists launchable profiles only", async ({ page }) => {
   await expect(menu.getByRole("menuitem", { name: "Gone Shell" })).toHaveCount(0);
 });
 
+test("the new-tab button is not clipped by the scrolling tab list", async ({ page }) => {
+  await page.goto("/");
+
+  // A flex container with overflow-x set to a non-visible value computes
+  // overflow-y to `auto` too (CSS Overflow spec), which would clip an
+  // absolutely-positioned dropdown living inside it — visibility/bounding-box
+  // assertions can't see that. Assert the DOM structure directly instead.
+  const isInsideScrollContainer = await page.evaluate(() => {
+    const scrollContainer = document.querySelector('[data-testid="tab-scroll-container"]');
+    const trigger = document.querySelector('[title="New Tab"]');
+    return !!(scrollContainer && trigger && scrollContainer.contains(trigger));
+  });
+  expect(isInsideScrollContainer).toBe(false);
+});
+
+test("clicking the new-tab button again closes the menu instead of reopening it", async ({ page }) => {
+  await page.goto("/");
+  const trigger = page.getByRole("button", { name: /new tab/i });
+
+  await trigger.click();
+  await expect(page.getByRole("menu")).toBeVisible();
+
+  await trigger.click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+});
+
 test("local profile surfaces have no accessibility violations", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /new tab/i }).click();

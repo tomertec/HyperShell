@@ -6,9 +6,13 @@ interface NewTabMenuProps {
   profiles: LocalProfileRecord[];
   onSelect: (profile: LocalProfileRecord) => void;
   onClose: () => void;
+  /** The button that opens this menu. Excluded from the outside-pointerdown
+   * check, otherwise clicking the trigger again while the menu is open fires
+   * pointerdown (closes it) followed by click (reopens it) — a broken toggle. */
+  triggerRef: React.RefObject<HTMLElement | null>;
 }
 
-export function NewTabMenu({ profiles, onSelect, onClose }: NewTabMenuProps) {
+export function NewTabMenu({ profiles, onSelect, onClose, triggerRef }: NewTabMenuProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -19,9 +23,11 @@ export function NewTabMenu({ profiles, onSelect, onClose }: NewTabMenuProps) {
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        onClose();
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target) || triggerRef.current?.contains(target)) {
+        return;
       }
+      onClose();
     };
 
     document.addEventListener("keydown", onKeyDown);
@@ -30,14 +36,14 @@ export function NewTabMenu({ profiles, onSelect, onClose }: NewTabMenuProps) {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   return (
     <div
       ref={containerRef}
       role="menu"
       aria-label="New tab"
-      className="absolute left-0 top-full z-50 mt-1 min-w-48 rounded-md border border-border/60 bg-base-800 py-1 shadow-lg"
+      className="absolute right-0 top-full z-50 mt-1 min-w-48 rounded-md border border-border/60 bg-base-800 py-1 shadow-lg"
     >
       {profiles.map((profile) => (
         <button

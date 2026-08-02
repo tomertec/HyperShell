@@ -157,6 +157,7 @@ export function TabBar({
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [newTabMenuOpen, setNewTabMenuOpen] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newTabButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -191,48 +192,61 @@ export function TabBar({
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
-        <div className="flex h-full items-end bg-base-800 px-1 pt-2 overflow-x-auto">
-          {tabs.map((tab) => {
-            const isActive = tab.sessionId === activeSessionId;
-            const sessionState = sessionStates[tab.sessionId]?.state;
-            return (
-              <SortableTab
-                key={tab.tabKey ?? tab.sessionId}
-                tab={tab}
-                isActive={isActive}
-                sessionState={sessionState}
-                onActivate={() => onActivate(tab.sessionId)}
-                onClose={() => onClose(tab.sessionId)}
-                hoveredTab={hoveredTab}
-                onMouseEnter={() => handleMouseEnter(tab.sessionId)}
-                onMouseLeave={handleMouseLeave}
-              />
-            );
-          })}
-          {launchableProfiles.length > 0 && (
-            <div className="relative flex items-center h-full pb-2 pl-0.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => setNewTabMenuOpen((v) => !v)}
-                title="New Tab"
-                className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              </button>
-              {newTabMenuOpen && (
-                <NewTabMenu
-                  profiles={launchableProfiles}
-                  onSelect={onConnectLocal}
-                  onClose={() => setNewTabMenuOpen(false)}
+      {/* The scrollable tab list and the "+" button/menu are siblings, not
+          parent/child: a flex container with one non-`visible` overflow axis
+          computes the other axis to `auto` too (CSS Overflow spec), so an
+          `overflow-x-auto` div also clips vertically. Keeping the dropdown
+          outside that container means it's never clipped, and the "+" stays
+          reachable even when the tab list scrolls. */}
+      <div className="flex h-full items-end bg-base-800 px-1 pt-2">
+        <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+          <div
+            data-testid="tab-scroll-container"
+            className="flex h-full min-w-0 items-end overflow-x-auto"
+          >
+            {tabs.map((tab) => {
+              const isActive = tab.sessionId === activeSessionId;
+              const sessionState = sessionStates[tab.sessionId]?.state;
+              return (
+                <SortableTab
+                  key={tab.tabKey ?? tab.sessionId}
+                  tab={tab}
+                  isActive={isActive}
+                  sessionState={sessionState}
+                  onActivate={() => onActivate(tab.sessionId)}
+                  onClose={() => onClose(tab.sessionId)}
+                  hoveredTab={hoveredTab}
+                  onMouseEnter={() => handleMouseEnter(tab.sessionId)}
+                  onMouseLeave={handleMouseLeave}
                 />
-              )}
-            </div>
-          )}
-        </div>
-      </SortableContext>
+              );
+            })}
+          </div>
+        </SortableContext>
+        {launchableProfiles.length > 0 && (
+          <div className="relative flex items-center h-full pb-2 pl-0.5 shrink-0">
+            <button
+              ref={newTabButtonRef}
+              type="button"
+              onClick={() => setNewTabMenuOpen((v) => !v)}
+              title="New Tab"
+              className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            {newTabMenuOpen && (
+              <NewTabMenu
+                profiles={launchableProfiles}
+                onSelect={onConnectLocal}
+                onClose={() => setNewTabMenuOpen(false)}
+                triggerRef={newTabButtonRef}
+              />
+            )}
+          </div>
+        )}
+      </div>
     </DndContext>
   );
 }

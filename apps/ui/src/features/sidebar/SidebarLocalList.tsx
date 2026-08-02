@@ -88,7 +88,7 @@ function SortableLocalItem({
         type="button"
         {...attributes}
         {...listeners}
-        className="shrink-0 cursor-grab touch-none rounded p-1 text-text-muted/40 opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-text-secondary active:cursor-grabbing"
+        className="shrink-0 cursor-grab touch-none rounded p-1 text-text-muted/40 opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-text-secondary focus-visible:opacity-100 active:cursor-grabbing"
         title="Drag to reorder"
       >
         <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
