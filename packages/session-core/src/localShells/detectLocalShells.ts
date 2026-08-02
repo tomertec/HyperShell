@@ -39,7 +39,7 @@ export function parseWslDistros(stdout: Buffer): string[] {
   return stdout
     .toString("utf16le")
     .split(/\r?\n/)
-    .map((line) => line.replace(/\u0000/g, "").trim())
+    .map((line) => line.replaceAll("\u0000", "").trim())
     .filter((line) => line.length > 0);
 }
 

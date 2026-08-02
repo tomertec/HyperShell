@@ -93,6 +93,11 @@ export function useTerminalSession(
   const asyncOperationGuardRef = useRef(createAsyncOperationGuard());
   const broadcastEnabledRef = useRef(broadcastEnabled);
   const broadcastTargetsRef = useRef<string[]>(broadcastTargets);
+  // input.onExit is a fresh closure every render — keep the latest one in a
+  // ref rather than depending on it directly, so applySessionEvent (and the
+  // onSessionEvent subscription that depends on it) doesn't get recreated on
+  // every render.
+  const onExitRef = useRef(input.onExit);
   const pendingSessionEventsRef = useRef<SessionEvent[]>([]);
   const eventUnsubscribeRef = useRef<(() => void) | null>(null);
   const tmuxAttachSentRef = useRef(false);
@@ -243,7 +248,7 @@ export function useTerminalSession(
     }
 
     if (effect.exitCode !== undefined) {
-      input.onExit?.(effect.exitCode ?? null);
+      onExitRef.current?.(effect.exitCode ?? null);
     }
 
     const instance = terminalRef.current;
@@ -258,7 +263,7 @@ export function useTerminalSession(
     if (effect.errorMessage) {
       instance.writeln(`\r\n[error] ${effect.errorMessage}`);
     }
-  }, [setStateSafe, input.tmuxAttachTarget, input.onExit]);
+  }, [setStateSafe, input.tmuxAttachTarget]);
 
   useEffect(() => {
     const asyncOperationGuard = asyncOperationGuardRef.current;
@@ -309,6 +314,10 @@ export function useTerminalSession(
     broadcastEnabledRef.current = broadcastEnabled;
     broadcastTargetsRef.current = broadcastTargets;
   }, [broadcastEnabled, broadcastTargets]);
+
+  useEffect(() => {
+    onExitRef.current = input.onExit;
+  }, [input.onExit]);
 
   useEffect(() => {
     let disposed = false;
