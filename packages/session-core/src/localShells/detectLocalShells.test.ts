@@ -91,6 +91,23 @@ describe("detectLocalShells", () => {
     expect(shells.some((s) => s.detectKey === "wsl:Debian")).toBe(true);
   });
 
+  it("excludes Docker Desktop internal distros from WSL profiles", () => {
+    const probes = windowsProbes({
+      runCommand: (file, args) =>
+        file.toLowerCase().includes("wsl") && args.includes("-q")
+          ? Buffer.from("Ubuntu-22.04\r\ndocker-desktop\r\nDebian\r\ndocker-desktop-data\r\n", "utf16le")
+          : null
+    });
+
+    const shells = detectLocalShells(probes);
+    const distroKeys = shells.filter((s) => s.detectKey.startsWith("wsl:")).map((s) => s.detectKey);
+
+    expect(distroKeys).toContain("wsl:Ubuntu-22.04");
+    expect(distroKeys).toContain("wsl:Debian");
+    expect(distroKeys).not.toContain("wsl:docker-desktop");
+    expect(distroKeys).not.toContain("wsl:docker-desktop-data");
+  });
+
   it("falls back to $SHELL on non-Windows platforms", () => {
     const shells = detectLocalShells({
       platform: "linux",

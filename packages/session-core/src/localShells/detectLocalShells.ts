@@ -43,6 +43,18 @@ export function parseWslDistros(stdout: Buffer): string[] {
     .filter((line) => line.length > 0);
 }
 
+/**
+ * Docker Desktop manages internal WSL distros (`docker-desktop`, `docker-desktop-data`)
+ * that are not intended for direct terminal use. Filter them out to match Windows Terminal's behavior.
+ */
+function isInternalWslDistro(distroName: string): boolean {
+  const internalNames = new Set([
+    "docker-desktop",
+    "docker-desktop-data"
+  ]);
+  return internalNames.has(distroName.toLowerCase());
+}
+
 function detectWindowsShells(probes: DetectProbes): DetectedShell[] {
   const shells: DetectedShell[] = [];
   const systemRoot = probes.env.SystemRoot ?? probes.env.WINDIR ?? "C:\\Windows";
@@ -102,13 +114,15 @@ function detectWindowsShells(probes: DetectProbes): DetectedShell[] {
   const wslOutput = probes.runCommand(wsl, ["-l", "-q"]);
   if (wslOutput) {
     for (const distro of parseWslDistros(wslOutput)) {
-      shells.push({
-        detectKey: `wsl:${distro}`,
-        name: `${distro} (WSL)`,
-        executable: wsl,
-        args: ["-d", distro],
-        icon: "linux"
-      });
+      if (!isInternalWslDistro(distro)) {
+        shells.push({
+          detectKey: `wsl:${distro}`,
+          name: `${distro} (WSL)`,
+          executable: wsl,
+          args: ["-d", distro],
+          icon: "linux"
+        });
+      }
     }
   }
 
