@@ -61,8 +61,11 @@ from the inherited environment before spawning, then layers per-profile variable
 Without this, running `node` inside a HyperShell tab behaves differently than in any other
 terminal.
 
-`HOME` and `USERPROFILE` are never set or overridden — overriding them would relocate
-`$PROFILE` and break profile loading.
+The transport never sets `HOME` or `USERPROFILE` itself. A profile may override them
+through its own environment variables, which is a deliberate escape hatch — overriding
+them relocates `$PROFILE` and `~`, so a profile that does it owns that consequence.
+*(Ruling, 2026-08-02: this originally read "never set or overridden", which contradicted
+the reference implementation in §1 of the plan. The escape hatch was kept.)*
 
 Two inherited behaviors match Windows Terminal and are not regressions: `PATH` is
 snapshotted at app launch (newly installed tools need an app restart), and a shell profile

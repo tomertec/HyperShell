@@ -17,7 +17,7 @@
 - **`packages/session-core` has zero renderer dependencies.** No Electron imports, no React.
 - **`session.open` with `transport: "local"` must never accept `executable`, `args`, or `cwd` from the renderer.** Only `profileId`. This is a security boundary, asserted by test in Task 14.
 - **Detected profiles are created with `args = []`** — never `-NoProfile`, `-Command`, or `-File`. Those skip the user's `$PROFILE` or break interactivity.
-- **`HOME` and `USERPROFILE` are never set or overridden** on a spawned shell.
+- **The transport never sets `HOME` or `USERPROFILE` itself.** A profile *may* override them through its own env vars — that escape hatch is deliberate (e.g. a WSL or Git Bash profile pointed at a different home). Doing so relocates `$PROFILE` / `~`, so a profile that overrides them owns that consequence. Do not add a denylist. *(Ruling, 2026-08-02: the original constraint read "never set or overridden", which contradicted the plan's own `buildLocalEnv` reference code; the user chose to keep the escape hatch and relax the wording.)*
 - **`wsl.exe -l -q` output is UTF-16LE.** Always decode explicitly.
 - **Local sessions never auto-reconnect** and never register with `NetworkMonitor`.
 - **Icon values are exactly** `"powershell" | "cmd" | "linux" | "bash" | "terminal"`. No other strings.
