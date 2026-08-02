@@ -1,9 +1,11 @@
-import { Fragment, useCallback, useRef, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
+import type { LocalProfileRecord } from "@hypershell/shared";
 
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { WelcomeScreen } from "../welcome";
 import { BroadcastBar, BroadcastButton } from "../broadcast/BroadcastBar";
+import { localProfilesStore, selectLaunchableProfiles } from "../local/localProfilesStore";
 import { SftpTab } from "../sftp";
 import { TerminalPane } from "../terminal/TerminalPane";
 import { requestTerminalFocus } from "../terminal/terminalFocus";
@@ -134,10 +136,13 @@ interface WorkspaceProps {
   onRefreshPorts: () => void;
   onConnectSsh: (host: string, port: number, username: string, password: string) => void;
   onConnectSerial: (port: string, baudRate: number) => void;
+  onConnectLocal: (profile: LocalProfileRecord) => void;
 }
 
-export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConnectSerial }: WorkspaceProps) {
+export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConnectSerial, onConnectLocal }: WorkspaceProps) {
   const tabs = useStore(layoutStore, (s) => s.tabs);
+  const localProfiles = useStore(localProfilesStore, (s) => s.profiles);
+  const launchableProfiles = useMemo(() => selectLaunchableProfiles(localProfiles), [localProfiles]);
   const activeSessionId = useStore(layoutStore, (s) => s.activeSessionId);
   const activateTab = useStore(layoutStore, (s) => s.activateTab);
   const panes = useStore(layoutStore, (s) => s.panes);
@@ -227,6 +232,8 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
             }}
             onClose={closeTab}
             onReorder={(from, to) => layoutStore.getState().moveTab(from, to)}
+            launchableProfiles={launchableProfiles}
+            onConnectLocal={onConnectLocal}
           />
         </div>
         <div className="relative flex h-full items-end gap-0.5 px-2 pb-1.5">
@@ -329,6 +336,8 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
             onRefreshPorts={onRefreshPorts}
             onConnectSsh={onConnectSsh}
             onConnectSerial={onConnectSerial}
+            localProfiles={launchableProfiles}
+            onConnectLocal={onConnectLocal}
           />
         )}
 

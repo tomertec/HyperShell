@@ -19,7 +19,7 @@ import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
 import { layoutStore } from "../features/layout/layoutStore";
 import { handlePaneShortcut } from "../features/layout/paneShortcuts";
-import { localProfilesStore } from "../features/local/localProfilesStore";
+import { localProfilesStore, selectLaunchableProfiles } from "../features/local/localProfilesStore";
 import { QuickConnectDialog } from "../features/quick-connect/QuickConnectDialog";
 import type { QuickConnectProfile } from "../features/quick-connect/searchIndex";
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
@@ -53,6 +53,7 @@ import type { KeyboardInteractiveRequest } from "@hypershell/shared";
 import { CommandPalette } from "../features/command-palette/CommandPalette";
 import { useCommandPaletteStore } from "../features/command-palette/commandPaletteStore";
 import { createCommands, type CommandContext } from "../features/command-palette/commandRegistry";
+import type { Command } from "../features/command-palette/searchCommands";
 import { useTunnelStore } from "../features/tunnels/tunnelStore";
 import { useUpdateStore } from "../features/updates/updateStore";
 
@@ -1112,6 +1113,12 @@ function MainApp() {
     [hosts, serialProfiles]
   );
 
+  const localProfiles = useStore(localProfilesStore, (s) => s.profiles);
+  const launchableLocalProfiles = useMemo(
+    () => selectLaunchableProfiles(localProfiles),
+    [localProfiles]
+  );
+
   const paletteCommands = useMemo(() => {
     const ctx: CommandContext = {
       getActiveSessionId: () => layoutStore.getState().activeSessionId,
@@ -1208,8 +1215,15 @@ function MainApp() {
       openTelnetDialog: () => setTelnetDialogOpen(true),
       openSerialModal: () => { setEditingSerial(null); setSerialModalOpen(true); },
     };
-    return createCommands(ctx);
-  }, [hosts, connectHost, openSftpHost, isBroadcastEnabled]);
+    const localCommands: Command[] = launchableLocalProfiles.map((profile) => ({
+      id: `local:${profile.id}`,
+      title: `Open local shell: ${profile.name}`,
+      category: "Local",
+      visible: () => true,
+      execute: () => handleConnectLocal(profile),
+    }));
+    return [...createCommands(ctx), ...localCommands];
+  }, [hosts, connectHost, openSftpHost, isBroadcastEnabled, launchableLocalProfiles, handleConnectLocal]);
 
   return (
     <>
@@ -1249,6 +1263,7 @@ function MainApp() {
           onRefreshPorts={refreshPorts}
           onConnectSsh={connectSshAdHoc}
           onConnectSerial={connectSerialAdHoc}
+          onConnectLocal={handleConnectLocal}
         />
       </AppShell>
 

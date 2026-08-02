@@ -14,7 +14,9 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { LocalProfileRecord } from "@hypershell/shared";
 import type { LayoutTab } from "./layoutStore";
+import { NewTabMenu } from "./NewTabMenu";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 
 const tabStateColors: Record<string, string> = {
@@ -41,6 +43,8 @@ export interface TabBarProps {
   onActivate: (sessionId: string) => void;
   onClose: (sessionId: string) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
+  launchableProfiles: LocalProfileRecord[];
+  onConnectLocal: (profile: LocalProfileRecord) => void;
 }
 
 function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: string | undefined }) {
@@ -140,9 +144,18 @@ function SortableTab({
   );
 }
 
-export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }: TabBarProps) {
+export function TabBar({
+  tabs,
+  activeSessionId,
+  onActivate,
+  onClose,
+  onReorder,
+  launchableProfiles,
+  onConnectLocal,
+}: TabBarProps) {
   const sessionStates = useStore(sessionStateStore, (s) => s.sessions);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+  const [newTabMenuOpen, setNewTabMenuOpen] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sensors = useSensors(
@@ -150,7 +163,10 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }
   );
   const tabIds = useMemo(() => tabs.map((t) => t.tabKey ?? t.sessionId), [tabs]);
 
-  if (tabs.length === 0) return null;
+  // Zero tabs and nothing launchable is exactly today's "nothing to show" case —
+  // preserve it. Zero tabs with at least one launchable profile still needs the
+  // "+" button rendered so a first tab can be opened from the tab bar too.
+  if (tabs.length === 0 && launchableProfiles.length === 0) return null;
 
   const handleMouseEnter = (sessionId: string) => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
@@ -194,6 +210,27 @@ export function TabBar({ tabs, activeSessionId, onActivate, onClose, onReorder }
               />
             );
           })}
+          {launchableProfiles.length > 0 && (
+            <div className="relative flex items-center h-full pb-2 pl-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setNewTabMenuOpen((v) => !v)}
+                title="New Tab"
+                className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+              {newTabMenuOpen && (
+                <NewTabMenu
+                  profiles={launchableProfiles}
+                  onSelect={onConnectLocal}
+                  onClose={() => setNewTabMenuOpen(false)}
+                />
+              )}
+            </div>
+          )}
         </div>
       </SortableContext>
     </DndContext>
