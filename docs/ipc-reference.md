@@ -44,6 +44,18 @@ Session states: `connecting`, `connected`, `reconnecting`, `waiting_for_network`
 | `serial-profiles:remove` | `{ id }` | void | `serialProfilesIpc.ts` |
 | `serial-profiles:list-ports` | — | `SerialPortInfo[]` | `serialProfilesIpc.ts` |
 
+## Local Profile Channels
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `local-profiles:list` | — | `LocalProfileRecord[]` | `localProfilesIpc.ts` |
+| `local-profiles:upsert` | `UpsertLocalProfileRequest` | `LocalProfileRecord` | `localProfilesIpc.ts` |
+| `local-profiles:remove` | `{ id }` | void | `localProfilesIpc.ts` |
+| `local-profiles:set-hidden` | `{ id, hidden }` | void | `localProfilesIpc.ts` |
+| `local-profiles:reorder` | `{ items: { id, sortOrder }[] }` | void | `localProfilesIpc.ts` |
+| `local-profiles:rescan` | — | `LocalProfileRecord[]` | `localProfilesIpc.ts` |
+| `local-profiles:get-env-vars` | `{ id }` | `LocalProfileEnvVar[]` | `localProfilesIpc.ts` |
+
 ## SFTP Channels
 
 | Channel | Request | Response | Handler |
