@@ -62,12 +62,10 @@ test.beforeEach(async ({ page }) => {
 test("lists local profiles in the sidebar", async ({ page }) => {
   await page.goto("/");
 
-  // Scoped by title rather than accessible name: dnd-kit's useSortable spreads
-  // its own role="button" onto each row's wrapping <div> (pre-existing, from
-  // the sidebar's drag-to-reorder support), which duplicates the "PowerShell"
-  // accessible name on that wrapper and on the real connect <button> inside it.
+  // Scoped to the sidebar landmark: the welcome screen also renders a
+  // "PowerShell" chip, so an unscoped query would match two elements.
   const sidebar = page.getByRole("complementary");
-  await expect(sidebar.getByTitle(/click to connect/)).toBeVisible();
+  await expect(sidebar.getByRole("button", { name: "PowerShell" })).toBeVisible();
 });
 
 test("marks an unavailable profile as disabled", async ({ page }) => {
@@ -99,10 +97,6 @@ test("local profile surfaces have no accessibility violations", async ({ page })
   await page.goto("/");
   await page.getByRole("button", { name: /new tab/i }).click();
 
-  // Scoped to <main>, where this task's surfaces (welcome chips, the "+"
-  // button, and its dropdown) live — the sidebar's pre-existing drag-to-reorder
-  // markup (Task 11) has its own unrelated nested-interactive violation that
-  // isn't part of what this task built.
-  const results = await scan(page, "main");
+  const results = await scan(page);
   expect(results.violations).toEqual([]);
 });

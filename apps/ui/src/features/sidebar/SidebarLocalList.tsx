@@ -75,10 +75,31 @@ function SortableLocalItem({
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className="group relative flex items-center gap-1 px-1 py-0.5"
     >
+      {/* Dedicated drag handle: dnd-kit's attributes/listeners include their own
+          role="button" and tabIndex, so spreading them onto the row's wrapper
+          (which already contains the real connect <button>) produced a nested
+          interactive element — an accessibility violation and a duplicate
+          accessible name. A separate handle avoids both, and sidesteps having
+          drag listeners on the disabled variant of the connect button (native
+          disabled buttons don't reliably fire pointer events). */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="shrink-0 cursor-grab touch-none rounded p-1 text-text-muted/40 opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-text-secondary active:cursor-grabbing"
+        title="Drag to reorder"
+      >
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="5" cy="3" r="1.3" />
+          <circle cx="11" cy="3" r="1.3" />
+          <circle cx="5" cy="8" r="1.3" />
+          <circle cx="11" cy="8" r="1.3" />
+          <circle cx="5" cy="13" r="1.3" />
+          <circle cx="11" cy="13" r="1.3" />
+        </svg>
+      </button>
       {profile.isAvailable ? (
         <button
           type="button"
