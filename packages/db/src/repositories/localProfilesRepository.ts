@@ -89,7 +89,15 @@ function mapRow(row: LocalProfileRow): LocalProfileRecord {
 }
 
 export function createLocalProfilesRepository(databasePath = ":memory:") {
-  return createLocalProfilesRepositoryFromDatabase(openDatabase(databasePath));
+  try {
+    return createLocalProfilesRepositoryFromDatabase(openDatabase(databasePath));
+  } catch (error) {
+    if (databasePath !== ":memory:") {
+      throw error;
+    }
+
+    return createInMemoryLocalProfilesRepository();
+  }
 }
 
 export function createLocalProfilesRepositoryFromDatabase(db: SqliteDatabase) {
@@ -230,6 +238,82 @@ export function createLocalProfilesRepositoryFromDatabase(db: SqliteDatabase) {
         });
       });
       run(vars);
+    }
+  };
+}
+
+function createInMemoryLocalProfilesRepository() {
+  const profiles = new Map<string, LocalProfileRecord>();
+  const envVars = new Map<string, LocalProfileEnvVar[]>();
+
+  function sortedList(): LocalProfileRecord[] {
+    return Array.from(profiles.values()).sort((left, right) => {
+      if (left.sortOrder !== right.sortOrder) {
+        return left.sortOrder - right.sortOrder;
+      }
+      return left.name.localeCompare(right.name, undefined, { sensitivity: "base" });
+    });
+  }
+
+  return {
+    create(input: LocalProfileInput): LocalProfileRecord {
+      const record: LocalProfileRecord = {
+        id: input.id,
+        name: input.name,
+        executable: input.executable,
+        args: input.args ?? [],
+        startingDirectory: input.startingDirectory ?? null,
+        icon: input.icon ?? "terminal",
+        color: input.color ?? null,
+        elevated: input.elevated ?? false,
+        source: input.source ?? "user",
+        detectKey: input.detectKey ?? null,
+        isAvailable: input.isAvailable ?? true,
+        isHidden: input.isHidden ?? false,
+        sortOrder: input.sortOrder ?? 0
+      };
+
+      profiles.set(record.id, record);
+      return record;
+    },
+    get(id: string): LocalProfileRecord | undefined {
+      return profiles.get(id);
+    },
+    getByDetectKey(detectKey: string): LocalProfileRecord | undefined {
+      return Array.from(profiles.values()).find((profile) => profile.detectKey === detectKey);
+    },
+    list(): LocalProfileRecord[] {
+      return sortedList();
+    },
+    remove(id: string): boolean {
+      envVars.delete(id);
+      return profiles.delete(id);
+    },
+    setHidden(id: string, hidden: boolean): void {
+      const profile = profiles.get(id);
+      if (profile) {
+        profile.isHidden = hidden;
+      }
+    },
+    setAvailable(id: string, available: boolean): void {
+      const profile = profiles.get(id);
+      if (profile) {
+        profile.isAvailable = available;
+      }
+    },
+    reorder(items: Array<{ id: string; sortOrder: number }>): void {
+      for (const item of items) {
+        const profile = profiles.get(item.id);
+        if (profile) {
+          profile.sortOrder = item.sortOrder;
+        }
+      }
+    },
+    listEnvVars(profileId: string): LocalProfileEnvVar[] {
+      return (envVars.get(profileId) ?? []).slice();
+    },
+    replaceEnvVars(profileId: string, vars: LocalProfileEnvVar[]): void {
+      envVars.set(profileId, vars.slice());
     }
   };
 }
