@@ -19,6 +19,7 @@ import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
 import { layoutStore } from "../features/layout/layoutStore";
 import { handlePaneShortcut } from "../features/layout/paneShortcuts";
+import { localProfilesStore } from "../features/local/localProfilesStore";
 import { QuickConnectDialog } from "../features/quick-connect/QuickConnectDialog";
 import type { QuickConnectProfile } from "../features/quick-connect/searchIndex";
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
@@ -34,6 +35,7 @@ import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
 import type {
   ConnectionHistoryRecord,
+  LocalProfileRecord,
   SavedSessionRecord,
   PuttySession,
   SerialProfileRecord,
@@ -442,6 +444,10 @@ function MainApp() {
     };
   }, []);
 
+  useEffect(() => {
+    void localProfilesStore.getState().load();
+  }, []);
+
   const refreshConnectionHistorySummary = useCallback(async () => {
     if (!window.hypershell?.connectionHistoryListRecent) {
       return;
@@ -645,6 +651,22 @@ function MainApp() {
         title: profile.name,
         transport: "serial",
         profileId: profile.id,
+        preopened: false
+      });
+    },
+    [openTab]
+  );
+
+  const handleConnectLocal = useCallback(
+    (profile: LocalProfileRecord) => {
+      const sessionId = `local-${profile.id}-${Date.now()}`;
+      openTab({
+        tabKey: sessionId,
+        sessionId,
+        title: profile.name,
+        transport: "local",
+        profileId: profile.id,
+        type: "terminal",
         preopened: false
       });
     },
@@ -1213,6 +1235,7 @@ function MainApp() {
             onConnectSerial={connectSerial}
             onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
             onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); }}
+            onConnectLocal={handleConnectLocal}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenTelnet={() => setTelnetDialogOpen(true)}
             restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}

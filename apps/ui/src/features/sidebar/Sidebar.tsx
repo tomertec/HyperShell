@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { SerialProfileRecord, TagRecord } from "@hypershell/shared";
+import type { LocalProfileRecord, SerialProfileRecord, TagRecord } from "@hypershell/shared";
 import { useStore } from "zustand";
 import type { HostRecord } from "../hosts/HostsView";
+import { localProfilesStore } from "../local/localProfilesStore";
 import { settingsStore } from "../settings/settingsStore";
 import { SidebarHostList } from "./SidebarHostList";
+import { SidebarLocalList } from "./SidebarLocalList";
 import { SidebarSerialList } from "./SidebarSerialList";
 import { SidebarSection } from "./SidebarSection";
 import { SidebarUpdateLabel } from "../updates/SidebarUpdateLabel";
@@ -28,6 +30,7 @@ export interface SidebarProps {
   onConnectSerial: (profile: SerialProfileRecord) => void;
   onEditSerial: (profile: SerialProfileRecord) => void;
   onNewSerial: () => void;
+  onConnectLocal: (profile: LocalProfileRecord) => void;
   onOpenSettings: () => void;
   onOpenTelnet?: () => void;
   collapsed?: boolean;
@@ -57,6 +60,7 @@ export function Sidebar({
   onConnectSerial,
   onEditSerial,
   onNewSerial,
+  onConnectLocal,
   onOpenSettings,
   onOpenTelnet,
   collapsed = false,
@@ -65,14 +69,20 @@ export function Sidebar({
   onDismissRestore,
 }: SidebarProps) {
   const [showHostFilter, setShowHostFilter] = useState(false);
+  const [showHiddenLocal, setShowHiddenLocal] = useState(false);
   const showSerialInSidebar = useStore(
     settingsStore,
     (s) => s.settings.general.showSerialInSidebar
+  );
+  const showLocalInSidebar = useStore(
+    settingsStore,
+    (s) => s.settings.general.showLocalInSidebar
   );
   const enableTelnet = useStore(
     settingsStore,
     (s) => s.settings.general.enableTelnet
   );
+  const localProfiles = useStore(localProfilesStore, (s) => s.profiles);
 
   if (collapsed) {
     return (
@@ -151,6 +161,22 @@ export function Sidebar({
           <kbd className="text-[10px] text-text-muted bg-base-750 px-1.5 py-0.5 rounded border border-border">Ctrl+K</kbd>
         </button>
       </div>
+
+      {showLocalInSidebar && (
+        <SidebarSection title="Local">
+          <SidebarLocalList
+            profiles={localProfiles}
+            onConnect={onConnectLocal}
+            onReorder={(items) => void localProfilesStore.getState().reorder(items)}
+            onRescan={() => void localProfilesStore.getState().rescan()}
+            showHidden={showHiddenLocal}
+            onToggleShowHidden={() => setShowHiddenLocal((v) => !v)}
+            onToggleHidden={(profile, hidden) =>
+              void localProfilesStore.getState().setHidden(profile.id, hidden)
+            }
+          />
+        </SidebarSection>
+      )}
 
       <SidebarSection
         title="Hosts"

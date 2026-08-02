@@ -200,6 +200,7 @@ function GeneralSection() {
     showRecordingButton,
     showRestoreBanner,
     showSerialInSidebar,
+    showLocalInSidebar,
     confirmOnClose,
     usePopupTransferMonitor,
     autoHideCompletedTransfers,
@@ -244,6 +245,18 @@ function GeneralSection() {
               label="Serial Section in Sidebar"
               checked={showSerialInSidebar}
               onChange={() => void updateGeneral({ showSerialInSidebar: !showSerialInSidebar })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-text-primary">Local Section in Sidebar</div>
+              <div className="text-xs text-text-muted">Show local shell profiles in the hosts sidebar list</div>
+            </div>
+            <ToggleSwitch
+              label="Local Section in Sidebar"
+              checked={showLocalInSidebar}
+              onChange={() => void updateGeneral({ showLocalInSidebar: !showLocalInSidebar })}
             />
           </div>
 
