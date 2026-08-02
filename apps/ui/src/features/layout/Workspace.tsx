@@ -76,7 +76,14 @@ function PaneView({
 
       {terminalTabs.map((tab) => {
         const isVisible = !activeSftpTab && tab.sessionId === resolvedSessionId;
-        const terminalTransport = tab.transport === "serial" ? "serial" : tab.transport === "telnet" ? "telnet" : "ssh";
+        const terminalTransport =
+          tab.transport === "serial"
+            ? "serial"
+            : tab.transport === "telnet"
+              ? "telnet"
+              : tab.transport === "local"
+                ? "local"
+                : "ssh";
         return (
           <div
             key={tab.tabKey ?? tab.sessionId}
@@ -94,6 +101,13 @@ function PaneView({
               tmuxAttachTarget={tab.tmuxAttachTarget}
               onSessionOpened={(sessionId) => {
                 replaceSessionId(tab.sessionId, sessionId);
+              }}
+              onProcessExit={(exitCode) => {
+                // Clean exit closes the tab so `exit` feels native; a failure
+                // keeps it open so the exit code stays readable.
+                if (tab.transport === "local" && exitCode === 0) {
+                  onCloseTab(tab.sessionId);
+                }
               }}
             />
           </div>

@@ -8,7 +8,7 @@ import { LoggingButton } from "./LoggingButton";
 import { settingsStore } from "../settings/settingsStore";
 
 export interface TerminalPaneProps {
-  transport: "ssh" | "serial" | "telnet";
+  transport: "ssh" | "serial" | "telnet" | "local";
   profileId: string;
   sessionId?: string;
   autoConnect?: boolean;
@@ -16,6 +16,7 @@ export interface TerminalPaneProps {
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   tmuxAttachTarget?: string;
   onSessionOpened?: (sessionId: string) => void;
+  onProcessExit?: (exitCode: number | null) => void;
 }
 
 export function TerminalPane({
@@ -26,7 +27,8 @@ export function TerminalPane({
   isVisible = true,
   telnetOptions,
   tmuxAttachTarget,
-  onSessionOpened
+  onSessionOpened,
+  onProcessExit
 }: TerminalPaneProps) {
   const [dtr, setDtr] = useState(true);
   const [rts, setRts] = useState(true);
@@ -39,7 +41,8 @@ export function TerminalPane({
     autoConnect,
     telnetOptions,
     tmuxAttachTarget,
-    onSessionOpened
+    onSessionOpened,
+    onExit: onProcessExit
   });
   const { fit, focusTerminal, terminal } = session;
 

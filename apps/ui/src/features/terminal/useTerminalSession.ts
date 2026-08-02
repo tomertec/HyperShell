@@ -26,13 +26,14 @@ import {
 export type { TerminalSessionState } from "./terminalSessionModel";
 
 export interface UseTerminalSessionInput {
-  transport: "ssh" | "serial" | "telnet";
+  transport: "ssh" | "serial" | "telnet" | "local";
   profileId: string;
   sessionId?: string;
   autoConnect?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   tmuxAttachTarget?: string;
   onSessionOpened?: (sessionId: string) => void;
+  onExit?: (exitCode: number | null) => void;
 }
 
 export interface UseTerminalSessionResult {
@@ -241,6 +242,10 @@ export function useTerminalSession(
       sessionIdRef.current = null;
     }
 
+    if (effect.exitCode !== undefined) {
+      input.onExit?.(effect.exitCode ?? null);
+    }
+
     const instance = terminalRef.current;
     if (!instance) {
       return;
@@ -253,7 +258,7 @@ export function useTerminalSession(
     if (effect.errorMessage) {
       instance.writeln(`\r\n[error] ${effect.errorMessage}`);
     }
-  }, [setStateSafe, input.tmuxAttachTarget]);
+  }, [setStateSafe, input.tmuxAttachTarget, input.onExit]);
 
   useEffect(() => {
     const asyncOperationGuard = asyncOperationGuardRef.current;
