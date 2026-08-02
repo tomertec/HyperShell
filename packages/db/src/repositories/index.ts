@@ -12,3 +12,4 @@ export * from "./savedSessionRepository";
 export * from "./hostProfileRepository";
 export * from "./hostEnvVarRepository";
 export * from "./tagRepository";
+export * from "./localProfilesRepository";

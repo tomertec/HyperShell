@@ -46,6 +46,10 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     new URL("./migrations/012_host_env_vars.sql", import.meta.url),
     "utf8"
   );
+  const localProfilesSql = readFileSync(
+    new URL("./migrations/015_local_profiles.sql", import.meta.url),
+    "utf8"
+  );
 
   const db = new Database(databasePath);
 
@@ -168,6 +172,9 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
       throw error;
     }
   }
+
+  // Migration 015: local shell profiles + their environment variables
+  db.exec(localProfilesSql);
 
   return db;
 }
