@@ -1,5 +1,6 @@
 import { useCallback, useId, useMemo, useState } from "react";
 import type {
+  LocalProfileColor,
   LocalProfileEnvVar,
   LocalProfileIcon as LocalProfileIconKey,
   LocalProfileRecord,
@@ -35,7 +36,16 @@ const ICON_OPTIONS: Array<{ key: LocalProfileIconKey; label: string }> = [
 // CSS custom properties (--host-*) and .color-swatch-* classes are global,
 // so these swatches render identically to host colours without importing
 // from a sidebar-list component.
-const PROFILE_COLORS = ["red", "orange", "yellow", "green", "blue", "cyan", "purple", "pink"] as const;
+const PROFILE_COLORS: readonly LocalProfileColor[] = [
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "cyan",
+  "purple",
+  "pink"
+];
 
 function createEnvVarId(): string {
   return `local-env-${crypto.randomUUID()}`;
@@ -87,7 +97,7 @@ export function LocalProfileForm({
   const [argsText, setArgsText] = useState(() => (profile?.args ?? []).join(" "));
   const [startingDirectory, setStartingDirectory] = useState(profile?.startingDirectory ?? "");
   const [icon, setIcon] = useState<LocalProfileIconKey>(profile?.icon ?? "terminal");
-  const [color, setColor] = useState<string | null>(profile?.color ?? null);
+  const [color, setColor] = useState<LocalProfileColor | null>(profile?.color ?? null);
   const [envVarRows, setEnvVarRows] = useState<LocalEnvVarFormValue[]>(() =>
     envVars.map(toEnvVarFormValue)
   );

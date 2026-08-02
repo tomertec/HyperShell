@@ -100,10 +100,20 @@ test("the new-tab button is not clipped by the scrolling tab list", async ({ pag
   // overflow-y to `auto` too (CSS Overflow spec), which would clip an
   // absolutely-positioned dropdown living inside it — visibility/bounding-box
   // assertions can't see that. Assert the DOM structure directly instead.
+  // Both nodes must exist for the containment check to mean anything — with a
+  // plain `!!(a && b && …)` the assertion would pass vacuously the moment
+  // either selector stopped matching, which is exactly the regression it is
+  // supposed to catch. `expect` is Node-side, so assert by throwing in-page.
   const isInsideScrollContainer = await page.evaluate(() => {
     const scrollContainer = document.querySelector('[data-testid="tab-scroll-container"]');
+    if (!scrollContainer) {
+      throw new Error('no element matched [data-testid="tab-scroll-container"]');
+    }
     const trigger = document.querySelector('[title="New Tab"]');
-    return !!(scrollContainer && trigger && scrollContainer.contains(trigger));
+    if (!trigger) {
+      throw new Error('no element matched [title="New Tab"]');
+    }
+    return scrollContainer.contains(trigger);
   });
   expect(isInsideScrollContainer).toBe(false);
 });

@@ -40,11 +40,45 @@ export function runLocalShellDetection(repo: LocalProfilesRepo): void {
   reconcileLocalProfiles(repo, detected, () => randomUUID());
 }
 
+export interface LocalProfilesIpcHandle {
+  /**
+   * Kicks off a detection pass on a later macrotask and resolves when it is
+   * done. Detection spawns child processes and runs synchronously once it
+   * starts, so it must never sit on the pre-window path — `registerIpc` is
+   * called before the main window and tray exist. Failures are logged and
+   * swallowed here so a broken probe cannot abort startup.
+   */
+  scheduleDetection(): Promise<void>;
+}
+
 export function registerLocalProfilesIpc(
   ipcMain: IpcMainLike,
   getRepo: () => LocalProfilesRepo
-): void {
+): LocalProfilesIpcHandle {
+  // `list` awaits this so the renderer's first read never races a detection
+  // pass that has been deferred off the startup path.
+  let detectionInFlight: Promise<void> | null = null;
+
+  function scheduleDetection(): Promise<void> {
+    detectionInFlight = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        try {
+          runLocalShellDetection(getRepo());
+        } catch (error) {
+          console.error(
+            "[local-profiles] shell detection failed:",
+            error instanceof Error ? error.message : error
+          );
+        }
+        resolve();
+      }, 0);
+    });
+
+    return detectionInFlight;
+  }
+
   ipcMain.handle(ipcChannels.localProfiles.list, async (): Promise<LocalProfileRecord[]> => {
+    await detectionInFlight;
     return getRepo().list().map(toRecord);
   });
 
@@ -60,9 +94,16 @@ export function registerLocalProfilesIpc(
         name: parsed.name,
         executable: parsed.executable,
         args: parsed.args ?? existing?.args ?? [],
-        startingDirectory: parsed.startingDirectory ?? existing?.startingDirectory ?? null,
+        // `null` means "clear it" and `undefined` means "leave it alone", so
+        // these two cannot use `??` — that would collapse an explicit clear
+        // back into the stored value and the old colour/directory would
+        // reappear as soon as the renderer reloaded the list.
+        startingDirectory:
+          parsed.startingDirectory !== undefined
+            ? parsed.startingDirectory
+            : existing?.startingDirectory ?? null,
         icon: parsed.icon ?? existing?.icon ?? "terminal",
-        color: parsed.color ?? existing?.color ?? null,
+        color: parsed.color !== undefined ? parsed.color : existing?.color ?? null,
         elevated: parsed.elevated ?? existing?.elevated ?? false,
         // Source and detect key are owned by detection, never by the renderer.
         source: existing?.source ?? "user",
@@ -131,4 +172,6 @@ export function registerLocalProfilesIpc(
       return getRepo().listEnvVars(parsed.id);
     }
   );
+
+  return { scheduleDetection };
 }

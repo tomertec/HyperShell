@@ -583,3 +583,42 @@ describe("network-aware reconnect", () => {
     vi.useRealTimers();
   });
 });
+
+describe("local sessions", () => {
+  it("refuses to build a local transport without resolved localOptions", () => {
+    // The default transport factory is the real one — no stub — because the
+    // point of this test is that it has no profileId-as-executable fallback.
+    // Only the main process may decide what a local session spawns.
+    const manager = createSessionManager();
+
+    expect(() =>
+      manager.open({
+        transport: "local",
+        profileId: "C:\\Windows\\System32\\calc.exe",
+        cols: 80,
+        rows: 24
+      })
+    ).toThrow(/local transport requires resolved localOptions/);
+  });
+
+  it("forces autoReconnect off for local sessions even when asked for it", () => {
+    // `attemptReconnect` never forwards localOptions, so a reconnecting local
+    // session would land in the branch the test above guards. The guard that
+    // keeps it unreachable is this flag, so pin it down.
+    const manager = createSessionManager({
+      createTransport: () => createStubTransport(),
+      sessionIdFactory: () => "s-local-1"
+    });
+
+    manager.open({
+      transport: "local",
+      profileId: "profile-1",
+      cols: 80,
+      rows: 24,
+      autoReconnect: true,
+      localOptions: { executable: "cmd.exe" }
+    });
+
+    expect(manager.getSession("s-local-1")?.autoReconnect).toBe(false);
+  });
+});

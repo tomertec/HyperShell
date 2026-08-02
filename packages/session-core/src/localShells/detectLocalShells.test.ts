@@ -7,7 +7,10 @@ function windowsProbes(overrides: Partial<DetectProbes> = {}): DetectProbes {
     "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
     "C:\\Windows\\System32\\cmd.exe",
     "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
-    "C:\\Program Files\\Git\\bin\\bash.exe"
+    "C:\\Program Files\\Git\\bin\\bash.exe",
+    // Detection only spawns `wsl -l -q` when the binary is there, so a fixture
+    // that expects distros back has to have it installed.
+    "C:\\Windows\\System32\\wsl.exe"
   ]);
 
   return {
@@ -106,6 +109,22 @@ describe("detectLocalShells", () => {
     expect(distroKeys).toContain("wsl:Debian");
     expect(distroKeys).not.toContain("wsl:docker-desktop");
     expect(distroKeys).not.toContain("wsl:docker-desktop-data");
+  });
+
+  it("never spawns wsl.exe when it is not installed", () => {
+    const spawned: string[] = [];
+    const present = new Set(["C:\\Windows\\System32\\cmd.exe"]);
+    const probes = windowsProbes({
+      fileExists: (candidate) => present.has(candidate),
+      runCommand: (file) => {
+        spawned.push(file);
+        return null;
+      }
+    });
+
+    detectLocalShells(probes);
+
+    expect(spawned).toEqual([]);
   });
 
   it("falls back to $SHELL on non-Windows platforms", () => {

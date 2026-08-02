@@ -110,8 +110,12 @@ function detectWindowsShells(probes: DetectProbes): DetectedShell[] {
     });
   }
 
+  // Gate the probe on the binary existing, like the four shells above: spawning
+  // `wsl.exe` is the only part of detection that costs real time (up to the 5s
+  // command timeout), so a machine without WSL should not pay for a failed
+  // spawn to learn what a file check already answers.
   const wsl = path.join(systemRoot, "System32", "wsl.exe");
-  const wslOutput = probes.runCommand(wsl, ["-l", "-q"]);
+  const wslOutput = probes.fileExists(wsl) ? probes.runCommand(wsl, ["-l", "-q"]) : null;
   if (wslOutput) {
     for (const distro of parseWslDistros(wslOutput)) {
       if (!isInternalWslDistro(distro)) {

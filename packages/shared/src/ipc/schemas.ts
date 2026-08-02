@@ -640,6 +640,20 @@ export const localProfileEnvVarSchema = z.object({
   isEnabled: z.boolean()
 });
 
+// A profile colour is a palette key, not a CSS colour — it is resolved through
+// the theme's `--host-*` variables by the `.color-swatch-*` classes. Constrained
+// to the palette so an arbitrary string can never reach a style attribute.
+export const localProfileColorSchema = z.enum([
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "cyan",
+  "purple",
+  "pink"
+]);
+
 export const localProfileRecordSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -647,7 +661,7 @@ export const localProfileRecordSchema = z.object({
   args: z.array(z.string()),
   startingDirectory: z.string().nullable(),
   icon: localProfileIconSchema,
-  color: z.string().nullable(),
+  color: localProfileColorSchema.nullable(),
   elevated: z.boolean(),
   source: z.enum(["user", "detected"]),
   detectKey: z.string().nullable(),
@@ -663,7 +677,7 @@ export const upsertLocalProfileRequestSchema = z.object({
   args: z.array(z.string()).optional(),
   startingDirectory: z.string().nullable().optional(),
   icon: localProfileIconSchema.optional(),
-  color: z.string().nullable().optional(),
+  color: localProfileColorSchema.nullable().optional(),
   elevated: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   envVars: z.array(localProfileEnvVarSchema).optional()
@@ -689,6 +703,7 @@ export const getLocalProfileEnvVarsRequestSchema = z.object({
   id: z.string().min(1)
 });
 
+export type LocalProfileColor = z.infer<typeof localProfileColorSchema>;
 export type LocalProfileEnvVar = z.infer<typeof localProfileEnvVarSchema>;
 export type LocalProfileRecord = z.infer<typeof localProfileRecordSchema>;
 export type UpsertLocalProfileRequest = z.infer<typeof upsertLocalProfileRequestSchema>;

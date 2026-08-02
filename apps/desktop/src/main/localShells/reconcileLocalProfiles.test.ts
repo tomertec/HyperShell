@@ -182,3 +182,84 @@ describe("reconcileLocalProfiles", () => {
     expect(summary.inserted).toHaveLength(1);
   });
 });
+
+describe("reconcileLocalProfiles name collisions", () => {
+  /**
+   * `local_profiles.name` is UNIQUE but the repository upsert only conflicts on
+   * `id`, so a user-created profile that happens to be called "PowerShell"
+   * makes the detected pwsh row's INSERT throw. This fake reproduces that
+   * exactly: same constraint, same error text.
+   */
+  function createUniqueNameStore(initial: StoredProfile[]): LocalProfileStore & {
+    rows: StoredProfile[];
+  } {
+    const rows = [...initial];
+
+    return {
+      rows,
+      list: () => rows.map((row) => ({ ...row })),
+      create: (input) => {
+        if (rows.some((row) => row.name === input.name)) {
+          throw new Error("UNIQUE constraint failed: local_profiles.name");
+        }
+        const row: StoredProfile = {
+          id: input.id,
+          name: input.name,
+          executable: input.executable,
+          detectKey: input.detectKey ?? null,
+          source: "detected",
+          isAvailable: true,
+          isHidden: false,
+          sortOrder: input.sortOrder ?? 0
+        };
+        rows.push(row);
+        return row;
+      },
+      setAvailable: (id, available) => {
+        const row = rows.find((candidate) => candidate.id === id);
+        if (row) {
+          row.isAvailable = available;
+        }
+      }
+    };
+  }
+
+  const userPowerShell: StoredProfile = {
+    id: "user-1",
+    name: "PowerShell",
+    executable: "C:\\my\\pwsh.exe",
+    // A user profile has no detect key, so it is invisible to the detect-key
+    // map — reconciliation cannot see the collision coming.
+    detectKey: null,
+    source: "user",
+    isAvailable: true,
+    isHidden: false,
+    sortOrder: 1
+  };
+
+  it("does not throw when a user profile already owns a detected shell's name", () => {
+    const store = createUniqueNameStore([userPowerShell]);
+
+    expect(() => reconcileLocalProfiles(store, [pwsh, cmd], createId)).not.toThrow();
+  });
+
+  it("still inserts every other shell and reports the one it skipped", () => {
+    const store = createUniqueNameStore([userPowerShell]);
+
+    const summary = reconcileLocalProfiles(store, [pwsh, cmd], createId);
+
+    expect(store.rows.some((row) => row.detectKey === "cmd")).toBe(true);
+    expect(summary.inserted).toHaveLength(1);
+    expect(summary.skipped.map((entry) => entry.detectKey)).toEqual(["pwsh7"]);
+    expect(summary.skipped[0].reason).toContain("local_profiles.name");
+  });
+
+  it("leaves the user's own profile untouched", () => {
+    const store = createUniqueNameStore([userPowerShell]);
+
+    reconcileLocalProfiles(store, [pwsh, cmd], createId);
+
+    const preserved = store.rows.find((row) => row.id === "user-1");
+    expect(preserved).toEqual(userPowerShell);
+  });
+});

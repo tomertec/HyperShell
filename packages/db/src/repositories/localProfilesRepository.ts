@@ -1,4 +1,4 @@
-import type { LocalProfileIcon } from "@hypershell/shared";
+import type { LocalProfileColor, LocalProfileIcon } from "@hypershell/shared";
 import type { SqliteDatabase } from "../index";
 import { openDatabase } from "../index";
 
@@ -9,7 +9,7 @@ export type LocalProfileRecord = {
   args: string[];
   startingDirectory: string | null;
   icon: LocalProfileIcon;
-  color: string | null;
+  color: LocalProfileColor | null;
   elevated: boolean;
   source: "user" | "detected";
   detectKey: string | null;
@@ -25,7 +25,7 @@ export type LocalProfileInput = {
   args?: string[];
   startingDirectory?: string | null;
   icon?: LocalProfileIcon;
-  color?: string | null;
+  color?: LocalProfileColor | null;
   elevated?: boolean;
   source?: "user" | "detected";
   detectKey?: string | null;
@@ -78,7 +78,7 @@ function mapRow(row: LocalProfileRow): LocalProfileRecord {
     args: parseArgs(row.args_json),
     startingDirectory: row.starting_directory,
     icon: row.icon as LocalProfileIcon,
-    color: row.color,
+    color: row.color as LocalProfileColor | null,
     elevated: row.elevated !== 0,
     source: row.source === "detected" ? "detected" : "user",
     detectKey: row.detect_key,

@@ -5,11 +5,13 @@ import type {
   CreateBackupResponse,
   HostRecord,
   ListBackupsResponse,
+  LocalProfileRecord,
   OpenSessionResponse,
   RestoreBackupResponse,
   SessionEvent,
   SettingRecord,
-  UpsertHostRequest
+  UpsertHostRequest,
+  UpsertLocalProfileRequest
 } from "@hypershell/shared";
 
 interface HypershellTestApi {
@@ -26,8 +28,12 @@ interface HypershellTestApi {
 
   editorOpen(request: { sftpSessionId: string; remotePath: string }): Promise<void>;
 
+  listLocalProfiles(): Promise<LocalProfileRecord[]>;
+  upsertLocalProfile(request: UpsertLocalProfileRequest): Promise<LocalProfileRecord>;
+  setLocalProfileHidden(request: { id: string; hidden: boolean }): Promise<void>;
+
   openSession(request: {
-    transport: "ssh" | "serial" | "sftp" | "telnet";
+    transport: "ssh" | "serial" | "sftp" | "telnet" | "local";
     profileId: string;
     cols: number;
     rows: number;

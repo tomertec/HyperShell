@@ -142,7 +142,16 @@ function createDefaultTransport(request: OpenSessionRequest): TransportHandle {
   }
 
   if (request.transport === "local") {
-    const opts = request.localOptions ?? { executable: request.profileId };
+    // No fallback here on purpose. Every other transport can degrade to
+    // "treat profileId as the target", but for local shells profileId comes
+    // from the renderer and the target is a process to spawn — the main
+    // process resolving it against the profile store is the whole security
+    // boundary. Refuse rather than spawn an unresolved string.
+    if (!request.localOptions) {
+      throw new Error("local transport requires resolved localOptions");
+    }
+
+    const opts = request.localOptions;
     return createLocalShellTransport(request, {
       executable: opts.executable,
       args: opts.args,

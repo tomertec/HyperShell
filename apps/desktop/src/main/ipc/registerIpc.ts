@@ -43,7 +43,7 @@ import { registerPortForwardIpc } from "./portForwardIpc";
 import { registerGroupsIpc } from "./groupsIpc";
 import { registerTagIpc } from "./tagIpc";
 import { registerSerialProfilesIpc } from "./serialProfilesIpc";
-import { registerLocalProfilesIpc, runLocalShellDetection } from "./localProfilesIpc";
+import { registerLocalProfilesIpc } from "./localProfilesIpc";
 import { registerHostProfileIpc } from "./hostProfileIpc";
 import { registerHostEnvVarIpc } from "./hostEnvVarIpc";
 import { registerSftpIpc } from "./sftpIpc";
@@ -81,7 +81,8 @@ import {
   createConnectionHistoryRepositoryFromDatabase,
   createGroupsRepository,
   createSerialProfilesRepository,
-  createLocalProfilesRepository
+  createLocalProfilesRepository,
+  createLocalProfilesRepositoryFromDatabase
 } from "@hypershell/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@hypershell/db";
 import type {
@@ -238,6 +239,7 @@ const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;
 let connectionHistoryRepository: ReturnType<typeof createConnectionHistoryRepositoryFromDatabase> | null = null;
 let hostEnvVarRepository: ReturnType<typeof createHostEnvVarRepositoryFromDatabase> | null = null;
+let localProfilesRepository: ReturnType<typeof createLocalProfilesRepositoryFromDatabase> | null = null;
 
 export function disposeSessionRuntime(): void {
   sessionManager.destroyAll();
@@ -325,9 +327,62 @@ function getHostEnvVarRepository():
   return hostEnvVarRepository;
 }
 
+/**
+ * Local profiles must live in the shared file database or nothing the user does
+ * to them survives a quit — including the generated profile ids that a restored
+ * local tab in `saved_sessions` refers back to. The in-memory fallback exists
+ * only for the case where the database itself could not be opened (see Plan
+ * Amendment 2); it keeps the feature usable for the session rather than
+ * throwing on every call.
+ */
+function getLocalProfilesRepo(): ReturnType<typeof createLocalProfilesRepositoryFromDatabase> {
+  if (localProfilesRepository) {
+    return localProfilesRepository;
+  }
+
+  const db = getOrCreateDatabase() as SqliteDatabase | null;
+  localProfilesRepository = db
+    ? createLocalProfilesRepositoryFromDatabase(db)
+    : createLocalProfilesRepository();
+
+  return localProfilesRepository;
+}
+
+function resolveLocalProfileForSession(id: string):
+  | {
+      name: string;
+      executable: string;
+      args: string[];
+      startingDirectory: string | null;
+      isAvailable: boolean;
+      envVars: Record<string, string>;
+    }
+  | undefined {
+  const repo = getLocalProfilesRepo();
+  const profile = repo.get(id);
+  if (!profile) {
+    return undefined;
+  }
+
+  const envVars = Object.fromEntries(
+    repo
+      .listEnvVars(id)
+      .filter((entry) => entry.isEnabled)
+      .map((entry) => [entry.name, entry.value])
+  );
+
+  return {
+    name: profile.name,
+    executable: profile.executable,
+    args: profile.args,
+    startingDirectory: profile.startingDirectory,
+    isAvailable: profile.isAvailable,
+    envVars
+  };
+}
+
 const groupsRepo = createGroupsRepository();
 const serialProfilesRepo = createSerialProfilesRepository();
-const localProfilesRepo = createLocalProfilesRepository();
 
 let cleanupRegisteredIpc: (() => void) | null = null;
 
@@ -1364,28 +1419,7 @@ export function registerIpc(
       manager,
       options.resolveHostProfile,
       (id) => serialProfilesRepo.get(id),
-      (id) => {
-        const profile = localProfilesRepo.get(id);
-        if (!profile) {
-          return undefined;
-        }
-
-        const envVars = Object.fromEntries(
-          localProfilesRepo
-            .listEnvVars(id)
-            .filter((entry) => entry.isEnabled)
-            .map((entry) => [entry.name, entry.value])
-        );
-
-        return {
-          name: profile.name,
-          executable: profile.executable,
-          args: profile.args,
-          startingDirectory: profile.startingDirectory,
-          isAvailable: profile.isAvailable,
-          envVars
-        };
-      }
+      resolveLocalProfileForSession
     )
   );
   ipcMain.handle(ipcChannels.session.resize, (event, request) =>
@@ -1477,8 +1511,13 @@ export function registerIpc(
   registerGroupsIpc(ipcMain, () => groupsRepo);
   registerTagIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
-  registerLocalProfilesIpc(ipcMain, () => localProfilesRepo);
-  runLocalShellDetection(localProfilesRepo);
+  const localProfilesIpc = registerLocalProfilesIpc(ipcMain, getLocalProfilesRepo);
+  // Deliberately not awaited and deliberately not synchronous: detection shells
+  // out to `wsl.exe`, and `registerIpc` runs before the main window exists.
+  // `scheduleDetection` defers the pass to a later macrotask and swallows its
+  // own failures, so a wedged shell probe can never leave the app with no
+  // window and no tray. `local-profiles:list` awaits the returned promise.
+  void localProfilesIpc.scheduleDetection();
   registerHostProfileIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerHostEnvVarIpc(ipcMain, () => getDb() as SqliteDatabase);
   const cleanupSftp = registerSftpIpc(ipcMain, {
@@ -1659,28 +1698,7 @@ export async function openSessionForTestInspectInput(
     managerWithCapture,
     effectiveResolveHostProfile,
     options?.resolveSerialProfile,
-    (id: string) => {
-      const profile = localProfilesRepo.get(id);
-      if (!profile) {
-        return undefined;
-      }
-
-      const envVars = Object.fromEntries(
-        localProfilesRepo
-          .listEnvVars(id)
-          .filter((entry) => entry.isEnabled)
-          .map((entry) => [entry.name, entry.value])
-      );
-
-      return {
-        name: profile.name,
-        executable: profile.executable,
-        args: profile.args,
-        startingDirectory: profile.startingDirectory,
-        isAvailable: profile.isAvailable,
-        envVars
-      };
-    }
+    resolveLocalProfileForSession
   );
 
   return {

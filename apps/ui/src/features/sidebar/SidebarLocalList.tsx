@@ -60,10 +60,12 @@ function SortableLocalItem({
         <span className="truncate text-[13px] font-medium leading-tight text-text-primary">
           {profile.name}
         </span>
+        {/* `color` is a palette key ("red", "blue", …), not a CSS colour — the
+            .color-swatch-* classes resolve it against the active theme's
+            --host-* variables, exactly as the host list does. */}
         {profile.color && (
           <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: profile.color }}
+            className={`color-swatch color-swatch-${profile.color} h-2 w-2 shrink-0 rounded-full`}
           />
         )}
         {showHidden && profile.isHidden && (

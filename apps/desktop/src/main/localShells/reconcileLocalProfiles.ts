@@ -32,6 +32,8 @@ export interface ReconcileSummary {
   inserted: string[];
   markedUnavailable: string[];
   markedAvailable: string[];
+  /** Detect keys whose insert threw — most often a UNIQUE name collision. */
+  skipped: Array<{ detectKey: string; reason: string }>;
 }
 
 /**
@@ -39,6 +41,15 @@ export interface ReconcileSummary {
  * shell appeared or vanished. Never mutates a user-editable field: a renamed or
  * recoloured detected profile survives every pass, and a hidden one is a tombstone
  * that must not be re-inserted.
+ *
+ * A single failing insert is recorded and skipped rather than aborting the pass.
+ * `local_profiles.name` is UNIQUE while the upsert only conflicts on `id`, so a
+ * user-created profile named e.g. "PowerShell" (invisible to the detect-key map,
+ * because user rows have no detect key) makes the matching detected shell's
+ * insert throw. That must not cost the user every other shell — and, since this
+ * runs during startup, must not escape at all. Skipping is preferred over
+ * inventing a disambiguated name: the user's own profile stays authoritative and
+ * no name they never chose appears in their sidebar.
  */
 export function reconcileLocalProfiles(
   store: LocalProfileStore,
@@ -48,7 +59,8 @@ export function reconcileLocalProfiles(
   const summary: ReconcileSummary = {
     inserted: [],
     markedUnavailable: [],
-    markedAvailable: []
+    markedAvailable: [],
+    skipped: []
   };
 
   const existing = store.list();
@@ -66,16 +78,24 @@ export function reconcileLocalProfiles(
     if (!row) {
       const id = createId();
       nextSortOrder += 1;
-      store.create({
-        id,
-        name: shell.name,
-        executable: shell.executable,
-        args: shell.args,
-        icon: shell.icon,
-        source: "detected",
-        detectKey: shell.detectKey,
-        sortOrder: nextSortOrder
-      });
+      try {
+        store.create({
+          id,
+          name: shell.name,
+          executable: shell.executable,
+          args: shell.args,
+          icon: shell.icon,
+          source: "detected",
+          detectKey: shell.detectKey,
+          sortOrder: nextSortOrder
+        });
+      } catch (error) {
+        summary.skipped.push({
+          detectKey: shell.detectKey,
+          reason: error instanceof Error ? error.message : String(error)
+        });
+        continue;
+      }
       // Track newly inserted row so duplicate detectKeys in one pass don't create duplicates
       const newRow: StoredProfile = {
         id,

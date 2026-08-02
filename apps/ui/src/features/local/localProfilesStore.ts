@@ -1,4 +1,5 @@
 import { createStore } from "zustand/vanilla";
+import { toast } from "sonner";
 import type {
   LocalProfileRecord,
   UpsertLocalProfileRequest
@@ -14,6 +15,10 @@ export type LocalProfilesState = {
   reorder: (items: Array<{ id: string; sortOrder: number }>) => Promise<void>;
   rescan: () => Promise<void>;
 };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 /** Profiles the user can actually launch — hidden and missing shells are excluded. */
 export function selectLaunchableProfiles(
@@ -50,20 +55,36 @@ export const localProfilesStore = createStore<LocalProfilesState>()((set, get) =
     await get().load();
   },
 
+  // These three are fired as `void store.setHidden(...)` from the sidebar, so
+  // a rejection here would be an unhandled promise rejection the user never
+  // sees. Report it and reload, which also rolls the optimistic-looking UI
+  // back to whatever the main process actually has.
   setHidden: async (id, hidden) => {
-    await window.hypershell?.setLocalProfileHidden?.({ id, hidden });
+    try {
+      await window.hypershell?.setLocalProfileHidden?.({ id, hidden });
+    } catch (error) {
+      toast.error(`Failed to ${hidden ? "hide" : "unhide"} profile: ${errorMessage(error)}`);
+    }
     await get().load();
   },
 
   reorder: async (items) => {
-    await window.hypershell?.reorderLocalProfiles?.({ items });
+    try {
+      await window.hypershell?.reorderLocalProfiles?.({ items });
+    } catch (error) {
+      toast.error(`Failed to reorder profiles: ${errorMessage(error)}`);
+    }
     await get().load();
   },
 
   rescan: async () => {
-    const profiles = await window.hypershell?.rescanLocalProfiles?.();
-    if (profiles) {
-      set({ profiles });
+    try {
+      const profiles = await window.hypershell?.rescanLocalProfiles?.();
+      if (profiles) {
+        set({ profiles });
+      }
+    } catch (error) {
+      toast.error(`Failed to rescan local shells: ${errorMessage(error)}`);
     }
   }
 }));
