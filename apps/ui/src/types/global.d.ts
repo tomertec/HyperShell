@@ -140,6 +140,8 @@ import type {
   SftpDragOutRequest,
   SftpDragOutResponse,
   UpdateState,
+  LocalProfileRecord,
+  UpsertLocalProfileRequest,
 } from "@hypershell/shared";
 
 declare global {
@@ -182,6 +184,14 @@ declare global {
       upsertSerialProfile?: (request: UpsertSerialProfileRequest) => Promise<SerialProfileRecord>;
       removeSerialProfile?: (request: RemoveSerialProfileRequest) => Promise<void>;
       listSerialPorts?: () => Promise<SerialPortInfo[]>;
+      listLocalProfiles?(): Promise<LocalProfileRecord[]>;
+      upsertLocalProfile?(request: UpsertLocalProfileRequest): Promise<LocalProfileRecord>;
+      removeLocalProfile?(request: { id: string }): Promise<void>;
+      setLocalProfileHidden?(request: { id: string; hidden: boolean }): Promise<void>;
+      reorderLocalProfiles?(request: {
+        items: Array<{ id: string; sortOrder: number }>;
+      }): Promise<void>;
+      rescanLocalProfiles?(): Promise<LocalProfileRecord[]>;
       setSessionSignals?: (request: SetSignalsRequest) => Promise<void>;
       getHostStats?: (request: HostStatsRequest) => Promise<HostStatsResponse>;
       sftpConnect?: (request: SftpConnectRequest) => Promise<SftpConnectResponse>;
