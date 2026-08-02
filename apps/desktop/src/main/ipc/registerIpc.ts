@@ -43,6 +43,7 @@ import { registerPortForwardIpc } from "./portForwardIpc";
 import { registerGroupsIpc } from "./groupsIpc";
 import { registerTagIpc } from "./tagIpc";
 import { registerSerialProfilesIpc } from "./serialProfilesIpc";
+import { registerLocalProfilesIpc, runLocalShellDetection } from "./localProfilesIpc";
 import { registerHostProfileIpc } from "./hostProfileIpc";
 import { registerHostEnvVarIpc } from "./hostEnvVarIpc";
 import { registerSftpIpc } from "./sftpIpc";
@@ -79,7 +80,8 @@ import {
   createHostEnvVarRepositoryFromDatabase,
   createConnectionHistoryRepositoryFromDatabase,
   createGroupsRepository,
-  createSerialProfilesRepository
+  createSerialProfilesRepository,
+  createLocalProfilesRepository
 } from "@hypershell/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@hypershell/db";
 import type {
@@ -130,6 +132,12 @@ const registeredChannels = [
   ipcChannels.serialProfiles.upsert,
   ipcChannels.serialProfiles.remove,
   ipcChannels.serialProfiles.listPorts,
+  ipcChannels.localProfiles.list,
+  ipcChannels.localProfiles.upsert,
+  ipcChannels.localProfiles.remove,
+  ipcChannels.localProfiles.setHidden,
+  ipcChannels.localProfiles.reorder,
+  ipcChannels.localProfiles.rescan,
   ipcChannels.hostProfiles.list,
   ipcChannels.hostProfiles.upsert,
   ipcChannels.hostProfiles.remove,
@@ -318,6 +326,7 @@ function getHostEnvVarRepository():
 
 const groupsRepo = createGroupsRepository();
 const serialProfilesRepo = createSerialProfilesRepository();
+const localProfilesRepo = createLocalProfilesRepository();
 
 let cleanupRegisteredIpc: (() => void) | null = null;
 
@@ -467,7 +476,17 @@ async function openSessionHandler(
   request: OpenSessionRequest,
   manager: SessionManager = sessionManager,
   resolveHostProfile?: RegisterIpcOptions["resolveHostProfile"],
-  resolveSerialProfile?: RegisterIpcOptions["resolveSerialProfile"]
+  resolveSerialProfile?: RegisterIpcOptions["resolveSerialProfile"],
+  resolveLocalProfile?: (profileId: string) =>
+    | {
+        name: string;
+        executable: string;
+        args: string[];
+        startingDirectory: string | null;
+        isAvailable: boolean;
+        envVars?: Record<string, string>;
+      }
+    | undefined
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
   const authTraceEnabled = isAuthTraceEnabled();
@@ -600,6 +619,29 @@ async function openSessionHandler(
     }
   }
 
+  let localOptions:
+    | { executable: string; args?: string[]; cwd?: string; envVars?: Record<string, string> }
+    | undefined;
+
+  if (parsed.transport === "local") {
+    const profile = resolveLocalProfile?.(parsed.profileId);
+
+    if (!profile) {
+      throw new Error(`Unknown local profile: ${parsed.profileId}`);
+    }
+
+    if (!profile.isAvailable) {
+      throw new Error(`Local shell is not available: ${profile.name}`);
+    }
+
+    localOptions = {
+      executable: profile.executable,
+      args: profile.args,
+      cwd: profile.startingDirectory ?? undefined,
+      envVars: profile.envVars
+    };
+  }
+
   let serialOptions: SerialConnectionOptions | undefined;
 
   if (parsed.transport === "serial") {
@@ -635,6 +677,7 @@ async function openSessionHandler(
     sshOptions: sshOptions ?? { hostname: parsed.profileId },
     serialOptions,
     telnetOptions,
+    localOptions,
     autoReconnect: parsed.autoReconnect ?? Boolean(resolvedHost?.autoReconnect),
     maxReconnectAttempts:
       parsed.reconnectMaxAttempts ?? resolvedHost?.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
@@ -1314,7 +1357,35 @@ export function registerIpc(
   }
 
   ipcMain.handle(ipcChannels.session.open, (event, request) =>
-    openSessionHandler(event, request, manager, options.resolveHostProfile, (id) => serialProfilesRepo.get(id))
+    openSessionHandler(
+      event,
+      request,
+      manager,
+      options.resolveHostProfile,
+      (id) => serialProfilesRepo.get(id),
+      (id) => {
+        const profile = localProfilesRepo.get(id);
+        if (!profile) {
+          return undefined;
+        }
+
+        const envVars = Object.fromEntries(
+          localProfilesRepo
+            .listEnvVars(id)
+            .filter((entry) => entry.isEnabled)
+            .map((entry) => [entry.name, entry.value])
+        );
+
+        return {
+          name: profile.name,
+          executable: profile.executable,
+          args: profile.args,
+          startingDirectory: profile.startingDirectory,
+          isAvailable: profile.isAvailable,
+          envVars
+        };
+      }
+    )
   );
   ipcMain.handle(ipcChannels.session.resize, (event, request) =>
     resizeSessionHandler(event, request, manager)
@@ -1405,6 +1476,8 @@ export function registerIpc(
   registerGroupsIpc(ipcMain, () => groupsRepo);
   registerTagIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
+  registerLocalProfilesIpc(ipcMain, () => localProfilesRepo);
+  runLocalShellDetection(localProfilesRepo);
   registerHostProfileIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerHostEnvVarIpc(ipcMain, () => getDb() as SqliteDatabase);
   const cleanupSftp = registerSftpIpc(ipcMain, {
@@ -1584,7 +1657,29 @@ export async function openSessionForTestInspectInput(
     request,
     managerWithCapture,
     effectiveResolveHostProfile,
-    options?.resolveSerialProfile
+    options?.resolveSerialProfile,
+    (id: string) => {
+      const profile = localProfilesRepo.get(id);
+      if (!profile) {
+        return undefined;
+      }
+
+      const envVars = Object.fromEntries(
+        localProfilesRepo
+          .listEnvVars(id)
+          .filter((entry) => entry.isEnabled)
+          .map((entry) => [entry.name, entry.value])
+      );
+
+      return {
+        name: profile.name,
+        executable: profile.executable,
+        args: profile.args,
+        startingDirectory: profile.startingDirectory,
+        isAvailable: profile.isAvailable,
+        envVars
+      };
+    }
   );
 
   return {
