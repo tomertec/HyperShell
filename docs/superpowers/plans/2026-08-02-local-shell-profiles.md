@@ -3353,6 +3353,27 @@ git commit -m "test(desktop): cover local shell sessions and document the transp
 
 ---
 
+## Plan Amendments (made during execution)
+
+Recorded here so the plan matches what was actually built.
+
+**1. `SavedSessionTransport` must include `"local"` (2026-08-02).** Task 2 widened
+`SessionTransportKind` and `transportSchema`, but `SavedSessionTransport` in
+`packages/db/src/repositories/savedSessionRepository.ts:4` was left at
+`"ssh" | "serial" | "sftp" | "telnet"`, which broke the desktop build in
+`sessionRecoveryIpc.ts` and `main.ts`. The plan had no task covering it. Ruling: widen the
+union. Local sessions persist and restore like any other transport — on restart the tab
+re-spawns the shell fresh from its `profileId` in the profile's starting directory.
+Scrollback is not restored, consistent with every other transport.
+
+**2. `createLocalProfilesRepository` gets the in-memory fallback (2026-08-02).** Task 5 was
+originally instructed to omit the try/catch → in-memory fallback that
+`createSerialProfilesRepository` has. Because `registerIpc.ts` constructs the repository at
+module scope, that omission made the `better-sqlite3` ABI error throw at *import* time,
+crashing `registerIpc.test.ts` and `openSession.integration.test.ts` wholesale instead of
+failing individual tests. Ruling: add the fallback, matching the existing repository
+pattern. This reverses the original instruction.
+
 ## Done Criteria
 
 - A fresh install detects and lists every installed shell with no configuration.
