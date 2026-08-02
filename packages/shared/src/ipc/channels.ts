@@ -64,6 +64,15 @@ export const serialProfileChannels = {
   listPorts: "serial-profiles:list-ports"
 } as const;
 
+export const localProfileChannels = {
+  list: "local-profiles:list",
+  upsert: "local-profiles:upsert",
+  remove: "local-profiles:remove",
+  setHidden: "local-profiles:set-hidden",
+  reorder: "local-profiles:reorder",
+  rescan: "local-profiles:rescan"
+} as const;
+
 export const hostProfileChannels = {
   list: "host-profiles:list",
   upsert: "host-profiles:upsert",
@@ -232,6 +241,7 @@ export const ipcChannels = {
   groups: groupChannels,
   tags: tagChannels,
   serialProfiles: serialProfileChannels,
+  localProfiles: localProfileChannels,
   hostProfiles: hostProfileChannels,
   hostEnvVars: hostEnvVarChannels,
   sftp: sftpChannels,

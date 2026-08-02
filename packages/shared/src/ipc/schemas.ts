@@ -632,6 +632,63 @@ export type RemoveSerialProfileRequest = z.infer<typeof removeSerialProfileReque
 export type SerialPortInfo = z.infer<typeof serialPortInfoSchema>;
 export type SetSignalsRequest = z.infer<typeof setSignalsRequestSchema>;
 
+// --- Local shell profile schemas ---
+
+export const localProfileEnvVarSchema = z.object({
+  name: z.string().regex(ENV_VAR_NAME_REGEX),
+  value: z.string(),
+  isEnabled: z.boolean()
+});
+
+export const localProfileRecordSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  executable: z.string().min(1),
+  args: z.array(z.string()),
+  startingDirectory: z.string().nullable(),
+  icon: localProfileIconSchema,
+  color: z.string().nullable(),
+  elevated: z.boolean(),
+  source: z.enum(["user", "detected"]),
+  detectKey: z.string().nullable(),
+  isAvailable: z.boolean(),
+  isHidden: z.boolean(),
+  sortOrder: z.number().int()
+});
+
+export const upsertLocalProfileRequestSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  executable: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  startingDirectory: z.string().nullable().optional(),
+  icon: localProfileIconSchema.optional(),
+  color: z.string().nullable().optional(),
+  elevated: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  envVars: z.array(localProfileEnvVarSchema).optional()
+});
+
+export const removeLocalProfileRequestSchema = z.object({
+  id: z.string().min(1)
+});
+
+export const setLocalProfileHiddenRequestSchema = z.object({
+  id: z.string().min(1),
+  hidden: z.boolean()
+});
+
+export const reorderLocalProfilesRequestSchema = z.object({
+  items: z.array(z.object({ id: z.string().min(1), sortOrder: z.number().int() }))
+});
+
+export type LocalProfileEnvVar = z.infer<typeof localProfileEnvVarSchema>;
+export type LocalProfileRecord = z.infer<typeof localProfileRecordSchema>;
+export type UpsertLocalProfileRequest = z.infer<typeof upsertLocalProfileRequestSchema>;
+export type RemoveLocalProfileRequest = z.infer<typeof removeLocalProfileRequestSchema>;
+export type SetLocalProfileHiddenRequest = z.infer<typeof setLocalProfileHiddenRequestSchema>;
+export type ReorderLocalProfilesRequest = z.infer<typeof reorderLocalProfilesRequestSchema>;
+
 // --- Workspace schemas ---
 
 export const workspaceTabSchema = z.object({
