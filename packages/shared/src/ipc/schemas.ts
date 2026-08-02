@@ -682,12 +682,20 @@ export const reorderLocalProfilesRequestSchema = z.object({
   items: z.array(z.object({ id: z.string().min(1), sortOrder: z.number().int() }))
 });
 
+// Read-only lookup for a profile's saved env vars — upsert's envVars field is
+// write-only, so the editor form needs this to load existing values rather
+// than silently overwriting them with an empty array on save.
+export const getLocalProfileEnvVarsRequestSchema = z.object({
+  id: z.string().min(1)
+});
+
 export type LocalProfileEnvVar = z.infer<typeof localProfileEnvVarSchema>;
 export type LocalProfileRecord = z.infer<typeof localProfileRecordSchema>;
 export type UpsertLocalProfileRequest = z.infer<typeof upsertLocalProfileRequestSchema>;
 export type RemoveLocalProfileRequest = z.infer<typeof removeLocalProfileRequestSchema>;
 export type SetLocalProfileHiddenRequest = z.infer<typeof setLocalProfileHiddenRequestSchema>;
 export type ReorderLocalProfilesRequest = z.infer<typeof reorderLocalProfilesRequestSchema>;
+export type GetLocalProfileEnvVarsRequest = z.infer<typeof getLocalProfileEnvVarsRequestSchema>;
 
 // --- Workspace schemas ---
 

@@ -13,6 +13,11 @@ import { LocalProfileIcon } from "./LocalProfileIcon";
 export interface LocalProfileFormProps {
   profile: LocalProfileRecord | null;
   envVars: LocalProfileEnvVar[];
+  // Whether `envVars` above reflects the profile's real saved values (vs. an
+  // empty placeholder because the read-path call failed or is unavailable).
+  // Ignored for new profiles (profile === null), where there's nothing to
+  // lose. See shouldIncludeEnvVarsInUpsert.
+  envVarsLoaded: boolean;
   onSave: (input: UpsertLocalProfileRequest) => void;
   onCancel: () => void;
   onDelete?: (id: string) => void;
@@ -47,16 +52,34 @@ function toEnvVarFormValue(item: LocalProfileEnvVar): LocalEnvVarFormValue {
   return { id: createEnvVarId(), name: item.name, value: item.value, isEnabled: item.isEnabled };
 }
 
-function parseArgs(text: string): string[] {
+export function parseArgs(text: string): string[] {
   return text.trim().split(/\s+/).filter(Boolean);
 }
 
-function isUniqueNameConflict(error: unknown): boolean {
+export function isUniqueNameConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /unique constraint failed:\s*local_profiles\.name/i.test(message);
 }
 
-export function LocalProfileForm({ profile, envVars, onSave, onCancel, onDelete }: LocalProfileFormProps) {
+// Editing an existing profile whose saved env vars we could not confidently
+// load must never overwrite them with an empty array — that would silently
+// destroy data the user never touched. Creating a new profile has nothing to
+// lose, so it always includes envVars (even an empty one).
+export function shouldIncludeEnvVarsInUpsert(
+  isNewProfile: boolean,
+  envVarsLoaded: boolean
+): boolean {
+  return isNewProfile || envVarsLoaded;
+}
+
+export function LocalProfileForm({
+  profile,
+  envVars,
+  envVarsLoaded,
+  onSave,
+  onCancel,
+  onDelete
+}: LocalProfileFormProps) {
   const formId = useId();
   const [id] = useState(() => profile?.id ?? crypto.randomUUID());
   const [name, setName] = useState(profile?.name ?? "");
@@ -74,6 +97,7 @@ export function LocalProfileForm({ profile, envVars, onSave, onCancel, onDelete 
   const [deleting, setDeleting] = useState(false);
 
   const isDetected = profile?.source === "detected";
+  const envVarsKnown = shouldIncludeEnvVarsInUpsert(!profile, envVarsLoaded);
 
   const addEnvVar = useCallback(() => {
     setEnvVarRows((prev) => [...prev, { id: createEnvVarId(), name: "", value: "", isEnabled: true }]);
@@ -146,11 +170,15 @@ export function LocalProfileForm({ profile, envVars, onSave, onCancel, onDelete 
         startingDirectory: startingDirectory.trim() || null,
         icon,
         color,
-        envVars: envVarRows.map((row) => ({
-          name: row.name.trim(),
-          value: row.value,
-          isEnabled: row.isEnabled
-        }))
+        ...(shouldIncludeEnvVarsInUpsert(!profile, envVarsLoaded)
+          ? {
+              envVars: envVarRows.map((row) => ({
+                name: row.name.trim(),
+                value: row.value,
+                isEnabled: row.isEnabled
+              }))
+            }
+          : {})
       };
 
       setFormError(null);
@@ -172,7 +200,20 @@ export function LocalProfileForm({ profile, envVars, onSave, onCancel, onDelete 
         })
         .finally(() => setSubmitting(false));
     },
-    [argsText, color, envVarRows, executable, hasErrors, icon, id, name, onSave, startingDirectory]
+    [
+      argsText,
+      color,
+      envVarRows,
+      envVarsLoaded,
+      executable,
+      hasErrors,
+      icon,
+      id,
+      name,
+      onSave,
+      profile,
+      startingDirectory
+    ]
   );
 
   const handleDelete = useCallback(() => {
@@ -332,78 +373,86 @@ export function LocalProfileForm({ profile, envVars, onSave, onCancel, onDelete 
           <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-text-secondary">
             Environment Variables
           </summary>
-          <span className="text-xs text-text-muted/70">
-            Variables are applied when opening this local shell.
-          </span>
+          {envVarsKnown ? (
+            <>
+              <span className="text-xs text-text-muted/70">
+                Variables are applied when opening this local shell.
+              </span>
 
-          {envVarRows.length === 0 ? (
-            <p className="text-xs text-text-muted/70">No variables configured.</p>
-          ) : (
-            <div className="grid gap-2">
-              {envVarRows.map((row, index) => (
-                <div key={row.id} className="grid gap-2 rounded-lg border border-border/60 bg-surface/30 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
-                      Variable {index + 1}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeEnvVar(row.id)}
-                      className="rounded border border-border px-2 py-1 text-[11px] text-text-muted transition-colors hover:text-text-primary"
-                    >
-                      Remove
-                    </button>
-                  </div>
+              {envVarRows.length === 0 ? (
+                <p className="text-xs text-text-muted/70">No variables configured.</p>
+              ) : (
+                <div className="grid gap-2">
+                  {envVarRows.map((row, index) => (
+                    <div key={row.id} className="grid gap-2 rounded-lg border border-border/60 bg-surface/30 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+                          Variable {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeEnvVar(row.id)}
+                          className="rounded border border-border px-2 py-1 text-[11px] text-text-muted transition-colors hover:text-text-primary"
+                        >
+                          Remove
+                        </button>
+                      </div>
 
-                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
-                    <label className="sr-only" htmlFor={`${formId}-envVar-${row.id}-name`}>
-                      Variable {index + 1} name
-                    </label>
-                    <input
-                      id={`${formId}-envVar-${row.id}-name`}
-                      value={row.name}
-                      onChange={(e) => updateEnvVar(row.id, { name: e.target.value })}
-                      placeholder="NAME"
-                      className={inputClasses}
-                    />
-                    <label className="sr-only" htmlFor={`${formId}-envVar-${row.id}-value`}>
-                      Variable {index + 1} value
-                    </label>
-                    <input
-                      id={`${formId}-envVar-${row.id}-value`}
-                      value={row.value}
-                      onChange={(e) => updateEnvVar(row.id, { value: e.target.value })}
-                      placeholder="value"
-                      className={inputClasses}
-                    />
-                    <label className="flex items-center gap-2 px-1 text-xs text-text-secondary">
-                      <input
-                        type="checkbox"
-                        checked={row.isEnabled}
-                        onChange={(e) => updateEnvVar(row.id, { isEnabled: e.target.checked })}
-                        className="rounded border-border accent-accent"
-                      />
-                      Enabled
-                    </label>
-                  </div>
+                      <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                        <label className="sr-only" htmlFor={`${formId}-envVar-${row.id}-name`}>
+                          Variable {index + 1} name
+                        </label>
+                        <input
+                          id={`${formId}-envVar-${row.id}-name`}
+                          value={row.name}
+                          onChange={(e) => updateEnvVar(row.id, { name: e.target.value })}
+                          placeholder="NAME"
+                          className={inputClasses}
+                        />
+                        <label className="sr-only" htmlFor={`${formId}-envVar-${row.id}-value`}>
+                          Variable {index + 1} value
+                        </label>
+                        <input
+                          id={`${formId}-envVar-${row.id}-value`}
+                          value={row.value}
+                          onChange={(e) => updateEnvVar(row.id, { value: e.target.value })}
+                          placeholder="value"
+                          className={inputClasses}
+                        />
+                        <label className="flex items-center gap-2 px-1 text-xs text-text-secondary">
+                          <input
+                            type="checkbox"
+                            checked={row.isEnabled}
+                            onChange={(e) => updateEnvVar(row.id, { isEnabled: e.target.checked })}
+                            className="rounded border-border accent-accent"
+                          />
+                          Enabled
+                        </label>
+                      </div>
 
-                  {envVarNameErrors[index] && (
-                    <span className="text-xs text-red-400">{envVarNameErrors[index]}</span>
-                  )}
+                      {envVarNameErrors[index] && (
+                        <span className="text-xs text-red-400">{envVarNameErrors[index]}</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          <div>
-            <button
-              type="button"
-              onClick={addEnvVar}
-              className="rounded-md border border-border bg-base-800 px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-base-700"
-            >
-              Add Variable
-            </button>
-          </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={addEnvVar}
+                  className="rounded-md border border-border bg-base-800 px-3 py-1.5 text-xs text-text-primary transition-colors hover:bg-base-700"
+                >
+                  Add Variable
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-amber-400">
+              Existing environment variables could not be loaded, so they will be left unchanged when you save.
+            </p>
+          )}
         </details>
       </div>
 

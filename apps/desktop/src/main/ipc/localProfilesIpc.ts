@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import {
   ipcChannels,
+  getLocalProfileEnvVarsRequestSchema,
   removeLocalProfileRequestSchema,
   reorderLocalProfilesRequestSchema,
   setLocalProfileHiddenRequestSchema,
   upsertLocalProfileRequestSchema,
+  type LocalProfileEnvVar,
   type LocalProfileRecord
 } from "@hypershell/shared";
 import { createDefaultProbes, detectLocalShells } from "@hypershell/session-core";
@@ -121,4 +123,12 @@ export function registerLocalProfilesIpc(
     runLocalShellDetection(repo);
     return repo.list().map(toRecord);
   });
+
+  ipcMain.handle(
+    ipcChannels.localProfiles.getEnvVars,
+    async (_event: unknown, request: unknown): Promise<LocalProfileEnvVar[]> => {
+      const parsed = getLocalProfileEnvVarsRequestSchema.parse(request);
+      return getRepo().listEnvVars(parsed.id);
+    }
+  );
 }

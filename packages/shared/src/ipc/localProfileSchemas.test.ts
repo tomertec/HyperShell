@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getLocalProfileEnvVarsRequestSchema,
   localProfileRecordSchema,
   openSessionRequestSchema,
   upsertLocalProfileRequestSchema
@@ -62,5 +63,11 @@ describe("local profile schemas", () => {
     });
 
     expect("localOptions" in parsed).toBe(false);
+  });
+
+  it("requires a non-empty id to look up a profile's env vars", () => {
+    expect(getLocalProfileEnvVarsRequestSchema.parse({ id: "p1" })).toEqual({ id: "p1" });
+    expect(() => getLocalProfileEnvVarsRequestSchema.parse({ id: "" })).toThrow();
+    expect(() => getLocalProfileEnvVarsRequestSchema.parse({})).toThrow();
   });
 });

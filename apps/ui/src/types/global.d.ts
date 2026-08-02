@@ -140,6 +140,7 @@ import type {
   SftpDragOutRequest,
   SftpDragOutResponse,
   UpdateState,
+  LocalProfileEnvVar,
   LocalProfileRecord,
   UpsertLocalProfileRequest,
 } from "@hypershell/shared";
@@ -192,6 +193,7 @@ declare global {
         items: Array<{ id: string; sortOrder: number }>;
       }): Promise<void>;
       rescanLocalProfiles?(): Promise<LocalProfileRecord[]>;
+      getLocalProfileEnvVars?(request: { id: string }): Promise<LocalProfileEnvVar[]>;
       setSessionSignals?: (request: SetSignalsRequest) => Promise<void>;
       getHostStats?: (request: HostStatsRequest) => Promise<HostStatsResponse>;
       sftpConnect?: (request: SftpConnectRequest) => Promise<SftpConnectResponse>;

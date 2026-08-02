@@ -70,7 +70,8 @@ export const localProfileChannels = {
   remove: "local-profiles:remove",
   setHidden: "local-profiles:set-hidden",
   reorder: "local-profiles:reorder",
-  rescan: "local-profiles:rescan"
+  rescan: "local-profiles:rescan",
+  getEnvVars: "local-profiles:get-env-vars"
 } as const;
 
 export const hostProfileChannels = {

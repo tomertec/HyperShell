@@ -137,6 +137,7 @@ const registeredChannels = [
   ipcChannels.localProfiles.remove,
   ipcChannels.localProfiles.setHidden,
   ipcChannels.localProfiles.reorder,
+  ipcChannels.localProfiles.getEnvVars,
   ipcChannels.localProfiles.rescan,
   ipcChannels.hostProfiles.list,
   ipcChannels.hostProfiles.upsert,

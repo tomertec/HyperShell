@@ -36,6 +36,7 @@ import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
 import type {
   ConnectionHistoryRecord,
+  LocalProfileEnvVar,
   LocalProfileRecord,
   SavedSessionRecord,
   PuttySession,
@@ -378,6 +379,8 @@ function MainApp() {
   const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
   const [localProfileModalOpen, setLocalProfileModalOpen] = useState(false);
   const [editingLocalProfile, setEditingLocalProfile] = useState<LocalProfileRecord | null>(null);
+  const [editingLocalProfileEnvVars, setEditingLocalProfileEnvVars] = useState<LocalProfileEnvVar[]>([]);
+  const [editingLocalProfileEnvVarsLoaded, setEditingLocalProfileEnvVarsLoaded] = useState(true);
   const [telnetDialogOpen, setTelnetDialogOpen] = useState(false);
   const [tmuxPickerState, setTmuxPickerState] = useState<{
     open: boolean;
@@ -676,6 +679,37 @@ function MainApp() {
     },
     [openTab]
   );
+
+  const handleNewLocalProfile = useCallback(() => {
+    setEditingLocalProfile(null);
+    setEditingLocalProfileEnvVars([]);
+    setEditingLocalProfileEnvVarsLoaded(true);
+    setLocalProfileModalOpen(true);
+  }, []);
+
+  // Fetches the profile's real saved env vars before opening the editor —
+  // the form must never submit an empty envVars array for a profile whose
+  // existing values it never actually saw (see LocalProfileForm's
+  // envVarsLoaded / shouldIncludeEnvVarsInUpsert).
+  const handleEditLocalProfile = useCallback((profile: LocalProfileRecord) => {
+    void (async () => {
+      let envVars: LocalProfileEnvVar[] = [];
+      let loaded = false;
+      try {
+        const result = await window.hypershell?.getLocalProfileEnvVars?.({ id: profile.id });
+        if (result) {
+          envVars = result;
+          loaded = true;
+        }
+      } catch {
+        // Leave loaded = false — the form will refuse to touch env vars on save.
+      }
+      setEditingLocalProfile(profile);
+      setEditingLocalProfileEnvVars(envVars);
+      setEditingLocalProfileEnvVarsLoaded(loaded);
+      setLocalProfileModalOpen(true);
+    })();
+  }, []);
 
   const openHostTab = useCallback(
     (host: HostRecord, tmuxAttachTarget?: string) => {
@@ -1253,8 +1287,8 @@ function MainApp() {
             onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
             onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); }}
             onConnectLocal={handleConnectLocal}
-            onNewLocal={() => { setEditingLocalProfile(null); setLocalProfileModalOpen(true); }}
-            onEditLocal={(profile) => { setEditingLocalProfile(profile); setLocalProfileModalOpen(true); }}
+            onNewLocal={handleNewLocalProfile}
+            onEditLocal={handleEditLocalProfile}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenTelnet={() => setTelnetDialogOpen(true)}
             restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}
@@ -1559,7 +1593,8 @@ function MainApp() {
         <LocalProfileForm
           key={editingLocalProfile?.id ?? "new-local"}
           profile={editingLocalProfile}
-          envVars={[]}
+          envVars={editingLocalProfileEnvVars}
+          envVarsLoaded={editingLocalProfileEnvVarsLoaded}
           onSave={() => setLocalProfileModalOpen(false)}
           onCancel={() => setLocalProfileModalOpen(false)}
           onDelete={() => setLocalProfileModalOpen(false)}
