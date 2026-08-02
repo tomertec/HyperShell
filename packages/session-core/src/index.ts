@@ -28,3 +28,7 @@ export {
   type TmuxSession,
   type TmuxProbeOptions
 } from "./tmux/tmuxProbe";
+export { createLocalShellTransport } from "./transports/localShellTransport";
+export type { CreateLocalShellTransportDeps } from "./transports/localShellTransport";
+export { createPtyProcess, sanitizePtyEnv } from "./transports/ptyProcess";
+export type { LocalConnectionOptions } from "./transports/transportEvents";
