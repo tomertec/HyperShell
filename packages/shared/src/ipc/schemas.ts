@@ -10,7 +10,17 @@ export const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const DEFAULT_RECONNECT_MAX_ATTEMPTS = 5;
 export const DEFAULT_RECONNECT_BASE_INTERVAL = 1;
 
-export const transportSchema = z.enum(["ssh", "serial", "sftp", "telnet"]);
+export const transportSchema = z.enum(["ssh", "serial", "sftp", "telnet", "local"]);
+
+export const localProfileIconSchema = z.enum([
+  "powershell",
+  "cmd",
+  "linux",
+  "bash",
+  "terminal"
+]);
+
+export type LocalProfileIcon = z.infer<typeof localProfileIconSchema>;
 
 export const sessionStateSchema = z.enum([
   "connecting",
