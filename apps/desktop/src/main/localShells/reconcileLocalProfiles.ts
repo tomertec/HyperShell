@@ -76,6 +76,18 @@ export function reconcileLocalProfiles(
         detectKey: shell.detectKey,
         sortOrder: nextSortOrder
       });
+      // Track newly inserted row so duplicate detectKeys in one pass don't create duplicates
+      const newRow: StoredProfile = {
+        id,
+        name: shell.name,
+        executable: shell.executable,
+        detectKey: shell.detectKey,
+        source: "detected",
+        isAvailable: true,
+        isHidden: false,
+        sortOrder: nextSortOrder
+      };
+      byDetectKey.set(shell.detectKey, newRow);
       summary.inserted.push(id);
       continue;
     }

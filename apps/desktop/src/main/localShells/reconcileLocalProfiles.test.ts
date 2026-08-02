@@ -160,4 +160,25 @@ describe("reconcileLocalProfiles", () => {
     expect(summary.markedUnavailable).toEqual([]);
     expect(store.rows.find((row) => row.id === "mine")?.isAvailable).toBe(true);
   });
+
+  it("deduplicates duplicate detectKeys within a single pass", () => {
+    const store = createFakeStore();
+    const duplicatePwsh: DetectedShell = {
+      detectKey: "pwsh7",
+      name: "PowerShell (duplicate)",
+      executable: "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+      args: [],
+      icon: "powershell"
+    };
+
+    const summary = reconcileLocalProfiles(
+      store,
+      [pwsh, duplicatePwsh],
+      createId
+    );
+
+    const pwshRows = store.rows.filter((row) => row.detectKey === "pwsh7");
+    expect(pwshRows).toHaveLength(1);
+    expect(summary.inserted).toHaveLength(1);
+  });
 });
