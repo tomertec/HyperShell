@@ -20,6 +20,7 @@ import { Workspace } from "../features/layout/Workspace";
 import { layoutStore } from "../features/layout/layoutStore";
 import { handlePaneShortcut } from "../features/layout/paneShortcuts";
 import { localProfilesStore, selectLaunchableProfiles } from "../features/local/localProfilesStore";
+import { LocalProfileForm } from "../features/local/LocalProfileForm";
 import { QuickConnectDialog } from "../features/quick-connect/QuickConnectDialog";
 import type { QuickConnectProfile } from "../features/quick-connect/searchIndex";
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
@@ -375,6 +376,8 @@ function MainApp() {
     hostId?: string;
   }>>([]);
   const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
+  const [localProfileModalOpen, setLocalProfileModalOpen] = useState(false);
+  const [editingLocalProfile, setEditingLocalProfile] = useState<LocalProfileRecord | null>(null);
   const [telnetDialogOpen, setTelnetDialogOpen] = useState(false);
   const [tmuxPickerState, setTmuxPickerState] = useState<{
     open: boolean;
@@ -1250,6 +1253,8 @@ function MainApp() {
             onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
             onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); }}
             onConnectLocal={handleConnectLocal}
+            onNewLocal={() => { setEditingLocalProfile(null); setLocalProfileModalOpen(true); }}
+            onEditLocal={(profile) => { setEditingLocalProfile(profile); setLocalProfileModalOpen(true); }}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenTelnet={() => setTelnetDialogOpen(true)}
             restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}
@@ -1543,6 +1548,21 @@ function MainApp() {
             void persistSerialProfile(record);
             setSerialModalOpen(false);
           }}
+        />
+      </Modal>
+
+      <Modal
+        open={localProfileModalOpen}
+        onClose={() => setLocalProfileModalOpen(false)}
+        title={editingLocalProfile ? `Edit ${editingLocalProfile.name}` : "New Local Profile"}
+      >
+        <LocalProfileForm
+          key={editingLocalProfile?.id ?? "new-local"}
+          profile={editingLocalProfile}
+          envVars={[]}
+          onSave={() => setLocalProfileModalOpen(false)}
+          onCancel={() => setLocalProfileModalOpen(false)}
+          onDelete={() => setLocalProfileModalOpen(false)}
         />
       </Modal>
 

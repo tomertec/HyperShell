@@ -273,7 +273,7 @@ export function registerFsIpc(ipcMain: IpcMainLike): () => void {
       title: parsed?.title,
       defaultPath: parsed?.defaultPath,
       filters: parsed?.filters,
-      properties: ["openFile"],
+      properties: [parsed?.directory ? "openDirectory" : "openFile"],
     });
     return result.canceled ? null : result.filePaths[0] ?? null;
   });

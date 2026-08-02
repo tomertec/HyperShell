@@ -31,6 +31,8 @@ export interface SidebarProps {
   onEditSerial: (profile: SerialProfileRecord) => void;
   onNewSerial: () => void;
   onConnectLocal: (profile: LocalProfileRecord) => void;
+  onNewLocal: () => void;
+  onEditLocal: (profile: LocalProfileRecord) => void;
   onOpenSettings: () => void;
   onOpenTelnet?: () => void;
   collapsed?: boolean;
@@ -61,6 +63,8 @@ export function Sidebar({
   onEditSerial,
   onNewSerial,
   onConnectLocal,
+  onNewLocal,
+  onEditLocal,
   onOpenSettings,
   onOpenTelnet,
   collapsed = false,
@@ -174,6 +178,8 @@ export function Sidebar({
             onToggleHidden={(profile, hidden) =>
               void localProfilesStore.getState().setHidden(profile.id, hidden)
             }
+            onNew={onNewLocal}
+            onEdit={onEditLocal}
           />
         </SidebarSection>
       )}

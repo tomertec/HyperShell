@@ -25,7 +25,7 @@ export interface FsApi {
   fsGetDrives(): Promise<FsGetDrivesResponse>;
   fsListSshKeys(): Promise<string[]>;
   fsShowSaveDialog(options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
-  fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
+  fsShowOpenDialog(options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }>; directory?: boolean }): Promise<string | null>;
   fsOpenItem(request: { path: string }): Promise<void>;
   fsShowInFolder(request: { path: string }): Promise<void>;
   fsTrash(request: { path: string }): Promise<void>;

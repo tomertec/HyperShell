@@ -26,6 +26,8 @@ export interface SidebarLocalListProps {
   showHidden: boolean;
   onToggleShowHidden: () => void;
   onToggleHidden: (profile: LocalProfileRecord, hidden: boolean) => void;
+  onNew: () => void;
+  onEdit: (profile: LocalProfileRecord) => void;
 }
 
 function SortableLocalItem({
@@ -33,11 +35,13 @@ function SortableLocalItem({
   showHidden,
   onConnect,
   onToggleHidden,
+  onEdit,
 }: {
   profile: LocalProfileRecord;
   showHidden: boolean;
   onConnect: (profile: LocalProfileRecord) => void;
   onToggleHidden: (profile: LocalProfileRecord, hidden: boolean) => void;
+  onEdit: (profile: LocalProfileRecord) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: profile.id,
@@ -120,6 +124,23 @@ function SortableLocalItem({
           {rowContent}
         </button>
       )}
+      <button
+        type="button"
+        onClick={() => onEdit(profile)}
+        className="shrink-0 rounded p-1 text-text-muted/40 opacity-0 transition-opacity duration-150 group-hover:opacity-100 hover:text-text-secondary focus-visible:opacity-100"
+        title={`Edit ${profile.name}`}
+        aria-label="Edit local profile"
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
       {showHidden && profile.isHidden && (
         <button
           type="button"
@@ -150,6 +171,8 @@ export function SidebarLocalList({
   showHidden,
   onToggleShowHidden,
   onToggleHidden,
+  onNew,
+  onEdit,
 }: SidebarLocalListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -183,6 +206,14 @@ export function SidebarLocalList({
       <div className="flex items-center gap-1 px-1 pb-1 shrink-0">
         <button
           type="button"
+          onClick={onNew}
+          className="h-7 rounded-md border border-border bg-base-750/70 px-2 text-[11px] text-text-secondary hover:border-accent/35 hover:text-text-primary transition-colors"
+          title="New local profile"
+        >
+          New
+        </button>
+        <button
+          type="button"
           onClick={onRescan}
           className="h-7 rounded-md border border-border bg-base-750/70 px-2 text-[11px] text-text-secondary hover:border-accent/35 hover:text-text-primary transition-colors"
           title="Rescan for local shells"
@@ -213,6 +244,7 @@ export function SidebarLocalList({
               showHidden={showHidden}
               onConnect={onConnect}
               onToggleHidden={onToggleHidden}
+              onEdit={onEdit}
             />
           ))}
         </SortableContext>
