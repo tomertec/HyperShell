@@ -18,23 +18,24 @@ import type { LocalProfileRecord } from "@hypershell/shared";
 import type { LayoutTab } from "./layoutStore";
 import { NewTabMenu } from "./NewTabMenu";
 import { sessionStateStore } from "../sessions/sessionStateStore";
+import { IconButton } from "../../components/ui/IconButton";
 
 const tabStateColors: Record<string, string> = {
-  connected: "bg-green-400",
-  connecting: "bg-yellow-400",
-  reconnecting: "bg-yellow-400",
-  waiting_for_network: "bg-orange-400",
-  disconnected: "bg-gray-400",
-  failed: "bg-red-400",
+  connected: "bg-success",
+  connecting: "bg-warning",
+  reconnecting: "bg-warning",
+  waiting_for_network: "bg-warning",
+  disconnected: "bg-text-muted/50",
+  failed: "bg-danger",
 };
 
 const stateTextColors: Record<string, string> = {
-  connected: "text-green-400",
-  connecting: "text-yellow-400",
-  reconnecting: "text-yellow-400",
-  waiting_for_network: "text-orange-400",
-  disconnected: "text-gray-400",
-  failed: "text-red-400",
+  connected: "text-success",
+  connecting: "text-warning",
+  reconnecting: "text-warning",
+  waiting_for_network: "text-warning",
+  disconnected: "text-text-muted",
+  failed: "text-danger",
 };
 
 export interface TabBarProps {
@@ -52,7 +53,7 @@ function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: strin
   const state = sessionState ?? "disconnected";
 
   return (
-    <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] py-2 px-3 rounded-lg bg-base-700 border border-border shadow-xl text-xs pointer-events-none">
+    <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] py-2 px-3 rounded-lg bg-base-700 border border-border shadow-raised animate-menu-in text-xs pointer-events-none">
       <div className="font-medium text-text-primary text-[13px] mb-1">{tab.title}</div>
       <div className="flex items-center gap-1.5 text-text-muted">
         <span className="text-text-secondary">{transport}</span>
@@ -63,8 +64,8 @@ function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: strin
           </>
         )}
       </div>
-      <div className={`mt-1.5 flex items-center gap-1.5 uppercase tracking-wider text-[10px] font-medium ${stateTextColors[state] ?? "text-gray-400"}`}>
-        <span className={`w-1.5 h-1.5 rounded-full ${tabStateColors[state] ?? "bg-gray-400"}`} />
+      <div className={`mt-1.5 flex items-center gap-1.5 uppercase tracking-wider text-[10px] font-medium ${stateTextColors[state] ?? "text-text-muted"}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${tabStateColors[state] ?? "bg-text-muted/50"}`} />
         {state}
       </div>
     </div>
@@ -101,19 +102,23 @@ function SortableTab({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="flex items-end">
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={`flex items-end ${isDragging ? "shadow-raised" : ""}`}>
       <button
         onClick={onActivate}
         onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(); } }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-all duration-150 max-w-[200px] ${
+        className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-colors duration-(--motion-fast) ease-standard max-w-[200px] ${
           isActive
             ? "bg-base-900 text-text-primary"
             : "text-text-secondary hover:text-text-primary hover:bg-base-700/40"
         }`}
       >
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabStateColors[sessionState ?? ""] ?? "bg-gray-400"}`} />
+        <span
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabStateColors[sessionState ?? ""] ?? "bg-text-muted/50"} ${
+            sessionState === "connecting" || sessionState === "reconnecting" ? "host-status-pulse" : ""
+          }`}
+        />
         <span className="truncate">{tab.title}</span>
         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- nested inside the tab <button>, so it cannot be a button; keyboard users close the tab with Ctrl+Shift+W */}
         <span
@@ -225,17 +230,17 @@ export function TabBar({
         </SortableContext>
         {launchableProfiles.length > 0 && (
           <div className="relative flex items-center h-full pb-2 pl-0.5 shrink-0">
-            <button
+            <IconButton
               ref={newTabButtonRef}
-              type="button"
+              variant="ghost"
               onClick={() => setNewTabMenuOpen((v) => !v)}
               title="New Tab"
-              className="flex h-6 w-6 items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-base-700/60 transition-colors"
+              className="h-6 w-6"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-            </button>
+            </IconButton>
             {newTabMenuOpen && (
               <NewTabMenu
                 profiles={launchableProfiles}
