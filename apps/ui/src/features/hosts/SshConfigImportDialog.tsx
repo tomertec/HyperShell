@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
 
@@ -74,6 +74,13 @@ export function SshConfigImportDialog({
 }: SshConfigImportDialogProps) {
   const [value, setValue] = useState(initialValue);
   const preview = useMemo(() => previewSshConfig(value), [value]);
+
+  // The component stays mounted so the modal can animate out, so reopening must
+  // clear the pasted config — otherwise the previous import is still armed and
+  // firing it again would duplicate every host.
+  useEffect(() => {
+    if (open) setValue(initialValue);
+  }, [open, initialValue]);
 
   return (
     <Modal

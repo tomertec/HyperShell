@@ -29,9 +29,13 @@ export function SshManagerImportDialog({ open, onImported, onClose }: SshManager
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setImporting(false);
     setHosts([]);
     setGroups([]);
     setSnippets([]);
+    setSelectedHosts(new Set());
+    setSelectedGroups(new Set());
+    setSelectedSnippets(new Set());
 
     async function scan() {
       try {
