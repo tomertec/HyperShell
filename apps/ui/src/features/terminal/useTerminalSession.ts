@@ -254,6 +254,15 @@ export function useTerminalSession(
       onExitRef.current?.(effect.exitCode ?? null);
     }
 
+    if (effect.processTitle !== undefined && sessionIdRef.current) {
+      layoutStore
+        .getState()
+        .setTabProcessTitle(
+          sessionIdRef.current,
+          effect.processTitle === null ? null : sanitizeTitle(effect.processTitle)
+        );
+    }
+
     const instance = terminalRef.current;
     if (!instance) {
       return;
