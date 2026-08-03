@@ -12,8 +12,9 @@
  * - It appends to PROMPT_COMMAND and refuses to install at all if the user
  *   already has a DEBUG trap — clobbering someone's prompt is worse than
  *   showing a stale tab title.
- * - Unknown shells (fish, csh, restricted) will emit syntax errors; they are
- *   silently skipped by the [ -n "${...VERSION}" ] guards and do not match.
+ * - POSIX-compatible shells that are neither bash nor zsh simply match neither
+ *   `VERSION` guard and install nothing; fish and csh will emit a syntax error,
+ *   since this line is not valid syntax for them.
  */
 const BOOTSTRAP = [
   'if [ -z "${__HS_SI:-}" ]; then',

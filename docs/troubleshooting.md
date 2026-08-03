@@ -68,6 +68,20 @@ Check the terminal theme and font settings in Settings. Ensure the font supports
 2. Check if ProxyJump is configured in `~/.ssh/config` — the system SSH handles this, but it may timeout
 3. Check host status in the sidebar (green dot = reachable)
 
+### A WSL tab's title never shows the running program
+
+WSL processes run inside the VM and are invisible to the Windows process tree (`@vscode/windows-process-tree`). The local process-title poller (`session-core/processTitle/`) can only see Win32 processes, so a WSL pty's tab title stays on the shell name. Expected, not a bug.
+
+### A remote shell prints a line of shell code right after connecting
+
+That line is the shell-integration bootstrap (`session-core/shellIntegration/bootstrap.ts`) being echoed back instead of installing silently — happens on shells it wasn't written for (fish, csh) or ones with unusual echo settings.
+
+**Fix:** Turn it off per host with the "Report the running command in the tab title" checkbox in the host editor.
+
+### SSH tab titles stop updating inside tmux
+
+The bootstrap hook installs into the shell that ran before `tmux attach`. Once attached, tmux captures OSC title escapes itself and won't forward them unless the remote's tmux config has `set -g set-titles on`.
+
 ## Serial
 
 ### No COM ports listed in serial profile form
