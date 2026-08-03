@@ -15,10 +15,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { LocalProfileRecord } from "@hypershell/shared";
-import type { LayoutTab } from "./layoutStore";
+import { resolveTabTitle, type LayoutTab } from "./layoutStore";
 import { NewTabMenu } from "./NewTabMenu";
 import { TabIcon } from "./TabIcon";
 import { sessionStateStore } from "../sessions/sessionStateStore";
+import { settingsStore } from "../settings/settingsStore";
 import { IconButton } from "../../components/ui/IconButton";
 
 const tabStateColors: Record<string, string> = {
@@ -49,13 +50,22 @@ export interface TabBarProps {
   onConnectLocal: (profile: LocalProfileRecord) => void;
 }
 
-function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: string | undefined }) {
+function TabTooltip({
+  tab,
+  sessionState,
+  showActiveProcess,
+}: {
+  tab: LayoutTab;
+  sessionState: string | undefined;
+  showActiveProcess: boolean;
+}) {
   const transport = tab.transport === "serial" ? "Serial" : tab.transport === "sftp" ? "SFTP" : tab.transport === "telnet" ? "Telnet" : "SSH";
   const state = sessionState ?? "disconnected";
+  const label = resolveTabTitle(showActiveProcess ? tab : { ...tab, processTitle: undefined });
 
   return (
     <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] max-w-[320px] py-2 px-3 rounded-lg bg-base-700 border border-border shadow-raised animate-menu-in text-xs pointer-events-none">
-      <div className="font-medium text-text-primary text-[13px] mb-1 break-words">{tab.dynamicTitle ?? tab.title}</div>
+      <div className="font-medium text-text-primary text-[13px] mb-1 break-words">{label}</div>
       <div className="flex items-center gap-1.5 text-text-muted">
         <span className="text-text-secondary">{transport}</span>
         {tab.dynamicTitle && tab.dynamicTitle !== tab.title && (
@@ -71,6 +81,18 @@ function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: strin
           </>
         )}
       </div>
+      {tab.processTitle && showActiveProcess && (
+        <div className="mt-1 flex items-center gap-1.5 text-text-muted">
+          <span>running</span>
+          <span className="text-text-secondary">{tab.processTitle}</span>
+        </div>
+      )}
+      {tab.dynamicTitle && tab.dynamicTitle !== tab.title && (
+        <div className="mt-1 flex items-center gap-1.5 text-text-muted">
+          <span>shell</span>
+          <span className="text-text-secondary">{tab.dynamicTitle}</span>
+        </div>
+      )}
       <div className={`mt-1.5 flex items-center gap-1.5 uppercase tracking-wider text-[10px] font-medium ${stateTextColors[state] ?? "text-text-muted"}`}>
         <span className={`w-1.5 h-1.5 rounded-full ${tabStateColors[state] ?? "bg-text-muted/50"}`} />
         {state}
@@ -83,6 +105,7 @@ function SortableTab({
   tab,
   isActive,
   sessionState,
+  showActiveProcess,
   onActivate,
   onClose,
   hoveredTab,
@@ -92,6 +115,7 @@ function SortableTab({
   tab: LayoutTab;
   isActive: boolean;
   sessionState: string | undefined;
+  showActiveProcess: boolean;
   onActivate: () => void;
   onClose: () => void;
   hoveredTab: string | null;
@@ -108,6 +132,8 @@ function SortableTab({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const label = resolveTabTitle(showActiveProcess ? tab : { ...tab, processTitle: undefined });
+
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={`flex items-end ${isDragging ? "shadow-raised" : ""}`}>
       <button
@@ -123,7 +149,7 @@ function SortableTab({
       >
         <TabIcon tab={tab} sessionState={sessionState} isActive={isActive} />
         <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-3 [mask-image:linear-gradient(to_right,black_calc(100%-14px),transparent)]">
-          {tab.dynamicTitle ?? tab.title}
+          {label}
         </span>
         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- nested inside the tab <button>, so it cannot be a button; keyboard users close the tab with Ctrl+Shift+W */}
         <span
@@ -147,7 +173,7 @@ function SortableTab({
         )}
         {/* Hover tooltip */}
         {hoveredTab === tab.sessionId && (
-          <TabTooltip tab={tab} sessionState={sessionState} />
+          <TabTooltip tab={tab} sessionState={sessionState} showActiveProcess={showActiveProcess} />
         )}
       </button>
     </div>
@@ -164,6 +190,7 @@ export function TabBar({
   onConnectLocal,
 }: TabBarProps) {
   const sessionStates = useStore(sessionStateStore, (s) => s.sessions);
+  const showActiveProcess = useStore(settingsStore, (s) => s.settings.general.showActiveProcess);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [newTabMenuOpen, setNewTabMenuOpen] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -232,6 +259,7 @@ export function TabBar({
                   tab={tab}
                   isActive={isActive}
                   sessionState={sessionState}
+                  showActiveProcess={showActiveProcess}
                   onActivate={() => onActivate(tab.sessionId)}
                   onClose={() => onClose(tab.sessionId)}
                   hoveredTab={hoveredTab}

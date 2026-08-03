@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { useStore } from "zustand";
 import { broadcastStore } from "./broadcastStore";
-import { layoutStore } from "../layout/layoutStore";
+import { layoutStore, resolveTabTitle } from "../layout/layoutStore";
+import { settingsStore } from "../settings/settingsStore";
 
 /** Icon button for the top-right toolbar — toggles broadcast on/off */
 export function BroadcastButton() {
@@ -36,6 +37,7 @@ export function BroadcastBar() {
   const toggle = useStore(broadcastStore, (s) => s.toggle);
   const setTargets = useStore(broadcastStore, (s) => s.setTargets);
   const tabs = useStore(layoutStore, (s) => s.tabs);
+  const showActiveProcess = useStore(settingsStore, (s) => s.settings.general.showActiveProcess);
 
   const activeSessionIds = useMemo(
     () => new Set(tabs.map((t) => t.sessionId)),
@@ -79,7 +81,7 @@ export function BroadcastBar() {
                   : "border-border bg-base-800 text-text-muted hover:text-text-primary"
               }`}
             >
-              {tab.dynamicTitle ?? tab.title}
+              {resolveTabTitle(showActiveProcess ? tab : { ...tab, processTitle: undefined })}
             </button>
           );
         })}
