@@ -23,6 +23,9 @@ export interface WindowsProcessTreeDeps {
   load?: () => WindowsProcessTreeModule;
 }
 
+/** If the native module accepts a call and never invokes its callback, give up rather than hang forever. */
+const CALLBACK_TIMEOUT_MS = 2000;
+
 function toProcessNode(raw: RawProcessTreeNode): ProcessNode {
   return {
     pid: raw.pid,
@@ -65,12 +68,24 @@ export function createWindowsProcessTreeProvider(
         }
       }
 
+      let settled = false;
+      const settle = (value: ProcessNode | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(value);
+      };
+
+      const timer = setTimeout(() => settle(null), CALLBACK_TIMEOUT_MS);
+
       try {
         cached.getProcessTree(rootPid, (tree) => {
-          resolve(tree ? toProcessNode(tree) : null);
+          settle(tree ? toProcessNode(tree) : null);
         });
       } catch {
-        resolve(null);
+        settle(null);
       }
     });
 }

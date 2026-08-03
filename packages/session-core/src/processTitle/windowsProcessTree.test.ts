@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createWindowsProcessTreeProvider } from "./windowsProcessTree";
 
 describe("createWindowsProcessTreeProvider", () => {
@@ -60,5 +60,26 @@ describe("createWindowsProcessTreeProvider", () => {
     });
 
     await expect(provider(1)).resolves.toBeNull();
+  });
+
+  it("resolves null when the native module never invokes its callback", async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = createWindowsProcessTreeProvider({
+        platform: "win32",
+        load: () => ({
+          getProcessTree() {
+            // never calls back — simulates a hung native call
+          }
+        })
+      });
+
+      const result = provider(1);
+      await vi.advanceTimersByTimeAsync(2000);
+
+      await expect(result).resolves.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
