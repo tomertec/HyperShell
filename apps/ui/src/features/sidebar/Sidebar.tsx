@@ -235,6 +235,8 @@ export function Sidebar({
           onCopyAddress={(host) => void navigator.clipboard.writeText(host.hostname)}
           onSetColor={onSetHostColor}
           onReorder={onReorderHosts}
+          onNewHost={onNewHost}
+          onImportSshConfig={onImportSshConfig}
           showFilter={showHostFilter}
           onCloseFilter={() => setShowHostFilter(false)}
         />

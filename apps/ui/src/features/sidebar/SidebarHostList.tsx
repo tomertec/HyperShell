@@ -20,6 +20,8 @@ import { CSS } from "@dnd-kit/utilities";
 import type { TagRecord } from "@hypershell/shared";
 import { ContextMenu } from "../../components/ContextMenu";
 import type { ContextMenuAction } from "../../components/ContextMenu";
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { IconButton } from "../../components/ui/IconButton";
 import type { HostRecord } from "../hosts/HostsView";
 import { loadCollapsedGroups, saveCollapsedGroups } from "./collapsedGroups";
@@ -43,6 +45,8 @@ export interface SidebarHostListProps {
   onCopyAddress: (host: HostRecord) => void;
   onSetColor: (host: HostRecord, color: string | null) => void;
   onReorder: (items: Array<{ id: string; sortOrder: number; group: string }>) => void;
+  onNewHost: () => void;
+  onImportSshConfig: () => void;
 }
 
 const HOST_COLORS = ["red", "orange", "yellow", "green", "blue", "cyan", "purple", "pink"] as const;
@@ -199,6 +203,8 @@ export function SidebarHostList({
   onCopyAddress,
   onSetColor,
   onReorder,
+  onNewHost,
+  onImportSshConfig,
   showFilter = false,
   onCloseFilter,
 }: SidebarHostListProps) {
@@ -694,11 +700,34 @@ export function SidebarHostList({
           </SortableContext>
 
           {hosts.length === 0 && (
-            <div className="px-2 py-6 text-center text-xs text-text-muted">No hosts yet</div>
+            <EmptyState
+              message="No hosts yet"
+              icon={
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M8 20H16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M12 16V20" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+              }
+            >
+              <Button size="sm" onClick={onNewHost}>Add host</Button>
+              <Button size="sm" variant="ghost" onClick={onImportSshConfig}>Import SSH config</Button>
+            </EmptyState>
           )}
 
           {hosts.length > 0 && filteredHosts.length === 0 && (
-            <div className="px-2 py-4 text-center text-xs text-text-muted">No matching hosts</div>
+            <EmptyState message={`No hosts match “${filterQuery.trim()}”`}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setFilterQuery("");
+                  setSelectedTagIds([]);
+                }}
+              >
+                Clear filter
+              </Button>
+            </EmptyState>
           )}
         </div>
 
