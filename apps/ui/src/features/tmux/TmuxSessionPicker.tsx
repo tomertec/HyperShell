@@ -1,5 +1,7 @@
 import { useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "../../components/ui/Button";
+import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../../lib/motion";
 
 export interface TmuxSessionInfo {
   name: string;
@@ -48,7 +50,7 @@ export function TmuxSessionPicker({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: MOTION_BASE }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={onSkip}
           onKeyDown={handleKeyDown}
@@ -57,8 +59,8 @@ export function TmuxSessionPicker({
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-            className="bg-base-800 border border-border rounded-xl shadow-2xl w-full max-w-sm p-6"
+            transition={{ duration: MOTION_SLOW, ease: [...EASE_STANDARD] }}
+            className="bg-base-800 border border-border rounded-xl shadow-overlay w-full max-w-sm p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-base font-medium text-text-primary mb-1">
@@ -105,13 +107,9 @@ export function TmuxSessionPicker({
             </div>
 
             <div className="pt-4">
-              <button
-                type="button"
-                onClick={onSkip}
-                className="w-full py-2 rounded-lg text-sm bg-base-700 hover:bg-base-600 text-text-muted hover:text-text-primary transition-colors"
-              >
+              <Button variant="outline" onClick={onSkip} className="w-full">
                 New shell
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Button } from "../../components/ui/Button";
 
 export type SshConfigImportItem = {
   alias: string;
@@ -101,13 +102,11 @@ export function SshConfigImportDialog({
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => onImport(preview)}
-        className="justify-self-start rounded-lg border border-accent-dim bg-accent/10 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/20 transition-colors"
-      >
-        Import {preview.length} host{preview.length === 1 ? "" : "s"}
-      </button>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="primary" onClick={() => onImport(preview)}>
+          Import {preview.length} host{preview.length === 1 ? "" : "s"}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PuttySession } from "@hypershell/shared";
+import { Button } from "../../components/ui/Button";
 
 export interface PuttyImportDialogProps {
   onImport: (sessions: PuttySession[]) => void;
@@ -82,13 +83,11 @@ export function PuttyImportDialog({ onImport, onClose }: PuttyImportDialogProps)
     return (
       <div className="grid gap-4">
         <p className="text-sm text-text-secondary">{error}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="justify-self-start rounded-lg border border-border bg-base-700/40 px-4 py-2 text-sm font-medium text-text-primary hover:bg-base-700/60 transition-colors"
-        >
-          Close
-        </button>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </div>
     );
   }
@@ -143,14 +142,11 @@ export function PuttyImportDialog({ onImport, onClose }: PuttyImportDialogProps)
         ))}
       </div>
 
-      <button
-        type="button"
-        disabled={selectedCount === 0}
-        onClick={handleImport}
-        className="justify-self-start rounded-lg border border-accent-dim bg-accent/10 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        Import {selectedCount} session{selectedCount === 1 ? "" : "s"}
-      </button>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="primary" disabled={selectedCount === 0} onClick={handleImport}>
+          Import {selectedCount} session{selectedCount === 1 ? "" : "s"}
+        </Button>
+      </div>
     </div>
   );
 }

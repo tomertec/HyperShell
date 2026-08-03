@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { SshManagerHost, SshManagerGroup, SshManagerSnippet } from "@hypershell/shared";
+import { Button } from "../../components/ui/Button";
+import { SectionLabel } from "../../components/ui/SectionLabel";
 
 export interface SshManagerImportDialogProps {
   onImported: () => void;
@@ -145,13 +147,11 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
     return (
       <div className="grid gap-4">
         <p className="text-sm text-text-secondary">{error}</p>
-        <button
-          type="button"
-          onClick={onClose}
-          className="justify-self-start rounded-lg border border-border bg-base-700/40 px-4 py-2 text-sm font-medium text-text-primary hover:bg-base-700/60 transition-colors"
-        >
-          Close
-        </button>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </div>
     );
   }
@@ -163,14 +163,14 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
     <div className="grid gap-4 max-h-[70vh] overflow-y-auto">
       {/* Password warning */}
       {hasPasswordHosts && (
-        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+        <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           Saved passwords from SshManager cannot be migrated (they use Windows DPAPI encryption).
           You will need to re-enter passwords or switch to 1Password references.
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
           {error}
         </div>
       )}
@@ -179,7 +179,7 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
       {groups.length > 0 && (
         <div>
           <div className="flex items-center gap-2 text-xs mb-1.5">
-            <span className="font-medium text-text-primary">Groups ({groups.length})</span>
+            <SectionLabel>Groups ({groups.length})</SectionLabel>
             <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text-primary transition-colors ml-auto">
               <input
                 type="checkbox"
@@ -216,7 +216,7 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
       {hosts.length > 0 && (
         <div>
           <div className="flex items-center gap-2 text-xs mb-1.5">
-            <span className="font-medium text-text-primary">Hosts ({hosts.length})</span>
+            <SectionLabel>Hosts ({hosts.length})</SectionLabel>
             <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text-primary transition-colors ml-auto">
               <input
                 type="checkbox"
@@ -258,7 +258,7 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
       {snippets.length > 0 && (
         <div>
           <div className="flex items-center gap-2 text-xs mb-1.5">
-            <span className="font-medium text-text-primary">Snippets ({snippets.length})</span>
+            <SectionLabel>Snippets ({snippets.length})</SectionLabel>
             <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text-primary transition-colors ml-auto">
               <input
                 type="checkbox"
@@ -291,14 +291,11 @@ export function SshManagerImportDialog({ onImported, onClose }: SshManagerImport
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={totalSelected === 0 || importing}
-        onClick={() => void handleImport()}
-        className="justify-self-start rounded-lg border border-accent-dim bg-accent/10 px-4 py-2 text-sm font-medium text-accent hover:bg-accent/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {importing ? "Importing..." : `Import ${totalSelected} item${totalSelected === 1 ? "" : "s"}`}
-      </button>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="primary" disabled={totalSelected === 0 || importing} onClick={() => void handleImport()}>
+          {importing ? "Importing..." : `Import ${totalSelected} item${totalSelected === 1 ? "" : "s"}`}
+        </Button>
+      </div>
     </div>
   );
 }
