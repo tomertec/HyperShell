@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { LocalProfileRecord } from "@hypershell/shared";
 import type { LayoutTab } from "./layoutStore";
 import { NewTabMenu } from "./NewTabMenu";
+import { TabIcon } from "./TabIcon";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 import { IconButton } from "../../components/ui/IconButton";
 
@@ -53,10 +54,16 @@ function TabTooltip({ tab, sessionState }: { tab: LayoutTab; sessionState: strin
   const state = sessionState ?? "disconnected";
 
   return (
-    <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] py-2 px-3 rounded-lg bg-base-700 border border-border shadow-raised animate-menu-in text-xs pointer-events-none">
-      <div className="font-medium text-text-primary text-[13px] mb-1">{tab.title}</div>
+    <div className="absolute top-full left-0 mt-1 z-50 min-w-[180px] max-w-[320px] py-2 px-3 rounded-lg bg-base-700 border border-border shadow-raised animate-menu-in text-xs pointer-events-none">
+      <div className="font-medium text-text-primary text-[13px] mb-1 break-words">{tab.dynamicTitle ?? tab.title}</div>
       <div className="flex items-center gap-1.5 text-text-muted">
         <span className="text-text-secondary">{transport}</span>
+        {tab.dynamicTitle && tab.dynamicTitle !== tab.title && (
+          <>
+            <span className="text-text-muted/50">&middot;</span>
+            <span>{tab.title}</span>
+          </>
+        )}
         {tab.profileId && (
           <>
             <span className="text-text-muted/50">&middot;</span>
@@ -108,18 +115,16 @@ function SortableTab({
         onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(); } }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-colors duration-(--motion-fast) ease-standard max-w-[200px] ${
+        className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-colors duration-(--motion-fast) ease-standard min-w-[110px] max-w-[220px] ${
           isActive
             ? "bg-base-900 text-text-primary"
-            : "text-text-secondary hover:text-text-primary hover:bg-base-700/40"
+            : "text-text-muted hover:text-text-primary hover:bg-base-700/40"
         }`}
       >
-        <span
-          className={`w-1.5 h-1.5 rounded-full shrink-0 ${tabStateColors[sessionState ?? ""] ?? "bg-text-muted/50"} ${
-            sessionState === "connecting" || sessionState === "reconnecting" ? "host-status-pulse" : ""
-          }`}
-        />
-        <span className="truncate">{tab.title}</span>
+        <TabIcon tab={tab} sessionState={sessionState} isActive={isActive} />
+        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-3 [mask-image:linear-gradient(to_right,black_calc(100%-14px),transparent)]">
+          {tab.dynamicTitle ?? tab.title}
+        </span>
         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- nested inside the tab <button>, so it cannot be a button; keyboard users close the tab with Ctrl+Shift+W */}
         <span
           onClick={(e) => {
