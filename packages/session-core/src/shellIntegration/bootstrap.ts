@@ -12,7 +12,8 @@
  * - It appends to PROMPT_COMMAND and refuses to install at all if the user
  *   already has a DEBUG trap — clobbering someone's prompt is worse than
  *   showing a stale tab title.
- * - Unknown shells (fish, csh, restricted) match neither branch and get nothing.
+ * - Unknown shells (fish, csh, restricted) will emit syntax errors; they are
+ *   silently skipped by the [ -n "${...VERSION}" ] guards and do not match.
  */
 const BOOTSTRAP = [
   'if [ -z "${__HS_SI:-}" ]; then',
@@ -27,7 +28,7 @@ const BOOTSTRAP = [
   `__hs_pre() { case "$BASH_COMMAND" in __hs_post*) return;; esac; printf '\\033]0;%s\\007' "\${BASH_COMMAND%% *}"; };`,
   `__hs_post() { printf '\\033]0;%s@%s: %s\\007' "\${USER}" "\${HOSTNAME%%.*}" "\${PWD/#$HOME/~}"; };`,
   "trap '__hs_pre' DEBUG;",
-  'PROMPT_COMMAND="__hs_post${PROMPT_COMMAND:+;$PROMPT_COMMAND}";',
+  'PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND;}__hs_post";',
   'fi;',
   'fi'
 ].join(" ");

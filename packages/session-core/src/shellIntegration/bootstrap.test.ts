@@ -32,6 +32,10 @@ describe("buildShellIntegrationBootstrap", () => {
     expect(line).toContain("${PROMPT_COMMAND:+");
   });
 
+  it("appends __hs_post after existing PROMPT_COMMAND to preserve exit status", () => {
+    expect(line).toContain("${PROMPT_COMMAND:+$PROMPT_COMMAND;}__hs_post");
+  });
+
   it("emits an OSC 0 title sequence", () => {
     expect(line).toContain("\\033]0;");
   });
