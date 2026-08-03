@@ -522,6 +522,7 @@ export function useTerminalSession(
             profileId: input.profileId,
             cols,
             rows,
+            tmuxAttach: Boolean(input.tmuxAttachTarget),
             ...(input.telnetOptions ? { telnetOptions: input.telnetOptions } : {})
           }),
         isStale: () =>

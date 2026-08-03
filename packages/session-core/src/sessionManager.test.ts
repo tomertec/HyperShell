@@ -721,3 +721,111 @@ describe("process titles", () => {
     expect(fake.registered.has(sessionId)).toBe(false);
   });
 });
+
+describe("shell integration injection", () => {
+  function recordingTransport() {
+    const listeners = new Set<(event: SessionTransportEvent) => void>();
+    const writes: string[] = [];
+    return {
+      writes,
+      emit(event: SessionTransportEvent) {
+        for (const listener of listeners) listener(event);
+      },
+      handle: {
+        write(data: string) {
+          writes.push(data);
+        },
+        resize() {},
+        close() {},
+        onEvent(listener: (event: SessionTransportEvent) => void) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        }
+      }
+    };
+  }
+
+  it("writes the bootstrap when an SSH session connects", () => {
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+
+    expect(transport.writes).toHaveLength(1);
+    expect(transport.writes[0]).toContain("__HS_SI");
+  });
+
+  it("writes it again after a reconnect", () => {
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "status", sessionId, state: "reconnecting" });
+    transport.emit({ type: "status", sessionId, state: "connected" });
+
+    expect(transport.writes).toHaveLength(2);
+  });
+
+  it("skips hosts that opted out", () => {
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes", shellIntegration: false }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+
+    expect(transport.writes).toHaveLength(0);
+  });
+
+  it("skips tmux attach tabs", () => {
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      tmuxAttach: true,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+
+    expect(transport.writes).toHaveLength(0);
+  });
+
+  it("never injects into local or serial sessions", () => {
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "local",
+      profileId: "p1",
+      cols: 80,
+      rows: 24,
+      localOptions: { executable: "pwsh.exe" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+
+    expect(transport.writes).toHaveLength(0);
+  });
+});

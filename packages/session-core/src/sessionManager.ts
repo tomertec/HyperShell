@@ -18,6 +18,7 @@ import { createTelnetTransport } from "./transports/telnetTransport";
 import { createLocalShellTransport } from "./transports/localShellTransport";
 import type { NetworkMonitor } from "./networkMonitor";
 import type { ProcessTitlePoller } from "./processTitle/processTitlePoller";
+import { buildShellIntegrationBootstrap } from "./shellIntegration/bootstrap";
 
 const execFileAsync = promisify(execFile);
 
@@ -52,6 +53,8 @@ export interface OpenSessionInput {
   autoReconnect?: boolean;
   maxReconnectAttempts?: number;
   reconnectBaseInterval?: number;
+  /** True when this tab will immediately attach to tmux. Suppresses shell integration. */
+  tmuxAttach?: boolean;
 }
 
 export interface OpenSessionResult {
@@ -248,6 +251,21 @@ export function createSessionManager(
 
         clearReconnectStabilityTimer(session);
       });
+
+      if (event.state === "connected") {
+        const session = sessions.get(sessionId);
+        const shouldInject =
+          session !== undefined &&
+          session.input.transport === "ssh" &&
+          session.input.sshOptions?.shellIntegration !== false &&
+          session.input.tmuxAttach !== true;
+
+        if (shouldInject) {
+          // Fires on every connect, including reconnects — each one is a fresh
+          // remote shell with no hook installed.
+          session.transport.write(buildShellIntegrationBootstrap());
+        }
+      }
     }
 
     if (event.type === "error") {

@@ -47,6 +47,7 @@ export const openSessionRequestSchema = z.object({
   reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
   telnetOptions: telnetConnectionOptionsSchema.optional(),
+  tmuxAttach: z.boolean().optional(),
 });
 
 export const openSessionResponseSchema = z.object({
