@@ -22,6 +22,7 @@ import { ContextMenu } from "../../components/ContextMenu";
 import type { ContextMenuAction } from "../../components/ContextMenu";
 import { IconButton } from "../../components/ui/IconButton";
 import type { HostRecord } from "../hosts/HostsView";
+import { loadCollapsedGroups, saveCollapsedGroups } from "./collapsedGroups";
 
 export interface SidebarHostListProps {
   hosts: HostRecord[];
@@ -208,7 +209,20 @@ export function SidebarHostList({
   const [hostReachabilityById, setHostReachabilityById] = useState<
     Record<string, HostReachability>
   >({});
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() =>
+    loadCollapsedGroups()
+  );
   const filterInputRef = useRef<HTMLInputElement>(null);
+
+  const toggleGroup = useCallback((group: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      saveCollapsedGroups(next);
+      return next;
+    });
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -625,26 +639,49 @@ export function SidebarHostList({
         {/* Scrollable host cards */}
         <div className="flex-1 min-h-0 overflow-y-auto space-y-0.5">
           <SortableContext items={allHostIds} strategy={verticalListSortingStrategy}>
-            {[...grouped.entries()].map(([group, groupHosts]) => (
-              <div key={group}>
-                <div className="select-none px-2 py-1.5 text-[10px] font-medium uppercase tracking-widest text-text-muted/70">
-                  {group}
-                </div>
+            {[...grouped.entries()].map(([group, groupHosts]) => {
+              const isCollapsed =
+                collapsedGroups.has(group) &&
+                filterQuery.trim() === "" &&
+                selectedTagIds.length === 0;
+              return (
+                <div key={group}>
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group)}
+                    aria-expanded={!isCollapsed}
+                    className="flex w-full items-center gap-1 select-none px-2 py-1.5 text-[10px] font-medium uppercase tracking-widest text-text-muted/70 hover:text-text-secondary transition-colors duration-(--motion-fast) focus-ring rounded-sm"
+                  >
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      aria-hidden="true"
+                      className={`transition-transform duration-(--motion-base) ease-standard ${isCollapsed ? "" : "rotate-90"}`}
+                    >
+                      <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>{group}</span>
+                    <span className="text-text-muted/50">· {groupHosts.length}</span>
+                  </button>
 
-                {groupHosts.map((host) => (
-                  <SortableHostItem
-                    key={host.id}
-                    host={host}
-                    activeSessionHostIds={activeSessionHostIds}
-                    connectingHostIds={connectingHostIds}
-                    hostReachabilityById={hostReachabilityById}
-                    onConnect={onConnect}
-                    onOpenSftp={onOpenSftp}
-                    onContextMenu={(e, h) => setContextMenu({ x: e.clientX, y: e.clientY, host: h })}
-                  />
-                ))}
-              </div>
-            ))}
+                  {!isCollapsed &&
+                    groupHosts.map((host) => (
+                      <SortableHostItem
+                        key={host.id}
+                        host={host}
+                        activeSessionHostIds={activeSessionHostIds}
+                        connectingHostIds={connectingHostIds}
+                        hostReachabilityById={hostReachabilityById}
+                        onConnect={onConnect}
+                        onOpenSftp={onOpenSftp}
+                        onContextMenu={(e, h) => setContextMenu({ x: e.clientX, y: e.clientY, host: h })}
+                      />
+                    ))}
+                </div>
+              );
+            })}
           </SortableContext>
 
           {hosts.length === 0 && (
