@@ -17,6 +17,7 @@ import { createSshPtyTransport, buildSshPtyCommand } from "./transports/sshPtyTr
 import { createTelnetTransport } from "./transports/telnetTransport";
 import { createLocalShellTransport } from "./transports/localShellTransport";
 import type { NetworkMonitor } from "./networkMonitor";
+import type { ProcessTitlePoller } from "./processTitle/processTitlePoller";
 
 const execFileAsync = promisify(execFile);
 
@@ -36,6 +37,7 @@ export interface SessionManagerDeps {
   createTransport?: (request: OpenSessionRequest) => TransportHandle;
   sessionIdFactory?: () => string;
   networkMonitor?: NetworkMonitor;
+  processTitlePoller?: ProcessTitlePoller;
 }
 
 export interface OpenSessionInput {
@@ -183,6 +185,18 @@ export function createSessionManager(
     deps.sessionIdFactory ?? (() => `session-${nextSessionId++}`);
   const createTransport = deps.createTransport ?? createDefaultTransport;
   const networkMonitor = deps.networkMonitor;
+  const processTitlePoller = deps.processTitlePoller;
+
+  processTitlePoller?.onChange((sessionId, name) => {
+    // A poll can land after the session went away; don't resurrect a dead tab.
+    if (!sessions.has(sessionId)) {
+      return;
+    }
+
+    for (const listener of listeners) {
+      listener({ type: "process-title", sessionId, name });
+    }
+  });
 
   function updateSession(
     sessionId: string,
@@ -301,6 +315,7 @@ export function createSessionManager(
         } else {
           session.snapshot.state = "disconnected";
           session.unsubscribe();
+          processTitlePoller?.unregister(sessionId);
           sessions.delete(sessionId);
         }
       }
@@ -376,6 +391,10 @@ export function createSessionManager(
         networkOnlineUnsub: null
       });
 
+      if (input.transport === "local" && transport.pid !== undefined) {
+        processTitlePoller?.register(sessionId, transport.pid);
+      }
+
       return {
         sessionId,
         state: snapshot.state
@@ -414,6 +433,7 @@ export function createSessionManager(
       session.transport.close();
       session.unsubscribe();
       session.snapshot.state = "disconnected";
+      processTitlePoller?.unregister(sessionId);
       sessions.delete(sessionId);
     },
 
@@ -429,6 +449,7 @@ export function createSessionManager(
         session.transport.close();
         session.unsubscribe();
         session.snapshot.state = "disconnected";
+        processTitlePoller?.unregister(sessionId);
         sessions.delete(sessionId);
       }
     },

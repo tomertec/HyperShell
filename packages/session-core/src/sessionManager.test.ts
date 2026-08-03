@@ -622,3 +622,102 @@ describe("local sessions", () => {
     expect(manager.getSession("s-local-1")?.autoReconnect).toBe(false);
   });
 });
+
+describe("process titles", () => {
+  function fakePoller() {
+    const registered = new Map<string, number>();
+    let emit: ((sessionId: string, name: string | null) => void) | null = null;
+
+    return {
+      registered,
+      fire(sessionId: string, name: string | null) {
+        emit?.(sessionId, name);
+      },
+      poller: {
+        register(sessionId: string, pid: number) {
+          registered.set(sessionId, pid);
+        },
+        unregister(sessionId: string) {
+          registered.delete(sessionId);
+        },
+        onChange(listener: (sessionId: string, name: string | null) => void) {
+          emit = listener;
+          return () => {
+            emit = null;
+          };
+        },
+        stop() {}
+      }
+    };
+  }
+
+  function transportWithPid(pid: number | undefined) {
+    const listeners = new Set<(event: SessionTransportEvent) => void>();
+    return {
+      pid,
+      write() {},
+      resize() {},
+      close() {},
+      onEvent(listener: (event: SessionTransportEvent) => void) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }
+    };
+  }
+
+  it("registers local sessions that report a pid", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+
+    const { sessionId } = manager.open({ transport: "local", profileId: "p1", cols: 80, rows: 24 });
+
+    expect(fake.registered.get(sessionId)).toBe(4242);
+  });
+
+  it("does not register non-local transports", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+
+    manager.open({ transport: "ssh", profileId: "host", cols: 80, rows: 24 });
+
+    expect(fake.registered.size).toBe(0);
+  });
+
+  it("forwards poller changes as process-title events", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+    const events: SessionTransportEvent[] = [];
+    manager.onEvent((event) => events.push(event));
+
+    const { sessionId } = manager.open({ transport: "local", profileId: "p1", cols: 80, rows: 24 });
+    fake.fire(sessionId, "llmtop");
+
+    expect(events).toContainEqual({ type: "process-title", sessionId, name: "llmtop" });
+  });
+
+  it("drops events for sessions that already closed", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+    const events: SessionTransportEvent[] = [];
+
+    const { sessionId } = manager.open({ transport: "local", profileId: "p1", cols: 80, rows: 24 });
+    manager.close(sessionId);
+    manager.onEvent((event) => events.push(event));
+    fake.fire(sessionId, "llmtop");
+
+    expect(events).toHaveLength(0);
+    expect(fake.registered.has(sessionId)).toBe(false);
+  });
+});

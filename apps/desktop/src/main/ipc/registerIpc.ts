@@ -22,8 +22,10 @@ import type {
 } from "@hypershell/shared";
 import {
   createNetworkMonitor,
+  createProcessTitlePoller,
   createSessionManager,
   createSsh2ConnectionPool,
+  createWindowsProcessTreeProvider,
   parseSshConfig,
 } from "@hypershell/session-core";
 import {
@@ -233,7 +235,12 @@ const registeredChannels = [
 const networkMonitor = createNetworkMonitor({
   probeIntervalMs: process.env.VITEST || process.env.NODE_ENV === "test" ? 0 : 10_000
 });
-export const sessionManager = createSessionManager({ networkMonitor });
+export const sessionManager = createSessionManager({
+  networkMonitor,
+  processTitlePoller: createProcessTitlePoller({
+    provider: createWindowsProcessTreeProvider()
+  })
+});
 const ssh2ConnectionPool = createSsh2ConnectionPool();
 const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;

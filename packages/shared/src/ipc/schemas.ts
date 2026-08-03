@@ -124,6 +124,11 @@ export const sessionEventSchema = z.discriminatedUnion("type", [
     type: z.literal("error"),
     sessionId: z.string().min(1),
     message: z.string().min(1)
+  }),
+  z.object({
+    type: z.literal("process-title"),
+    sessionId: z.string().min(1),
+    name: z.string().min(1).nullable()
   })
 ]);
 

@@ -28,6 +28,11 @@ export type SessionTransportEvent =
       type: "error";
       sessionId: string;
       message: string;
+    }
+  | {
+      type: "process-title";
+      sessionId: string;
+      name: string | null;
     };
 
 export interface TransportHandle {

@@ -38,3 +38,6 @@ export { createLocalShellTransport } from "./transports/localShellTransport";
 export type { CreateLocalShellTransportDeps } from "./transports/localShellTransport";
 export { createPtyProcess, sanitizePtyEnv } from "./transports/ptyProcess";
 export type { LocalConnectionOptions } from "./transports/transportEvents";
+export * from "./processTitle/foregroundProcess";
+export * from "./processTitle/processTitlePoller";
+export * from "./processTitle/windowsProcessTree";
