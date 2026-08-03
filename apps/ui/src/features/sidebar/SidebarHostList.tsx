@@ -20,6 +20,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { TagRecord } from "@hypershell/shared";
 import { ContextMenu } from "../../components/ContextMenu";
 import type { ContextMenuAction } from "../../components/ContextMenu";
+import { IconButton } from "../../components/ui/IconButton";
 import type { HostRecord } from "../hosts/HostsView";
 
 export interface SidebarHostListProps {
@@ -101,7 +102,7 @@ function SortableHostItem({
   connectingHostIds,
   hostReachabilityById,
   onConnect,
-  showDivider,
+  onOpenSftp,
   onContextMenu,
 }: {
   host: HostRecord;
@@ -109,7 +110,7 @@ function SortableHostItem({
   connectingHostIds: Set<string>;
   hostReachabilityById: Record<string, HostReachability>;
   onConnect: (host: HostRecord) => void;
-  showDivider: boolean;
+  onOpenSftp: (host: HostRecord) => void;
   onContextMenu: (e: React.MouseEvent, host: HostRecord) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -139,7 +140,7 @@ function SortableHostItem({
         }}
         className={`relative flex min-w-0 flex-1 items-center gap-2.5 rounded-md border-l-2 ${
           host.color ? `host-color-${host.color}` : "border-transparent hover:border-accent/50"
-        } px-2 py-1.5 text-left text-sm transition-all duration-150 hover:bg-base-700/60`}
+        } px-2 py-1.5 pr-8 text-left text-sm transition-colors duration-(--motion-fast) ease-standard hover:bg-base-700/50`}
         title={`${host.hostname}:${host.port} — click to connect`}
       >
         <StatusDot
@@ -163,12 +164,19 @@ function SortableHostItem({
           </div>
         </div>
       </button>
-      {showDivider && !isDragging && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-px left-8 right-2 h-px bg-gradient-to-r from-transparent via-border/70 to-transparent"
-        />
-      )}
+      <IconButton
+        variant="ghost"
+        title="Open SFTP"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenSftp(host);
+        }}
+        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-(--motion-fast) bg-base-800/80"
+      >
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <path d="M2 4.5A1.5 1.5 0 013.5 3H6.5L8 5H12.5A1.5 1.5 0 0114 6.5V11.5A1.5 1.5 0 0112.5 13H3.5A1.5 1.5 0 012 11.5V4.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        </svg>
+      </IconButton>
     </div>
   );
 }
@@ -623,7 +631,7 @@ export function SidebarHostList({
                   {group}
                 </div>
 
-                {groupHosts.map((host, index) => (
+                {groupHosts.map((host) => (
                   <SortableHostItem
                     key={host.id}
                     host={host}
@@ -631,7 +639,7 @@ export function SidebarHostList({
                     connectingHostIds={connectingHostIds}
                     hostReachabilityById={hostReachabilityById}
                     onConnect={onConnect}
-                    showDivider={index < groupHosts.length - 1}
+                    onOpenSftp={onOpenSftp}
                     onContextMenu={(e, h) => setContextMenu({ x: e.clientX, y: e.clientY, host: h })}
                   />
                 ))}
@@ -660,7 +668,7 @@ export function SidebarHostList({
 
       <DragOverlay>
         {activeHost ? (
-          <div className="flex items-center gap-2.5 rounded-md border border-accent/30 bg-base-800/95 px-2 py-1.5 text-sm shadow-lg backdrop-blur">
+          <div className="flex items-center gap-2.5 rounded-md border border-accent/30 bg-base-800/95 px-2 py-1.5 text-sm shadow-raised backdrop-blur">
             <StatusDot
               hostId={activeHost.id}
               activeSessionHostIds={activeSessionHostIds}
