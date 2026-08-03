@@ -780,6 +780,24 @@ describe("shell integration injection", () => {
     expect(transport.writes).toHaveLength(2);
   });
 
+  it("skips hosts with a configured password", () => {
+    // Password auth races the bootstrap write against sshPtyTransport's
+    // password-prompt watcher on the same pty — see task-10-report.md.
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes", password: "hunter2" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+
+    expect(transport.writes).toHaveLength(0);
+  });
+
   it("skips hosts that opted out", () => {
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });

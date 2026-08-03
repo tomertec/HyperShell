@@ -82,6 +82,10 @@ That line is the shell-integration bootstrap (`session-core/shellIntegration/boo
 
 The bootstrap hook installs into the shell that ran before `tmux attach`. Once attached, tmux captures OSC title escapes itself and won't forward them unless the remote's tmux config has `set -g set-titles on`.
 
+### A password-authenticated SSH host never shows the running command
+
+`SessionManager` deliberately skips the shell-integration bootstrap when the host has a configured password. Writing the bootstrap and `sshPtyTransport`'s password-prompt watcher would race on the same pty, so the bootstrap is silently dropped or consumed as (part of) the password. Key-based auth hosts are unaffected. Expected, not a bug.
+
 ## Serial
 
 ### No COM ports listed in serial profile form

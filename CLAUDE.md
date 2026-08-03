@@ -78,7 +78,9 @@ a `process-title` session event. SSH tabs instead receive a one-line shell hook
 (`session-core/shellIntegration/bootstrap.ts`) written into the pty on every
 `connected` transition (including reconnects, since each is a fresh remote
 shell), which emits ordinary OSC titles per command; it is skipped for
-tmux-attach sessions. Display order is `processTitle ?? dynamicTitle ?? title`
+tmux-attach sessions and for password-authenticated hosts (the bootstrap write
+would race `sshPtyTransport`'s password-prompt watcher on the same pty).
+Display order is `processTitle ?? dynamicTitle ?? title`
 (`resolveTabTitle`), read at four sites — tab label, tab tooltip, status bar,
 broadcast bar. Per-host opt-out via the `shellIntegration` column (default on);
 global display toggle via `general.showActiveProcess` (default on), which gates

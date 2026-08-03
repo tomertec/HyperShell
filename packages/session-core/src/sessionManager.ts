@@ -258,6 +258,7 @@ export function createSessionManager(
           session !== undefined &&
           session.input.transport === "ssh" &&
           session.input.sshOptions?.shellIntegration !== false &&
+          session.input.sshOptions?.password === undefined &&
           session.input.tmuxAttach !== true;
 
         if (shouldInject) {
