@@ -28,6 +28,7 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "@serialport/bindings-cpp",
+      "@vscode/windows-process-tree",
       "better-sqlite3",
       "cpu-features",
       "electron",
