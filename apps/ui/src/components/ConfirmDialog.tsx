@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "./ui/Button";
+import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../lib/motion";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -51,11 +53,6 @@ export function ConfirmDialog({
     [onConfirm],
   );
 
-  const confirmClasses =
-    variant === "danger"
-      ? "bg-red-600 text-white hover:bg-red-500 focus:ring-red-500/40"
-      : "bg-accent text-white hover:bg-accent/90 focus:ring-accent/40";
-
   return (
     <AnimatePresence>
       {open && (
@@ -76,14 +73,14 @@ export function ConfirmDialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: MOTION_BASE }}
         >
           <motion.div
-            className="mx-4 w-full max-w-sm rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/40"
+            className="mx-4 w-full max-w-sm rounded-xl border border-border-bright/60 bg-base-800 shadow-overlay"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{ duration: MOTION_SLOW, ease: [...EASE_STANDARD] }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 py-4">
@@ -93,19 +90,17 @@ export function ConfirmDialog({
               <p className="mt-2 text-sm text-text-secondary">{message}</p>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
-              <button
-                onClick={onCancel}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-base-700 transition-colors"
-              >
+              <Button variant="ghost" size="sm" onClick={onCancel}>
                 {cancelLabel}
-              </button>
-              <button
+              </Button>
+              <Button
                 ref={confirmBtnRef}
+                variant={variant === "danger" ? "danger" : "primary"}
+                size="sm"
                 onClick={onConfirm}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 ${confirmClasses}`}
               >
                 {confirmLabel}
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>

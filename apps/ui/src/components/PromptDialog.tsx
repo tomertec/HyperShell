@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "./ui/Button";
+import { Input } from "./ui/Input";
+import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../lib/motion";
 
 export interface PromptDialogProps {
   open: boolean;
@@ -84,14 +87,14 @@ export function PromptDialog({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: MOTION_BASE }}
         >
           <motion.div
-            className="mx-4 w-full max-w-sm rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/40"
+            className="mx-4 w-full max-w-sm rounded-xl border border-border-bright/60 bg-base-800 shadow-overlay"
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{ duration: MOTION_SLOW, ease: [...EASE_STANDARD] }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 py-4">
@@ -101,29 +104,27 @@ export function PromptDialog({
               {label && (
                 <p className="mt-2 text-xs text-text-secondary">{label}</p>
               )}
-              <input
+              <Input
                 ref={inputRef}
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="mt-3 w-full rounded-lg border border-border bg-base-900 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-accent/20 transition-colors"
+                className="mt-3"
               />
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
-              <button
-                onClick={onCancel}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-base-700 transition-colors"
-              >
+              <Button variant="ghost" size="sm" onClick={onCancel}>
                 {cancelLabel}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleSubmit}
                 disabled={!value.trim()}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-accent/40"
               >
                 {confirmLabel}
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>
