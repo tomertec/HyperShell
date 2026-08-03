@@ -1,4 +1,5 @@
 import type { SerialProfileRecord } from "@hypershell/shared";
+import { EmptyState } from "../../components/ui/EmptyState";
 
 export interface SidebarSerialListProps {
   profiles: SerialProfileRecord[];
@@ -29,11 +30,7 @@ export function SidebarSerialList({ profiles, onConnect, onEdit }: SidebarSerial
           </div>
         </button>
       ))}
-      {profiles.length === 0 && (
-        <div className="px-2 py-6 text-xs text-text-muted text-center">
-          No serial profiles yet
-        </div>
-      )}
+      {profiles.length === 0 && <EmptyState message="No serial profiles yet" />}
     </div>
   );
 }

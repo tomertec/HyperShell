@@ -2,6 +2,9 @@ import { useState, useCallback } from "react";
 import { AnimatePresence, LayoutGroup } from "framer-motion";
 import { motion } from "framer-motion";
 import type { LocalProfileRecord } from "@hypershell/shared";
+import { Button } from "../../components/ui/Button";
+import { Kbd } from "../../components/ui/Kbd";
+import { MOTION_SLOW, EASE_STANDARD } from "../../lib/motion";
 import { LocalProfileIcon } from "../local/LocalProfileIcon";
 import { AnimatedLogo } from "./AnimatedLogo";
 import { QuickConnectForm, type SerialAdvancedOptions } from "./QuickConnectForm";
@@ -49,7 +52,7 @@ export function WelcomeScreen({
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+                transition={{ duration: MOTION_SLOW, ease: EASE_STANDARD }}
                 className="overflow-hidden"
               >
                 <QuickConnectForm
@@ -67,15 +70,16 @@ export function WelcomeScreen({
         {localProfiles.length > 0 && (
           <div className="flex flex-wrap items-center justify-center gap-2 max-w-md">
             {localProfiles.map((profile) => (
-              <button
+              <Button
                 key={profile.id}
-                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full"
                 onClick={() => onConnectLocal(profile)}
-                className="flex items-center gap-1.5 rounded-full border border-border bg-base-800/60 px-3 py-1.5 text-xs text-text-secondary hover:border-accent/40 hover:text-text-primary transition-colors"
               >
                 <LocalProfileIcon icon={profile.icon} className="h-3.5 w-3.5 shrink-0" />
                 <span>{profile.name}</span>
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -89,9 +93,7 @@ export function WelcomeScreen({
             className="text-xs text-text-muted mt-2"
           >
             or press{" "}
-            <kbd className="inline-flex items-center px-1.5 py-0.5 rounded bg-base-700/80 text-text-secondary text-[11px] border border-border/50 font-medium">
-              Ctrl+K
-            </kbd>{" "}
+            <Kbd>Ctrl+K</Kbd>{" "}
             to search hosts
           </motion.div>
         )}

@@ -1,5 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useCallback, useEffect, useId } from "react";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 import { TransportToggle, type TransportMode } from "./TransportToggle";
 
 interface QuickConnectFormProps {
@@ -18,12 +21,6 @@ export interface SerialAdvancedOptions {
 }
 
 const BAUD_RATES = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200];
-
-const inputClass =
-  "w-full bg-base-900 border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/40 focus:shadow-[inset_0_0_0_1px_var(--color-accent)] transition-colors";
-
-const selectClass =
-  "w-full bg-base-900 border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/40 focus:shadow-[inset_0_0_0_1px_var(--color-accent)] transition-colors appearance-none";
 
 export function QuickConnectForm({
   availablePorts,
@@ -97,37 +94,33 @@ export function QuickConnectForm({
             transition={{ duration: 0.15 }}
             className="w-full flex flex-col gap-3"
           >
-            <input
+            <Input
               type="text"
               placeholder="Hostname or IP address"
               value={host}
               onChange={(e) => setHost(e.target.value)}
-              className={inputClass}
               // eslint-disable-next-line jsx-a11y/no-autofocus -- focuses the field the user just opened this form to fill
               autoFocus
             />
             <div className="grid grid-cols-[6rem_1fr] gap-2">
-              <input
+              <Input
                 type="text"
                 placeholder="Port"
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
-                className={inputClass}
               />
-              <input
+              <Input
                 type="text"
                 placeholder="Username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className={inputClass}
               />
             </div>
-            <input
+            <Input
               type="password"
               placeholder="Password (optional)"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={inputClass}
             />
           </motion.div>
         ) : (
@@ -140,10 +133,10 @@ export function QuickConnectForm({
             className="w-full flex flex-col gap-3"
           >
             <div className="flex gap-2">
-              <select
+              <Select
                 value={comPort}
                 onChange={(e) => setComPort(e.target.value)}
-                className={`${selectClass} flex-1`}
+                className="flex-1"
               >
                 <option value="" disabled>
                   {availablePorts.length ? "Select COM port" : "No ports found"}
@@ -151,28 +144,27 @@ export function QuickConnectForm({
                 {availablePorts.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
-              </select>
-              <button
+              </Select>
+              <Button
                 type="button"
+                variant="outline"
                 onClick={onRefreshPorts}
-                className="px-2.5 py-2 rounded-lg border border-border bg-base-900 text-text-muted hover:text-text-primary hover:border-border-bright transition-colors"
                 title="Refresh ports"
               >
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M11.5 7A4.5 4.5 0 1 1 7 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                   <path d="M7 1v3h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-              </button>
+              </Button>
             </div>
-            <select
+            <Select
               value={baudRate}
               onChange={(e) => setBaudRate(e.target.value)}
-              className={selectClass}
             >
               {BAUD_RATES.map((r) => (
                 <option key={r} value={r}>{r} baud</option>
               ))}
-            </select>
+            </Select>
 
             {/* More options toggle */}
             <button
@@ -205,33 +197,33 @@ export function QuickConnectForm({
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-dataBits`}>Data bits</label>
-                        <select id={`${fieldId}-dataBits`} value={dataBits} onChange={(e) => setDataBits(e.target.value)} className={selectClass}>
+                        <Select id={`${fieldId}-dataBits`} value={dataBits} onChange={(e) => setDataBits(e.target.value)}>
                           {[5, 6, 7, 8].map((v) => <option key={v} value={v}>{v}</option>)}
-                        </select>
+                        </Select>
                       </div>
                       <div className="flex-1">
                         <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-stopBits`}>Stop bits</label>
-                        <select id={`${fieldId}-stopBits`} value={stopBits} onChange={(e) => setStopBits(e.target.value)} className={selectClass}>
+                        <Select id={`${fieldId}-stopBits`} value={stopBits} onChange={(e) => setStopBits(e.target.value)}>
                           {[1, 2].map((v) => <option key={v} value={v}>{v}</option>)}
-                        </select>
+                        </Select>
                       </div>
                     </div>
                     <div className="flex gap-2">
                       <div className="flex-1">
                         <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-parity`}>Parity</label>
-                        <select id={`${fieldId}-parity`} value={parity} onChange={(e) => setParity(e.target.value as typeof parity)} className={selectClass}>
+                        <Select id={`${fieldId}-parity`} value={parity} onChange={(e) => setParity(e.target.value as typeof parity)}>
                           <option value="none">None</option>
                           <option value="even">Even</option>
                           <option value="odd">Odd</option>
-                        </select>
+                        </Select>
                       </div>
                       <div className="flex-1">
                         <label className="text-[10px] text-text-muted mb-1 block" htmlFor={`${fieldId}-flowControl`}>Flow control</label>
-                        <select id={`${fieldId}-flowControl`} value={flowControl} onChange={(e) => setFlowControl(e.target.value as typeof flowControl)} className={selectClass}>
+                        <Select id={`${fieldId}-flowControl`} value={flowControl} onChange={(e) => setFlowControl(e.target.value as typeof flowControl)}>
                           <option value="none">None</option>
                           <option value="rtscts">RTS/CTS</option>
                           <option value="xonxoff">XON/XOFF</option>
-                        </select>
+                        </Select>
                       </div>
                     </div>
                   </div>
@@ -244,19 +236,12 @@ export function QuickConnectForm({
 
       {/* Action buttons */}
       <div className="flex items-center gap-3 w-full">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 py-2 rounded-lg text-sm text-text-muted hover:text-text-secondary border border-border/40 hover:border-border-bright transition-colors"
-        >
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
           Cancel
-        </button>
-        <button
-          type="submit"
-          className="flex-1 py-2 rounded-lg text-sm font-medium bg-accent/[0.12] text-accent border border-accent/20 hover:bg-accent/[0.18] hover:border-accent/30 transition-colors"
-        >
+        </Button>
+        <Button type="submit" variant="primary" className="flex-1">
           Connect
-        </button>
+        </Button>
       </div>
     </motion.form>
   );

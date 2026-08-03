@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useStore } from "zustand";
 import { toast } from "sonner";
+import { Button } from "../../components/ui/Button";
+import { EmptyState } from "../../components/ui/EmptyState";
 import { useSnippetStore } from "./snippetStore";
 import { layoutStore } from "../layout/layoutStore";
 import { requestTerminalFocus } from "../terminal/terminalFocus";
@@ -177,10 +179,9 @@ export function SnippetsPanel() {
             Loading...
           </div>
         ) : snippets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 gap-2 text-xs text-text-muted px-4 text-center">
-            <span>No snippets yet.</span>
-            <span>Click + to create your first snippet.</span>
-          </div>
+          <EmptyState message="No snippets yet.">
+            <Button size="sm" variant="ghost" onClick={startCreate}>New snippet</Button>
+          </EmptyState>
         ) : (
           <ul className="divide-y divide-border/50">
             {snippets.map((snippet) => (
