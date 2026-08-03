@@ -572,6 +572,7 @@ export function useTerminalSession(
     onSessionOpened,
     input.profileId,
     input.telnetOptions,
+    input.tmuxAttachTarget,
     input.transport,
     setStateSafe,
     writeTerminalError
