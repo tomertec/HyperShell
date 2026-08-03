@@ -22,6 +22,18 @@ const SHELL_AND_WRAPPER_NAMES = new Set([
   "winpty-agent"
 ]);
 
+/**
+ * Remote/relay clients — a different reason to return null than
+ * SHELL_AND_WRAPPER_NAMES. A shell being deepest means nothing is running;
+ * one of these being deepest means something IS running, but only the far
+ * end knows its name (e.g. `ssh host` then `llmtop` on the remote — the
+ * local tree only ever sees `ssh`). Returning null here lets the remote's
+ * own OSC title win instead of masking it with "ssh". The trade-off: ssh'ing
+ * to a host with no shell integration leaves the tab showing whatever OSC
+ * title was last set, since there is no local answer to fall back to.
+ */
+const PASSTHROUGH_NAMES = new Set(["ssh", "mosh", "plink", "telnet"]);
+
 function stripExe(name: string): string {
   return name.replace(/\.exe$/i, "");
 }
@@ -55,7 +67,8 @@ export function pickForegroundName(root: ProcessNode | null): string | null {
   }
 
   const name = stripExe(node.name);
-  if (SHELL_AND_WRAPPER_NAMES.has(name.toLowerCase())) {
+  const lowerName = name.toLowerCase();
+  if (SHELL_AND_WRAPPER_NAMES.has(lowerName) || PASSTHROUGH_NAMES.has(lowerName)) {
     return null;
   }
 

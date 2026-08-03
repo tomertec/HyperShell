@@ -42,4 +42,21 @@ describe("pickForegroundName", () => {
   it("matches shell names case-insensitively", () => {
     expect(pickForegroundName(node("pwsh.exe", [node("PowerShell.EXE", [], 2)]))).toBeNull();
   });
+
+  it("returns null when the deepest process is a remote/relay client", () => {
+    expect(pickForegroundName(node("pwsh.exe", [node("ssh.exe", [], 2)]))).toBeNull();
+    expect(pickForegroundName(node("bash", [node("mosh", [], 2)]))).toBeNull();
+  });
+
+  it("matches passthrough names case-insensitively", () => {
+    expect(pickForegroundName(node("pwsh.exe", [node("SSH.EXE", [], 2)]))).toBeNull();
+  });
+
+  it("still resolves a normal program under a passthrough client", () => {
+    // Guard against over-filtering: ssh itself is deepest here, and the
+    // remote program (if any) is invisible to the local process tree — this
+    // just confirms an ordinary program elsewhere in the tree still resolves.
+    const tree = node("pwsh.exe", [node("git.exe", [node("less.exe", [], 3)], 2)]);
+    expect(pickForegroundName(tree)).toBe("less");
+  });
 });

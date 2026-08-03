@@ -86,6 +86,12 @@ The bootstrap hook installs into the shell that ran before `tmux attach`. Once a
 
 `SessionManager` deliberately skips the shell-integration bootstrap when the host has a configured password. Writing the bootstrap and `sshPtyTransport`'s password-prompt watcher would race on the same pty, so the bootstrap is silently dropped or consumed as (part of) the password. Key-based auth hosts are unaffected. Expected, not a bug.
 
+### A local tab running `ssh` shows "ssh" instead of the remote program's name
+
+The process-title poller only sees the local process tree, and `ssh` (or `mosh`/`plink`/`telnet`) is deepest in it — the actual foreground program is on the far end of the connection. `pickForegroundName` treats these client names as "no local answer" and returns `null`, letting the OSC title from the remote's own shell-integration bootstrap win instead.
+
+**Consequence:** if the remote host has no shell integration (or it's an unsupported shell), the tab keeps showing whatever OSC title was last set — not "ssh". That's the intended trade-off; permanently pinning the tab to "ssh" would hide the real program's name whenever integration does work.
+
 ## Serial
 
 ### No COM ports listed in serial profile form
