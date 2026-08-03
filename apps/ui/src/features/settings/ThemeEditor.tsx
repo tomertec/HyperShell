@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useStore } from "zustand";
 import { settingsStore } from "./settingsStore";
 import type { TerminalTheme } from "../terminal/terminalTheme";
 import { terminalThemes } from "../terminal/terminalTheme";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 
 const THEME_KEYS: (keyof TerminalTheme)[] = [
   "background", "foreground", "cursor", "cursorAccent", "selectionBackground",
@@ -11,14 +14,12 @@ const THEME_KEYS: (keyof TerminalTheme)[] = [
   "brightMagenta", "brightCyan", "brightWhite",
 ];
 
-const inputClasses =
-  "w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20";
-
 function formatLabel(key: string): string {
   return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 }
 
 export function ThemeEditor({ onClose }: { onClose: () => void }) {
+  const fieldId = useId();
   const saveCustomTheme = useStore(settingsStore, (s) => s.saveCustomTheme);
   const [name, setName] = useState("");
   const [baseTheme, setBaseTheme] = useState("default");
@@ -44,37 +45,38 @@ export function ThemeEditor({ onClose }: { onClose: () => void }) {
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-text-primary">New Custom Theme</span>
-        <button
-          onClick={onClose}
-          className="text-xs text-text-muted hover:text-text-primary transition-colors"
-        >
+        <Button variant="ghost" size="sm" onClick={onClose}>
           Cancel
-        </button>
+        </Button>
       </div>
 
-      <label className="grid gap-1.5">
-        <span className="text-xs font-medium text-text-secondary">Theme Name</span>
-        <input
+      <div className="grid gap-1.5">
+        <label htmlFor={`${fieldId}-name`} className="text-xs font-medium text-text-secondary">
+          Theme Name
+        </label>
+        <Input
+          id={`${fieldId}-name`}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="My Theme"
-          className={inputClasses}
         />
-      </label>
+      </div>
 
-      <label className="grid gap-1.5">
-        <span className="text-xs font-medium text-text-secondary">Base Theme</span>
-        <select
+      <div className="grid gap-1.5">
+        <label htmlFor={`${fieldId}-base`} className="text-xs font-medium text-text-secondary">
+          Base Theme
+        </label>
+        <Select
+          id={`${fieldId}-base`}
           value={baseTheme}
           onChange={(e) => handleBaseChange(e.target.value)}
-          className={inputClasses}
         >
           {Object.keys(terminalThemes).map((key) => (
             <option key={key} value={key}>{formatLabel(key)}</option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </div>
 
       {/* Preview strip */}
       <div
@@ -106,13 +108,11 @@ export function ThemeEditor({ onClose }: { onClose: () => void }) {
         ))}
       </div>
 
-      <button
-        onClick={() => void handleSave()}
-        disabled={!name.trim()}
-        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-      >
-        Save Theme
-      </button>
+      <div className="flex items-center justify-end">
+        <Button variant="primary" onClick={() => void handleSave()} disabled={!name.trim()}>
+          Save Theme
+        </Button>
+      </div>
     </div>
   );
 }

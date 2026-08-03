@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { BackupInfo } from "@hypershell/shared";
+import { Button } from "../../components/ui/Button";
+import { SectionLabel } from "../../components/ui/SectionLabel";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -92,21 +94,20 @@ export function BackupRestorePanel() {
   return (
     <div className="grid gap-6">
       {restartRequired && (
-        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+        <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           Database restored successfully. Please restart the application for changes to take effect.
         </div>
       )}
 
       {/* Actions */}
       <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
-          Database Backup
-        </h3>
+        <SectionLabel className="mb-3">Database Backup</SectionLabel>
         <div className="grid gap-3">
-          <button
+          <Button
+            variant="outline"
             onClick={() => void handleCreateBackup()}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-2.5 text-sm text-text-primary hover:bg-surface hover:border-border-bright transition-all duration-150 disabled:opacity-50"
+            className="w-full"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
@@ -118,11 +119,12 @@ export function BackupRestorePanel() {
               />
             </svg>
             Create Backup
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => void handleRestore()}
             disabled={loading}
-            className="flex items-center gap-2 rounded-lg border border-border bg-surface/80 px-4 py-2.5 text-sm text-text-primary hover:bg-surface hover:border-border-bright transition-all duration-150 disabled:opacity-50"
+            className="w-full"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
@@ -134,15 +136,13 @@ export function BackupRestorePanel() {
               />
             </svg>
             Restore from Backup
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Recent backups */}
       <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
-          Auto-Backups
-        </h3>
+        <SectionLabel className="mb-3">Auto-Backups</SectionLabel>
         {backups.length === 0 ? (
           <p className="text-xs text-text-muted">No auto-backups found.</p>
         ) : (
@@ -161,14 +161,16 @@ export function BackupRestorePanel() {
                     )}
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => void handleRestore(backup.filePath)}
                   disabled={loading}
-                  className="ml-2 shrink-0 rounded px-2 py-1 text-text-muted hover:text-text-primary hover:bg-base-700/50 transition-colors disabled:opacity-50"
+                  className="ml-2 shrink-0"
                   title="Restore this backup"
                 >
                   Restore
-                </button>
+                </Button>
               </div>
             ))}
           </div>
