@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useId, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
+import { IconButton } from "../../components/ui/IconButton";
+import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../../lib/motion";
 
 export interface ModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  size?: "sm" | "md" | "lg";
+  footer?: React.ReactNode;
 }
+
+const SIZE_CLASSES = { sm: "max-w-sm", md: "max-w-2xl", lg: "max-w-4xl" } as const;
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -18,7 +24,7 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])'
 ].join(",");
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, size = "md", footer }: ModalProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
@@ -106,7 +112,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration: MOTION_BASE }}
         >
           <motion.div
             ref={dialogRef}
@@ -115,28 +121,28 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
             aria-labelledby={titleId}
             tabIndex={-1}
             onKeyDown={onDialogKeyDown}
-            className="my-8 flex max-h-[calc(100dvh-4rem)] w-full max-w-2xl flex-col rounded-xl border border-border-bright/60 bg-base-800 shadow-2xl shadow-black/40 focus:outline-none"
+            className={`my-8 flex max-h-[calc(100dvh-4rem)] w-full ${SIZE_CLASSES[size]} flex-col rounded-xl border border-border-bright/60 bg-base-800 shadow-overlay focus:outline-none`}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            transition={{ duration: MOTION_SLOW, ease: [...EASE_STANDARD] }}
           >
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
               <h2 id={titleId} className="text-sm font-semibold text-text-primary tracking-tight">
                 {title}
               </h2>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={`Close ${title}`}
-                className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-base-700 transition-colors duration-100"
-              >
+              <IconButton variant="ghost" onClick={onClose} aria-label={`Close ${title}`}>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false">
                   <path d="M3 3L11 11M11 3L3 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
-              </button>
+              </IconButton>
             </div>
             <div className="min-h-0 overflow-y-auto p-5">{children}</div>
+            {footer && (
+              <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-3">
+                {footer}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
