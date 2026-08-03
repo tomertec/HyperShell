@@ -84,6 +84,7 @@ export type HostFormValue = {
   savePassword?: boolean;
   clearSavedPassword?: boolean;
   tmuxDetect: boolean;
+  shellIntegration: boolean;
   hasSavedPassword?: boolean;
   passwordSavedAt?: string | null;
 };
@@ -120,6 +121,7 @@ const defaultValue: HostFormValue = {
   savePassword: true,
   clearSavedPassword: false,
   tmuxDetect: false,
+  shellIntegration: true,
   hasSavedPassword: false,
   passwordSavedAt: null,
 };
@@ -1111,6 +1113,20 @@ export function HostForm({
               {value.tmuxDetect && value.authMethod === "password" && (
                 <span className="block text-[11px] text-warning mt-0.5">Requires key-based auth — password-only hosts cannot be probed</span>
               )}
+            </div>
+          </label>
+
+          <label htmlFor={`${formId}-shellIntegration`} className="flex items-center gap-3 cursor-pointer">
+            <input
+              id={`${formId}-shellIntegration`}
+              type="checkbox"
+              checked={value.shellIntegration}
+              onChange={(e) => setValue({ ...value, shellIntegration: e.target.checked })}
+              className="rounded border-border accent-accent"
+            />
+            <div>
+              <span className="text-xs font-medium text-text-secondary">Report the running command in the tab title</span>
+              <span className="block text-[11px] text-text-muted mt-0.5">Sends a one-line hook to bash/zsh when the session opens.</span>
             </div>
           </label>
         </div>

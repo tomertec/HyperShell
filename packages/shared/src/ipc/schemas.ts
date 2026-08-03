@@ -176,6 +176,7 @@ export const hostRecordSchema = z.object({
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
   passwordSavedAt: z.string().nullable().optional(),
   tmuxDetect: z.boolean().optional(),
+  shellIntegration: z.boolean().optional(),
 });
 
 export const upsertHostRequestSchema = z.object({
@@ -205,6 +206,7 @@ export const upsertHostRequestSchema = z.object({
   savePassword: z.boolean().optional(),
   clearSavedPassword: z.boolean().optional(),
   tmuxDetect: z.boolean().optional(),
+  shellIntegration: z.boolean().optional(),
 });
 
 export const removeHostRequestSchema = z.object({

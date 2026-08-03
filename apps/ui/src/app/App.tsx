@@ -104,6 +104,7 @@ function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
       h.keepAliveInterval == null ? "" : String(h.keepAliveInterval),
     autoReconnect: Boolean(h.autoReconnect ?? false),
     tmuxDetect: Boolean(h.tmuxDetect ?? false),
+    shellIntegration: Boolean(h.shellIntegration ?? true),
     reconnectMaxAttempts:
       h.reconnectMaxAttempts == null ? DEFAULT_RECONNECT_MAX_ATTEMPTS : Number(h.reconnectMaxAttempts),
     reconnectBaseInterval:
@@ -226,6 +227,7 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
     const reconnectMaxAttempts = host.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS;
     const reconnectBaseInterval = host.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL;
     const tmuxDetect = host.tmuxDetect ?? false;
+    const shellIntegration = host.shellIntegration ?? true;
 
     const keepAliveSource =
       typeof host.keepAliveInterval === "string" ? host.keepAliveInterval : "";
@@ -267,6 +269,7 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
       reconnectMaxAttempts,
       reconnectBaseInterval,
       tmuxDetect,
+      shellIntegration,
       savePassword,
       clearSavedPassword,
       ...(savePassword && hasPasswordForSave
@@ -1482,6 +1485,7 @@ function MainApp() {
             reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
             reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
             tmuxDetect: false,
+            shellIntegration: true,
           }));
           setHosts((prev) => [...prev, ...newHosts]);
           for (const host of newHosts) {
@@ -1516,6 +1520,7 @@ function MainApp() {
             reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
             reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
             tmuxDetect: false,
+            shellIntegration: true,
           }));
           setHosts((prev) => [...prev, ...newHosts]);
           for (const host of newHosts) {

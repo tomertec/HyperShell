@@ -54,6 +54,8 @@ export interface SshConnectionOptions {
   proxyJump?: string;
   keepAliveSeconds?: number;
   envVars?: Record<string, string>;
+  /** False disables the shell-integration bootstrap for this host. */
+  shellIntegration?: boolean;
 }
 
 export interface SerialConnectionOptions {

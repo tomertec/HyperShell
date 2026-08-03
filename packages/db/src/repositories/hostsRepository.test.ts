@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createHostsRepository } from "./hostsRepository";
+import { openDatabase } from "../index";
+import { createHostsRepository, createHostsRepositoryFromDatabase } from "./hostsRepository";
 
 describe("hostsRepository", () => {
   it("creates and lists hosts", () => {
@@ -65,5 +66,39 @@ describe("hostsRepository", () => {
     expect(host.autoReconnect).toBe(false);
     expect(host.reconnectMaxAttempts).toBe(5);
     expect(host.reconnectBaseInterval).toBe(1);
+  });
+
+  it("defaults shell integration to enabled", () => {
+    const repo = createHostsRepository();
+    const host = repo.create({ id: "h3", name: "hermes", hostname: "hermes", username: "tomer" });
+
+    expect(repo.get(host.id)?.shellIntegration).toBe(true);
+  });
+
+  it("persists a shell integration opt-out", () => {
+    const repo = createHostsRepository();
+    const host = repo.create({
+      id: "h4",
+      name: "hermes",
+      hostname: "hermes",
+      username: "tomer",
+      shellIntegration: false,
+    });
+
+    expect(host.shellIntegration).toBe(false);
+    expect(repo.get(host.id)?.shellIntegration).toBe(false);
+  });
+
+  // createHostsRepository falls back to an in-memory store when SQLite throws,
+  // so the tests above stay green even if migration 017 never ran. Go through
+  // the database-backed factory directly to prove the column exists.
+  it("stores shell integration in the migrated hosts table", () => {
+    const repo = createHostsRepositoryFromDatabase(openDatabase(":memory:"));
+
+    expect(repo.create({ id: "h5", name: "on", hostname: "on" }).shellIntegration).toBe(true);
+    expect(
+      repo.create({ id: "h6", name: "off", hostname: "off", shellIntegration: false })
+        .shellIntegration
+    ).toBe(false);
   });
 });

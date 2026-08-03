@@ -566,6 +566,7 @@ async function openSessionHandler(
         proxyJump?: string;
         keepAliveSeconds?: number;
         envVars?: Record<string, string>;
+        shellIntegration?: boolean;
       }
     | undefined;
 
@@ -603,7 +604,8 @@ async function openSessionHandler(
           hostname: host.hostname,
           username: host.username ?? undefined,
           port: host.port,
-          identityFile: host.identityFile ?? undefined
+          identityFile: host.identityFile ?? undefined,
+          shellIntegration: host.shellIntegration ?? true
         };
 
         if (resolvedHost?.proxyJump) {

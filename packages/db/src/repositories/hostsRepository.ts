@@ -29,6 +29,7 @@ export type HostRecord = {
   reconnectMaxAttempts: number;
   reconnectBaseInterval: number;
   tmuxDetect: boolean;
+  shellIntegration: boolean;
 };
 
 export type HostInput = {
@@ -55,6 +56,7 @@ export type HostInput = {
   reconnectMaxAttempts?: number;
   reconnectBaseInterval?: number;
   tmuxDetect?: boolean;
+  shellIntegration?: boolean;
 };
 
 type HostRow = {
@@ -81,6 +83,7 @@ type HostRow = {
   reconnect_max_attempts: number;
   reconnect_base_interval: number;
   tmux_detect: number;
+  shell_integration: number;
 };
 
 function mapRow(row: HostRow): HostRecord {
@@ -108,6 +111,7 @@ function mapRow(row: HostRow): HostRecord {
     reconnectMaxAttempts: row.reconnect_max_attempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
     reconnectBaseInterval: row.reconnect_base_interval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
     tmuxDetect: Boolean(row.tmux_detect),
+    shellIntegration: Boolean(row.shell_integration),
   };
 }
 
@@ -129,13 +133,13 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
       auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
       proxy_jump, proxy_jump_host_ids, keep_alive_interval,
-      auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect
+      auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect, shell_integration
     )
     VALUES (
       @id, @name, @hostname, @port, @username, @identityFile, @hostProfileId, @authProfileId, @groupId, @notes,
       @authMethod, @agentKind, @opReference, @isFavorite, @sortOrder, @color,
       @proxyJump, @proxyJumpHostIds, @keepAliveInterval,
-      @autoReconnect, @reconnectMaxAttempts, @reconnectBaseInterval, @tmuxDetect
+      @autoReconnect, @reconnectMaxAttempts, @reconnectBaseInterval, @tmuxDetect, @shellIntegration
     )
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -160,6 +164,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       reconnect_max_attempts = excluded.reconnect_max_attempts,
       reconnect_base_interval = excluded.reconnect_base_interval,
       tmux_detect = excluded.tmux_detect,
+      shell_integration = excluded.shell_integration,
       updated_at = CURRENT_TIMESTAMP
   `);
 
@@ -168,7 +173,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
       id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
       auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
       proxy_jump, proxy_jump_host_ids, keep_alive_interval,
-      auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect
+      auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect, shell_integration
     FROM hosts
     ORDER BY COALESCE(sort_order, 999999) ASC, is_favorite DESC, name COLLATE NOCASE ASC
   `);
@@ -178,7 +183,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         id, name, hostname, port, username, identity_file, host_profile_id, auth_profile_id, group_id, notes,
         auth_method, agent_kind, op_reference, is_favorite, sort_order, color,
         proxy_jump, proxy_jump_host_ids, keep_alive_interval,
-        auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect
+        auto_reconnect, reconnect_max_attempts, reconnect_base_interval, tmux_detect, shell_integration
       FROM hosts
       WHERE id = ?
     `
@@ -214,6 +219,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
         reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
         reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
         tmuxDetect: input.tmuxDetect ? 1 : 0,
+        shellIntegration: input.shellIntegration === false ? 0 : 1,
       };
 
       insertHost.run(normalized);
@@ -276,6 +282,7 @@ function createInMemoryHostsRepository() {
         reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
         reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
         tmuxDetect: input.tmuxDetect ?? false,
+        shellIntegration: input.shellIntegration === false ? false : true,
       };
 
       hosts.set(record.id, record);
