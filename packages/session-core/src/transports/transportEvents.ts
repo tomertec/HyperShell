@@ -1,4 +1,4 @@
-export type SessionTransportKind = "ssh" | "serial" | "sftp" | "telnet";
+export type SessionTransportKind = "ssh" | "serial" | "sftp" | "telnet" | "local";
 
 export type SessionState =
   | "connecting"
@@ -68,6 +68,13 @@ export interface TelnetConnectionOptions {
   terminalType?: string;
 }
 
+export interface LocalConnectionOptions {
+  executable: string;
+  args?: string[];
+  cwd?: string;
+  envVars?: Record<string, string>;
+}
+
 export interface SftpConnectionOptions {
   hostname: string;
   port?: number;
@@ -97,4 +104,5 @@ export type OpenSessionRequest = {
   serialOptions?: SerialConnectionOptions;
   sftpOptions?: SftpConnectionOptions;
   telnetOptions?: TelnetConnectionOptions;
+  localOptions?: LocalConnectionOptions;
 };

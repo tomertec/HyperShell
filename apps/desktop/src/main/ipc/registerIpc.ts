@@ -43,6 +43,7 @@ import { registerPortForwardIpc } from "./portForwardIpc";
 import { registerGroupsIpc } from "./groupsIpc";
 import { registerTagIpc } from "./tagIpc";
 import { registerSerialProfilesIpc } from "./serialProfilesIpc";
+import { registerLocalProfilesIpc } from "./localProfilesIpc";
 import { registerHostProfileIpc } from "./hostProfileIpc";
 import { registerHostEnvVarIpc } from "./hostEnvVarIpc";
 import { registerSftpIpc } from "./sftpIpc";
@@ -79,7 +80,9 @@ import {
   createHostEnvVarRepositoryFromDatabase,
   createConnectionHistoryRepositoryFromDatabase,
   createGroupsRepository,
-  createSerialProfilesRepository
+  createSerialProfilesRepository,
+  createLocalProfilesRepository,
+  createLocalProfilesRepositoryFromDatabase
 } from "@hypershell/db";
 import type { SerialProfileRecord, SqliteDatabase, HostRecord as DbHostRecord } from "@hypershell/db";
 import type {
@@ -130,6 +133,13 @@ const registeredChannels = [
   ipcChannels.serialProfiles.upsert,
   ipcChannels.serialProfiles.remove,
   ipcChannels.serialProfiles.listPorts,
+  ipcChannels.localProfiles.list,
+  ipcChannels.localProfiles.upsert,
+  ipcChannels.localProfiles.remove,
+  ipcChannels.localProfiles.setHidden,
+  ipcChannels.localProfiles.reorder,
+  ipcChannels.localProfiles.getEnvVars,
+  ipcChannels.localProfiles.rescan,
   ipcChannels.hostProfiles.list,
   ipcChannels.hostProfiles.upsert,
   ipcChannels.hostProfiles.remove,
@@ -229,6 +239,7 @@ const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;
 let connectionHistoryRepository: ReturnType<typeof createConnectionHistoryRepositoryFromDatabase> | null = null;
 let hostEnvVarRepository: ReturnType<typeof createHostEnvVarRepositoryFromDatabase> | null = null;
+let localProfilesRepository: ReturnType<typeof createLocalProfilesRepositoryFromDatabase> | null = null;
 
 export function disposeSessionRuntime(): void {
   sessionManager.destroyAll();
@@ -314,6 +325,60 @@ function getHostEnvVarRepository():
 
   hostEnvVarRepository = createHostEnvVarRepositoryFromDatabase(db);
   return hostEnvVarRepository;
+}
+
+/**
+ * Local profiles must live in the shared file database or nothing the user does
+ * to them survives a quit — including the generated profile ids that a restored
+ * local tab in `saved_sessions` refers back to. The in-memory fallback exists
+ * only for the case where the database itself could not be opened (see Plan
+ * Amendment 2); it keeps the feature usable for the session rather than
+ * throwing on every call.
+ */
+function getLocalProfilesRepo(): ReturnType<typeof createLocalProfilesRepositoryFromDatabase> {
+  if (localProfilesRepository) {
+    return localProfilesRepository;
+  }
+
+  const db = getOrCreateDatabase() as SqliteDatabase | null;
+  localProfilesRepository = db
+    ? createLocalProfilesRepositoryFromDatabase(db)
+    : createLocalProfilesRepository();
+
+  return localProfilesRepository;
+}
+
+function resolveLocalProfileForSession(id: string):
+  | {
+      name: string;
+      executable: string;
+      args: string[];
+      startingDirectory: string | null;
+      isAvailable: boolean;
+      envVars: Record<string, string>;
+    }
+  | undefined {
+  const repo = getLocalProfilesRepo();
+  const profile = repo.get(id);
+  if (!profile) {
+    return undefined;
+  }
+
+  const envVars = Object.fromEntries(
+    repo
+      .listEnvVars(id)
+      .filter((entry) => entry.isEnabled)
+      .map((entry) => [entry.name, entry.value])
+  );
+
+  return {
+    name: profile.name,
+    executable: profile.executable,
+    args: profile.args,
+    startingDirectory: profile.startingDirectory,
+    isAvailable: profile.isAvailable,
+    envVars
+  };
 }
 
 const groupsRepo = createGroupsRepository();
@@ -467,7 +532,17 @@ async function openSessionHandler(
   request: OpenSessionRequest,
   manager: SessionManager = sessionManager,
   resolveHostProfile?: RegisterIpcOptions["resolveHostProfile"],
-  resolveSerialProfile?: RegisterIpcOptions["resolveSerialProfile"]
+  resolveSerialProfile?: RegisterIpcOptions["resolveSerialProfile"],
+  resolveLocalProfile?: (profileId: string) =>
+    | {
+        name: string;
+        executable: string;
+        args: string[];
+        startingDirectory: string | null;
+        isAvailable: boolean;
+        envVars?: Record<string, string>;
+      }
+    | undefined
 ): Promise<OpenSessionResponse> {
   const parsed = openSessionRequestSchema.parse(request);
   const authTraceEnabled = isAuthTraceEnabled();
@@ -600,6 +675,29 @@ async function openSessionHandler(
     }
   }
 
+  let localOptions:
+    | { executable: string; args?: string[]; cwd?: string; envVars?: Record<string, string> }
+    | undefined;
+
+  if (parsed.transport === "local") {
+    const profile = resolveLocalProfile?.(parsed.profileId);
+
+    if (!profile) {
+      throw new Error(`Unknown local profile: ${parsed.profileId}`);
+    }
+
+    if (!profile.isAvailable) {
+      throw new Error(`Local shell is not available: ${profile.name}`);
+    }
+
+    localOptions = {
+      executable: profile.executable,
+      args: profile.args,
+      cwd: profile.startingDirectory ?? undefined,
+      envVars: profile.envVars
+    };
+  }
+
   let serialOptions: SerialConnectionOptions | undefined;
 
   if (parsed.transport === "serial") {
@@ -635,6 +733,7 @@ async function openSessionHandler(
     sshOptions: sshOptions ?? { hostname: parsed.profileId },
     serialOptions,
     telnetOptions,
+    localOptions,
     autoReconnect: parsed.autoReconnect ?? Boolean(resolvedHost?.autoReconnect),
     maxReconnectAttempts:
       parsed.reconnectMaxAttempts ?? resolvedHost?.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
@@ -1314,7 +1413,14 @@ export function registerIpc(
   }
 
   ipcMain.handle(ipcChannels.session.open, (event, request) =>
-    openSessionHandler(event, request, manager, options.resolveHostProfile, (id) => serialProfilesRepo.get(id))
+    openSessionHandler(
+      event,
+      request,
+      manager,
+      options.resolveHostProfile,
+      (id) => serialProfilesRepo.get(id),
+      resolveLocalProfileForSession
+    )
   );
   ipcMain.handle(ipcChannels.session.resize, (event, request) =>
     resizeSessionHandler(event, request, manager)
@@ -1405,6 +1511,13 @@ export function registerIpc(
   registerGroupsIpc(ipcMain, () => groupsRepo);
   registerTagIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerSerialProfilesIpc(ipcMain, () => serialProfilesRepo);
+  const localProfilesIpc = registerLocalProfilesIpc(ipcMain, getLocalProfilesRepo);
+  // Deliberately not awaited and deliberately not synchronous: detection shells
+  // out to `wsl.exe`, and `registerIpc` runs before the main window exists.
+  // `scheduleDetection` defers the pass to a later macrotask and swallows its
+  // own failures, so a wedged shell probe can never leave the app with no
+  // window and no tray. `local-profiles:list` awaits the returned promise.
+  void localProfilesIpc.scheduleDetection();
   registerHostProfileIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerHostEnvVarIpc(ipcMain, () => getDb() as SqliteDatabase);
   const cleanupSftp = registerSftpIpc(ipcMain, {
@@ -1584,7 +1697,8 @@ export async function openSessionForTestInspectInput(
     request,
     managerWithCapture,
     effectiveResolveHostProfile,
-    options?.resolveSerialProfile
+    options?.resolveSerialProfile,
+    resolveLocalProfileForSession
   );
 
   return {

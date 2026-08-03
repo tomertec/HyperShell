@@ -46,6 +46,14 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     new URL("./migrations/012_host_env_vars.sql", import.meta.url),
     "utf8"
   );
+  const localProfilesSql = readFileSync(
+    new URL("./migrations/015_local_profiles.sql", import.meta.url),
+    "utf8"
+  );
+  const savedSessionsTransportsSql = readFileSync(
+    new URL("./migrations/016_saved_sessions_transports.sql", import.meta.url),
+    "utf8"
+  );
 
   const db = new Database(databasePath);
 
@@ -167,6 +175,25 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     if (!isIgnorableMigrationError(error)) {
       throw error;
     }
+  }
+
+  // Migration 015: local shell profiles + their environment variables
+  db.exec(localProfilesSql);
+
+  // Migration 016: widen saved_sessions.transport CHECK to allow 'telnet' and
+  // 'local'. SQLite can't ALTER a CHECK constraint, so this recreates the
+  // table (preserving rows) when needed. Guarded by inspecting the stored
+  // table DDL rather than just "does the table exist" — a fresh database
+  // gets the widened CHECK directly from migration 010 above, so the DDL
+  // already contains 'local' and this is a no-op for it. An existing
+  // database still carries the old CHECK in its DDL and needs the recreate.
+  const savedSessionsTableInfo = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'saved_sessions'")
+    .get() as { sql?: string } | undefined;
+  if (savedSessionsTableInfo?.sql && !savedSessionsTableInfo.sql.includes("'local'")) {
+    db.transaction(() => {
+      db.exec(savedSessionsTransportsSql);
+    })();
   }
 
   return db;

@@ -256,6 +256,9 @@ export const fsShowOpenDialogRequestSchema = z.object({
   title: z.string().optional(),
   defaultPath: z.string().optional(),
   filters: z.array(fsDialogFilterSchema).optional(),
+  // When true, the dialog picks a directory instead of a file (e.g. a local
+  // shell profile's starting directory). Defaults to file selection.
+  directory: z.boolean().optional(),
 }).optional();
 export type FsShowOpenDialogRequest = z.infer<typeof fsShowOpenDialogRequestSchema>;
 

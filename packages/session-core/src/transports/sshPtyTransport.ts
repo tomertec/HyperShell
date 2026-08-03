@@ -1,11 +1,16 @@
-import type {
-  OpenSessionRequest,
-  SessionTransportEvent,
-  TransportHandle
-} from "./transportEvents";
-import { ENV_VAR_NAME_REGEX, toErrorMessage as toSharedErrorMessage } from "@hypershell/shared";
+import type { OpenSessionRequest, TransportHandle } from "./transportEvents";
+import { ENV_VAR_NAME_REGEX } from "@hypershell/shared";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import {
+  createPtyProcess,
+  getDefaultSpawnPty,
+  type DisposableLike,
+  type PtyExitEvent,
+  type PtyProcessLike,
+  type PtySpawn,
+  type PtySpawnOptions
+} from "./ptyProcess";
 
 export interface SshConnectionProfile {
   hostname: string;
@@ -25,36 +30,12 @@ export interface SshPtyCommand {
   args: string[];
 }
 
-export interface SshPtySpawnOptions {
-  name?: string;
-  cols: number;
-  rows: number;
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-}
-
-export interface DisposableLike {
-  dispose(): void;
-}
-
-export interface SshPtyExitEvent {
-  exitCode: number;
-  signal?: number;
-}
-
-export interface SshPtyProcess {
-  write(data: string): void;
-  resize(cols: number, rows: number): void;
-  kill(signal?: string): void;
-  onData(listener: (data: string) => void): DisposableLike;
-  onExit(listener: (event: SshPtyExitEvent) => void): DisposableLike;
-}
-
-export type SshPtySpawn = (
-  file: string,
-  args: string[],
-  options: SshPtySpawnOptions
-) => SshPtyProcess;
+// Preserved names for existing importers.
+export type SshPtySpawnOptions = PtySpawnOptions;
+export type SshPtyExitEvent = PtyExitEvent;
+export type SshPtyProcess = PtyProcessLike;
+export type SshPtySpawn = PtySpawn;
+export type { DisposableLike };
 
 export interface CreateSshPtyTransportDeps {
   spawnPty?: SshPtySpawn;
@@ -62,9 +43,6 @@ export interface CreateSshPtyTransportDeps {
   env?: NodeJS.ProcessEnv;
   termName?: string;
 }
-
-// node-pty is loaded via require() at runtime (provided by esbuild banner's createRequire)
-declare const require: (id: string) => unknown;
 
 export function buildSshArgs(profile: SshConnectionProfile): string[] {
   const args: string[] = [];
@@ -133,22 +111,6 @@ export interface SshPtyTransport extends TransportHandle {
   request: OpenSessionRequest;
 }
 
-function getDefaultSpawnPty(): SshPtySpawn {
-  const loaded = require("node-pty") as {
-    spawn?: SshPtySpawn;
-  };
-
-  if (!loaded.spawn) {
-    throw new Error("node-pty did not provide a spawn function");
-  }
-
-  return loaded.spawn;
-}
-
-function toErrorMessage(error: unknown): string {
-  return toSharedErrorMessage(error, "Unknown PTY error");
-}
-
 function buildPtyEnv(
   baseEnv: NodeJS.ProcessEnv,
   envVars?: Record<string, string>
@@ -191,170 +153,40 @@ export function createSshPtyTransport(
   profile: SshConnectionProfile,
   deps: CreateSshPtyTransportDeps = {}
 ): SshPtyTransport {
-  const listeners = new Set<(event: SessionTransportEvent) => void>();
   const command = buildSshPtyCommand(profile);
-  const spawnPty = deps.spawnPty ?? getDefaultSpawnPty();
-  let pty: SshPtyProcess | null = null;
-  let dataSubscription: DisposableLike | null = null;
-  let exitSubscription: DisposableLike | null = null;
-  let isClosed = false;
-  let hasExited = false;
   let authSecretSent = false;
   let promptBuffer = "";
 
-  const emit = (event: SessionTransportEvent): void => {
-    for (const listener of listeners) {
-      listener(event);
-    }
-  };
-
-  const cleanup = (): void => {
-    dataSubscription?.dispose();
-    exitSubscription?.dispose();
-    dataSubscription = null;
-    exitSubscription = null;
-  };
-
-  const emitExit = (exitCode: number | null): void => {
-    if (hasExited) {
-      return;
-    }
-
-    hasExited = true;
-    cleanup();
-
-    emit({
-      type: "exit",
-      sessionId: request.sessionId,
-      exitCode
-    });
-  };
-
-  try {
-    pty = spawnPty(command.command, command.args, {
-      name: deps.termName ?? "xterm-256color",
+  const handle = createPtyProcess(
+    request,
+    {
+      command: command.command,
+      args: command.args,
       cols: request.cols,
       rows: request.rows,
       cwd: deps.cwd,
-      env: buildPtyEnv(deps.env ?? process.env, profile.envVars)
-    });
-  } catch (error) {
-    queueMicrotask(() => {
-      emit({
-        type: "error",
-        sessionId: request.sessionId,
-        message: toErrorMessage(error)
-      });
-      emitExit(null);
-    });
-  }
-
-  if (pty) {
-    dataSubscription = pty.onData((data) => {
-      if (hasExited || isClosed) {
-        return;
-      }
-
-      if (!authSecretSent && profile.password) {
-        promptBuffer = `${promptBuffer}${data}`.slice(-512);
-        if (isPasswordPrompt(promptBuffer)) {
-          authSecretSent = true;
-          try {
-            pty?.write(`${profile.password}\r`);
-          } catch {
-            // Ignore write failures and let normal SSH auth continue.
-          }
-          // Clear password from memory after transmission
-          profile.password = undefined;
+      env: buildPtyEnv(deps.env ?? process.env, profile.envVars),
+      termName: deps.termName
+    },
+    {
+      spawnPty: deps.spawnPty ?? getDefaultSpawnPty(),
+      onData(data, pty) {
+        if (authSecretSent || !profile.password) {
+          return;
         }
+
+        promptBuffer = `${promptBuffer}${data}`.slice(-512);
+        if (!isPasswordPrompt(promptBuffer)) {
+          return;
+        }
+
+        authSecretSent = true;
+        pty.write(`${profile.password}\r`);
+        // Clear password from memory after transmission
+        profile.password = undefined;
       }
-
-      emit({
-        type: "data",
-        sessionId: request.sessionId,
-        data
-      });
-    });
-
-    exitSubscription = pty.onExit((event) => {
-      emitExit(event.exitCode ?? null);
-    });
-
-    queueMicrotask(() => {
-      if (isClosed || hasExited) {
-        return;
-      }
-
-      emit({
-        type: "status",
-        sessionId: request.sessionId,
-        state: "connected"
-      });
-    });
-  }
-
-  return {
-    command,
-    request,
-    write(data: string) {
-      if (!pty || hasExited || isClosed) {
-        return;
-      }
-
-      try {
-        pty.write(data);
-      } catch (error) {
-        emit({
-          type: "error",
-          sessionId: request.sessionId,
-          message: toErrorMessage(error)
-        });
-      }
-    },
-    resize(cols: number, rows: number) {
-      if (!pty || hasExited || isClosed) {
-        return;
-      }
-
-      try {
-        pty.resize(cols, rows);
-      } catch (error) {
-        emit({
-          type: "error",
-          sessionId: request.sessionId,
-          message: toErrorMessage(error)
-        });
-      }
-    },
-    close() {
-      if (isClosed || hasExited) {
-        return;
-      }
-
-      isClosed = true;
-
-      if (!pty) {
-        emitExit(null);
-        return;
-      }
-
-      try {
-        pty.kill();
-      } catch (error) {
-        emit({
-          type: "error",
-          sessionId: request.sessionId,
-          message: toErrorMessage(error)
-        });
-
-        emitExit(null);
-      }
-    },
-    onEvent(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
     }
-  };
+  );
+
+  return { ...handle, command, request };
 }

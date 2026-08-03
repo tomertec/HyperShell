@@ -43,7 +43,7 @@ apps/desktop    → Electron main + preload (IPC boundary, window mgmt, tray, se
 apps/ui         → React workbench (xterm.js terminals, host browser, tabs/panes, Zustand state)
 packages/shared → IPC channel names, Zod request/response schemas, auth/transport enums
 packages/session-core → Transport abstraction (SSH via PTY, serial, SFTP via ssh2), session lifecycle, connection pool, network monitor, tmux probe
-packages/db     → SQLite via better-sqlite3, migrations (001-014), repositories
+packages/db     → SQLite via better-sqlite3, migrations (001-016), repositories
 ```
 
 Dependency direction: `desktop` → `shared`, `session-core`, `db`; `ui` → `shared`; `session-core` → `shared`.
@@ -60,6 +60,7 @@ Dependency direction: `desktop` → `shared`, `session-core`, `db`; `ui` → `sh
 **Session transports:** `session-core` provides a `SessionManager` that creates transport instances:
 - **SSH** — spawns system `ssh` binary in node-pty (full agent/config/proxy compatibility)
 - **Serial** — opens via `serialport` npm with configurable baud/parity/flow
+- **Local** — spawns a local shell (PowerShell, cmd.exe, WSL, Git Bash) in node-pty via the shared `ptyProcess` core. Profiles are auto-detected on startup and stored in `local_profiles`; the renderer may only pass a `profileId`, never an executable.
 - **SFTP** — programmatic ssh2 library (separate from SSH terminal, handles transfers/streams)
 
 The SFTP transport tries all candidate key files sequentially (like system ssh) and strips Windows domain prefixes from usernames. When an `Ssh2ConnectionPool` is provided, SFTP reuses pooled connections instead of creating new ones.
@@ -78,7 +79,7 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 
 **Keyboard shortcuts:** Global shortcuts registered in App.tsx keydown handler: `Ctrl+Shift+S` (snippets panel), `Ctrl+Shift+D` (split horizontal), `Ctrl+Shift+E` (split vertical), `Ctrl+Shift+W` (close pane), `Ctrl+Shift+[/]` (navigate panes). Handler logic in `paneShortcuts.ts`.
 
-**Database:** SQLite with foreign keys enabled. 6 migrations in `packages/db/src/migrations/`. Repositories pattern for data access. See [`docs/data-model.md`](docs/data-model.md).
+**Database:** SQLite with foreign keys enabled. 16 migrations in `packages/db/src/migrations/`. Repositories pattern for data access. See [`docs/data-model.md`](docs/data-model.md).
 
 ## Adding New Features
 
@@ -131,3 +132,5 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 - **Bundled vs dev renderer** — If `apps/desktop/dist/renderer/index.html` exists, Electron loads it instead of the Vite dev server. Delete that directory during development to get HMR.
 - **Native module version mismatch** — After Node.js updates, run `pnpm --filter @hypershell/desktop rebuild:native`.
 - **Auto-reconnect not triggering** — Check that `autoReconnect` is enabled on the host record (DB) and that the network monitor hasn't paused reconnection (`waiting_for_network` state). The connection pool ref-counts connections, so closing one consumer doesn't necessarily close the underlying ssh2 client.
+- **A local shell ignores your PowerShell profile** — the profile row has non-empty `args`. Detected profiles must launch bare (`args = []`); `-NoProfile`/`-Command`/`-File` all skip `$PROFILE`.
+- **WSL distros missing from the Local section** — `wsl.exe -l -q` emits UTF-16LE. Decoding it as UTF-8 yields NUL-interleaved names that match nothing.

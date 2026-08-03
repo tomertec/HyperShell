@@ -17,7 +17,7 @@
 - **`packages/session-core` has zero renderer dependencies.** No Electron imports, no React.
 - **`session.open` with `transport: "local"` must never accept `executable`, `args`, or `cwd` from the renderer.** Only `profileId`. This is a security boundary, asserted by test in Task 14.
 - **Detected profiles are created with `args = []`** — never `-NoProfile`, `-Command`, or `-File`. Those skip the user's `$PROFILE` or break interactivity.
-- **`HOME` and `USERPROFILE` are never set or overridden** on a spawned shell.
+- **The transport never sets `HOME` or `USERPROFILE` itself.** A profile *may* override them through its own env vars — that escape hatch is deliberate (e.g. a WSL or Git Bash profile pointed at a different home). Doing so relocates `$PROFILE` / `~`, so a profile that overrides them owns that consequence. Do not add a denylist. *(Ruling, 2026-08-02: the original constraint read "never set or overridden", which contradicted the plan's own `buildLocalEnv` reference code; the user chose to keep the escape hatch and relax the wording.)*
 - **`wsl.exe -l -q` output is UTF-16LE.** Always decode explicitly.
 - **Local sessions never auto-reconnect** and never register with `NetworkMonitor`.
 - **Icon values are exactly** `"powershell" | "cmd" | "linux" | "bash" | "terminal"`. No other strings.
@@ -3352,6 +3352,27 @@ git commit -m "test(desktop): cover local shell sessions and document the transp
 ```
 
 ---
+
+## Plan Amendments (made during execution)
+
+Recorded here so the plan matches what was actually built.
+
+**1. `SavedSessionTransport` must include `"local"` (2026-08-02).** Task 2 widened
+`SessionTransportKind` and `transportSchema`, but `SavedSessionTransport` in
+`packages/db/src/repositories/savedSessionRepository.ts:4` was left at
+`"ssh" | "serial" | "sftp" | "telnet"`, which broke the desktop build in
+`sessionRecoveryIpc.ts` and `main.ts`. The plan had no task covering it. Ruling: widen the
+union. Local sessions persist and restore like any other transport — on restart the tab
+re-spawns the shell fresh from its `profileId` in the profile's starting directory.
+Scrollback is not restored, consistent with every other transport.
+
+**2. `createLocalProfilesRepository` gets the in-memory fallback (2026-08-02).** Task 5 was
+originally instructed to omit the try/catch → in-memory fallback that
+`createSerialProfilesRepository` has. Because `registerIpc.ts` constructs the repository at
+module scope, that omission made the `better-sqlite3` ABI error throw at *import* time,
+crashing `registerIpc.test.ts` and `openSession.integration.test.ts` wholesale instead of
+failing individual tests. Ruling: add the fallback, matching the existing repository
+pattern. This reverses the original instruction.
 
 ## Done Criteria
 

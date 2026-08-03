@@ -21,6 +21,7 @@ export interface GeneralSettings {
   showRecordingButton: boolean;
   showRestoreBanner: boolean;
   showSerialInSidebar: boolean;
+  showLocalInSidebar: boolean;
   confirmOnClose: boolean;
   usePopupTransferMonitor: boolean;
   autoHideCompletedTransfers: boolean;
@@ -119,6 +120,7 @@ const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   showRecordingButton: true,
   showRestoreBanner: true,
   showSerialInSidebar: true,
+  showLocalInSidebar: true,
   confirmOnClose: true,
   usePopupTransferMonitor: false,
   autoHideCompletedTransfers: false,

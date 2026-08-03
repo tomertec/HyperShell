@@ -28,3 +28,13 @@ export {
   type TmuxSession,
   type TmuxProbeOptions
 } from "./tmux/tmuxProbe";
+export {
+  createDefaultProbes,
+  detectLocalShells,
+  parseWslDistros
+} from "./localShells/detectLocalShells";
+export type { DetectProbes, DetectedShell } from "./localShells/detectLocalShells";
+export { createLocalShellTransport } from "./transports/localShellTransport";
+export type { CreateLocalShellTransportDeps } from "./transports/localShellTransport";
+export { createPtyProcess, sanitizePtyEnv } from "./transports/ptyProcess";
+export type { LocalConnectionOptions } from "./transports/transportEvents";

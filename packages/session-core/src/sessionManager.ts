@@ -6,6 +6,7 @@ import type {
   SshConnectionOptions,
   SerialConnectionOptions,
   TelnetConnectionOptions,
+  LocalConnectionOptions,
   TransportHandle
 } from "./transports/transportEvents";
 import { DEFAULT_RECONNECT_BASE_INTERVAL } from "@hypershell/shared";
@@ -14,6 +15,7 @@ import { promisify } from "node:util";
 import { createSerialTransport } from "./transports/serialTransport";
 import { createSshPtyTransport, buildSshPtyCommand } from "./transports/sshPtyTransport";
 import { createTelnetTransport } from "./transports/telnetTransport";
+import { createLocalShellTransport } from "./transports/localShellTransport";
 import type { NetworkMonitor } from "./networkMonitor";
 
 const execFileAsync = promisify(execFile);
@@ -44,6 +46,7 @@ export interface OpenSessionInput {
   sshOptions?: SshConnectionOptions;
   serialOptions?: SerialConnectionOptions;
   telnetOptions?: TelnetConnectionOptions;
+  localOptions?: LocalConnectionOptions;
   autoReconnect?: boolean;
   maxReconnectAttempts?: number;
   reconnectBaseInterval?: number;
@@ -135,6 +138,25 @@ function createDefaultTransport(request: OpenSessionRequest): TransportHandle {
       localEcho: opts.localEcho,
       dtr: opts.dtr,
       rts: opts.rts
+    });
+  }
+
+  if (request.transport === "local") {
+    // No fallback here on purpose. Every other transport can degrade to
+    // "treat profileId as the target", but for local shells profileId comes
+    // from the renderer and the target is a process to spawn — the main
+    // process resolving it against the profile store is the whole security
+    // boundary. Refuse rather than spawn an unresolved string.
+    if (!request.localOptions) {
+      throw new Error("local transport requires resolved localOptions");
+    }
+
+    const opts = request.localOptions;
+    return createLocalShellTransport(request, {
+      executable: opts.executable,
+      args: opts.args,
+      cwd: opts.cwd,
+      envVars: opts.envVars
     });
   }
 
@@ -231,7 +253,7 @@ export function createSessionManager(
         const { snapshot, input } = session;
         const maxAttempts = input.maxReconnectAttempts ?? 5;
 
-        if (snapshot.autoReconnect && snapshot.reconnectAttempts < maxAttempts) {
+        if (input.transport !== "local" && snapshot.autoReconnect && snapshot.reconnectAttempts < maxAttempts) {
           session.unsubscribe();
 
           // Check network status before attempting reconnect
@@ -323,7 +345,7 @@ export function createSessionManager(
         cols: input.cols,
         rows: input.rows,
         state: "connecting",
-        autoReconnect: input.autoReconnect ?? false,
+        autoReconnect: input.transport === "local" ? false : (input.autoReconnect ?? false),
         reconnectAttempts: 0,
         reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL
       };
@@ -336,7 +358,8 @@ export function createSessionManager(
         rows: input.rows,
         sshOptions: input.sshOptions,
         serialOptions: input.serialOptions,
-        telnetOptions: input.telnetOptions
+        telnetOptions: input.telnetOptions,
+        localOptions: input.localOptions
       });
 
       const unsubscribe = transport.onEvent((event) => {

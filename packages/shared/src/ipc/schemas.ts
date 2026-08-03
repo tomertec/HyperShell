@@ -10,7 +10,17 @@ export const ENV_VAR_NAME_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const DEFAULT_RECONNECT_MAX_ATTEMPTS = 5;
 export const DEFAULT_RECONNECT_BASE_INTERVAL = 1;
 
-export const transportSchema = z.enum(["ssh", "serial", "sftp", "telnet"]);
+export const transportSchema = z.enum(["ssh", "serial", "sftp", "telnet", "local"]);
+
+export const localProfileIconSchema = z.enum([
+  "powershell",
+  "cmd",
+  "linux",
+  "bash",
+  "terminal"
+]);
+
+export type LocalProfileIcon = z.infer<typeof localProfileIconSchema>;
 
 export const sessionStateSchema = z.enum([
   "connecting",
@@ -621,6 +631,86 @@ export type UpsertSerialProfileRequest = z.infer<typeof upsertSerialProfileReque
 export type RemoveSerialProfileRequest = z.infer<typeof removeSerialProfileRequestSchema>;
 export type SerialPortInfo = z.infer<typeof serialPortInfoSchema>;
 export type SetSignalsRequest = z.infer<typeof setSignalsRequestSchema>;
+
+// --- Local shell profile schemas ---
+
+export const localProfileEnvVarSchema = z.object({
+  name: z.string().regex(ENV_VAR_NAME_REGEX),
+  value: z.string(),
+  isEnabled: z.boolean()
+});
+
+// A profile colour is a palette key, not a CSS colour — it is resolved through
+// the theme's `--host-*` variables by the `.color-swatch-*` classes. Constrained
+// to the palette so an arbitrary string can never reach a style attribute.
+export const localProfileColorSchema = z.enum([
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "cyan",
+  "purple",
+  "pink"
+]);
+
+export const localProfileRecordSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  executable: z.string().min(1),
+  args: z.array(z.string()),
+  startingDirectory: z.string().nullable(),
+  icon: localProfileIconSchema,
+  color: localProfileColorSchema.nullable(),
+  elevated: z.boolean(),
+  source: z.enum(["user", "detected"]),
+  detectKey: z.string().nullable(),
+  isAvailable: z.boolean(),
+  isHidden: z.boolean(),
+  sortOrder: z.number().int()
+});
+
+export const upsertLocalProfileRequestSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  executable: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  startingDirectory: z.string().nullable().optional(),
+  icon: localProfileIconSchema.optional(),
+  color: localProfileColorSchema.nullable().optional(),
+  elevated: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+  envVars: z.array(localProfileEnvVarSchema).optional()
+});
+
+export const removeLocalProfileRequestSchema = z.object({
+  id: z.string().min(1)
+});
+
+export const setLocalProfileHiddenRequestSchema = z.object({
+  id: z.string().min(1),
+  hidden: z.boolean()
+});
+
+export const reorderLocalProfilesRequestSchema = z.object({
+  items: z.array(z.object({ id: z.string().min(1), sortOrder: z.number().int() }))
+});
+
+// Read-only lookup for a profile's saved env vars — upsert's envVars field is
+// write-only, so the editor form needs this to load existing values rather
+// than silently overwriting them with an empty array on save.
+export const getLocalProfileEnvVarsRequestSchema = z.object({
+  id: z.string().min(1)
+});
+
+export type LocalProfileColor = z.infer<typeof localProfileColorSchema>;
+export type LocalProfileEnvVar = z.infer<typeof localProfileEnvVarSchema>;
+export type LocalProfileRecord = z.infer<typeof localProfileRecordSchema>;
+export type UpsertLocalProfileRequest = z.infer<typeof upsertLocalProfileRequestSchema>;
+export type RemoveLocalProfileRequest = z.infer<typeof removeLocalProfileRequestSchema>;
+export type SetLocalProfileHiddenRequest = z.infer<typeof setLocalProfileHiddenRequestSchema>;
+export type ReorderLocalProfilesRequest = z.infer<typeof reorderLocalProfilesRequestSchema>;
+export type GetLocalProfileEnvVarsRequest = z.infer<typeof getLocalProfileEnvVarsRequestSchema>;
 
 // --- Workspace schemas ---
 

@@ -26,13 +26,14 @@ import {
 export type { TerminalSessionState } from "./terminalSessionModel";
 
 export interface UseTerminalSessionInput {
-  transport: "ssh" | "serial" | "telnet";
+  transport: "ssh" | "serial" | "telnet" | "local";
   profileId: string;
   sessionId?: string;
   autoConnect?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   tmuxAttachTarget?: string;
   onSessionOpened?: (sessionId: string) => void;
+  onExit?: (exitCode: number | null) => void;
 }
 
 export interface UseTerminalSessionResult {
@@ -92,6 +93,11 @@ export function useTerminalSession(
   const asyncOperationGuardRef = useRef(createAsyncOperationGuard());
   const broadcastEnabledRef = useRef(broadcastEnabled);
   const broadcastTargetsRef = useRef<string[]>(broadcastTargets);
+  // input.onExit is a fresh closure every render — keep the latest one in a
+  // ref rather than depending on it directly, so applySessionEvent (and the
+  // onSessionEvent subscription that depends on it) doesn't get recreated on
+  // every render.
+  const onExitRef = useRef(input.onExit);
   const pendingSessionEventsRef = useRef<SessionEvent[]>([]);
   const eventUnsubscribeRef = useRef<(() => void) | null>(null);
   const tmuxAttachSentRef = useRef(false);
@@ -241,6 +247,10 @@ export function useTerminalSession(
       sessionIdRef.current = null;
     }
 
+    if (effect.exitCode !== undefined) {
+      onExitRef.current?.(effect.exitCode ?? null);
+    }
+
     const instance = terminalRef.current;
     if (!instance) {
       return;
@@ -304,6 +314,10 @@ export function useTerminalSession(
     broadcastEnabledRef.current = broadcastEnabled;
     broadcastTargetsRef.current = broadcastTargets;
   }, [broadcastEnabled, broadcastTargets]);
+
+  useEffect(() => {
+    onExitRef.current = input.onExit;
+  }, [input.onExit]);
 
   useEffect(() => {
     let disposed = false;

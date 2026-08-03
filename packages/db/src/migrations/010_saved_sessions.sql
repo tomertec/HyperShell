@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS saved_sessions (
   id TEXT PRIMARY KEY,
   host_id TEXT REFERENCES hosts(id) ON DELETE SET NULL,
-  transport TEXT NOT NULL CHECK (transport IN ('ssh', 'serial', 'sftp')),
+  transport TEXT NOT NULL CHECK (transport IN ('ssh', 'serial', 'sftp', 'telnet', 'local')),
   profile_id TEXT NOT NULL,
   title TEXT NOT NULL,
   was_graceful INTEGER NOT NULL DEFAULT 0,

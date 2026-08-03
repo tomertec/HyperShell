@@ -140,6 +140,9 @@ import type {
   SftpDragOutRequest,
   SftpDragOutResponse,
   UpdateState,
+  LocalProfileEnvVar,
+  LocalProfileRecord,
+  UpsertLocalProfileRequest,
 } from "@hypershell/shared";
 
 declare global {
@@ -182,6 +185,15 @@ declare global {
       upsertSerialProfile?: (request: UpsertSerialProfileRequest) => Promise<SerialProfileRecord>;
       removeSerialProfile?: (request: RemoveSerialProfileRequest) => Promise<void>;
       listSerialPorts?: () => Promise<SerialPortInfo[]>;
+      listLocalProfiles?(): Promise<LocalProfileRecord[]>;
+      upsertLocalProfile?(request: UpsertLocalProfileRequest): Promise<LocalProfileRecord>;
+      removeLocalProfile?(request: { id: string }): Promise<void>;
+      setLocalProfileHidden?(request: { id: string; hidden: boolean }): Promise<void>;
+      reorderLocalProfiles?(request: {
+        items: Array<{ id: string; sortOrder: number }>;
+      }): Promise<void>;
+      rescanLocalProfiles?(): Promise<LocalProfileRecord[]>;
+      getLocalProfileEnvVars?(request: { id: string }): Promise<LocalProfileEnvVar[]>;
       setSessionSignals?: (request: SetSignalsRequest) => Promise<void>;
       getHostStats?: (request: HostStatsRequest) => Promise<HostStatsResponse>;
       sftpConnect?: (request: SftpConnectRequest) => Promise<SftpConnectResponse>;
@@ -212,7 +224,7 @@ declare global {
       fsGetDrives?: () => Promise<FsGetDrivesResponse>;
       fsListSshKeys?: () => Promise<string[]>;
       fsShowSaveDialog?: (options?: { defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
-      fsShowOpenDialog?: (options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
+      fsShowOpenDialog?: (options?: { title?: string; defaultPath?: string; filters?: Array<{ name: string; extensions: string[] }>; directory?: boolean }) => Promise<string | null>;
       fsOpenItem?: (request: { path: string }) => Promise<void>;
       fsShowInFolder?: (request: { path: string }) => Promise<void>;
       fsTrash?: (request: { path: string }) => Promise<void>;

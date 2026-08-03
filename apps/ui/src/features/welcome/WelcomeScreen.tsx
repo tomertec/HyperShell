@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { AnimatePresence, LayoutGroup } from "framer-motion";
 import { motion } from "framer-motion";
+import type { LocalProfileRecord } from "@hypershell/shared";
+import { LocalProfileIcon } from "../local/LocalProfileIcon";
 import { AnimatedLogo } from "./AnimatedLogo";
 import { QuickConnectForm, type SerialAdvancedOptions } from "./QuickConnectForm";
 
@@ -9,6 +11,8 @@ interface WelcomeScreenProps {
   onRefreshPorts: () => void;
   onConnectSsh: (host: string, port: number, username: string, password: string) => void;
   onConnectSerial: (port: string, baudRate: number, options?: SerialAdvancedOptions) => void;
+  localProfiles: LocalProfileRecord[];
+  onConnectLocal: (profile: LocalProfileRecord) => void;
 }
 
 export function WelcomeScreen({
@@ -16,6 +20,8 @@ export function WelcomeScreen({
   onRefreshPorts,
   onConnectSsh,
   onConnectSerial,
+  localProfiles,
+  onConnectLocal,
 }: WelcomeScreenProps) {
   const [formOpen, setFormOpen] = useState(false);
 
@@ -57,6 +63,22 @@ export function WelcomeScreen({
             )}
           </AnimatePresence>
         </LayoutGroup>
+
+        {localProfiles.length > 0 && (
+          <div className="flex flex-wrap items-center justify-center gap-2 max-w-md">
+            {localProfiles.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                onClick={() => onConnectLocal(profile)}
+                className="flex items-center gap-1.5 rounded-full border border-border bg-base-800/60 px-3 py-1.5 text-xs text-text-secondary hover:border-accent/40 hover:text-text-primary transition-colors"
+              >
+                <LocalProfileIcon icon={profile.icon} className="h-3.5 w-3.5 shrink-0" />
+                <span>{profile.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Keyboard shortcut hint - only when form is closed */}
         {!formOpen && (

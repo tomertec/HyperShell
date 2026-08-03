@@ -40,8 +40,31 @@ describe("mapSessionEvent", () => {
     ).toEqual({
       handled: true,
       state: "disconnected",
-      clearSessionId: true
+      clearSessionId: true,
+      exitCode: 0
     });
+  });
+
+  it("surfaces the exit code on an exit event", () => {
+    const effect = mapSessionEvent("session-1", {
+      type: "exit",
+      sessionId: "session-1",
+      exitCode: 0
+    });
+
+    expect(effect.state).toBe("disconnected");
+    expect(effect.clearSessionId).toBe(true);
+    expect(effect.exitCode).toBe(0);
+  });
+
+  it("surfaces a non-zero exit code", () => {
+    const effect = mapSessionEvent("session-1", {
+      type: "exit",
+      sessionId: "session-1",
+      exitCode: 1
+    });
+
+    expect(effect.exitCode).toBe(1);
   });
 
   it("maps error events to failed state with message", () => {

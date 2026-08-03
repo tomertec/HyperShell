@@ -19,6 +19,8 @@ import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
 import { layoutStore } from "../features/layout/layoutStore";
 import { handlePaneShortcut } from "../features/layout/paneShortcuts";
+import { localProfilesStore, selectLaunchableProfiles } from "../features/local/localProfilesStore";
+import { LocalProfileForm } from "../features/local/LocalProfileForm";
 import { QuickConnectDialog } from "../features/quick-connect/QuickConnectDialog";
 import type { QuickConnectProfile } from "../features/quick-connect/searchIndex";
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
@@ -34,6 +36,8 @@ import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
 import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
 import type {
   ConnectionHistoryRecord,
+  LocalProfileEnvVar,
+  LocalProfileRecord,
   SavedSessionRecord,
   PuttySession,
   SerialProfileRecord,
@@ -51,6 +55,7 @@ import type { KeyboardInteractiveRequest } from "@hypershell/shared";
 import { CommandPalette } from "../features/command-palette/CommandPalette";
 import { useCommandPaletteStore } from "../features/command-palette/commandPaletteStore";
 import { createCommands, type CommandContext } from "../features/command-palette/commandRegistry";
+import type { Command } from "../features/command-palette/searchCommands";
 import { useTunnelStore } from "../features/tunnels/tunnelStore";
 import { useUpdateStore } from "../features/updates/updateStore";
 
@@ -372,6 +377,10 @@ function MainApp() {
     hostId?: string;
   }>>([]);
   const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
+  const [localProfileModalOpen, setLocalProfileModalOpen] = useState(false);
+  const [editingLocalProfile, setEditingLocalProfile] = useState<LocalProfileRecord | null>(null);
+  const [editingLocalProfileEnvVars, setEditingLocalProfileEnvVars] = useState<LocalProfileEnvVar[]>([]);
+  const [editingLocalProfileEnvVarsLoaded, setEditingLocalProfileEnvVarsLoaded] = useState(true);
   const [telnetDialogOpen, setTelnetDialogOpen] = useState(false);
   const [tmuxPickerState, setTmuxPickerState] = useState<{
     open: boolean;
@@ -440,6 +449,10 @@ function MainApp() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    void localProfilesStore.getState().load();
   }, []);
 
   const refreshConnectionHistorySummary = useCallback(async () => {
@@ -650,6 +663,53 @@ function MainApp() {
     },
     [openTab]
   );
+
+  const handleConnectLocal = useCallback(
+    (profile: LocalProfileRecord) => {
+      const sessionId = `local-${profile.id}-${Date.now()}`;
+      openTab({
+        tabKey: sessionId,
+        sessionId,
+        title: profile.name,
+        transport: "local",
+        profileId: profile.id,
+        type: "terminal",
+        preopened: false
+      });
+    },
+    [openTab]
+  );
+
+  const handleNewLocalProfile = useCallback(() => {
+    setEditingLocalProfile(null);
+    setEditingLocalProfileEnvVars([]);
+    setEditingLocalProfileEnvVarsLoaded(true);
+    setLocalProfileModalOpen(true);
+  }, []);
+
+  // Fetches the profile's real saved env vars before opening the editor —
+  // the form must never submit an empty envVars array for a profile whose
+  // existing values it never actually saw (see LocalProfileForm's
+  // envVarsLoaded / shouldIncludeEnvVarsInUpsert).
+  const handleEditLocalProfile = useCallback((profile: LocalProfileRecord) => {
+    void (async () => {
+      let envVars: LocalProfileEnvVar[] = [];
+      let loaded = false;
+      try {
+        const result = await window.hypershell?.getLocalProfileEnvVars?.({ id: profile.id });
+        if (result) {
+          envVars = result;
+          loaded = true;
+        }
+      } catch {
+        // Leave loaded = false — the form will refuse to touch env vars on save.
+      }
+      setEditingLocalProfile(profile);
+      setEditingLocalProfileEnvVars(envVars);
+      setEditingLocalProfileEnvVarsLoaded(loaded);
+      setLocalProfileModalOpen(true);
+    })();
+  }, []);
 
   const openHostTab = useCallback(
     (host: HostRecord, tmuxAttachTarget?: string) => {
@@ -1090,6 +1150,12 @@ function MainApp() {
     [hosts, serialProfiles]
   );
 
+  const localProfiles = useStore(localProfilesStore, (s) => s.profiles);
+  const launchableLocalProfiles = useMemo(
+    () => selectLaunchableProfiles(localProfiles),
+    [localProfiles]
+  );
+
   const paletteCommands = useMemo(() => {
     const ctx: CommandContext = {
       getActiveSessionId: () => layoutStore.getState().activeSessionId,
@@ -1186,8 +1252,15 @@ function MainApp() {
       openTelnetDialog: () => setTelnetDialogOpen(true),
       openSerialModal: () => { setEditingSerial(null); setSerialModalOpen(true); },
     };
-    return createCommands(ctx);
-  }, [hosts, connectHost, openSftpHost, isBroadcastEnabled]);
+    const localCommands: Command[] = launchableLocalProfiles.map((profile) => ({
+      id: `local:${profile.id}`,
+      title: `Open local shell: ${profile.name}`,
+      category: "Local",
+      visible: () => true,
+      execute: () => handleConnectLocal(profile),
+    }));
+    return [...createCommands(ctx), ...localCommands];
+  }, [hosts, connectHost, openSftpHost, isBroadcastEnabled, launchableLocalProfiles, handleConnectLocal]);
 
   return (
     <>
@@ -1213,6 +1286,9 @@ function MainApp() {
             onConnectSerial={connectSerial}
             onEditSerial={(profile) => { setEditingSerial(profile); setSerialModalOpen(true); }}
             onNewSerial={() => { setEditingSerial(null); setSerialModalOpen(true); }}
+            onConnectLocal={handleConnectLocal}
+            onNewLocal={handleNewLocalProfile}
+            onEditLocal={handleEditLocalProfile}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenTelnet={() => setTelnetDialogOpen(true)}
             restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}
@@ -1226,6 +1302,7 @@ function MainApp() {
           onRefreshPorts={refreshPorts}
           onConnectSsh={connectSshAdHoc}
           onConnectSerial={connectSerialAdHoc}
+          onConnectLocal={handleConnectLocal}
         />
       </AppShell>
 
@@ -1505,6 +1582,22 @@ function MainApp() {
             void persistSerialProfile(record);
             setSerialModalOpen(false);
           }}
+        />
+      </Modal>
+
+      <Modal
+        open={localProfileModalOpen}
+        onClose={() => setLocalProfileModalOpen(false)}
+        title={editingLocalProfile ? `Edit ${editingLocalProfile.name}` : "New Local Profile"}
+      >
+        <LocalProfileForm
+          key={editingLocalProfile?.id ?? "new-local"}
+          profile={editingLocalProfile}
+          envVars={editingLocalProfileEnvVars}
+          envVarsLoaded={editingLocalProfileEnvVarsLoaded}
+          onSave={() => setLocalProfileModalOpen(false)}
+          onCancel={() => setLocalProfileModalOpen(false)}
+          onDelete={() => setLocalProfileModalOpen(false)}
         />
       </Modal>
 
