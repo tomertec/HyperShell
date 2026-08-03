@@ -89,7 +89,7 @@ export function StatusBar() {
                         : "bg-text-muted/50"
                 ].join(" ")}
               />
-              <span className="text-text-primary truncate max-w-[160px]">{activeTab.title}</span>
+              <span className="text-text-primary truncate max-w-[160px]">{activeTab.dynamicTitle ?? activeTab.title}</span>
             </div>
 
             {/* Transport badge */}

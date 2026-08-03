@@ -6,6 +6,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 import type { SessionEvent } from "@hypershell/shared";
 
 import { broadcastStore } from "../broadcast/broadcastStore";
+import { layoutStore } from "../layout/layoutStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 import { settingsStore } from "../settings/settingsStore";
 import { getTerminalOptions } from "./terminalTheme";
@@ -22,6 +23,7 @@ import {
   resolveConnectAttempt,
   type TerminalSessionState
 } from "./terminalSessionModel";
+import { sanitizeTitle } from "./titleSanitizer";
 
 export type { TerminalSessionState } from "./terminalSessionModel";
 
@@ -322,6 +324,7 @@ export function useTerminalSession(
   useEffect(() => {
     let disposed = false;
     let disposeInput: { dispose(): void } | null = null;
+    let titleDisposable: { dispose(): void } | null = null;
     let instance: Terminal | null = null;
     let container: HTMLDivElement | null = null;
     let removeFocusListeners: (() => void) | null = null;
@@ -347,6 +350,14 @@ export function useTerminalSession(
       terminalRef.current = instance;
       setTerminal(instance);
       setSearchAddon(search);
+
+      titleDisposable = instance.onTitleChange((rawTitle) => {
+        const sessionId = sessionIdRef.current;
+        if (!sessionId) {
+          return;
+        }
+        layoutStore.getState().setTabDynamicTitle(sessionId, sanitizeTitle(rawTitle));
+      });
 
       container = containerRef.current;
       if (container) {
@@ -448,6 +459,7 @@ export function useTerminalSession(
     return () => {
       disposed = true;
       disposeInput?.dispose();
+      titleDisposable?.dispose();
       removeFocusListeners?.();
       instance?.dispose();
       terminalRef.current = null;
