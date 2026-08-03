@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useId, useState, useEffect } from "react";
 import { useStore } from "zustand";
 import {
   MAX_CREDENTIAL_CACHE_TTL_MINUTES,
@@ -17,9 +17,10 @@ import { ThemeEditor } from "./ThemeEditor";
 import { SshKeyManager } from "../ssh-keys/SshKeyManager";
 import { BackupRestorePanel } from "./BackupRestorePanel";
 import { useUpdateStore } from "../updates/updateStore";
-
-const inputClasses =
-  "w-full rounded-lg border border-border bg-base-900 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 hover:border-border-bright";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { SectionLabel } from "../../components/ui/SectionLabel";
 
 const FONT_OPTIONS: { label: string; value: string }[] = [
   {
@@ -193,6 +194,45 @@ function ToggleSwitch({
   );
 }
 
+/**
+ * The one setting-row anatomy: title (plus optional one-line description) on
+ * the left, control right-aligned. Pass `controlId` when the control is a real
+ * form field so the title becomes its `<label>`; toggles carry their own
+ * aria-label instead.
+ */
+function SettingRow({
+  label,
+  description,
+  controlId,
+  children
+}: {
+  label: string;
+  description?: React.ReactNode;
+  controlId?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <div className="min-w-0">
+        {controlId ? (
+          <label htmlFor={controlId} className="block text-sm text-text-primary">
+            {label}
+          </label>
+        ) : (
+          <div className="text-sm text-text-primary">{label}</div>
+        )}
+        {description ? <div className="text-xs text-text-muted">{description}</div> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Keeps right-aligned fields off the full-width default the field recipe uses. */
+function ControlSlot({ children }: { children: React.ReactNode }) {
+  return <div className="w-40 shrink-0">{children}</div>;
+}
+
 function GeneralSection() {
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateGeneral = useStore(settingsStore, (s) => s.updateGeneral);
@@ -208,127 +248,104 @@ function GeneralSection() {
   } = settings.general;
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Session</h3>
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Session Recording Button</div>
-              <div className="text-xs text-text-muted">Show the recording button in terminal panes</div>
-            </div>
-            <ToggleSwitch
-              label="Session Recording Button"
-              checked={showRecordingButton}
-              onChange={() => void updateGeneral({ showRecordingButton: !showRecordingButton })}
-            />
-          </div>
+    <div>
+      <SectionLabel className="pt-4 pb-1">Session</SectionLabel>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Session Restore Prompt</div>
-              <div className="text-xs text-text-muted">Show "Restore sessions from last session" on startup</div>
-            </div>
-            <ToggleSwitch
-              label="Session Restore Prompt"
-              checked={showRestoreBanner}
-              onChange={() => void updateGeneral({ showRestoreBanner: !showRestoreBanner })}
-            />
-          </div>
+      <SettingRow
+        label="Session Recording Button"
+        description="Show the recording button in terminal panes"
+      >
+        <ToggleSwitch
+          label="Session Recording Button"
+          checked={showRecordingButton}
+          onChange={() => void updateGeneral({ showRecordingButton: !showRecordingButton })}
+        />
+      </SettingRow>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Serial Section in Sidebar</div>
-              <div className="text-xs text-text-muted">Show serial profiles in the hosts sidebar list</div>
-            </div>
-            <ToggleSwitch
-              label="Serial Section in Sidebar"
-              checked={showSerialInSidebar}
-              onChange={() => void updateGeneral({ showSerialInSidebar: !showSerialInSidebar })}
-            />
-          </div>
+      <SettingRow
+        label="Session Restore Prompt"
+        description={'Show "Restore sessions from last session" on startup'}
+      >
+        <ToggleSwitch
+          label="Session Restore Prompt"
+          checked={showRestoreBanner}
+          onChange={() => void updateGeneral({ showRestoreBanner: !showRestoreBanner })}
+        />
+      </SettingRow>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Local Section in Sidebar</div>
-              <div className="text-xs text-text-muted">Show local shell profiles in the hosts sidebar list</div>
-            </div>
-            <ToggleSwitch
-              label="Local Section in Sidebar"
-              checked={showLocalInSidebar}
-              onChange={() => void updateGeneral({ showLocalInSidebar: !showLocalInSidebar })}
-            />
-          </div>
+      <SettingRow
+        label="Serial Section in Sidebar"
+        description="Show serial profiles in the hosts sidebar list"
+      >
+        <ToggleSwitch
+          label="Serial Section in Sidebar"
+          checked={showSerialInSidebar}
+          onChange={() => void updateGeneral({ showSerialInSidebar: !showSerialInSidebar })}
+        />
+      </SettingRow>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Confirm on Close</div>
-              <div className="text-xs text-text-muted">Ask for confirmation before closing with active sessions</div>
-            </div>
-            <ToggleSwitch
-              label="Confirm on Close"
-              checked={confirmOnClose}
-              onChange={() => void updateGeneral({ confirmOnClose: !confirmOnClose })}
-            />
-          </div>
-        </div>
-      </div>
+      <SettingRow
+        label="Local Section in Sidebar"
+        description="Show local shell profiles in the hosts sidebar list"
+      >
+        <ToggleSwitch
+          label="Local Section in Sidebar"
+          checked={showLocalInSidebar}
+          onChange={() => void updateGeneral({ showLocalInSidebar: !showLocalInSidebar })}
+        />
+      </SettingRow>
 
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Transfers</h3>
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm text-text-primary">Popup SFTP Transfer Monitor</div>
-              <div className="text-xs text-text-muted">
-                Replace the inline transfer strip with a floating popup that shows animated progress and live speed
-              </div>
-            </div>
-            <ToggleSwitch
-              label="Popup SFTP Transfer Monitor"
-              checked={usePopupTransferMonitor}
-              onChange={() =>
-                void updateGeneral({ usePopupTransferMonitor: !usePopupTransferMonitor })
-              }
-            />
-          </div>
+      <SettingRow
+        label="Confirm on Close"
+        description="Ask for confirmation before closing with active sessions"
+      >
+        <ToggleSwitch
+          label="Confirm on Close"
+          checked={confirmOnClose}
+          onChange={() => void updateGeneral({ confirmOnClose: !confirmOnClose })}
+        />
+      </SettingRow>
 
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-sm text-text-primary">Auto-Hide Completed Transfers</div>
-              <div className="text-xs text-text-muted">
-                Automatically hide the transfer popup when all transfers finish
-              </div>
-            </div>
-            <ToggleSwitch
-              label="Auto-Hide Completed Transfers"
-              checked={autoHideCompletedTransfers}
-              onChange={() =>
-                void updateGeneral({ autoHideCompletedTransfers: !autoHideCompletedTransfers })
-              }
-            />
-          </div>
-        </div>
-      </div>
+      <SectionLabel className="pt-4 pb-1">Transfers</SectionLabel>
 
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Protocols</h3>
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Enable Telnet / Raw TCP</div>
-              <div className="text-xs text-text-muted">
-                Show Telnet quick-connect option for network gear and raw TCP services
-              </div>
-            </div>
-            <ToggleSwitch
-              label="Enable Telnet / Raw TCP"
-              checked={enableTelnet}
-              onChange={() => void updateGeneral({ enableTelnet: !enableTelnet })}
-            />
-          </div>
-        </div>
-      </div>
+      <SettingRow
+        label="Popup SFTP Transfer Monitor"
+        description="Replace the inline transfer strip with a floating popup that shows animated progress and live speed"
+      >
+        <ToggleSwitch
+          label="Popup SFTP Transfer Monitor"
+          checked={usePopupTransferMonitor}
+          onChange={() =>
+            void updateGeneral({ usePopupTransferMonitor: !usePopupTransferMonitor })
+          }
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Auto-Hide Completed Transfers"
+        description="Automatically hide the transfer popup when all transfers finish"
+      >
+        <ToggleSwitch
+          label="Auto-Hide Completed Transfers"
+          checked={autoHideCompletedTransfers}
+          onChange={() =>
+            void updateGeneral({ autoHideCompletedTransfers: !autoHideCompletedTransfers })
+          }
+        />
+      </SettingRow>
+
+      <SectionLabel className="pt-4 pb-1">Protocols</SectionLabel>
+
+      <SettingRow
+        label="Enable Telnet / Raw TCP"
+        description="Show Telnet quick-connect option for network gear and raw TCP services"
+      >
+        <ToggleSwitch
+          label="Enable Telnet / Raw TCP"
+          checked={enableTelnet}
+          onChange={() => void updateGeneral({ enableTelnet: !enableTelnet })}
+        />
+      </SettingRow>
     </div>
   );
 }
@@ -371,97 +388,87 @@ function UpdatesSection() {
   const status = statusLine();
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
-          Application Updates
-        </h3>
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Current version</div>
-              <div className="text-xs text-text-muted">
-                {update ? `v${currentVersion}` : currentVersion}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => void check()}
-              disabled={checking}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-text-primary hover:bg-base-600 disabled:opacity-50"
-            >
-              {checking ? "Checking…" : "Check for updates"}
-            </button>
-          </div>
-          {status ? (
-            <div className="text-xs text-text-muted">{status}</div>
-          ) : null}
-          {update?.lastCheckedAt ? (
-            <div className="text-xs text-text-muted">
-              Last checked: {new Date(update.lastCheckedAt).toLocaleString()}
-            </div>
-          ) : null}
+    <div>
+      <SectionLabel className="pt-4 pb-1">Application Updates</SectionLabel>
+
+      <SettingRow
+        label="Current version"
+        description={update ? `v${currentVersion}` : currentVersion}
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void check()}
+          disabled={checking}
+          className="shrink-0"
+        >
+          {checking ? "Checking…" : "Check for updates"}
+        </Button>
+      </SettingRow>
+
+      {status ? <div className="text-xs text-text-muted">{status}</div> : null}
+      {update?.lastCheckedAt ? (
+        <div className="text-xs text-text-muted">
+          Last checked: {new Date(update.lastCheckedAt).toLocaleString()}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
 
 function SecuritySection() {
+  const fieldId = useId();
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateSecurity = useStore(settingsStore, (s) => s.updateSecurity);
   const { credentialCacheEnabled, credentialCacheTtlMinutes } = settings.security;
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Authentication</h3>
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Credential Cache</div>
-              <div className="text-xs text-text-muted">
-                Cache SSH passwords in main-process memory for reconnects (never written to disk)
-              </div>
-            </div>
-            <ToggleSwitch
-              label="Credential Cache"
-              checked={credentialCacheEnabled}
-              onChange={() =>
-                void updateSecurity({ credentialCacheEnabled: !credentialCacheEnabled })
-              }
-            />
-          </div>
+    <div>
+      <SectionLabel className="pt-4 pb-1">Authentication</SectionLabel>
 
-          <label className="grid gap-1.5">
-            <span className="text-sm text-text-primary">Cache Timeout (minutes)</span>
-            <span className="text-xs text-text-muted">
-              Cached credentials expire after this inactivity window
-            </span>
-            <input
-              type="number"
-              min={MIN_CREDENTIAL_CACHE_TTL_MINUTES}
-              max={MAX_CREDENTIAL_CACHE_TTL_MINUTES}
-              step={1}
-              disabled={!credentialCacheEnabled}
-              value={credentialCacheTtlMinutes}
-              onChange={(e) => {
-                const parsed = Number.parseInt(e.target.value, 10);
-                if (!Number.isFinite(parsed)) {
-                  return;
-                }
-                void updateSecurity({ credentialCacheTtlMinutes: parsed });
-              }}
-              className={inputClasses}
-            />
-          </label>
-        </div>
-      </div>
+      <SettingRow
+        label="Credential Cache"
+        description="Cache SSH passwords in main-process memory for reconnects (never written to disk)"
+      >
+        <ToggleSwitch
+          label="Credential Cache"
+          checked={credentialCacheEnabled}
+          onChange={() =>
+            void updateSecurity({ credentialCacheEnabled: !credentialCacheEnabled })
+          }
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Cache Timeout (minutes)"
+        description="Cached credentials expire after this inactivity window"
+        controlId={`${fieldId}-cacheTtl`}
+      >
+        <ControlSlot>
+          <Input
+            id={`${fieldId}-cacheTtl`}
+            type="number"
+            min={MIN_CREDENTIAL_CACHE_TTL_MINUTES}
+            max={MAX_CREDENTIAL_CACHE_TTL_MINUTES}
+            step={1}
+            disabled={!credentialCacheEnabled}
+            value={credentialCacheTtlMinutes}
+            onChange={(e) => {
+              const parsed = Number.parseInt(e.target.value, 10);
+              if (!Number.isFinite(parsed)) {
+                return;
+              }
+              void updateSecurity({ credentialCacheTtlMinutes: parsed });
+            }}
+          />
+        </ControlSlot>
+      </SettingRow>
     </div>
   );
 }
 
 function TerminalSection() {
+  const fieldId = useId();
   const settings = useStore(settingsStore, (s) => s.settings);
   const updateTerminal = useStore(settingsStore, (s) => s.updateTerminal);
   const updateDebug = useStore(settingsStore, (s) => s.updateDebug);
@@ -473,156 +480,121 @@ function TerminalSection() {
     FONT_OPTIONS.find((f) => fontFamily.includes(f.label))?.value ?? FONT_OPTIONS[0].value;
 
   return (
-    <div className="grid gap-6">
-      {/* Font */}
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Font</h3>
-        <div className="grid gap-4">
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-text-secondary">Family</span>
-            <select
-              value={activeFontValue}
-              onChange={(e) => void updateTerminal({ fontFamily: e.target.value })}
-              className={inputClasses}
-            >
-              {FONT_OPTIONS.map((f) => (
-                <option key={f.label} value={f.value}>{f.label}</option>
-              ))}
-            </select>
-          </label>
+    <div>
+      <SectionLabel className="pt-4 pb-1">Font</SectionLabel>
 
-          <div className="grid grid-cols-2 gap-4">
-            <label className="grid gap-1.5">
-              <span className="text-xs font-medium text-text-secondary">Size</span>
-              <select
-                value={fontSize}
-                onChange={(e) => void updateTerminal({ fontSize: Number(e.target.value) })}
-                className={inputClasses}
-              >
-                {FONT_SIZES.map((s) => (
-                  <option key={s} value={s}>{s}px</option>
-                ))}
-              </select>
-            </label>
+      <SettingRow label="Family" controlId={`${fieldId}-fontFamily`}>
+        <ControlSlot>
+          <Select
+            id={`${fieldId}-fontFamily`}
+            value={activeFontValue}
+            onChange={(e) => void updateTerminal({ fontFamily: e.target.value })}
+          >
+            {FONT_OPTIONS.map((f) => (
+              <option key={f.label} value={f.value}>{f.label}</option>
+            ))}
+          </Select>
+        </ControlSlot>
+      </SettingRow>
 
-            <label className="grid gap-1.5">
-              <span className="text-xs font-medium text-text-secondary">Line Height</span>
-              <input
-                type="number"
-                min={MIN_TERMINAL_LINE_HEIGHT}
-                max={MAX_TERMINAL_LINE_HEIGHT}
-                step={0.05}
-                value={lineHeight}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (
-                    !isNaN(val) &&
-                    val >= MIN_TERMINAL_LINE_HEIGHT &&
-                    val <= MAX_TERMINAL_LINE_HEIGHT
-                  ) {
-                    void updateTerminal({ lineHeight: val });
-                  }
-                }}
-                className={inputClasses}
-              />
-            </label>
-          </div>
+      <SettingRow label="Size" controlId={`${fieldId}-fontSize`}>
+        <ControlSlot>
+          <Select
+            id={`${fieldId}-fontSize`}
+            value={fontSize}
+            onChange={(e) => void updateTerminal({ fontSize: Number(e.target.value) })}
+          >
+            {FONT_SIZES.map((s) => (
+              <option key={s} value={s}>{s}px</option>
+            ))}
+          </Select>
+        </ControlSlot>
+      </SettingRow>
 
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-text-secondary">Character Spacing</span>
-            <input
-              type="number"
-              min={MIN_TERMINAL_LETTER_SPACING}
-              max={MAX_TERMINAL_LETTER_SPACING}
-              step={1}
-              value={letterSpacing}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (
-                  !Number.isNaN(val) &&
-                  val >= MIN_TERMINAL_LETTER_SPACING &&
-                  val <= MAX_TERMINAL_LETTER_SPACING
-                ) {
-                  void updateTerminal({ letterSpacing: val });
-                }
-              }}
-              className={inputClasses}
-            />
-          </label>
-        </div>
-      </div>
+      <SettingRow label="Line Height" controlId={`${fieldId}-lineHeight`}>
+        <ControlSlot>
+          <Input
+            id={`${fieldId}-lineHeight`}
+            type="number"
+            min={MIN_TERMINAL_LINE_HEIGHT}
+            max={MAX_TERMINAL_LINE_HEIGHT}
+            step={0.05}
+            value={lineHeight}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              if (
+                !isNaN(val) &&
+                val >= MIN_TERMINAL_LINE_HEIGHT &&
+                val <= MAX_TERMINAL_LINE_HEIGHT
+              ) {
+                void updateTerminal({ lineHeight: val });
+              }
+            }}
+          />
+        </ControlSlot>
+      </SettingRow>
 
-      {/* Behavior */}
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Behavior</h3>
-        <div className="grid gap-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-text-primary">Cursor Blink</div>
-              <div className="text-xs text-text-muted">Animate the cursor in the terminal</div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={cursorBlink}
-              onClick={() => void updateTerminal({ cursorBlink: !cursorBlink })}
-              className={[
-                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 focus:ring-offset-base-900",
-                cursorBlink ? "bg-accent" : "bg-base-600",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out",
-                  cursorBlink ? "translate-x-4" : "translate-x-0.5",
-                ].join(" ")}
-              />
-            </button>
-          </div>
+      <SettingRow label="Character Spacing" controlId={`${fieldId}-letterSpacing`}>
+        <ControlSlot>
+          <Input
+            id={`${fieldId}-letterSpacing`}
+            type="number"
+            min={MIN_TERMINAL_LETTER_SPACING}
+            max={MAX_TERMINAL_LETTER_SPACING}
+            step={1}
+            value={letterSpacing}
+            onChange={(e) => {
+              const val = parseInt(e.target.value, 10);
+              if (
+                !Number.isNaN(val) &&
+                val >= MIN_TERMINAL_LETTER_SPACING &&
+                val <= MAX_TERMINAL_LETTER_SPACING
+              ) {
+                void updateTerminal({ letterSpacing: val });
+              }
+            }}
+          />
+        </ControlSlot>
+      </SettingRow>
 
-          <label className="grid gap-1.5">
-            <span className="text-sm text-text-primary">Scrollback Lines</span>
-            <span className="text-xs text-text-muted">Number of lines to keep in terminal history</span>
-            <select
-              value={scrollback}
-              onChange={(e) => void updateTerminal({ scrollback: Number(e.target.value) })}
-              className={inputClasses}
-            >
-              {SCROLLBACK_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n.toLocaleString()}</option>
-              ))}
-            </select>
-          </label>
+      <SectionLabel className="pt-4 pb-1">Behavior</SectionLabel>
 
-          <div className="pt-2 border-t border-border/40">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-text-primary">Auth Trace Logging</div>
-                <div className="text-xs text-text-muted">
-                  Log whether saved credentials were resolved and used (never logs secrets)
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={authTracing}
-                onClick={() => void updateDebug({ authTracing: !authTracing })}
-                className={[
-                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-accent/40 focus:ring-offset-2 focus:ring-offset-base-900",
-                  authTracing ? "bg-accent" : "bg-base-600",
-                ].join(" ")}
-              >
-                <span
-                  className={[
-                    "pointer-events-none inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white shadow transition-transform duration-200 ease-in-out",
-                    authTracing ? "translate-x-4" : "translate-x-0.5",
-                  ].join(" ")}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SettingRow label="Cursor Blink" description="Animate the cursor in the terminal">
+        <ToggleSwitch
+          label="Cursor Blink"
+          checked={cursorBlink}
+          onChange={() => void updateTerminal({ cursorBlink: !cursorBlink })}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Scrollback Lines"
+        description="Number of lines to keep in terminal history"
+        controlId={`${fieldId}-scrollback`}
+      >
+        <ControlSlot>
+          <Select
+            id={`${fieldId}-scrollback`}
+            value={scrollback}
+            onChange={(e) => void updateTerminal({ scrollback: Number(e.target.value) })}
+          >
+            {SCROLLBACK_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n.toLocaleString()}</option>
+            ))}
+          </Select>
+        </ControlSlot>
+      </SettingRow>
+
+      <SettingRow
+        label="Auth Trace Logging"
+        description="Log whether saved credentials were resolved and used (never logs secrets)"
+      >
+        <ToggleSwitch
+          label="Auth Trace Logging"
+          checked={authTracing}
+          onChange={() => void updateDebug({ authTracing: !authTracing })}
+        />
+      </SettingRow>
     </div>
   );
 }
@@ -645,7 +617,7 @@ function AppThemeOption({
       type="button"
       onClick={() => onSelect(id)}
       className={[
-        "flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all duration-150",
+        "flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors duration-(--motion-fast) ease-standard focus-ring",
         active
           ? "border-accent/60 bg-accent/10 text-text-primary"
           : "border-border bg-base-900 text-text-secondary hover:border-border-bright hover:text-text-primary",
@@ -672,15 +644,13 @@ function AppearanceSection() {
   return (
     <div className="grid gap-6">
       <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
-          App Theme
-        </h3>
+        <SectionLabel className="pt-4 pb-1">App Theme</SectionLabel>
 
         <button
           type="button"
           onClick={() => select("system")}
           className={[
-            "mb-4 flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all duration-150",
+            "mt-1 mb-2 flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors duration-(--motion-fast) ease-standard focus-ring",
             followSystem
               ? "border-accent/60 bg-accent/10 text-text-primary"
               : "border-border bg-base-900 text-text-secondary hover:border-border-bright hover:text-text-primary",
@@ -697,10 +667,8 @@ function AppearanceSection() {
           <span className="text-xs font-medium">Follow system (auto light/dark)</span>
         </button>
 
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-          Dark
-        </p>
-        <div className="grid grid-cols-2 gap-2">
+        <SectionLabel className="pt-4 pb-1">Dark</SectionLabel>
+        <div className="grid grid-cols-2 gap-2 pt-1">
           {darkThemes.map((t) => (
             <AppThemeOption
               key={t.id}
@@ -713,10 +681,8 @@ function AppearanceSection() {
           ))}
         </div>
 
-        <p className="mb-2 mt-4 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-          Light
-        </p>
-        <div className="grid grid-cols-2 gap-2">
+        <SectionLabel className="pt-4 pb-1">Light</SectionLabel>
+        <div className="grid grid-cols-2 gap-2 pt-1">
           {lightThemes.map((t) => (
             <AppThemeOption
               key={t.id}
@@ -752,8 +718,8 @@ function TerminalThemeSection() {
     <div className="grid gap-6">
       {/* Theme picker */}
       <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Theme</h3>
-        <div className="grid grid-cols-2 gap-2">
+        <SectionLabel className="pt-4 pb-1">Theme</SectionLabel>
+        <div className="grid grid-cols-2 gap-2 pt-1">
           {allThemes.map(({ key, obj: themeObj, isCustom }) => {
             const isActive = theme === key;
             return (
@@ -762,7 +728,7 @@ function TerminalThemeSection() {
                   type="button"
                   onClick={() => void updateTerminal({ theme: key })}
                   className={[
-                    "w-full rounded-lg border p-3 text-left transition-all duration-150",
+                    "w-full rounded-lg border p-3 text-left transition-colors duration-(--motion-fast) ease-standard focus-ring",
                     isActive
                       ? "border-accent/40 bg-accent/10 ring-1 ring-accent/20"
                       : "border-border bg-surface/60 hover:border-border-bright hover:bg-surface/80",
@@ -802,8 +768,9 @@ function TerminalThemeSection() {
                 </button>
                 {isCustom && (
                   <button
+                    type="button"
                     onClick={() => void deleteCustomTheme(key)}
-                    className="absolute top-1.5 right-1.5 hidden group-hover:flex items-center justify-center w-5 h-5 rounded bg-base-900/80 text-text-muted hover:text-danger text-xs transition-colors"
+                    className="absolute top-1.5 right-1.5 hidden group-hover:flex items-center justify-center w-5 h-5 rounded bg-base-900/80 text-text-muted hover:text-danger text-xs transition-colors duration-(--motion-fast) ease-standard focus-ring"
                     title="Delete theme"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -822,8 +789,9 @@ function TerminalThemeSection() {
         <ThemeEditor onClose={() => setShowEditor(false)} />
       ) : (
         <button
+          type="button"
           onClick={() => setShowEditor(true)}
-          className="w-full rounded-lg border border-dashed border-border py-2.5 text-xs text-text-muted hover:text-text-secondary hover:border-border-bright transition-colors"
+          className="w-full rounded-lg border border-dashed border-border py-2.5 text-xs text-text-muted hover:text-text-secondary hover:border-border-bright transition-colors duration-(--motion-fast) ease-standard focus-ring"
         >
           + Create Custom Theme
         </button>
@@ -833,7 +801,7 @@ function TerminalThemeSection() {
 }
 
 const importButtonClasses =
-  "flex items-center gap-3 w-full rounded-lg border border-border bg-surface/60 px-4 py-3 text-left transition-all duration-150 hover:border-border-bright hover:bg-surface/80";
+  "flex items-center gap-3 w-full rounded-lg border border-border bg-surface/60 px-4 py-3 text-left transition-colors duration-(--motion-fast) ease-standard focus-ring hover:border-border-bright hover:bg-surface/80";
 
 function ImportSection({ onImportSshConfig, onImportPutty, onImportSshManager }: {
   onImportSshConfig: () => void;
@@ -841,44 +809,42 @@ function ImportSection({ onImportSshConfig, onImportPutty, onImportSshManager }:
   onImportSshManager: () => void;
 }) {
   return (
-    <div className="grid gap-6">
-      <div>
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Import Hosts</h3>
-        <div className="grid gap-3">
-          <button type="button" onClick={onImportSshConfig} className={importButtonClasses}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
-              <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M3 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <div>
-              <div className="text-sm text-text-primary">Import SSH Config</div>
-              <div className="text-xs text-text-muted">Import hosts from ~/.ssh/config</div>
-            </div>
-          </button>
+    <div>
+      <SectionLabel className="pt-4 pb-1">Import Hosts</SectionLabel>
+      <div className="grid gap-3 pt-1">
+        <button type="button" onClick={onImportSshConfig} className={importButtonClasses}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
+            <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 13H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <div>
+            <div className="text-sm text-text-primary">Import SSH Config</div>
+            <div className="text-xs text-text-muted">Import hosts from ~/.ssh/config</div>
+          </div>
+        </button>
 
-          <button type="button" onClick={onImportPutty} className={importButtonClasses}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
-              <rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-            <div>
-              <div className="text-sm text-text-primary">Import from PuTTY</div>
-              <div className="text-xs text-text-muted">Import saved sessions from PuTTY registry</div>
-            </div>
-          </button>
+        <button type="button" onClick={onImportPutty} className={importButtonClasses}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
+            <rect x="3" y="1" width="10" height="14" rx="2" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          <div>
+            <div className="text-sm text-text-primary">Import from PuTTY</div>
+            <div className="text-xs text-text-muted">Import saved sessions from PuTTY registry</div>
+          </div>
+        </button>
 
-          <button type="button" onClick={onImportSshManager} className={importButtonClasses}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
-              <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M2 6h12" stroke="currentColor" strokeWidth="1.2" />
-              <circle cx="4.5" cy="9.5" r="1" fill="currentColor" />
-            </svg>
-            <div>
-              <div className="text-sm text-text-primary">Import from SshManager</div>
-              <div className="text-xs text-text-muted">Import hosts, groups, and snippets from SshManager database</div>
-            </div>
-          </button>
-        </div>
+        <button type="button" onClick={onImportSshManager} className={importButtonClasses}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-text-muted shrink-0">
+            <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M2 6h12" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="4.5" cy="9.5" r="1" fill="currentColor" />
+          </svg>
+          <div>
+            <div className="text-sm text-text-primary">Import from SshManager</div>
+            <div className="text-xs text-text-muted">Import hosts, groups, and snippets from SshManager database</div>
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -900,12 +866,13 @@ export function SettingsPanel({ onImportSshConfig, onImportPutty, onImportSshMan
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
+            type="button"
             onClick={() => setActiveCategory(cat.id)}
             className={[
-              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 text-sm",
+              "flex items-center gap-2.5 rounded-lg border-l-2 px-3 py-2 text-left text-sm transition-colors duration-(--motion-fast) ease-standard focus-ring",
               activeCategory === cat.id
-                ? "bg-accent/10 text-accent font-medium"
-                : "text-text-secondary hover:text-text-primary hover:bg-base-700/50",
+                ? "border-accent bg-accent/10 text-accent font-medium"
+                : "border-transparent text-text-secondary hover:text-text-primary hover:bg-base-700/60",
             ].join(" ")}
           >
             <span className={activeCategory === cat.id ? "text-accent" : "text-text-muted"}>
