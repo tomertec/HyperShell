@@ -9,7 +9,7 @@ function stateTint(sessionState: string | undefined, isActive: boolean): string 
       return isActive ? "text-text-primary" : "text-text-secondary";
     case "connecting":
     case "reconnecting":
-      return "text-warning host-status-pulse";
+      return "text-warning animate-pulse";
     case "waiting_for_network":
       return "text-warning";
     case "failed":

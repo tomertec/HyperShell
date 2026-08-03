@@ -79,7 +79,7 @@ export function BroadcastBar() {
                   : "border-border bg-base-800 text-text-muted hover:text-text-primary"
               }`}
             >
-              {tab.title}
+              {tab.dynamicTitle ?? tab.title}
             </button>
           );
         })}

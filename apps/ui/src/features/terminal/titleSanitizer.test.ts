@@ -23,4 +23,26 @@ describe("sanitizeTitle", () => {
     expect(sanitizeTitle("   \t ")).toBeNull();
     expect(sanitizeTitle("\u0007\u001b")).toBeNull();
   });
+
+  it("strips bidi override characters", () => {
+    expect(sanitizeTitle("abc\u202egfedcba")).toBe("abcgfedcba");
+  });
+
+  it("strips zero-width characters", () => {
+    expect(sanitizeTitle("a\u200bb\u200cc\u200dd\u2060e\u00adf")).toBe("abcdef");
+  });
+
+  it("leaves no trailing space after capping at 120 characters", () => {
+    const raw = "x".repeat(119) + " " + "y".repeat(10);
+    const result = sanitizeTitle(raw);
+    expect(result).toHaveLength(119);
+    expect(result?.endsWith(" ")).toBe(false);
+  });
+
+  it("does not bisect a surrogate pair at the 120-character cap", () => {
+    const raw = "x".repeat(119) + "\ud83d\ude00"; // 119 chars + astral emoji straddling the cap
+    const result = sanitizeTitle(raw);
+    expect(result).toHaveLength(119);
+    expect(result?.charCodeAt(result.length - 1)).not.toBeGreaterThanOrEqual(0xd800);
+  });
 });
