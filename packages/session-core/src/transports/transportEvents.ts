@@ -36,6 +36,8 @@ export interface TransportHandle {
   close(): void;
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
   setSignals?(signals: { dtr?: boolean; rts?: boolean }): void;
+  /** OS pid of the spawned process. Only pty-backed transports have one. */
+  pid?: number;
 }
 
 export interface SshConnectionOptions {
