@@ -255,6 +255,7 @@ export function SidebarHostList({
       filterInputRef.current?.focus();
     } else {
       setFilterQuery("");
+      setSelectedTagIds([]);
     }
   }, [showFilter]);
 
@@ -575,7 +576,7 @@ export function SidebarHostList({
           </div>
         )}
 
-        {tags.length > 0 && (
+        {showFilter && tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 px-1 pb-1.5 shrink-0">
             {tags.map((tag) => {
               const selected = selectedTagIds.includes(tag.id);
