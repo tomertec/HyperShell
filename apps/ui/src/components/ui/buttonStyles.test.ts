@@ -8,7 +8,19 @@ describe("buttonClassName", () => {
       expect(cls).toContain("focus-ring");
       expect(cls).toContain("rounded-lg");
       expect(cls).toContain("duration-(--motion-fast)");
+      // Labels must never wrap mid-word in narrow containers like the sidebar
+      expect(cls).toContain("whitespace-nowrap");
     }
+  });
+
+  it("maps shapes, defaulting to the rounded corner radius", () => {
+    expect(buttonClassName("primary", "sm")).toContain("rounded-lg");
+    expect(buttonClassName("primary", "sm", "rounded")).toContain("rounded-lg");
+
+    const pill = buttonClassName("primary", "sm", "pill");
+    expect(pill).toContain("rounded-full");
+    // Only one radius may survive — the primitive concatenates without tailwind-merge
+    expect(pill).not.toContain("rounded-lg");
   });
 
   it("maps variants to semantic token colors only", () => {

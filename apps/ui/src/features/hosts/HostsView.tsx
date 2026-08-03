@@ -127,39 +127,39 @@ export function HostsView() {
         </button>
       </header>
 
-      {isImportOpen ? (
-        <SshConfigImportDialog
-          onImport={(items: SshConfigImportItem[]) => {
-            setHosts((currentHosts) => {
-              const importedHosts: HostRecord[] = items.map((item, index) => ({
-                id: `imported-${currentHosts.length + index + 1}`,
-                name: item.alias,
-                hostname: item.hostName ?? item.alias,
-                port: item.port ?? 22,
-                username: item.user ?? "",
-                identityFile: "",
-                envVars: [],
-                group: "Imported",
-                tags: "ssh-config",
-                tagIds: [],
-                authMethod: "default",
-                agentKind: "system",
-                opReference: "",
-                proxyJump: "",
-                proxyJumpHostIds: "",
-                keepAliveInterval: "",
-                autoReconnect: false,
-                reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
-                reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
-                tmuxDetect: false,
-              }));
+      <SshConfigImportDialog
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImport={(items: SshConfigImportItem[]) => {
+          setHosts((currentHosts) => {
+            const importedHosts: HostRecord[] = items.map((item, index) => ({
+              id: `imported-${currentHosts.length + index + 1}`,
+              name: item.alias,
+              hostname: item.hostName ?? item.alias,
+              port: item.port ?? 22,
+              username: item.user ?? "",
+              identityFile: "",
+              envVars: [],
+              group: "Imported",
+              tags: "ssh-config",
+              tagIds: [],
+              authMethod: "default",
+              agentKind: "system",
+              opReference: "",
+              proxyJump: "",
+              proxyJumpHostIds: "",
+              keepAliveInterval: "",
+              autoReconnect: false,
+              reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+              reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
+              tmuxDetect: false,
+            }));
 
-              return [...currentHosts, ...importedHosts];
-            });
-            setIsImportOpen(false);
-          }}
-        />
-      ) : null}
+            return [...currentHosts, ...importedHosts];
+          });
+          setIsImportOpen(false);
+        }}
+      />
 
       <div className="grid gap-4" style={{ gridTemplateColumns: "1.2fr 0.8fr" }}>
         <div className="grid gap-3">

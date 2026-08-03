@@ -164,7 +164,21 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
   }, [loadTags, selectedTag]);
 
   return (
-    <Modal open={open} onClose={onClose} title="Tag Manager">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Tag Manager"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => void removeTag()} disabled={!selectedTag}>
+            Delete
+          </Button>
+          <Button variant="primary" onClick={() => void saveTag()} disabled={isSaving}>
+            {isSaving ? "Saving..." : selectedTag ? "Update Tag" : "Create Tag"}
+          </Button>
+        </>
+      }
+    >
       <div className="grid gap-4 md:grid-cols-[220px,1fr]">
         <div className="grid gap-2 border-b border-border pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-3">
           <Button variant="outline" onClick={startNewTag} className="w-full">
@@ -248,15 +262,6 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
               }
               placeholder="#3b82f6"
             />
-          </div>
-
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => void removeTag()} disabled={!selectedTag}>
-              Delete
-            </Button>
-            <Button variant="primary" onClick={() => void saveTag()} disabled={isSaving}>
-              {isSaving ? "Saving..." : selectedTag ? "Update Tag" : "Create Tag"}
-            </Button>
           </div>
         </div>
       </div>

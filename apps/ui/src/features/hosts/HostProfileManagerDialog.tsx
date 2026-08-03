@@ -171,7 +171,21 @@ export function HostProfileManagerDialog({
   }, [loadProfiles, selectedProfile]);
 
   return (
-    <Modal open={open} onClose={onClose} title="Host Profiles">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Host Profiles"
+      footer={
+        <>
+          <Button variant="outline" onClick={() => void removeProfile()} disabled={!selectedProfile}>
+            Delete
+          </Button>
+          <Button variant="primary" onClick={() => void saveProfile()} disabled={isSaving}>
+            {isSaving ? "Saving..." : selectedProfile ? "Update Profile" : "Create Profile"}
+          </Button>
+        </>
+      }
+    >
       <div className="grid gap-4 md:grid-cols-[220px,1fr]">
         <div className="grid gap-2 border-b border-border pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-3">
           <Button variant="outline" onClick={startNewProfile} className="w-full">
@@ -295,15 +309,6 @@ export function HostProfileManagerDialog({
               placeholder="Leave empty for default"
             />
           </label>
-
-          <div className="flex items-center justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => void removeProfile()} disabled={!selectedProfile}>
-              Delete
-            </Button>
-            <Button variant="primary" onClick={() => void saveProfile()} disabled={isSaving}>
-              {isSaving ? "Saving..." : selectedProfile ? "Update Profile" : "Create Profile"}
-            </Button>
-          </div>
         </div>
       </div>
     </Modal>

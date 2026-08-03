@@ -799,6 +799,7 @@ export function HostForm({
                 />
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => {
                     void (async () => {
                       const filePath = await window.hypershell?.fsShowOpenDialog?.({
@@ -810,7 +811,7 @@ export function HostForm({
                       }
                     })();
                   }}
-                  className="shrink-0 px-2.5"
+                  className="shrink-0"
                   title="Browse for key file"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -859,9 +860,10 @@ export function HostForm({
                 />
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => setOpPickerOpen(true)}
                   title="Browse 1Password vault"
-                  className="shrink-0 px-2.5"
+                  className="shrink-0"
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <path d="M6.5 2a4.5 4.5 0 1 0 2.76 8.05l2.85 2.85a.75.75 0 1 0 1.06-1.06l-2.85-2.85A4.5 4.5 0 0 0 6.5 2ZM3 6.5a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0Z" fill="currentColor" />

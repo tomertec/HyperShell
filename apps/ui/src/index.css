@@ -29,8 +29,11 @@
   --font-outfit: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --shadow-raised: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  /* Tailwind inlines @theme shadow values into the emitted utility, so a theme
+     cannot override --shadow-* directly. Indirect through --elevation-*, which
+     stays a live var reference in the utility and is themeable at runtime. */
+  --shadow-raised: var(--elevation-raised);
+  --shadow-overlay: var(--elevation-overlay);
   --animate-menu-in: menu-in var(--motion-fast, 120ms) var(--ease-standard);
 
   @keyframes menu-in {
@@ -69,6 +72,8 @@
   --motion-fast: 120ms;
   --motion-base: 180ms;
   --motion-slow: 260ms;
+  --elevation-raised: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --elevation-overlay: 0 16px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 html[data-theme="default-light"] {
@@ -113,8 +118,8 @@ html[data-theme="default-light"] {
   --tw-shadow-color: rgba(0, 0, 0, 0.06);
 
   /* Elevation shadows — dark inset highlight makes no sense on white; use real soft shadows */
-  --shadow-raised: 0 4px 16px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
-  --shadow-overlay: 0 16px 48px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
+  --elevation-raised: 0 4px 16px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
+  --elevation-overlay: 0 16px 48px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
 
   /* Host tag colors — muted for light backgrounds */
   --host-red: #ef4444;

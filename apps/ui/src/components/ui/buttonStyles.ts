@@ -1,9 +1,15 @@
 export type ButtonVariant = "primary" | "ghost" | "outline" | "danger";
 export type ButtonSize = "sm" | "md";
+export type ButtonShape = "rounded" | "pill";
 export type IconButtonVariant = "ghost" | "accent";
 
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium cursor-pointer select-none transition-colors duration-(--motion-fast) ease-standard focus-ring disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 font-medium whitespace-nowrap cursor-pointer select-none transition-colors duration-(--motion-fast) ease-standard focus-ring disabled:cursor-not-allowed disabled:opacity-50";
+
+const BUTTON_SHAPES: Record<ButtonShape, string> = {
+  rounded: "rounded-lg",
+  pill: "rounded-full",
+};
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
   sm: "px-3 py-1.5 text-xs",
@@ -26,8 +32,12 @@ const ICON_BUTTON_VARIANTS: Record<IconButtonVariant, string> = {
   accent: "text-text-muted hover:text-accent/80 hover:bg-accent/[0.06]",
 };
 
-export function buttonClassName(variant: ButtonVariant, size: ButtonSize): string {
-  return `${BUTTON_BASE} ${BUTTON_SIZES[size]} ${BUTTON_VARIANTS[variant]}`;
+export function buttonClassName(
+  variant: ButtonVariant,
+  size: ButtonSize,
+  shape: ButtonShape = "rounded"
+): string {
+  return `${BUTTON_BASE} ${BUTTON_SHAPES[shape]} ${BUTTON_SIZES[size]} ${BUTTON_VARIANTS[variant]}`;
 }
 
 export function iconButtonClassName(variant: IconButtonVariant): string {

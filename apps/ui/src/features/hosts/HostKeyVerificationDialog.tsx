@@ -43,6 +43,20 @@ export function HostKeyVerificationDialog({
       open={open}
       onClose={onReject}
       title={isKeyChanged ? "WARNING: Host Key Changed" : "Unknown Host Key"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onReject}>
+            Reject
+          </Button>
+          <Button
+            variant={isKeyChanged ? "danger" : "primary"}
+            onClick={() => { void handleTrust(); }}
+            disabled={confirming}
+          >
+            {isKeyChanged ? "Trust New Key" : "Trust & Connect"}
+          </Button>
+        </>
+      }
     >
       <div className="grid gap-4">
         {isKeyChanged ? (
@@ -95,19 +109,6 @@ export function HostKeyVerificationDialog({
             ? "If you trust this new key, the old fingerprint will be replaced."
             : "If you trust this host, the fingerprint will be saved for future connections."}
         </p>
-
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onReject}>
-            Reject
-          </Button>
-          <Button
-            variant={isKeyChanged ? "danger" : "primary"}
-            onClick={() => { void handleTrust(); }}
-            disabled={confirming}
-          >
-            {isKeyChanged ? "Trust New Key" : "Trust & Connect"}
-          </Button>
-        </div>
       </div>
     </Modal>
   );

@@ -9,7 +9,9 @@ export function EmptyState({ icon, message, children }: EmptyStateProps) {
     <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
       {icon && <div className="text-text-muted/50">{icon}</div>}
       <p className="text-xs text-text-muted">{message}</p>
-      {children && <div className="flex items-center justify-center gap-2">{children}</div>}
+      {children && (
+        <div className="flex flex-wrap items-center justify-center gap-2">{children}</div>
+      )}
     </div>
   );
 }

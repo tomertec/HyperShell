@@ -1457,103 +1457,90 @@ function MainApp() {
         />
       </Modal>
 
-      <Modal
+      <SshConfigImportDialog
         open={importModalOpen}
         onClose={() => setImportModalOpen(false)}
-        title="Import SSH Config"
-      >
-        <SshConfigImportDialog
-          onImport={(items: SshConfigImportItem[]) => {
-            const newHosts = items.map((item, i) => ({
-              id: `imported-${Date.now()}-${i}`,
-              name: item.alias,
-              hostname: item.hostName ?? item.alias,
-              port: item.port ?? 22,
-              username: item.user ?? "",
-              identityFile: "",
-              envVars: [],
-              group: "Imported",
-              tags: "ssh-config",
-              tagIds: [],
-              authMethod: "default" as const,
-              agentKind: "system" as const,
-              opReference: "",
-              proxyJump: "",
-              proxyJumpHostIds: "",
-              keepAliveInterval: "",
-              autoReconnect: false,
-              reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
-              reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
-              tmuxDetect: false,
-            }));
-            setHosts((prev) => [...prev, ...newHosts]);
-            for (const host of newHosts) {
-              void persistHost(host);
-            }
-            setImportModalOpen(false);
-          }}
-        />
-      </Modal>
+        onImport={(items: SshConfigImportItem[]) => {
+          const newHosts = items.map((item, i) => ({
+            id: `imported-${Date.now()}-${i}`,
+            name: item.alias,
+            hostname: item.hostName ?? item.alias,
+            port: item.port ?? 22,
+            username: item.user ?? "",
+            identityFile: "",
+            envVars: [],
+            group: "Imported",
+            tags: "ssh-config",
+            tagIds: [],
+            authMethod: "default" as const,
+            agentKind: "system" as const,
+            opReference: "",
+            proxyJump: "",
+            proxyJumpHostIds: "",
+            keepAliveInterval: "",
+            autoReconnect: false,
+            reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+            reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
+            tmuxDetect: false,
+          }));
+          setHosts((prev) => [...prev, ...newHosts]);
+          for (const host of newHosts) {
+            void persistHost(host);
+          }
+          setImportModalOpen(false);
+        }}
+      />
 
-      <Modal
+      <PuttyImportDialog
         open={puttyImportOpen}
         onClose={() => setPuttyImportOpen(false)}
-        title="Import from PuTTY"
-      >
-        <PuttyImportDialog
-          onClose={() => setPuttyImportOpen(false)}
-          onImport={(sessions: PuttySession[]) => {
-            const newHosts = sessions.map((session, i) => ({
-              id: `putty-${Date.now()}-${i}`,
-              name: session.name,
-              hostname: session.hostname,
-              port: session.port,
-              username: session.username || "",
-              identityFile: session.keyFile || "",
-              envVars: [],
-              group: "PuTTY Import",
-              tags: "putty",
-              tagIds: [],
-              authMethod: "default" as const,
-              agentKind: "system" as const,
-              opReference: "",
-              proxyJump: "",
-              proxyJumpHostIds: "",
-              keepAliveInterval: "",
-              autoReconnect: false,
-              reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
-              reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
-              tmuxDetect: false,
-            }));
-            setHosts((prev) => [...prev, ...newHosts]);
-            for (const host of newHosts) {
-              void persistHost(host);
-            }
-            setPuttyImportOpen(false);
-            toast.success(`Imported ${newHosts.length} PuTTY session${newHosts.length === 1 ? "" : "s"}`);
-          }}
-        />
-      </Modal>
+        onImport={(sessions: PuttySession[]) => {
+          const newHosts = sessions.map((session, i) => ({
+            id: `putty-${Date.now()}-${i}`,
+            name: session.name,
+            hostname: session.hostname,
+            port: session.port,
+            username: session.username || "",
+            identityFile: session.keyFile || "",
+            envVars: [],
+            group: "PuTTY Import",
+            tags: "putty",
+            tagIds: [],
+            authMethod: "default" as const,
+            agentKind: "system" as const,
+            opReference: "",
+            proxyJump: "",
+            proxyJumpHostIds: "",
+            keepAliveInterval: "",
+            autoReconnect: false,
+            reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
+            reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
+            tmuxDetect: false,
+          }));
+          setHosts((prev) => [...prev, ...newHosts]);
+          for (const host of newHosts) {
+            void persistHost(host);
+          }
+          setPuttyImportOpen(false);
+          toast.success(`Imported ${newHosts.length} PuTTY session${newHosts.length === 1 ? "" : "s"}`);
+        }}
+      />
 
-      <Modal
+      <SshManagerImportDialog
         open={sshManagerImportOpen}
         onClose={() => setSshManagerImportOpen(false)}
-        title="Import from SshManager"
-      >
-        <SshManagerImportDialog
-          onClose={() => setSshManagerImportOpen(false)}
-          onImported={() => {
-            setSshManagerImportOpen(false);
-            void Promise.all([loadHosts(), loadTags()]).then(
-              async ([loadedHosts, loadedTags]) => {
-                const hostsWithTags = await attachHostTags(loadedHosts);
-                setHosts(hostsWithTags);
-                setTags(loadedTags);
-              }
-            );
-          }}
-        />
-      </Modal>
+        onImported={() => {
+          setSshManagerImportOpen(false);
+          void Promise.all([loadHosts(), loadTags()]).then(
+            async ([loadedHosts, loadedTags]) => {
+              const hostsWithTags = await attachHostTags(loadedHosts);
+              setHosts(hostsWithTags);
+              setTags(loadedTags);
+            }
+          );
+        }}
+      />
+
 
       <Modal
         open={serialModalOpen}

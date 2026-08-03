@@ -34,7 +34,29 @@ export function SessionRecoveryDialog({
   onDismiss,
 }: SessionRecoveryDialogProps) {
   return (
-    <Modal open={open} onClose={() => { void onDismiss(); }} title="Restore Previous Sessions">
+    <Modal
+      open={open}
+      onClose={() => { void onDismiss(); }}
+      title="Restore Previous Sessions"
+      footer={
+        <>
+          <button
+            type="button"
+            className="rounded-lg border border-border bg-base-700/60 px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
+            onClick={() => void onDismiss()}
+          >
+            Dismiss
+          </button>
+          <button
+            type="button"
+            className="rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40"
+            onClick={() => void onRestore()}
+          >
+            Restore All
+          </button>
+        </>
+      }
+    >
       <div className="grid gap-4">
         <p className="text-xs text-text-muted">
           HyperShell detected sessions from an ungraceful shutdown. Restore the
@@ -68,23 +90,6 @@ export function SessionRecoveryDialog({
               ))}
             </tbody>
           </table>
-        </div>
-
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-border bg-base-700/60 px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
-            onClick={() => void onDismiss()}
-          >
-            Dismiss
-          </button>
-          <button
-            type="button"
-            className="rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40"
-            onClick={() => void onRestore()}
-          >
-            Restore All
-          </button>
         </div>
       </div>
     </Modal>

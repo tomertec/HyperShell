@@ -74,7 +74,7 @@ export function WelcomeScreen({
                 key={profile.id}
                 variant="outline"
                 size="sm"
-                className="rounded-full"
+                shape="pill"
                 onClick={() => onConnectLocal(profile)}
               >
                 <LocalProfileIcon icon={profile.icon} className="h-3.5 w-3.5 shrink-0" />

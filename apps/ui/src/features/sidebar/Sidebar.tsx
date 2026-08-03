@@ -262,15 +262,11 @@ export function Sidebar({
           title="Serial"
           actions={
             <div className="flex gap-0.5">
-              <button
-                onClick={onNewSerial}
-                className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-                title="New serial profile"
-              >
+              <IconButton variant="accent" onClick={onNewSerial} title="New serial profile">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
-              </button>
+              </IconButton>
             </div>
           }
         >
@@ -287,15 +283,11 @@ export function Sidebar({
           title="Telnet"
           actions={
             <div className="flex gap-0.5">
-              <button
-                onClick={onOpenTelnet}
-                className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-                title="Quick connect"
-              >
+              <IconButton variant="accent" onClick={onOpenTelnet} title="Quick connect">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
-              </button>
+              </IconButton>
             </div>
           }
         >

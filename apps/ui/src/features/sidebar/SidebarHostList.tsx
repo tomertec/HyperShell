@@ -176,7 +176,7 @@ function SortableHostItem({
           e.stopPropagation();
           onOpenSftp(host);
         }}
-        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-(--motion-fast) bg-base-800/80"
+        className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-(--motion-fast) bg-base-800/80"
       >
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
           <path d="M2 4.5A1.5 1.5 0 013.5 3H6.5L8 5H12.5A1.5 1.5 0 0114 6.5V11.5A1.5 1.5 0 0112.5 13H3.5A1.5 1.5 0 012 11.5V4.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
@@ -602,7 +602,7 @@ export function SidebarHostList({
                   setFilterQuery("");
                   onCloseFilter?.();
                 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-sm text-text-muted/60 hover:text-text-primary transition-colors duration-150"
+                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-4 w-4 items-center justify-center rounded-sm text-text-muted/60 hover:text-text-primary focus-ring transition-colors duration-150"
                 title="Close filter"
               >
                 <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
@@ -716,7 +716,13 @@ export function SidebarHostList({
           )}
 
           {hosts.length > 0 && filteredHosts.length === 0 && (
-            <EmptyState message={`No hosts match “${filterQuery.trim()}”`}>
+            <EmptyState
+              message={
+                filterQuery.trim()
+                  ? `No hosts match “${filterQuery.trim()}”`
+                  : "No hosts match the selected tags"
+              }
+            >
               <Button
                 size="sm"
                 variant="ghost"
