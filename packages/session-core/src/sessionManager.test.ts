@@ -745,7 +745,8 @@ describe("shell integration injection", () => {
     };
   }
 
-  it("writes the bootstrap when an SSH session connects", () => {
+  it("writes the bootstrap only after the session goes quiet", () => {
+    vi.useFakeTimers();
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });
     const { sessionId } = manager.open({
@@ -757,12 +758,91 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    expect(transport.writes).toHaveLength(0);
 
+    vi.advanceTimersByTime(499);
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(1);
     expect(transport.writes).toHaveLength(1);
     expect(transport.writes[0]).toContain("__HS_SI");
+
+    vi.useRealTimers();
+  });
+
+  it("resets the quiet wait on a data event", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(400);
+    transport.emit({ type: "data", sessionId, data: "MOTD line\r\n" });
+    vi.advanceTimersByTime(400);
+    // 800ms since connected, but only 400ms since the last data event.
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(100);
+    expect(transport.writes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("collapses a burst of data events into exactly one write", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(100);
+      transport.emit({ type: "data", sessionId, data: "chunk\r\n" });
+    }
+
+    vi.advanceTimersByTime(500);
+    expect(transport.writes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("does not write if the session closes before the quiet timer fires", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(100);
+    manager.close(sessionId);
+
+    vi.advanceTimersByTime(1000);
+    expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
   });
 
   it("writes it again after a reconnect", () => {
+    vi.useFakeTimers();
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });
     const { sessionId } = manager.open({
@@ -774,15 +854,20 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
     transport.emit({ type: "status", sessionId, state: "reconnecting" });
     transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(2);
+
+    vi.useRealTimers();
   });
 
   it("skips hosts with a configured password", () => {
     // Password auth races the bootstrap write against sshPtyTransport's
     // password-prompt watcher on the same pty — see task-10-report.md.
+    vi.useFakeTimers();
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });
     const { sessionId } = manager.open({
@@ -794,11 +879,15 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
   });
 
   it("skips hosts that opted out", () => {
+    vi.useFakeTimers();
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });
     const { sessionId } = manager.open({
@@ -810,11 +899,15 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
   });
 
   it("skips tmux attach tabs", () => {
+    vi.useFakeTimers();
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });
     const { sessionId } = manager.open({
@@ -827,11 +920,15 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
   });
 
   it("never injects into local or serial sessions", () => {
+    vi.useFakeTimers();
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });
     const { sessionId } = manager.open({
@@ -843,7 +940,10 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
   });
 });

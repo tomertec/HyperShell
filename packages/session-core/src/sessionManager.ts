@@ -88,9 +88,17 @@ interface ManagedSession {
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   reconnectStabilityTimer: ReturnType<typeof setTimeout> | null;
   networkOnlineUnsub: (() => void) | null;
+  bootstrapTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const RECONNECT_STABILITY_WINDOW_MS = 5_000;
+
+// How long the session must go quiet (no "data" events) before we write the
+// shell-integration bootstrap. Writing immediately on "connected" races the
+// remote login tty — MOTD and the prompt draw are still landing — and the
+// line gets echoed twice (once truncated, once in full once bash reads the
+// buffered input). By 500ms of silence the prompt has settled.
+const SHELL_INTEGRATION_QUIET_MS = 500;
 
 function createNoopTransport(sessionId: string): TransportHandle {
   const listeners = new Set<(event: SessionTransportEvent) => void>();
@@ -231,6 +239,47 @@ export function createSessionManager(
     session.reconnectStabilityTimer = null;
   }
 
+  function clearBootstrapTimer(session: ManagedSession): void {
+    if (session.bootstrapTimer === null) {
+      return;
+    }
+
+    clearTimeout(session.bootstrapTimer);
+    session.bootstrapTimer = null;
+  }
+
+  // Debounced by SHELL_INTEGRATION_QUIET_MS: (re)scheduling cancels any
+  // pending write, so a burst of "data" events collapses to a single write
+  // once the session goes quiet. Guard conditions are re-checked at fire
+  // time — the session may have closed or its input may no longer qualify
+  // by then, not just at schedule time.
+  function scheduleShellIntegrationBootstrapWrite(sessionId: string): void {
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return;
+    }
+
+    clearBootstrapTimer(session);
+    session.bootstrapTimer = setTimeout(() => {
+      const current = sessions.get(sessionId);
+      if (!current) {
+        return;
+      }
+
+      current.bootstrapTimer = null;
+
+      const shouldInject =
+        current.input.transport === "ssh" &&
+        current.input.sshOptions?.shellIntegration !== false &&
+        current.input.sshOptions?.password === undefined &&
+        current.input.tmuxAttach !== true;
+
+      if (shouldInject) {
+        current.transport.write(buildShellIntegrationBootstrap());
+      }
+    }, SHELL_INTEGRATION_QUIET_MS);
+  }
+
   function handleEvent(sessionId: string, event: SessionTransportEvent): void {
     if (event.type === "status") {
       updateSession(sessionId, (session) => {
@@ -263,9 +312,19 @@ export function createSessionManager(
 
         if (shouldInject) {
           // Fires on every connect, including reconnects — each one is a fresh
-          // remote shell with no hook installed.
-          session.transport.write(buildShellIntegrationBootstrap());
+          // remote shell with no hook installed. The actual write is debounced;
+          // see scheduleShellIntegrationBootstrapWrite.
+          scheduleShellIntegrationBootstrapWrite(sessionId);
         }
+      }
+    }
+
+    if (event.type === "data") {
+      const session = sessions.get(sessionId);
+      if (session?.bootstrapTimer !== null && session?.bootstrapTimer !== undefined) {
+        // Still waiting to write the bootstrap — more output means the
+        // session isn't quiet yet, so push the write back out.
+        scheduleShellIntegrationBootstrapWrite(sessionId);
       }
     }
 
@@ -283,6 +342,7 @@ export function createSessionManager(
       const session = sessions.get(sessionId);
       if (session) {
         clearReconnectStabilityTimer(session);
+        clearBootstrapTimer(session);
         const { snapshot, input } = session;
         const maxAttempts = input.maxReconnectAttempts ?? 5;
 
@@ -407,7 +467,8 @@ export function createSessionManager(
         input,
         reconnectTimer: null,
         reconnectStabilityTimer: null,
-        networkOnlineUnsub: null
+        networkOnlineUnsub: null,
+        bootstrapTimer: null
       });
 
       if (input.transport === "local" && transport.pid !== undefined) {
@@ -443,6 +504,7 @@ export function createSessionManager(
 
       clearReconnectTimer(session);
       clearReconnectStabilityTimer(session);
+      clearBootstrapTimer(session);
       if (session.networkOnlineUnsub) {
         session.networkOnlineUnsub();
         session.networkOnlineUnsub = null;
@@ -460,6 +522,7 @@ export function createSessionManager(
       for (const [sessionId, session] of sessions) {
         clearReconnectTimer(session);
         clearReconnectStabilityTimer(session);
+        clearBootstrapTimer(session);
         if (session.networkOnlineUnsub) {
           session.networkOnlineUnsub();
           session.networkOnlineUnsub = null;
