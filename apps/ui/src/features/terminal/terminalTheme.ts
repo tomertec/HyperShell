@@ -33,6 +33,8 @@ export const terminalOptions: ITerminalOptions = {
   cursorBlink: true,
   convertEol: true,
   allowTransparency: false,
+  // Required by `terminal.unicode`, which the graphemes addon registers into.
+  allowProposedApi: true,
   scrollback: 5000,
   theme: terminalTheme
 };
@@ -211,6 +213,56 @@ export function resolveTerminalTheme(
   return customThemes?.[name] ?? terminalThemes[name] ?? terminalThemes["default"];
 }
 
+// Prompt frameworks (oh-my-posh, starship, powerlevel10k, Terminal-Icons) draw
+// their separators and icons from the Private Use Area, which no standard
+// monospace font carries. Windows Terminal renders them anyway because
+// DirectWrite falls back across every installed font; Chromium only falls back
+// within the declared stack, so xterm shows tofu unless we name the fallbacks.
+const GLYPH_FALLBACK_FONTS = [
+  '"Symbols Nerd Font Mono"',
+  '"CaskaydiaCove Nerd Font Mono"',
+  '"MesloLGS NF"',
+  '"Hack Nerd Font Mono"',
+  '"SauceCodePro Nerd Font Mono"',
+  '"DejaVuSansMono Nerd Font Mono"'
+];
+
+const GENERIC_FONT_FAMILIES = new Set([
+  "monospace",
+  "ui-monospace",
+  "serif",
+  "sans-serif",
+  "system-ui",
+  "cursive",
+  "fantasy"
+]);
+
+const unquote = (family: string) => family.replace(/^["']|["']$/g, "").toLowerCase();
+
+/**
+ * Appends Nerd Font fallbacks to a font stack, keeping the user's chosen family
+ * first so ordinary text is untouched. The fallbacks go before any generic
+ * family, because a generic always resolves and hides everything after it.
+ */
+export function withGlyphFallback(fontFamily: string): string {
+  const families = fontFamily
+    .split(",")
+    .map((family) => family.trim())
+    .filter(Boolean);
+
+  const present = new Set(families.map(unquote));
+  const missing = GLYPH_FALLBACK_FONTS.filter((family) => !present.has(unquote(family)));
+  if (missing.length === 0) return fontFamily;
+
+  const genericIndex = families.findIndex((family) =>
+    GENERIC_FONT_FAMILIES.has(unquote(family))
+  );
+  const insertAt = genericIndex === -1 ? families.length : genericIndex;
+  families.splice(insertAt, 0, ...missing);
+
+  return families.join(", ");
+}
+
 export function getTerminalOptions(settings?: {
   fontFamily?: string;
   fontSize?: number;
@@ -225,7 +277,7 @@ export function getTerminalOptions(settings?: {
 
   return {
     ...terminalOptions,
-    ...(settings?.fontFamily !== undefined && { fontFamily: settings.fontFamily }),
+    fontFamily: withGlyphFallback(settings?.fontFamily ?? terminalOptions.fontFamily ?? "monospace"),
     ...(settings?.fontSize !== undefined && { fontSize: settings.fontSize }),
     ...(settings?.lineHeight !== undefined && { lineHeight: settings.lineHeight }),
     ...(settings?.letterSpacing !== undefined && { letterSpacing: settings.letterSpacing }),

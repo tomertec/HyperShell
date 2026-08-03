@@ -12,6 +12,7 @@ import { settingsStore } from "../settings/settingsStore";
 import { getTerminalOptions } from "./terminalTheme";
 import { getTerminalClipboardAction } from "./terminalClipboard";
 import { getTerminalFontSizeAction } from "./terminalFontSize";
+import { TERMINAL_UNICODE_VERSION } from "./terminalUnicode";
 import {
   TERMINAL_FOCUS_REQUEST_EVENT,
   shouldHandleTerminalFocusRequest,
@@ -330,10 +331,16 @@ export function useTerminalSession(
     let removeFocusListeners: (() => void) | null = null;
 
     void (async () => {
-      const [{ Terminal: XTerm }, { FitAddon: FitAddonClass }, { SearchAddon: SearchAddonClass }] = await Promise.all([
+      const [
+        { Terminal: XTerm },
+        { FitAddon: FitAddonClass },
+        { SearchAddon: SearchAddonClass },
+        { UnicodeGraphemesAddon: UnicodeAddonClass }
+      ] = await Promise.all([
         import("@xterm/xterm"),
         import("@xterm/addon-fit"),
-        import("@xterm/addon-search")
+        import("@xterm/addon-search"),
+        import("@xterm/addon-unicode-graphemes")
       ]);
       if (disposed) {
         return;
@@ -345,6 +352,8 @@ export function useTerminalSession(
       const search = new SearchAddonClass();
       instance.loadAddon(addon);
       instance.loadAddon(search);
+      instance.loadAddon(new UnicodeAddonClass());
+      instance.unicode.activeVersion = TERMINAL_UNICODE_VERSION;
       fitAddonRef.current = addon;
       searchAddonRef.current = search;
       terminalRef.current = instance;

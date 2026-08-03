@@ -210,9 +210,18 @@ export function TabBar({
           reachable even when the tab list scrolls. */}
       <div className="flex h-full items-end bg-base-800 px-1 pt-2">
         <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+          {/* The scrollbar is hidden, not styled: a native horizontal scrollbar
+              consumes layout height here, squishing the tabs and detaching the
+              active tab from the terminal below it. Vertical wheel delta maps
+              to horizontal scroll so overflowed tabs stay reachable. */}
           <div
             data-testid="tab-scroll-container"
-            className="flex h-full min-w-0 items-end overflow-x-auto"
+            className="flex h-full min-w-0 items-end overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onWheel={(e) => {
+              if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
           >
             {tabs.map((tab) => {
               const isActive = tab.sessionId === activeSessionId;
