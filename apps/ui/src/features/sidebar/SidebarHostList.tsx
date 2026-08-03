@@ -302,7 +302,16 @@ export function SidebarHostList({
     return map;
   }, [filteredHosts]);
 
-  const allHostIds = useMemo(() => filteredHosts.map((h) => h.id), [filteredHosts]);
+  const allHostIds = useMemo(() => {
+    const filterActive = filterQuery.trim() !== "" || selectedTagIds.length > 0;
+    const ids: string[] = [];
+    for (const [group, groupHosts] of grouped) {
+      const isCollapsed = !filterActive && collapsedGroups.has(group);
+      if (isCollapsed) continue;
+      for (const host of groupHosts) ids.push(host.id);
+    }
+    return ids;
+  }, [grouped, collapsedGroups, filterQuery, selectedTagIds]);
   const activeHost = activeId ? hosts.find((h) => h.id === activeId) : null;
 
   const setStatusTargets = useCallback((hostIds: string[]) => {
