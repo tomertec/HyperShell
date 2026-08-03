@@ -108,4 +108,41 @@ describe("layoutStore", () => {
       tabKey: "sftp-1"
     });
   });
+
+  describe("setTabDynamicTitle", () => {
+    it("sets the dynamic title without touching the base title", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "s1", title: "PowerShell" });
+      store.getState().setTabDynamicTitle("s1", "pwsh in hypershell");
+      const tab = store.getState().tabs.find((t) => t.sessionId === "s1");
+      expect(tab?.dynamicTitle).toBe("pwsh in hypershell");
+      expect(tab?.title).toBe("PowerShell");
+    });
+
+    it("clears the dynamic title with null", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "s1", title: "PowerShell" });
+      store.getState().setTabDynamicTitle("s1", "cd C:\\repos");
+      store.getState().setTabDynamicTitle("s1", null);
+      const tab = store.getState().tabs.find((t) => t.sessionId === "s1");
+      expect(tab?.dynamicTitle).toBeUndefined();
+    });
+
+    it("is a no-op for unknown sessions", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "s1", title: "PowerShell" });
+      const before = store.getState().tabs;
+      store.getState().setTabDynamicTitle("nope", "x");
+      expect(store.getState().tabs).toBe(before);
+    });
+
+    it("survives replaceSessionId", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "s1", title: "hermes" });
+      store.getState().setTabDynamicTitle("s1", "htop");
+      store.getState().replaceSessionId("s1", "s2");
+      const tab = store.getState().tabs.find((t) => t.sessionId === "s2");
+      expect(tab?.dynamicTitle).toBe("htop");
+    });
+  });
 });

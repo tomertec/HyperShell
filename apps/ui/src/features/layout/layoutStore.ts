@@ -4,6 +4,7 @@ export type LayoutTab = {
   tabKey?: string;
   sessionId: string;
   title: string;
+  dynamicTitle?: string;
   transport?: "ssh" | "serial" | "sftp" | "telnet" | "local";
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   profileId?: string;
@@ -34,6 +35,7 @@ export type LayoutState = {
   activatePane: (paneId: string) => void;
   setPaneSizes: (sizes: number[]) => void;
   moveTab: (fromIndex: number, toIndex: number) => void;
+  setTabDynamicTitle: (sessionId: string, title: string | null) => void;
 };
 
 function equalPaneSizes(count: number): number[] {
@@ -163,6 +165,26 @@ export function createLayoutStore() {
         const tabs = [...state.tabs];
         const [moved] = tabs.splice(fromIndex, 1);
         tabs.splice(toIndex, 0, moved);
+        return { tabs };
+      }),
+
+    setTabDynamicTitle: (sessionId, title) =>
+      set((state) => {
+        const index = state.tabs.findIndex((t) => t.sessionId === sessionId);
+        if (index === -1) {
+          return state;
+        }
+        const current = state.tabs[index];
+        if ((current.dynamicTitle ?? null) === title) {
+          return state;
+        }
+        const tabs = state.tabs.slice();
+        if (title === null) {
+          const { dynamicTitle: _cleared, ...rest } = current;
+          tabs[index] = rest;
+        } else {
+          tabs[index] = { ...current, dynamicTitle: title };
+        }
         return { tabs };
       }),
   }));
