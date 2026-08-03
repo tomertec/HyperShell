@@ -1291,6 +1291,7 @@ function MainApp() {
             onEditLocal={handleEditLocalProfile}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenTelnet={() => setTelnetDialogOpen(true)}
+            onImportSshConfig={() => setImportModalOpen(true)}
             restoreCount={restoreBannerVisible ? lastWorkspaceTabs.length : undefined}
             onRestore={restoreLastWorkspace}
             onDismissRestore={dismissRestoreBanner}

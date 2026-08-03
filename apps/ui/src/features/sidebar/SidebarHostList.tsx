@@ -17,7 +17,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { toast } from "sonner";
 import type { TagRecord } from "@hypershell/shared";
 import { ContextMenu } from "../../components/ContextMenu";
 import type { ContextMenuAction } from "../../components/ContextMenu";
@@ -45,19 +44,7 @@ export interface SidebarHostListProps {
 }
 
 const HOST_COLORS = ["red", "orange", "yellow", "green", "blue", "cyan", "purple", "pink"] as const;
-type HostExportFormat = "json" | "csv" | "ssh-config";
 type HostReachability = "online" | "offline" | "unknown";
-
-const HOST_EXPORT_OPTIONS: Array<{
-  value: HostExportFormat;
-  label: string;
-  extension: string;
-  filterName: string;
-}> = [
-  { value: "json", label: "JSON", extension: "json", filterName: "JSON" },
-  { value: "csv", label: "CSV", extension: "csv", filterName: "CSV" },
-  { value: "ssh-config", label: "SSH Config", extension: "conf", filterName: "SSH Config" },
-];
 
 function formatLastConnected(value: string | null | undefined): string {
   if (!value) {
@@ -210,7 +197,6 @@ export function SidebarHostList({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filterQuery, setFilterQuery] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
-  const [exportFormat, setExportFormat] = useState<HostExportFormat>("json");
   const [hostReachabilityById, setHostReachabilityById] = useState<
     Record<string, HostReachability>
   >({});
@@ -369,34 +355,6 @@ export function SidebarHostList({
     }));
     onReorder(items);
   }
-
-  const handleExportHosts = useCallback(async () => {
-    const option = HOST_EXPORT_OPTIONS.find((item) => item.value === exportFormat);
-    if (!option) {
-      toast.error("Unsupported export format selected.");
-      return;
-    }
-
-    if (!window.hypershell?.fsShowSaveDialog || !window.hypershell?.exportHosts) {
-      toast.error("Host export is unavailable in this environment.");
-      return;
-    }
-
-    const filePath = await window.hypershell.fsShowSaveDialog({
-      defaultPath: `hosts.${option.extension}`,
-      filters: [{ name: option.filterName, extensions: [option.extension] }],
-    });
-    if (!filePath) {
-      return;
-    }
-
-    try {
-      const result = await window.hypershell.exportHosts({ format: exportFormat, filePath });
-      toast.success(`Exported ${result.exported} host${result.exported === 1 ? "" : "s"} to ${filePath}`);
-    } catch (error) {
-      toast.error(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }, [exportFormat]);
 
   const toggleTagFilter = useCallback((tagId: string) => {
     setSelectedTagIds((previous) => {
@@ -616,30 +574,6 @@ export function SidebarHostList({
             </div>
           </div>
         )}
-
-        {/* Export */}
-        <div className="flex items-center gap-1 px-1 pb-1 shrink-0">
-          <select
-            value={exportFormat}
-            onChange={(event) => setExportFormat(event.target.value as HostExportFormat)}
-            className="h-7 rounded-md border border-border bg-base-750/70 px-2 text-[11px] text-text-secondary focus:border-accent/40 focus:outline-none"
-            title="Export format"
-          >
-            {HOST_EXPORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => { void handleExportHosts(); }}
-            className="h-7 rounded-md border border-border bg-base-750/70 px-2 text-[11px] text-text-secondary hover:border-accent/35 hover:text-text-primary transition-colors"
-            title="Export hosts"
-          >
-            Export
-          </button>
-        </div>
 
         {tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 px-1 pb-1.5 shrink-0">

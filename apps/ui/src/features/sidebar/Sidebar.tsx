@@ -1,7 +1,10 @@
 import { useState } from "react";
 import type { LocalProfileRecord, SerialProfileRecord, TagRecord } from "@hypershell/shared";
 import { useStore } from "zustand";
+import { ContextMenu } from "../../components/ContextMenu";
+import { IconButton } from "../../components/ui/IconButton";
 import type { HostRecord } from "../hosts/HostsView";
+import { useHostExport } from "../hosts/useHostExport";
 import { localProfilesStore } from "../local/localProfilesStore";
 import { settingsStore } from "../settings/settingsStore";
 import { SidebarHostList } from "./SidebarHostList";
@@ -35,6 +38,7 @@ export interface SidebarProps {
   onEditLocal: (profile: LocalProfileRecord) => void;
   onOpenSettings: () => void;
   onOpenTelnet?: () => void;
+  onImportSshConfig: () => void;
   collapsed?: boolean;
   restoreCount?: number;
   onRestore?: () => void;
@@ -67,6 +71,7 @@ export function Sidebar({
   onEditLocal,
   onOpenSettings,
   onOpenTelnet,
+  onImportSshConfig,
   collapsed = false,
   restoreCount,
   onRestore,
@@ -74,6 +79,8 @@ export function Sidebar({
 }: SidebarProps) {
   const [showHostFilter, setShowHostFilter] = useState(false);
   const [showHiddenLocal, setShowHiddenLocal] = useState(false);
+  const [hostsMenu, setHostsMenu] = useState<{ x: number; y: number } | null>(null);
+  const { exportHosts } = useHostExport();
   const showSerialInSidebar = useStore(
     settingsStore,
     (s) => s.settings.general.showSerialInSidebar
@@ -189,15 +196,25 @@ export function Sidebar({
         className="flex-1 min-h-0"
         actions={
           <div className="flex gap-0.5">
-            <button
-              onClick={onNewHost}
-              className="p-1 rounded text-text-muted hover:text-accent/80 hover:bg-accent/[0.06] transition-all duration-150"
-              title="New host"
-            >
+            <IconButton variant="accent" onClick={onNewHost} title="New host">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-            </button>
+            </IconButton>
+            <IconButton
+              variant="accent"
+              title="More actions"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setHostsMenu({ x: rect.left, y: rect.bottom + 4 });
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="3.5" cy="8" r="1.3" />
+                <circle cx="8" cy="8" r="1.3" />
+                <circle cx="12.5" cy="8" r="1.3" />
+              </svg>
+            </IconButton>
           </div>
         }
       >
@@ -222,6 +239,21 @@ export function Sidebar({
           onCloseFilter={() => setShowHostFilter(false)}
         />
       </SidebarSection>
+
+      {hostsMenu && (
+        <ContextMenu
+          x={hostsMenu.x}
+          y={hostsMenu.y}
+          onClose={() => setHostsMenu(null)}
+          actions={[
+            { label: "Export as JSON", action: () => void exportHosts("json") },
+            { label: "Export as CSV", action: () => void exportHosts("csv") },
+            { label: "Export as SSH Config", action: () => void exportHosts("ssh-config") },
+            { label: "", action: () => {}, separator: true },
+            { label: "Import SSH Config…", action: onImportSshConfig },
+          ]}
+        />
+      )}
 
       {showSerialInSidebar && (
         <SidebarSection
