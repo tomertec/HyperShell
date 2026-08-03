@@ -23,6 +23,7 @@ export interface PtyExitEvent {
 }
 
 export interface PtyProcessLike {
+  readonly pid?: number;
   write(data: string): void;
   resize(cols: number, rows: number): void;
   kill(signal?: string): void;
@@ -178,6 +179,7 @@ export function createPtyProcess(
   }
 
   return {
+    pid: pty?.pid,
     write(data: string) {
       if (!pty || hasExited || isClosed) {
         return;

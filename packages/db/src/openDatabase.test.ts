@@ -57,3 +57,12 @@ describe("openDatabase pragmas", () => {
     db.close();
   });
 });
+
+describe("openDatabase migrations", () => {
+  it("applies migration 017 so hosts carries shell_integration", () => {
+    const db = openDatabase(":memory:");
+    const columns = (db.pragma("table_info(hosts)") as PragmaRow[]).map((c) => c.name);
+    expect(columns).toContain("shell_integration");
+    db.close();
+  });
+});

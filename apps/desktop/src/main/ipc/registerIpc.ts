@@ -22,8 +22,10 @@ import type {
 } from "@hypershell/shared";
 import {
   createNetworkMonitor,
+  createProcessTitlePoller,
   createSessionManager,
   createSsh2ConnectionPool,
+  createWindowsProcessTreeProvider,
   parseSshConfig,
 } from "@hypershell/session-core";
 import {
@@ -233,7 +235,12 @@ const registeredChannels = [
 const networkMonitor = createNetworkMonitor({
   probeIntervalMs: process.env.VITEST || process.env.NODE_ENV === "test" ? 0 : 10_000
 });
-export const sessionManager = createSessionManager({ networkMonitor });
+export const sessionManager = createSessionManager({
+  networkMonitor,
+  processTitlePoller: createProcessTitlePoller({
+    provider: createWindowsProcessTreeProvider()
+  })
+});
 const ssh2ConnectionPool = createSsh2ConnectionPool();
 const sessionLogger = createSessionLogger();
 let sessionRecorder: SessionRecordingManager | null = null;
@@ -559,6 +566,7 @@ async function openSessionHandler(
         proxyJump?: string;
         keepAliveSeconds?: number;
         envVars?: Record<string, string>;
+        shellIntegration?: boolean;
       }
     | undefined;
 
@@ -596,7 +604,8 @@ async function openSessionHandler(
           hostname: host.hostname,
           username: host.username ?? undefined,
           port: host.port,
-          identityFile: host.identityFile ?? undefined
+          identityFile: host.identityFile ?? undefined,
+          shellIntegration: host.shellIntegration ?? true
         };
 
         if (resolvedHost?.proxyJump) {

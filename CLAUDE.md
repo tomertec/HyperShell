@@ -71,6 +71,30 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 
 **Tmux session detection:** Per-host opt-in (`tmuxDetect` on host record). Before connecting, spawns a one-shot `ssh host 'tmux ls -F ...'` via `child_process.execFile` (reuses `buildSshArgs()` for identical auth). Parses output into session list, shows a `TmuxSessionPicker` modal. On attach, sends `tmux attach -t '<name>'` as terminal input after SSH connects. Requires key-based auth — password-only hosts are skipped. All probe failures silently fall back to normal connection. Key files: `session-core/tmux/tmuxProbe.ts`, `desktop/ipc/tmuxIpc.ts`, `ui/features/tmux/TmuxSessionPicker.tsx`.
 
+**Active-process tab titles:** Local tabs get their title from the pty's process
+tree — `SessionManager` runs a 1s poller (`session-core/processTitle/`) over
+`@vscode/windows-process-tree`, takes the deepest descendant, and emits a
+`process-title` session event. `pickForegroundName` returns `null` (deferring to
+the OSC title) for two different reasons, kept as separate name sets: the deepest
+process is a shell/wrapper (`SHELL_AND_WRAPPER_NAMES` — nothing is running), or
+it's a remote/relay client like `ssh`/`mosh`/`plink`/`telnet`
+(`PASSTHROUGH_NAMES` — something is running, but only the far end knows its
+name, e.g. `pwsh → ssh` masking a remote `llmtop`). SSH tabs instead receive a
+one-line shell hook
+(`session-core/shellIntegration/bootstrap.ts`) written into the pty on every
+`connected` transition (including reconnects, since each is a fresh remote
+shell), which emits ordinary OSC titles per command; it is skipped for
+tmux-attach sessions and for password-authenticated hosts (the bootstrap write
+would race `sshPtyTransport`'s password-prompt watcher on the same pty). The
+write itself is debounced by `SHELL_INTEGRATION_QUIET_MS` (500ms of no `data`
+events) so it lands after the MOTD and prompt have drawn, instead of racing the
+login tty and getting echoed twice. Display order is
+`processTitle ?? dynamicTitle ?? title`
+(`resolveTabTitle`), read at four sites — tab label, tab tooltip, status bar,
+broadcast bar. Per-host opt-out via the `shellIntegration` column (default on);
+global display toggle via `general.showActiveProcess` (default on), which gates
+only the process title — an OSC shell title still shows when it's off.
+
 **State management:** UI uses Zustand stores — `layoutStore` (tabs/panes, drag-and-drop reorder), `settingsStore`, `sessionRecoveryStore`, `broadcastStore`, `sftpStore` (per SFTP session), `transferStore`, `tunnelStore` (port forward manager), `snippetStore` (snippets panel).
 
 **Session logging:** `loggingIpc.ts` provides a `createSessionLogger()` that intercepts terminal data events in `registerIpc.ts`, strips ANSI escape sequences, and writes to user-chosen files. Controlled per-session via recording button in TerminalPane (visibility controlled by `general.showRecordingButton` setting).

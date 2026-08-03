@@ -17,6 +17,8 @@ import { createSshPtyTransport, buildSshPtyCommand } from "./transports/sshPtyTr
 import { createTelnetTransport } from "./transports/telnetTransport";
 import { createLocalShellTransport } from "./transports/localShellTransport";
 import type { NetworkMonitor } from "./networkMonitor";
+import type { ProcessTitlePoller } from "./processTitle/processTitlePoller";
+import { buildShellIntegrationBootstrap } from "./shellIntegration/bootstrap";
 
 const execFileAsync = promisify(execFile);
 
@@ -36,6 +38,7 @@ export interface SessionManagerDeps {
   createTransport?: (request: OpenSessionRequest) => TransportHandle;
   sessionIdFactory?: () => string;
   networkMonitor?: NetworkMonitor;
+  processTitlePoller?: ProcessTitlePoller;
 }
 
 export interface OpenSessionInput {
@@ -50,6 +53,8 @@ export interface OpenSessionInput {
   autoReconnect?: boolean;
   maxReconnectAttempts?: number;
   reconnectBaseInterval?: number;
+  /** True when this tab will immediately attach to tmux. Suppresses shell integration. */
+  tmuxAttach?: boolean;
 }
 
 export interface OpenSessionResult {
@@ -83,9 +88,17 @@ interface ManagedSession {
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   reconnectStabilityTimer: ReturnType<typeof setTimeout> | null;
   networkOnlineUnsub: (() => void) | null;
+  bootstrapTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const RECONNECT_STABILITY_WINDOW_MS = 5_000;
+
+// How long the session must go quiet (no "data" events) before we write the
+// shell-integration bootstrap. Writing immediately on "connected" races the
+// remote login tty — MOTD and the prompt draw are still landing — and the
+// line gets echoed twice (once truncated, once in full once bash reads the
+// buffered input). By 500ms of silence the prompt has settled.
+const SHELL_INTEGRATION_QUIET_MS = 500;
 
 function createNoopTransport(sessionId: string): TransportHandle {
   const listeners = new Set<(event: SessionTransportEvent) => void>();
@@ -183,6 +196,18 @@ export function createSessionManager(
     deps.sessionIdFactory ?? (() => `session-${nextSessionId++}`);
   const createTransport = deps.createTransport ?? createDefaultTransport;
   const networkMonitor = deps.networkMonitor;
+  const processTitlePoller = deps.processTitlePoller;
+
+  processTitlePoller?.onChange((sessionId, name) => {
+    // A poll can land after the session went away; don't resurrect a dead tab.
+    if (!sessions.has(sessionId)) {
+      return;
+    }
+
+    for (const listener of listeners) {
+      listener({ type: "process-title", sessionId, name });
+    }
+  });
 
   function updateSession(
     sessionId: string,
@@ -214,6 +239,47 @@ export function createSessionManager(
     session.reconnectStabilityTimer = null;
   }
 
+  function clearBootstrapTimer(session: ManagedSession): void {
+    if (session.bootstrapTimer === null) {
+      return;
+    }
+
+    clearTimeout(session.bootstrapTimer);
+    session.bootstrapTimer = null;
+  }
+
+  // Debounced by SHELL_INTEGRATION_QUIET_MS: (re)scheduling cancels any
+  // pending write, so a burst of "data" events collapses to a single write
+  // once the session goes quiet. Guard conditions are re-checked at fire
+  // time — the session may have closed or its input may no longer qualify
+  // by then, not just at schedule time.
+  function scheduleShellIntegrationBootstrapWrite(sessionId: string): void {
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return;
+    }
+
+    clearBootstrapTimer(session);
+    session.bootstrapTimer = setTimeout(() => {
+      const current = sessions.get(sessionId);
+      if (!current) {
+        return;
+      }
+
+      current.bootstrapTimer = null;
+
+      const shouldInject =
+        current.input.transport === "ssh" &&
+        current.input.sshOptions?.shellIntegration !== false &&
+        current.input.sshOptions?.password === undefined &&
+        current.input.tmuxAttach !== true;
+
+      if (shouldInject) {
+        current.transport.write(buildShellIntegrationBootstrap());
+      }
+    }, SHELL_INTEGRATION_QUIET_MS);
+  }
+
   function handleEvent(sessionId: string, event: SessionTransportEvent): void {
     if (event.type === "status") {
       updateSession(sessionId, (session) => {
@@ -234,6 +300,32 @@ export function createSessionManager(
 
         clearReconnectStabilityTimer(session);
       });
+
+      if (event.state === "connected") {
+        const session = sessions.get(sessionId);
+        const shouldInject =
+          session !== undefined &&
+          session.input.transport === "ssh" &&
+          session.input.sshOptions?.shellIntegration !== false &&
+          session.input.sshOptions?.password === undefined &&
+          session.input.tmuxAttach !== true;
+
+        if (shouldInject) {
+          // Fires on every connect, including reconnects — each one is a fresh
+          // remote shell with no hook installed. The actual write is debounced;
+          // see scheduleShellIntegrationBootstrapWrite.
+          scheduleShellIntegrationBootstrapWrite(sessionId);
+        }
+      }
+    }
+
+    if (event.type === "data") {
+      const session = sessions.get(sessionId);
+      if (session?.bootstrapTimer !== null && session?.bootstrapTimer !== undefined) {
+        // Still waiting to write the bootstrap — more output means the
+        // session isn't quiet yet, so push the write back out.
+        scheduleShellIntegrationBootstrapWrite(sessionId);
+      }
     }
 
     if (event.type === "error") {
@@ -250,6 +342,7 @@ export function createSessionManager(
       const session = sessions.get(sessionId);
       if (session) {
         clearReconnectStabilityTimer(session);
+        clearBootstrapTimer(session);
         const { snapshot, input } = session;
         const maxAttempts = input.maxReconnectAttempts ?? 5;
 
@@ -301,6 +394,7 @@ export function createSessionManager(
         } else {
           session.snapshot.state = "disconnected";
           session.unsubscribe();
+          processTitlePoller?.unregister(sessionId);
           sessions.delete(sessionId);
         }
       }
@@ -373,8 +467,13 @@ export function createSessionManager(
         input,
         reconnectTimer: null,
         reconnectStabilityTimer: null,
-        networkOnlineUnsub: null
+        networkOnlineUnsub: null,
+        bootstrapTimer: null
       });
+
+      if (input.transport === "local" && transport.pid !== undefined) {
+        processTitlePoller?.register(sessionId, transport.pid);
+      }
 
       return {
         sessionId,
@@ -405,6 +504,7 @@ export function createSessionManager(
 
       clearReconnectTimer(session);
       clearReconnectStabilityTimer(session);
+      clearBootstrapTimer(session);
       if (session.networkOnlineUnsub) {
         session.networkOnlineUnsub();
         session.networkOnlineUnsub = null;
@@ -414,6 +514,7 @@ export function createSessionManager(
       session.transport.close();
       session.unsubscribe();
       session.snapshot.state = "disconnected";
+      processTitlePoller?.unregister(sessionId);
       sessions.delete(sessionId);
     },
 
@@ -421,6 +522,7 @@ export function createSessionManager(
       for (const [sessionId, session] of sessions) {
         clearReconnectTimer(session);
         clearReconnectStabilityTimer(session);
+        clearBootstrapTimer(session);
         if (session.networkOnlineUnsub) {
           session.networkOnlineUnsub();
           session.networkOnlineUnsub = null;
@@ -429,6 +531,7 @@ export function createSessionManager(
         session.transport.close();
         session.unsubscribe();
         session.snapshot.state = "disconnected";
+        processTitlePoller?.unregister(sessionId);
         sessions.delete(sessionId);
       }
     },

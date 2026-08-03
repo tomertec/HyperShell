@@ -5,6 +5,8 @@ export type LayoutTab = {
   sessionId: string;
   title: string;
   dynamicTitle?: string;
+  /** Foreground program reported by the main-process poller. Local tabs only. */
+  processTitle?: string;
   transport?: "ssh" | "serial" | "sftp" | "telnet" | "local";
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   profileId?: string;
@@ -36,6 +38,7 @@ export type LayoutState = {
   setPaneSizes: (sizes: number[]) => void;
   moveTab: (fromIndex: number, toIndex: number) => void;
   setTabDynamicTitle: (sessionId: string, title: string | null) => void;
+  setTabProcessTitle: (sessionId: string, name: string | null) => void;
 };
 
 function equalPaneSizes(count: number): number[] {
@@ -187,7 +190,35 @@ export function createLayoutStore() {
         }
         return { tabs };
       }),
+
+    setTabProcessTitle: (sessionId, name) =>
+      set((state) => {
+        const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId);
+        if (index === -1) {
+          return state;
+        }
+
+        const current = state.tabs[index];
+        if ((current.processTitle ?? null) === name) {
+          return state;
+        }
+
+        const tabs = [...state.tabs];
+        if (name === null) {
+          const { processTitle: _cleared, ...rest } = current;
+          tabs[index] = rest;
+        } else {
+          tabs[index] = { ...current, processTitle: name };
+        }
+
+        return { tabs };
+      }),
   }));
 }
 
 export const layoutStore = createLayoutStore();
+
+/** Single source of truth for what a tab is called. */
+export function resolveTabTitle(tab: LayoutTab): string {
+  return tab.processTitle ?? tab.dynamicTitle ?? tab.title;
+}

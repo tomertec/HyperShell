@@ -3,7 +3,7 @@ import { createPtyProcess, sanitizePtyEnv } from "./ptyProcess";
 import type { PtyProcessLike, PtySpawn } from "./ptyProcess";
 import type { OpenSessionRequest, SessionTransportEvent } from "./transportEvents";
 
-function createFakePty() {
+function createFakePty(pid?: number) {
   const dataListeners: Array<(data: string) => void> = [];
   const exitListeners: Array<(event: { exitCode: number }) => void> = [];
   const written: string[] = [];
@@ -11,6 +11,7 @@ function createFakePty() {
   let killed = false;
 
   const pty: PtyProcessLike = {
+    pid,
     write: (data) => void written.push(data),
     resize: (cols, rows) => void resized.push({ cols, rows }),
     kill: () => void (killed = true),
@@ -122,6 +123,41 @@ describe("createPtyProcess", () => {
         resolve();
       });
     });
+  });
+});
+
+describe("createPtyProcess pid", () => {
+  it("exposes the spawned pty's pid on the handle", () => {
+    const handle = createPtyProcess(
+      { sessionId: "s1", transport: "local", profileId: "p1", cols: 80, rows: 24 },
+      { command: "pwsh.exe", args: [], cols: 80, rows: 24 },
+      {
+        spawnPty: () => ({
+          pid: 4242,
+          write() {},
+          resize() {},
+          kill() {},
+          onData: () => ({ dispose() {} }),
+          onExit: () => ({ dispose() {} })
+        })
+      }
+    );
+
+    expect(handle.pid).toBe(4242);
+  });
+
+  it("leaves pid undefined when the spawn throws", () => {
+    const handle = createPtyProcess(
+      { sessionId: "s1", transport: "local", profileId: "p1", cols: 80, rows: 24 },
+      { command: "missing.exe", args: [], cols: 80, rows: 24 },
+      {
+        spawnPty: () => {
+          throw new Error("ENOENT");
+        }
+      }
+    );
+
+    expect(handle.pid).toBeUndefined();
   });
 });
 

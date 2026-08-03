@@ -118,6 +118,45 @@ test("the new-tab button is not clipped by the scrolling tab list", async ({ pag
   expect(isInsideScrollContainer).toBe(false);
 });
 
+test("the tab list suppresses its native scrollbar", async ({ page }) => {
+  await page.goto("/");
+
+  // In real (headed) Chromium on Windows a horizontal scrollbar takes layout
+  // height (6px per index.css), squishing the tabs upward and breaking the
+  // active tab's bottom blend with the terminal. Headless Chromium uses
+  // overlay scrollbars, so an offsetHeight/clientHeight probe passes vacuously
+  // here — assert the computed style that disables the scrollbar instead.
+  const scrollbarWidth = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="tab-scroll-container"]');
+    if (!el) {
+      throw new Error('no element matched [data-testid="tab-scroll-container"]');
+    }
+    return getComputedStyle(el).scrollbarWidth;
+  });
+  expect(scrollbarWidth).toBe("none");
+});
+
+test("the mouse wheel scrolls an overflowing tab list horizontally", async ({ page }) => {
+  await page.goto("/");
+
+  // With the scrollbar hidden, the wheel is the only way to reach overflowed
+  // tabs — vertical wheel delta must translate into horizontal scroll.
+  const scrollLeft = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="tab-scroll-container"]') as HTMLElement | null;
+    if (!el) {
+      throw new Error('no element matched [data-testid="tab-scroll-container"]');
+    }
+    const filler = document.createElement("div");
+    filler.style.cssText = "width:5000px;height:1px;flex:none";
+    el.appendChild(filler);
+    el.dispatchEvent(new WheelEvent("wheel", { deltaY: 120, bubbles: true }));
+    const result = el.scrollLeft;
+    filler.remove();
+    return result;
+  });
+  expect(scrollLeft).toBeGreaterThan(0);
+});
+
 test("clicking the new-tab button again closes the menu instead of reopening it", async ({ page }) => {
   await page.goto("/");
   const trigger = page.getByRole("button", { name: /new tab/i });

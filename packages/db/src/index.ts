@@ -54,6 +54,10 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     new URL("./migrations/016_saved_sessions_transports.sql", import.meta.url),
     "utf8"
   );
+  const shellIntegrationSql = readFileSync(
+    new URL("./migrations/017_shell_integration.sql", import.meta.url),
+    "utf8"
+  );
 
   const db = new Database(databasePath);
 
@@ -194,6 +198,15 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     db.transaction(() => {
       db.exec(savedSessionsTransportsSql);
     })();
+  }
+
+  // Migration 017: per-host shell integration opt-out. Defaults to 1 (enabled).
+  try {
+    db.exec(shellIntegrationSql);
+  } catch (error) {
+    if (!isIgnorableMigrationError(error)) {
+      throw error;
+    }
   }
 
   return db;

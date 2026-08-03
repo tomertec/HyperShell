@@ -47,6 +47,7 @@ export const openSessionRequestSchema = z.object({
   reconnectMaxAttempts: z.number().int().min(1).max(50).optional(),
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
   telnetOptions: telnetConnectionOptionsSchema.optional(),
+  tmuxAttach: z.boolean().optional(),
 });
 
 export const openSessionResponseSchema = z.object({
@@ -124,6 +125,11 @@ export const sessionEventSchema = z.discriminatedUnion("type", [
     type: z.literal("error"),
     sessionId: z.string().min(1),
     message: z.string().min(1)
+  }),
+  z.object({
+    type: z.literal("process-title"),
+    sessionId: z.string().min(1),
+    name: z.string().min(1).nullable()
   })
 ]);
 
@@ -171,6 +177,7 @@ export const hostRecordSchema = z.object({
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
   passwordSavedAt: z.string().nullable().optional(),
   tmuxDetect: z.boolean().optional(),
+  shellIntegration: z.boolean().optional(),
 });
 
 export const upsertHostRequestSchema = z.object({
@@ -200,6 +207,7 @@ export const upsertHostRequestSchema = z.object({
   savePassword: z.boolean().optional(),
   clearSavedPassword: z.boolean().optional(),
   tmuxDetect: z.boolean().optional(),
+  shellIntegration: z.boolean().optional(),
 });
 
 export const removeHostRequestSchema = z.object({

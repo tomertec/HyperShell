@@ -82,6 +82,28 @@ describe("mapSessionEvent", () => {
   });
 });
 
+describe("mapSessionEvent process-title", () => {
+  it("passes the process name through for the current session", () => {
+    expect(mapSessionEvent("s1", { type: "process-title", sessionId: "s1", name: "llmtop" })).toEqual({
+      handled: true,
+      processTitle: "llmtop"
+    });
+  });
+
+  it("passes null through so the renderer can clear it", () => {
+    expect(mapSessionEvent("s1", { type: "process-title", sessionId: "s1", name: null })).toEqual({
+      handled: true,
+      processTitle: null
+    });
+  });
+
+  it("ignores events for another session", () => {
+    expect(mapSessionEvent("s1", { type: "process-title", sessionId: "s2", name: "llmtop" })).toEqual({
+      handled: false
+    });
+  });
+});
+
 describe("createAsyncOperationGuard", () => {
   it("accepts only the latest issued token", () => {
     const guard = createAsyncOperationGuard();

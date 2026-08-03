@@ -16,6 +16,7 @@ export interface SessionEventEffect {
   clearSessionId?: boolean;
   errorMessage?: string;
   exitCode?: number | null;
+  processTitle?: string | null;
 }
 
 export interface AsyncOperationGuard {
@@ -103,6 +104,13 @@ export function mapSessionEvent(
       state: "disconnected",
       clearSessionId: true,
       exitCode: event.exitCode
+    };
+  }
+
+  if (event.type === "process-title") {
+    return {
+      handled: true,
+      processTitle: event.name
     };
   }
 

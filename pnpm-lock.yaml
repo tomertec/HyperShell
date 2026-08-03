@@ -50,6 +50,9 @@ importers:
       '@hypershell/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@vscode/windows-process-tree':
+        specifier: ^0.8.0
+        version: 0.8.0
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
@@ -168,6 +171,9 @@ importers:
       '@xterm/addon-search':
         specifier: ^0.16.0
         version: 0.16.0
+      '@xterm/addon-unicode-graphemes':
+        specifier: ^0.4.0
+        version: 0.4.0
       '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
@@ -1272,6 +1278,9 @@ packages:
   '@vitest/utils@3.2.6':
     resolution: {integrity: sha512-lI23nIs4bnT3T8NIoh+vFaz5s2/DdP0Jgt2jxwgWljvwn82cLJtyi/If+fjFyoLMGIOz0U/fKvWE0d4jsNQEfg==}
 
+  '@vscode/windows-process-tree@0.8.0':
+    resolution: {integrity: sha512-TI+h2GRwX+igD/YYJMQQVAFcsCNSg7Te2yYxQpKMzwto5RsJ8d2KKgOeur/p/6sAOQwZvopiTDOClyTHEn9MhQ==}
+
   '@xmldom/xmldom@0.8.13':
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
@@ -1281,6 +1290,9 @@ packages:
 
   '@xterm/addon-search@0.16.0':
     resolution: {integrity: sha512-9OeuBFu0/uZJPu+9AHKY6g/w0Czyb/Ut0A5t79I4ULoU4IfU5BEpPFVGQxP4zTTMdfZEYkVIRYbHBX1xWwjeSA==}
+
+  '@xterm/addon-unicode-graphemes@0.4.0':
+    resolution: {integrity: sha512-9+/CqwbKcnlkJU4d3wIgO+wjsL8f6vyz+UwUWLu6nADQz8Gr8ONqGCJfdDjIdI+yYZLABQqQy47FzEM6AWELjw==}
 
   '@xterm/xterm@6.0.0':
     resolution: {integrity: sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==}
@@ -2544,6 +2556,10 @@ packages:
 
   node-addon-api@7.0.0:
     resolution: {integrity: sha512-vgbBJTS4m5/KkE16t5Ly0WW9hz46swAstv0hYYwMtbG7AznRhNyfLRe8HZAiWIpcHzoO7HxhLuBQj9rJ/Ho0ZA==}
+
+  node-addon-api@7.1.0:
+    resolution: {integrity: sha512-mNcltoe1R8o7STTegSOHdnJNN7s5EUvhoS7ShnTHDyOSd+8H+UdWODq6qSv67PjC8Zc5JRT8+oLAMCr0SIXw7g==}
+    engines: {node: ^16 || ^18 || >= 20}
 
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
@@ -4498,11 +4514,17 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
+  '@vscode/windows-process-tree@0.8.0':
+    dependencies:
+      node-addon-api: 7.1.0
+
   '@xmldom/xmldom@0.8.13': {}
 
   '@xterm/addon-fit@0.11.0': {}
 
   '@xterm/addon-search@0.16.0': {}
+
+  '@xterm/addon-unicode-graphemes@0.4.0': {}
 
   '@xterm/xterm@6.0.0': {}
 
@@ -6021,6 +6043,8 @@ snapshots:
       semver: 7.8.5
 
   node-addon-api@7.0.0: {}
+
+  node-addon-api@7.1.0: {}
 
   node-addon-api@7.1.1: {}
 

@@ -68,6 +68,30 @@ Check the terminal theme and font settings in Settings. Ensure the font supports
 2. Check if ProxyJump is configured in `~/.ssh/config` — the system SSH handles this, but it may timeout
 3. Check host status in the sidebar (green dot = reachable)
 
+### A WSL tab's title never shows the running program
+
+WSL processes run inside the VM and are invisible to the Windows process tree (`@vscode/windows-process-tree`). The local process-title poller (`session-core/processTitle/`) can only see Win32 processes, so a WSL pty's tab title stays on the shell name. Expected, not a bug.
+
+### A remote shell prints a line of shell code right after connecting
+
+That line is the shell-integration bootstrap (`session-core/shellIntegration/bootstrap.ts`) being echoed back instead of installing silently — happens on shells it wasn't written for (fish, csh) or ones with unusual echo settings.
+
+**Fix:** Turn it off per host with the "Report the running command in the tab title" checkbox in the host editor.
+
+### SSH tab titles stop updating inside tmux
+
+The bootstrap hook installs into the shell that ran before `tmux attach`. Once attached, tmux captures OSC title escapes itself and won't forward them unless the remote's tmux config has `set -g set-titles on`.
+
+### A password-authenticated SSH host never shows the running command
+
+`SessionManager` deliberately skips the shell-integration bootstrap when the host has a configured password. Writing the bootstrap and `sshPtyTransport`'s password-prompt watcher would race on the same pty, so the bootstrap is silently dropped or consumed as (part of) the password. Key-based auth hosts are unaffected. Expected, not a bug.
+
+### A local tab running `ssh` shows "ssh" instead of the remote program's name
+
+The process-title poller only sees the local process tree, and `ssh` (or `mosh`/`plink`/`telnet`) is deepest in it — the actual foreground program is on the far end of the connection. `pickForegroundName` treats these client names as "no local answer" and returns `null`, letting the OSC title from the remote's own shell-integration bootstrap win instead.
+
+**Consequence:** if the remote host has no shell integration (or it's an unsupported shell), the tab keeps showing whatever OSC title was last set — not "ssh". That's the intended trade-off; permanently pinning the tab to "ssh" would hide the real program's name whenever integration does work.
+
 ## Serial
 
 ### No COM ports listed in serial profile form

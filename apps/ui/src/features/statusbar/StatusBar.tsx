@@ -1,6 +1,7 @@
 import { useStore } from "zustand";
-import { layoutStore } from "../layout/layoutStore";
+import { layoutStore, resolveTabTitle } from "../layout/layoutStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
+import { settingsStore } from "../settings/settingsStore";
 import { useSessionStats, formatDuration } from "./useSessionStats";
 import { latencyTone } from "./latencyTone";
 
@@ -59,6 +60,7 @@ function DatabaseIcon() {
 export function StatusBar() {
   const tabs = useStore(layoutStore, (s) => s.tabs);
   const activeSessionId = useStore(layoutStore, (s) => s.activeSessionId);
+  const showActiveProcess = useStore(settingsStore, (s) => s.settings.general.showActiveProcess);
 
   const activeTab = tabs.find((t) => t.sessionId === activeSessionId) ?? null;
 
@@ -89,7 +91,9 @@ export function StatusBar() {
                         : "bg-text-muted/50"
                 ].join(" ")}
               />
-              <span className="text-text-primary truncate max-w-[160px]">{activeTab.dynamicTitle ?? activeTab.title}</span>
+              <span className="text-text-primary truncate max-w-[160px]">
+                {resolveTabTitle(showActiveProcess ? activeTab : { ...activeTab, processTitle: undefined })}
+              </span>
             </div>
 
             {/* Transport badge */}

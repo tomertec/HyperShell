@@ -29,6 +29,7 @@ const common = {
     "@serialport/bindings-cpp",
     "ssh2",
     "cpu-features",
+    "@vscode/windows-process-tree",
   ],
 };
 

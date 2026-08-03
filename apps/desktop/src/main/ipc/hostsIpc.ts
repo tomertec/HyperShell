@@ -293,7 +293,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           autoReconnect: Boolean(item?.autoReconnect ?? false),
           reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS),
           reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL),
-          tmuxDetect: Boolean(item?.tmuxDetect ?? false)
+          tmuxDetect: Boolean(item?.tmuxDetect ?? false),
+          shellIntegration: item?.shellIntegration === false ? false : true
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
     } catch {
@@ -330,7 +331,8 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
         autoReconnect: input.autoReconnect ?? false,
         reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
         reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
-        tmuxDetect: input.tmuxDetect ?? false
+        tmuxDetect: input.tmuxDetect ?? false,
+        shellIntegration: input.shellIntegration === false ? false : true
       };
 
       const hosts = readHosts();
@@ -557,7 +559,8 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       autoReconnect: parsed.autoReconnect ?? false,
       reconnectMaxAttempts: parsed.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
       reconnectBaseInterval: parsed.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
-      tmuxDetect: parsed.tmuxDetect ?? false
+      tmuxDetect: parsed.tmuxDetect ?? false,
+      shellIntegration: parsed.shellIntegration
     });
     return attachPasswordMetadata(persistedHost);
   });

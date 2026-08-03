@@ -28,6 +28,11 @@ export type SessionTransportEvent =
       type: "error";
       sessionId: string;
       message: string;
+    }
+  | {
+      type: "process-title";
+      sessionId: string;
+      name: string | null;
     };
 
 export interface TransportHandle {
@@ -36,6 +41,8 @@ export interface TransportHandle {
   close(): void;
   onEvent(listener: (event: SessionTransportEvent) => void): () => void;
   setSignals?(signals: { dtr?: boolean; rts?: boolean }): void;
+  /** OS pid of the spawned process. Only pty-backed transports have one. */
+  pid?: number;
 }
 
 export interface SshConnectionOptions {
@@ -47,6 +54,8 @@ export interface SshConnectionOptions {
   proxyJump?: string;
   keepAliveSeconds?: number;
   envVars?: Record<string, string>;
+  /** False disables the shell-integration bootstrap for this host. */
+  shellIntegration?: boolean;
 }
 
 export interface SerialConnectionOptions {

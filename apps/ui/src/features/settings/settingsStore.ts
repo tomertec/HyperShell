@@ -26,6 +26,7 @@ export interface GeneralSettings {
   usePopupTransferMonitor: boolean;
   autoHideCompletedTransfers: boolean;
   enableTelnet: boolean;
+  showActiveProcess: boolean;
 }
 
 export interface SecuritySettings {
@@ -125,6 +126,7 @@ const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   usePopupTransferMonitor: false,
   autoHideCompletedTransfers: false,
   enableTelnet: false,
+  showActiveProcess: true,
 };
 
 const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {

@@ -622,3 +622,328 @@ describe("local sessions", () => {
     expect(manager.getSession("s-local-1")?.autoReconnect).toBe(false);
   });
 });
+
+describe("process titles", () => {
+  function fakePoller() {
+    const registered = new Map<string, number>();
+    let emit: ((sessionId: string, name: string | null) => void) | null = null;
+
+    return {
+      registered,
+      fire(sessionId: string, name: string | null) {
+        emit?.(sessionId, name);
+      },
+      poller: {
+        register(sessionId: string, pid: number) {
+          registered.set(sessionId, pid);
+        },
+        unregister(sessionId: string) {
+          registered.delete(sessionId);
+        },
+        onChange(listener: (sessionId: string, name: string | null) => void) {
+          emit = listener;
+          return () => {
+            emit = null;
+          };
+        },
+        stop() {}
+      }
+    };
+  }
+
+  function transportWithPid(pid: number | undefined) {
+    const listeners = new Set<(event: SessionTransportEvent) => void>();
+    return {
+      pid,
+      write() {},
+      resize() {},
+      close() {},
+      onEvent(listener: (event: SessionTransportEvent) => void) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }
+    };
+  }
+
+  it("registers local sessions that report a pid", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+
+    const { sessionId } = manager.open({ transport: "local", profileId: "p1", cols: 80, rows: 24 });
+
+    expect(fake.registered.get(sessionId)).toBe(4242);
+  });
+
+  it("does not register non-local transports", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+
+    manager.open({ transport: "ssh", profileId: "host", cols: 80, rows: 24 });
+
+    expect(fake.registered.size).toBe(0);
+  });
+
+  it("forwards poller changes as process-title events", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+    const events: SessionTransportEvent[] = [];
+    manager.onEvent((event) => events.push(event));
+
+    const { sessionId } = manager.open({ transport: "local", profileId: "p1", cols: 80, rows: 24 });
+    fake.fire(sessionId, "llmtop");
+
+    expect(events).toContainEqual({ type: "process-title", sessionId, name: "llmtop" });
+  });
+
+  it("drops events for sessions that already closed", () => {
+    const fake = fakePoller();
+    const manager = createSessionManager({
+      processTitlePoller: fake.poller,
+      createTransport: () => transportWithPid(4242)
+    });
+    const events: SessionTransportEvent[] = [];
+
+    const { sessionId } = manager.open({ transport: "local", profileId: "p1", cols: 80, rows: 24 });
+    manager.close(sessionId);
+    manager.onEvent((event) => events.push(event));
+    fake.fire(sessionId, "llmtop");
+
+    expect(events).toHaveLength(0);
+    expect(fake.registered.has(sessionId)).toBe(false);
+  });
+});
+
+describe("shell integration injection", () => {
+  function recordingTransport() {
+    const listeners = new Set<(event: SessionTransportEvent) => void>();
+    const writes: string[] = [];
+    return {
+      writes,
+      emit(event: SessionTransportEvent) {
+        for (const listener of listeners) listener(event);
+      },
+      handle: {
+        write(data: string) {
+          writes.push(data);
+        },
+        resize() {},
+        close() {},
+        onEvent(listener: (event: SessionTransportEvent) => void) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        }
+      }
+    };
+  }
+
+  it("writes the bootstrap only after the session goes quiet", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(499);
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(1);
+    expect(transport.writes).toHaveLength(1);
+    expect(transport.writes[0]).toContain("__HS_SI");
+
+    vi.useRealTimers();
+  });
+
+  it("resets the quiet wait on a data event", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(400);
+    transport.emit({ type: "data", sessionId, data: "MOTD line\r\n" });
+    vi.advanceTimersByTime(400);
+    // 800ms since connected, but only 400ms since the last data event.
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(100);
+    expect(transport.writes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("collapses a burst of data events into exactly one write", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(100);
+      transport.emit({ type: "data", sessionId, data: "chunk\r\n" });
+    }
+
+    vi.advanceTimersByTime(500);
+    expect(transport.writes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("does not write if the session closes before the quiet timer fires", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(100);
+    manager.close(sessionId);
+
+    vi.advanceTimersByTime(1000);
+    expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
+  });
+
+  it("writes it again after a reconnect", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
+    transport.emit({ type: "status", sessionId, state: "reconnecting" });
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(2);
+
+    vi.useRealTimers();
+  });
+
+  it("skips hosts with a configured password", () => {
+    // Password auth races the bootstrap write against sshPtyTransport's
+    // password-prompt watcher on the same pty — see task-10-report.md.
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes", password: "hunter2" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
+  });
+
+  it("skips hosts that opted out", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes", shellIntegration: false }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
+  });
+
+  it("skips tmux attach tabs", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      tmuxAttach: true,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
+  });
+
+  it("never injects into local or serial sessions", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "local",
+      profileId: "p1",
+      cols: 80,
+      rows: 24,
+      localOptions: { executable: "pwsh.exe" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(0);
+
+    vi.useRealTimers();
+  });
+});

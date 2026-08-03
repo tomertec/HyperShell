@@ -38,6 +38,7 @@ const demoHosts: HostRecord[] = [
     reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
     reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
     tmuxDetect: false,
+    shellIntegration: true,
     notes: "Primary web server"
   },
   {
@@ -61,6 +62,7 @@ const demoHosts: HostRecord[] = [
     reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
     reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
     tmuxDetect: false,
+    shellIntegration: true,
     notes: "Use for multi-hop access"
   }
 ];
@@ -153,6 +155,7 @@ export function HostsView() {
               reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
               reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
               tmuxDetect: false,
+              shellIntegration: true,
             }));
 
             return [...currentHosts, ...importedHosts];

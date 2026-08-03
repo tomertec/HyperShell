@@ -244,7 +244,8 @@ function GeneralSection() {
     confirmOnClose,
     usePopupTransferMonitor,
     autoHideCompletedTransfers,
-    enableTelnet
+    enableTelnet,
+    showActiveProcess
   } = settings.general;
 
   return (
@@ -292,6 +293,17 @@ function GeneralSection() {
           label="Local Section in Sidebar"
           checked={showLocalInSidebar}
           onChange={() => void updateGeneral({ showLocalInSidebar: !showLocalInSidebar })}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Show Running Program in Tab Titles"
+        description="Show the foreground program's name in tab titles, tooltips, and the status bar"
+      >
+        <ToggleSwitch
+          label="Show Running Program in Tab Titles"
+          checked={showActiveProcess}
+          onChange={() => void updateGeneral({ showActiveProcess: !showActiveProcess })}
         />
       </SettingRow>
 

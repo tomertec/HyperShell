@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createLayoutStore } from "./layoutStore";
+import { createLayoutStore, resolveTabTitle } from "./layoutStore";
 
 describe("layoutStore", () => {
   it("opens a tab for a new session", () => {
@@ -143,6 +143,37 @@ describe("layoutStore", () => {
       store.getState().replaceSessionId("s1", "s2");
       const tab = store.getState().tabs.find((t) => t.sessionId === "s2");
       expect(tab?.dynamicTitle).toBe("htop");
+    });
+  });
+
+  describe("process titles", () => {
+    it("sets the process title without touching base or dynamic titles", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "s1", title: "PowerShell" });
+      store.getState().setTabDynamicTitle("s1", "pwsh in hypershell");
+      store.getState().setTabProcessTitle("s1", "llmtop");
+
+      const tab = store.getState().tabs.find((t) => t.sessionId === "s1");
+      expect(tab?.processTitle).toBe("llmtop");
+      expect(tab?.dynamicTitle).toBe("pwsh in hypershell");
+      expect(tab?.title).toBe("PowerShell");
+    });
+
+    it("clears the process title with null", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "s1", title: "PowerShell" });
+      store.getState().setTabProcessTitle("s1", "llmtop");
+      store.getState().setTabProcessTitle("s1", null);
+
+      expect(store.getState().tabs.find((t) => t.sessionId === "s1")?.processTitle).toBeUndefined();
+    });
+
+    it("resolves process over dynamic over base", () => {
+      expect(resolveTabTitle({ sessionId: "s1", title: "base" })).toBe("base");
+      expect(resolveTabTitle({ sessionId: "s1", title: "base", dynamicTitle: "osc" })).toBe("osc");
+      expect(
+        resolveTabTitle({ sessionId: "s1", title: "base", dynamicTitle: "osc", processTitle: "llmtop" })
+      ).toBe("llmtop");
     });
   });
 });
