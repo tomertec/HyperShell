@@ -2,6 +2,13 @@ import { useStore } from "zustand";
 import { layoutStore } from "../layout/layoutStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 import { useSessionStats, formatDuration } from "./useSessionStats";
+import { latencyTone } from "./latencyTone";
+
+const LATENCY_TONE_CLASS = {
+  normal: "text-text-secondary",
+  warning: "text-warning",
+  danger: "text-danger",
+} as const;
 
 function ClockIcon() {
   return (
@@ -87,55 +94,57 @@ export function StatusBar() {
 
             {/* Transport badge */}
             {activeTab.transport && (
-              <span className="px-1.5 py-px rounded text-[10px] uppercase tracking-wide text-text-secondary bg-base-700/60">
+              <span className="rounded border border-border bg-base-750/60 px-1.5 py-px text-[9.5px] uppercase tracking-widest text-text-muted">
                 {activeTab.transport}
               </span>
             )}
 
+            <span aria-hidden className="h-3 w-px bg-border" />
+
             {/* Connection time */}
             {stats.connectionTime !== null && (
-              <span className="flex items-center gap-1 text-accent">
-                <ClockIcon />
+              <span className="flex items-center gap-1 text-text-secondary">
+                <span className="text-text-muted"><ClockIcon /></span>
                 {formatDuration(stats.connectionTime)}
               </span>
             )}
 
             {/* Latency */}
             {stats.latency !== null && (
-              <span className="flex items-center gap-1 text-success">
-                <ChartIcon />
+              <span className={`flex items-center gap-1 ${LATENCY_TONE_CLASS[latencyTone(stats.latency)]}`}>
+                <span className="text-text-muted"><ChartIcon /></span>
                 {stats.latency}ms
               </span>
             )}
 
             {/* CPU */}
             {stats.cpuUsage !== null && (
-              <span className="flex items-center gap-1 text-warning">
-                <ChipIcon />
+              <span className="flex items-center gap-1 text-text-secondary">
+                <span className="text-text-muted"><ChipIcon /></span>
                 {stats.cpuUsage}
               </span>
             )}
 
             {/* Memory */}
             {stats.memUsage !== null && (
-              <span className="flex items-center gap-1 text-info">
-                <RamIcon />
+              <span className="flex items-center gap-1 text-text-secondary">
+                <span className="text-text-muted"><RamIcon /></span>
                 {stats.memUsage}
               </span>
             )}
 
             {/* Disk */}
             {stats.diskUsage !== null && (
-              <span className="flex items-center gap-1 text-cyan-400">
-                <DatabaseIcon />
+              <span className="flex items-center gap-1 text-text-secondary">
+                <span className="text-text-muted"><DatabaseIcon /></span>
                 {stats.diskUsage}
               </span>
             )}
 
             {/* Uptime */}
             {stats.uptime !== null && (
-              <span className="flex items-center gap-1 text-success">
-                <ClockIcon />
+              <span className="flex items-center gap-1 text-text-secondary">
+                <span className="text-text-muted"><ClockIcon /></span>
                 {stats.uptime}
               </span>
             )}
