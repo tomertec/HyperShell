@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "../layout/Modal";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 import type { KeyboardInteractiveRequest } from "@hypershell/shared";
 
 interface KeyboardInteractiveDialogProps {
@@ -113,12 +115,11 @@ export function KeyboardInteractiveDialog({
             <span className="text-xs font-medium text-text-secondary">
               {prompt.prompt.replace(/:?\s*$/, "")}
             </span>
-            <input
+            <Input
               ref={index === 0 ? firstInputRef : undefined}
               type={prompt.echo ? "text" : "password"}
               value={responses[index] ?? ""}
               onChange={(e) => handleResponseChange(index, e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright"
               autoComplete={prompt.echo ? "off" : "current-password"}
               disabled={submitting}
             />
@@ -130,21 +131,12 @@ export function KeyboardInteractiveDialog({
             {timeLeft}s remaining
           </span>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-border bg-base-700/60 px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
-              onClick={handleCancel}
-              disabled={submitting}
-            >
+            <Button variant="ghost" onClick={handleCancel} disabled={submitting}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40 disabled:opacity-60"
-              disabled={submitting}
-            >
+            </Button>
+            <Button type="submit" variant="primary" disabled={submitting}>
               {submitting ? "Submitting..." : "Submit"}
-            </button>
+            </Button>
           </div>
         </div>
       </form>

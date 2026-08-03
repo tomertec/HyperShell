@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { TagRecord } from "@hypershell/shared";
 import { Modal } from "../layout/Modal";
-import { inputClasses } from "../../lib/formStyles";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -44,6 +45,7 @@ interface TagManagerProps {
 }
 
 export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
+  const formId = useId();
   const [tags, setTags] = useState<TagRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<TagDraft>({ ...emptyDraft });
@@ -165,13 +167,9 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
     <Modal open={open} onClose={onClose} title="Tag Manager">
       <div className="grid gap-4 md:grid-cols-[220px,1fr]">
         <div className="grid gap-2 border-b border-border pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-3">
-          <button
-            type="button"
-            onClick={startNewTag}
-            className="rounded-md border border-border bg-base-800 px-3 py-2 text-sm text-text-primary transition-colors hover:bg-base-700"
-          >
+          <Button variant="outline" onClick={startNewTag} className="w-full">
             New Tag
-          </button>
+          </Button>
           <div className="max-h-72 overflow-y-auto">
             {tags.length === 0 ? (
               <div className="rounded-md border border-border bg-base-900 px-3 py-2 text-xs text-text-muted">
@@ -205,14 +203,14 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
         </div>
 
         <div className="grid gap-3">
-          <label className="grid gap-1.5">
+          <label htmlFor={`${formId}-name`} className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">Name</span>
-            <input
+            <Input
+              id={`${formId}-name`}
               value={draft.name}
               onChange={(event) =>
                 setDraft({ ...draft, name: event.target.value })
               }
-              className={inputClasses}
             />
           </label>
 
@@ -243,33 +241,22 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
                 title="Custom color"
               />
             </div>
-            <input
+            <Input
               value={draft.color}
               onChange={(event) =>
                 setDraft({ ...draft, color: event.target.value })
               }
               placeholder="#3b82f6"
-              className={inputClasses}
             />
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => void saveTag()}
-              disabled={isSaving}
-              className="rounded-md border border-accent/40 bg-accent/15 px-3 py-2 text-sm text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSaving ? "Saving..." : selectedTag ? "Update Tag" : "Create Tag"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void removeTag()}
-              disabled={!selectedTag}
-              className="rounded-md border border-border bg-base-800 px-3 py-2 text-sm text-text-primary transition-colors hover:bg-base-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => void removeTag()} disabled={!selectedTag}>
               Delete
-            </button>
+            </Button>
+            <Button variant="primary" onClick={() => void saveTag()} disabled={isSaving}>
+              {isSaving ? "Saving..." : selectedTag ? "Update Tag" : "Create Tag"}
+            </Button>
           </div>
         </div>
       </div>

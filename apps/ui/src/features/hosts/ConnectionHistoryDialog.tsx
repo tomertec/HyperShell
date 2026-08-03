@@ -3,6 +3,7 @@ import type { ConnectionHistoryRecord } from "@hypershell/shared";
 
 import type { HostRecord } from "./HostsView";
 import { Modal } from "../layout/Modal";
+import { Button } from "../../components/ui/Button";
 
 function formatDateTime(value: string): string {
   const parsed = new Date(value);
@@ -102,14 +103,14 @@ export function ConnectionHistoryDialog({
           <p className="text-xs text-text-muted">
             Success: {summary.success} · Failed: {summary.failed}
           </p>
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => void refresh()}
             disabled={loading || !host}
-            className="rounded border border-border px-2 py-1 text-xs text-text-muted hover:text-text-primary hover:border-border-bright transition-colors disabled:opacity-50"
           >
             Refresh
-          </button>
+          </Button>
         </div>
 
         {error ? (

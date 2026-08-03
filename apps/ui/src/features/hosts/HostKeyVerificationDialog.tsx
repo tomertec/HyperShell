@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal } from "../layout/Modal";
+import { Button } from "../../components/ui/Button";
 
 export interface HostKeyVerificationInfo {
   hostname: string;
@@ -96,25 +97,16 @@ export function HostKeyVerificationDialog({
         </p>
 
         <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-border bg-base-700/60 px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
-            onClick={onReject}
-          >
+          <Button variant="ghost" onClick={onReject}>
             Reject
-          </button>
-          <button
-            type="button"
-            className={
-              isKeyChanged
-                ? "rounded-lg bg-danger/15 border border-danger/30 px-5 py-2 text-sm font-medium text-danger hover:bg-danger/25 hover:border-danger/40 disabled:opacity-60"
-                : "rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40 disabled:opacity-60"
-            }
+          </Button>
+          <Button
+            variant={isKeyChanged ? "danger" : "primary"}
             onClick={() => { void handleTrust(); }}
             disabled={confirming}
           >
             {isKeyChanged ? "Trust New Key" : "Trust & Connect"}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

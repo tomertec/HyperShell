@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { HostProfileRecord } from "@hypershell/shared";
 import { Modal } from "../layout/Modal";
-import { inputClasses } from "../../lib/formStyles";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 
 type ProfileDraft = {
   name: string;
@@ -54,6 +56,7 @@ export function HostProfileManagerDialog({
   onClose,
   onProfilesChanged,
 }: HostProfileManagerDialogProps) {
+  const formId = useId();
   const [profiles, setProfiles] = useState<HostProfileRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<ProfileDraft>({ ...emptyDraft });
@@ -171,13 +174,9 @@ export function HostProfileManagerDialog({
     <Modal open={open} onClose={onClose} title="Host Profiles">
       <div className="grid gap-4 md:grid-cols-[220px,1fr]">
         <div className="grid gap-2 border-b border-border pb-3 md:border-b-0 md:border-r md:pb-0 md:pr-3">
-          <button
-            type="button"
-            onClick={startNewProfile}
-            className="rounded-md border border-border bg-base-800 px-3 py-2 text-sm text-text-primary transition-colors hover:bg-base-700"
-          >
+          <Button variant="outline" onClick={startNewProfile} className="w-full">
             New Profile
-          </button>
+          </Button>
           <div className="max-h-72 overflow-y-auto">
             {profiles.length === 0 ? (
               <div className="rounded-md border border-border bg-base-900 px-3 py-2 text-xs text-text-muted">
@@ -205,49 +204,50 @@ export function HostProfileManagerDialog({
         </div>
 
         <div className="grid gap-3">
-          <label className="grid gap-1.5">
+          <label htmlFor={`${formId}-name`} className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">Name</span>
-            <input
+            <Input
+              id={`${formId}-name`}
               value={draft.name}
               onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-              className={inputClasses}
             />
           </label>
 
-          <label className="grid gap-1.5">
+          <label htmlFor={`${formId}-description`} className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">Description</span>
-            <input
+            <Input
+              id={`${formId}-description`}
               value={draft.description}
               onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-              className={inputClasses}
             />
           </label>
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="grid gap-1.5">
+            <label htmlFor={`${formId}-defaultPort`} className="grid gap-1.5">
               <span className="text-xs font-medium text-text-secondary">Default Port</span>
-              <input
+              <Input
+                id={`${formId}-defaultPort`}
                 type="number"
                 min={1}
                 max={65535}
                 value={draft.defaultPort}
                 onChange={(event) => setDraft({ ...draft, defaultPort: event.target.value })}
-                className={inputClasses}
               />
             </label>
-            <label className="grid gap-1.5">
+            <label htmlFor={`${formId}-defaultUsername`} className="grid gap-1.5">
               <span className="text-xs font-medium text-text-secondary">Default Username</span>
-              <input
+              <Input
+                id={`${formId}-defaultUsername`}
                 value={draft.defaultUsername}
                 onChange={(event) => setDraft({ ...draft, defaultUsername: event.target.value })}
-                className={inputClasses}
               />
             </label>
           </div>
 
-          <label className="grid gap-1.5">
+          <label htmlFor={`${formId}-authMethod`} className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">Authentication Method</span>
-            <select
+            <Select
+              id={`${formId}-authMethod`}
               value={draft.authMethod}
               onChange={(event) =>
                 setDraft({
@@ -255,65 +255,54 @@ export function HostProfileManagerDialog({
                   authMethod: event.target.value as ProfileDraft["authMethod"],
                 })
               }
-              className={inputClasses}
             >
               <option value="default">Default (SSH config)</option>
               <option value="password">Password</option>
               <option value="keyfile">Key File</option>
               <option value="agent">SSH Agent</option>
               <option value="op-reference">1Password Reference</option>
-            </select>
+            </Select>
           </label>
 
-          <label className="grid gap-1.5">
+          <label htmlFor={`${formId}-identityFile`} className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">Identity File</span>
-            <input
+            <Input
+              id={`${formId}-identityFile`}
               value={draft.identityFile}
               onChange={(event) => setDraft({ ...draft, identityFile: event.target.value })}
               placeholder="~/.ssh/id_ed25519"
-              className={inputClasses}
             />
           </label>
 
-          <label className="grid gap-1.5">
+          <label htmlFor={`${formId}-proxyJump`} className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">ProxyJump</span>
-            <input
+            <Input
+              id={`${formId}-proxyJump`}
               value={draft.proxyJump}
               onChange={(event) => setDraft({ ...draft, proxyJump: event.target.value })}
               placeholder="user@bastion:22"
-              className={inputClasses}
             />
           </label>
 
-          <label className="grid gap-1.5">
+          <label htmlFor={`${formId}-keepAliveInterval`} className="grid gap-1.5">
             <span className="text-xs font-medium text-text-secondary">Keep-Alive Interval</span>
-            <input
+            <Input
+              id={`${formId}-keepAliveInterval`}
               type="number"
               min={0}
               value={draft.keepAliveInterval}
               onChange={(event) => setDraft({ ...draft, keepAliveInterval: event.target.value })}
               placeholder="Leave empty for default"
-              className={inputClasses}
             />
           </label>
 
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => void saveProfile()}
-              disabled={isSaving}
-              className="rounded-md border border-accent/40 bg-accent/15 px-3 py-2 text-sm text-accent transition-colors hover:bg-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSaving ? "Saving..." : selectedProfile ? "Update Profile" : "Create Profile"}
-            </button>
-            <button
-              type="button"
-              onClick={() => void removeProfile()}
-              disabled={!selectedProfile}
-              className="rounded-md border border-border bg-base-800 px-3 py-2 text-sm text-text-primary transition-colors hover:bg-base-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => void removeProfile()} disabled={!selectedProfile}>
               Delete
-            </button>
+            </Button>
+            <Button variant="primary" onClick={() => void saveProfile()} disabled={isSaving}>
+              {isSaving ? "Saving..." : selectedProfile ? "Update Profile" : "Create Profile"}
+            </Button>
           </div>
         </div>
       </div>

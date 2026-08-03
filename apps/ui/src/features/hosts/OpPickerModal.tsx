@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Modal } from "../layout/Modal";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 
 type Step = "vaults" | "items" | "fields";
 
@@ -155,30 +157,26 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
         {/* Breadcrumb + Back */}
         <div className="flex items-center gap-2 text-xs text-text-muted">
           {step !== "vaults" && (
-            <button
-              onClick={handleBack}
-              className="rounded px-1.5 py-0.5 hover:bg-base-700 hover:text-text-primary transition-colors"
-            >
+            <Button variant="ghost" size="sm" onClick={handleBack}>
               ← Back
-            </button>
+            </Button>
           )}
           <span>{breadcrumb}</span>
         </div>
 
         {/* Search */}
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter..."
           // eslint-disable-next-line jsx-a11y/no-autofocus -- focuses the field the user just opened this modal to fill
           autoFocus
-          className="w-full rounded-md border border-border bg-base-900 px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted/50 focus:border-accent focus:outline-none"
         />
 
         {/* Error */}
         {error && (
-          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
             {error}
           </div>
         )}
