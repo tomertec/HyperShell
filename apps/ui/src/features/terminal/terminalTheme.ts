@@ -31,7 +31,7 @@ export const terminalOptions: ITerminalOptions = {
   lineHeight: 1.0,
   letterSpacing: 0,
   cursorBlink: true,
-  convertEol: true,
+  convertEol: false,
   allowTransparency: false,
   // Required by `terminal.unicode`, which the graphemes addon registers into.
   allowProposedApi: true,
