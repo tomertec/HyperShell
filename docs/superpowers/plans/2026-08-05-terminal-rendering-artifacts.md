@@ -135,31 +135,67 @@ Expected: 3 tests pass.
 - Modify: `apps/ui/src/index.css:794-813`
 - Modify: `apps/ui/package.json:39-43`
 - Modify: `pnpm-lock.yaml`
-- Create: `apps/ui/src/features/terminal/terminalRendererStyles.test.ts`
+- Create: `apps/ui/tests/terminal-rendering.spec.ts`
 
 **Interfaces:**
 - Consumes: `loadOptionalWebglRenderer(terminal): Promise<boolean>` from Task 1.
 - Produces: non-blocking WebGL activation immediately after `Terminal.open()` with DOM fallback and renderer-safe CSS.
 
-- [ ] **Step 1: Write a failing CSS contract test**
+- [ ] **Step 1: Write a failing browser rendering contract test**
 
 ```ts
-import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { expect, test } from "@playwright/test";
 
-const css = readFileSync(new URL("../../index.css", import.meta.url), "utf8");
+const profiles = [{
+  id: "p1",
+  name: "PowerShell",
+  executable: "pwsh.exe",
+  args: [],
+  startingDirectory: null,
+  icon: "powershell",
+  color: null,
+  elevated: false,
+  source: "detected",
+  detectKey: "pwsh7",
+  isAvailable: true,
+  isHidden: false,
+  sortOrder: 1
+}];
 
-describe("terminal renderer CSS", () => {
-  it("does not override renderer canvases or xterm screen height", () => {
-    expect(css).not.toMatch(/\.xterm\s+\.xterm-screen\s+canvas\s*\{[^}]*background/si);
-    expect(css).not.toMatch(/\.xterm\s+\.xterm-screen\s*\{[^}]*height\s*:/si);
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript((seed) => {
+    (window as unknown as { hypershell: unknown }).hypershell = {
+      listLocalProfiles: async () => seed,
+      rescanLocalProfiles: async () => seed
+    };
+  }, profiles);
+});
+
+test("xterm owns screen geometry and renderer canvases stay transparent", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("main").getByRole("button", { name: "PowerShell" }).click();
+  await expect(page.locator(".xterm-screen")).toBeVisible();
+
+  const styles = await page.locator(".xterm-screen").evaluate((screen) => {
+    const element = screen as HTMLElement;
+    element.style.height = "123px";
+    const canvas = document.createElement("canvas");
+    canvas.style.backgroundColor = "transparent";
+    element.appendChild(canvas);
+    return {
+      screenHeight: getComputedStyle(element).height,
+      canvasBackground: getComputedStyle(canvas).backgroundColor
+    };
   });
+
+  expect(styles.screenHeight).toBe("123px");
+  expect(styles.canvasBackground).toBe("rgba(0, 0, 0, 0)");
 });
 ```
 
-- [ ] **Step 2: Run the CSS test to verify RED**
+- [ ] **Step 2: Run the browser test to verify RED**
 
-Run: `pnpm --filter @hypershell/ui exec vitest run src/features/terminal/terminalRendererStyles.test.ts`
+Run: `pnpm --filter @hypershell/ui exec playwright test tests/terminal-rendering.spec.ts`
 
 Expected: FAIL because `.xterm .xterm-screen { height: 100% !important; }` remains.
 
@@ -186,7 +222,13 @@ Run: `pnpm --filter @hypershell/ui run build`
 
 Expected: TypeScript and Vite complete with exit code 0. The existing Vite large-chunk warning may remain.
 
-- [ ] **Step 6: Review task-scoped diff**
+- [ ] **Step 6: Run the browser rendering contract test**
+
+Run: `pnpm --filter @hypershell/ui exec playwright test tests/terminal-rendering.spec.ts`
+
+Expected: 1 test passes.
+
+- [ ] **Step 7: Review task-scoped diff**
 
 Run: `git diff --check -- apps/ui/package.json apps/ui/src/features/terminal apps/ui/src/index.css pnpm-lock.yaml`
 
