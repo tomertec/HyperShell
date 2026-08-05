@@ -1,260 +1,137 @@
-# Terminal Rendering Artifacts Implementation Plan
+# Terminal PTY Semantics Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Prefer xterm's WebGL renderer to eliminate fractional-DPI ghost glyphs while retaining a reliable DOM-renderer fallback.
+**Goal:** Stop incremental TUI cursor corruption by restoring xterm's PTY-safe line-feed behavior.
 
-**Architecture:** Isolate optional WebGL activation in a small helper that owns dynamic import failure, activation failure, and context-loss behavior. Keep `useTerminalSession` responsible only for opening xterm and requesting optional acceleration, while CSS leaves renderer canvases and xterm's calculated screen geometry untouched.
+**Architecture:** Keep `terminalOptions` as the single source of xterm defaults and disable application-side LF-to-CRLF conversion. Prove the behavior through xterm's public buffer API, then rebuild and synchronize the exact renderer consumed by Electron.
 
-**Tech Stack:** TypeScript, React, xterm.js 6, `@xterm/addon-webgl` 0.19, Vitest, Vite.
+**Tech Stack:** TypeScript, xterm.js 6, Playwright, Vitest, Vite, Electron.
 
 ## Global Constraints
 
 - Preserve all unrelated working-tree changes.
-- WebGL failure must never prevent the terminal from opening or accepting input.
-- Do not add forced redraws or change Unicode width handling.
-- Do not apply CSS or inline backgrounds to `.xterm-screen canvas`.
-- Do not override xterm's calculated `.xterm-screen` height.
+- Change newline handling only; retain the current renderer and repaint code for this live validation.
+- Do not alter PTY, SSH, serial, or telnet transport bytes.
+- Do not claim visual resolution until the original streaming TUI workload passes after restart.
 
 ---
 
-### Task 1: Optional WebGL renderer lifecycle
+### Task 1: Restore PTY line-feed semantics
 
 **Files:**
-- Create: `apps/ui/src/features/terminal/optionalWebglRenderer.ts`
-- Create: `apps/ui/src/features/terminal/optionalWebglRenderer.test.ts`
+- Modify: `apps/ui/tests/terminal-rendering.spec.ts`
+- Modify: `apps/ui/src/features/terminal/terminalTheme.ts:27-39`
 
 **Interfaces:**
-- Consumes: an open `Pick<Terminal, "loadAddon">` and an optional asynchronous addon factory.
-- Produces: `loadOptionalWebglRenderer(terminal, createAddon?): Promise<boolean>`; `true` means WebGL was loaded, while `false` means the existing DOM renderer remains active.
+- Consumes: `getTerminalOptions()` and xterm's public `Terminal.write()` and buffer APIs.
+- Produces: terminal defaults with `convertEol: false`, preserving the cursor column when PTY output contains a bare line feed.
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [ ] **Step 1: Add the failing behavioral test**
 
-```ts
-import type { ITerminalAddon, Terminal } from "@xterm/xterm";
-import { describe, expect, it, vi } from "vitest";
-
-import { loadOptionalWebglRenderer } from "./optionalWebglRenderer";
-
-function createFakeAddon() {
-  let contextLoss: (() => void) | undefined;
-  const addon = {
-    activate: vi.fn(),
-    dispose: vi.fn(),
-    onContextLoss: vi.fn((listener: () => void) => {
-      contextLoss = listener;
-      return { dispose: vi.fn() };
-    })
-  } satisfies ITerminalAddon & {
-    onContextLoss(listener: () => void): { dispose(): void };
-  };
-  return { addon, loseContext: () => contextLoss?.() };
-}
-
-describe("loadOptionalWebglRenderer", () => {
-  it("loads the addon and disposes it when the WebGL context is lost", async () => {
-    const { addon, loseContext } = createFakeAddon();
-    const terminal = { loadAddon: vi.fn() } as unknown as Pick<Terminal, "loadAddon">;
-
-    await expect(loadOptionalWebglRenderer(terminal, async () => addon)).resolves.toBe(true);
-    expect(terminal.loadAddon).toHaveBeenCalledWith(addon);
-    loseContext();
-    expect(addon.dispose).toHaveBeenCalledOnce();
-  });
-
-  it("keeps the DOM renderer when the addon factory rejects", async () => {
-    const terminal = { loadAddon: vi.fn() } as unknown as Pick<Terminal, "loadAddon">;
-
-    await expect(
-      loadOptionalWebglRenderer(terminal, async () => { throw new Error("WebGL unavailable"); })
-    ).resolves.toBe(false);
-    expect(terminal.loadAddon).not.toHaveBeenCalled();
-  });
-
-  it("disposes a partially loaded addon when activation throws", async () => {
-    const { addon } = createFakeAddon();
-    const terminal = {
-      loadAddon: vi.fn(() => { throw new Error("activation failed"); })
-    } as unknown as Pick<Terminal, "loadAddon">;
-
-    await expect(loadOptionalWebglRenderer(terminal, async () => addon)).resolves.toBe(false);
-    expect(addon.dispose).toHaveBeenCalledOnce();
-  });
-});
-```
-
-- [ ] **Step 2: Run the test to verify RED**
-
-Run: `pnpm --filter @hypershell/ui exec vitest run src/features/terminal/optionalWebglRenderer.test.ts`
-
-Expected: FAIL because `./optionalWebglRenderer` does not exist.
-
-- [ ] **Step 3: Implement the minimal optional loader**
+Append this Playwright test to `apps/ui/tests/terminal-rendering.spec.ts`:
 
 ```ts
-import type { ITerminalAddon, Terminal } from "@xterm/xterm";
-
-type OptionalWebglAddon = ITerminalAddon & {
-  onContextLoss(listener: () => void): { dispose(): void };
-};
-
-type CreateWebglAddon = () => Promise<OptionalWebglAddon>;
-
-const createWebglAddon: CreateWebglAddon = async () => {
-  const { WebglAddon } = await import("@xterm/addon-webgl");
-  return new WebglAddon();
-};
-
-export async function loadOptionalWebglRenderer(
-  terminal: Pick<Terminal, "loadAddon">,
-  createAddon: CreateWebglAddon = createWebglAddon
-): Promise<boolean> {
-  let addon: OptionalWebglAddon | undefined;
-  try {
-    addon = await createAddon();
-    addon.onContextLoss(() => addon?.dispose());
-    terminal.loadAddon(addon);
-    return true;
-  } catch {
-    addon?.dispose();
-    return false;
-  }
-}
-```
-
-- [ ] **Step 4: Run the focused test to verify GREEN**
-
-Run: `pnpm --filter @hypershell/ui exec vitest run src/features/terminal/optionalWebglRenderer.test.ts`
-
-Expected: 3 tests pass.
-
-### Task 2: Terminal integration and renderer-safe CSS
-
-**Files:**
-- Modify: `apps/ui/src/features/terminal/useTerminalSession.ts:1-10,343-399`
-- Modify: `apps/ui/src/index.css:794-813`
-- Modify: `apps/ui/package.json:39-43`
-- Modify: `pnpm-lock.yaml`
-- Create: `apps/ui/tests/terminal-rendering.spec.ts`
-
-**Interfaces:**
-- Consumes: `loadOptionalWebglRenderer(terminal): Promise<boolean>` from Task 1.
-- Produces: non-blocking WebGL activation immediately after `Terminal.open()` with DOM fallback and renderer-safe CSS.
-
-- [ ] **Step 1: Write a failing browser rendering contract test**
-
-```ts
-import { expect, test } from "@playwright/test";
-
-const profiles = [{
-  id: "p1",
-  name: "PowerShell",
-  executable: "pwsh.exe",
-  args: [],
-  startingDirectory: null,
-  icon: "powershell",
-  color: null,
-  elevated: false,
-  source: "detected",
-  detectKey: "pwsh7",
-  isAvailable: true,
-  isHidden: false,
-  sortOrder: 1
-}];
-
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript((seed) => {
-    (window as unknown as { hypershell: unknown }).hypershell = {
-      listLocalProfiles: async () => seed,
-      rescanLocalProfiles: async () => seed
-    };
-  }, profiles);
-});
-
-test("xterm owns screen geometry and renderer canvases stay transparent", async ({ page }) => {
+test("PTY line feeds preserve the cursor column", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("main").getByRole("button", { name: "PowerShell" }).click();
-  await expect(page.locator(".xterm-screen")).toBeVisible();
 
-  const styles = await page.locator(".xterm-screen").evaluate((screen) => {
-    const element = screen as HTMLElement;
-    element.style.height = "123px";
-    const canvas = document.createElement("canvas");
-    canvas.style.backgroundColor = "transparent";
-    element.appendChild(canvas);
-    return {
-      screenHeight: getComputedStyle(element).height,
-      canvasBackground: getComputedStyle(canvas).backgroundColor
+  const cells = await page.evaluate(async () => {
+    const [{ Terminal }, { getTerminalOptions }] = await Promise.all([
+      import("/@id/@xterm/xterm"),
+      import("/src/features/terminal/terminalTheme.ts")
+    ]);
+    const container = document.createElement("div");
+    container.style.cssText = "width:800px;height:400px;position:fixed;inset:0";
+    document.body.appendChild(container);
+
+    const terminal = new Terminal(getTerminalOptions());
+    terminal.open(container);
+    await new Promise<void>((resolve) => terminal.write("abc\nx", resolve));
+
+    const secondLine = terminal.buffer.active.getLine(1);
+    const result = {
+      columnZero: secondLine?.getCell(0)?.getChars() ?? "",
+      originalColumn: secondLine?.getCell(3)?.getChars() ?? ""
     };
+    terminal.dispose();
+    container.remove();
+    return result;
   });
 
-  expect(styles.screenHeight).toBe("123px");
-  expect(styles.canvasBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(cells).toEqual({ columnZero: "", originalColumn: "x" });
 });
 ```
 
-- [ ] **Step 2: Run the browser test to verify RED**
+- [ ] **Step 2: Run the focused browser test to verify RED**
 
-Run: `pnpm --filter @hypershell/ui exec playwright test tests/terminal-rendering.spec.ts`
+Run: `pnpm --filter @hypershell/ui exec playwright test tests/terminal-rendering.spec.ts --grep "PTY line feeds"`
 
-Expected: FAIL because `.xterm .xterm-screen { height: 100% !important; }` remains.
+Expected: FAIL because `convertEol: true` places `x` in `columnZero` and leaves `originalColumn` empty.
 
-- [ ] **Step 3: Integrate the optional loader and remove unsafe overrides**
+- [ ] **Step 3: Implement the minimal option change**
 
-In `useTerminalSession.ts`, import `loadOptionalWebglRenderer`, remove WebGL from the mandatory `Promise.all`, and replace inline construction with:
+In `apps/ui/src/features/terminal/terminalTheme.ts`, change only:
 
 ```ts
-instance.open(container);
-void loadOptionalWebglRenderer(instance);
+convertEol: false,
 ```
 
-Keep background application on the container, `.xterm`, and `.xterm-viewport` only. In `index.css`, remove both the `.xterm-screen` height override and canvas-background rule. Retain `@xterm/addon-webgl` in `apps/ui/package.json` and the lockfile.
+- [ ] **Step 4: Run the focused browser test to verify GREEN**
 
-- [ ] **Step 4: Run focused terminal tests**
-
-Run: `pnpm --filter @hypershell/ui exec vitest run src/features/terminal`
-
-Expected: all terminal test files pass.
-
-- [ ] **Step 5: Run production build**
-
-Run: `pnpm --filter @hypershell/ui run build`
-
-Expected: TypeScript and Vite complete with exit code 0. The existing Vite large-chunk warning may remain.
-
-- [ ] **Step 6: Run the browser rendering contract test**
-
-Run: `pnpm --filter @hypershell/ui exec playwright test tests/terminal-rendering.spec.ts`
+Run: `pnpm --filter @hypershell/ui exec playwright test tests/terminal-rendering.spec.ts --grep "PTY line feeds"`
 
 Expected: 1 test passes.
 
-- [ ] **Step 7: Review task-scoped diff**
+- [ ] **Step 5: Run UI regression gates**
 
-Run: `git diff --check -- apps/ui/package.json apps/ui/src/features/terminal apps/ui/src/index.css pnpm-lock.yaml`
+Run: `pnpm --filter @hypershell/ui test -- --run`
 
-Expected: no whitespace errors in task files.
+Expected: all UI unit tests pass.
 
-Run: `git diff -- apps/ui/package.json apps/ui/src/features/terminal apps/ui/src/index.css pnpm-lock.yaml`
+Run: `pnpm --filter @hypershell/ui run test:e2e`
 
-Expected: only the renderer dependency, optional loader, terminal integration, tests, and renderer-safe CSS changes appear.
+Expected: all UI browser tests pass.
 
-### Task 3: Manual visual acceptance gate
+- [ ] **Step 6: Build and synchronize the Electron renderer**
+
+Run: `pnpm --filter @hypershell/desktop run build:bundle`
+
+Expected: UI TypeScript, Vite, desktop TypeScript, esbuild, and renderer synchronization complete with exit code 0. The existing Vite large-chunk warning may remain.
+
+- [ ] **Step 7: Exercise a real PTY in Electron**
+
+Run: `pnpm --filter @hypershell/desktop run test:e2e -- tests/local-shell.spec.ts`
+
+Expected: all local-shell Electron tests pass.
+
+- [ ] **Step 8: Verify and commit the scoped change**
+
+Run: `git diff --check -- apps/ui/src/features/terminal/terminalTheme.ts apps/ui/tests/terminal-rendering.spec.ts`
+
+Expected: no whitespace errors.
+
+```bash
+git add apps/ui/src/features/terminal/terminalTheme.ts apps/ui/tests/terminal-rendering.spec.ts
+git commit -m "fix: preserve PTY line-feed semantics"
+```
+
+### Task 2: Live acceptance gate
 
 **Files:**
 - No code changes.
 
 **Interfaces:**
-- Consumes: the built renderer from Tasks 1 and 2.
-- Produces: evidence that the original GPU symptom is visually resolved.
+- Consumes: the synchronized Electron renderer from Task 1.
+- Produces: user confirmation that the original streaming TUI workload no longer leaves stale fragments.
 
-- [ ] **Step 1: Exercise the original reproduction**
+- [ ] **Step 1: Restart HyperShell without discarding active sessions unexpectedly**
 
-At Windows 100% and 115% display scaling, open a local or SSH terminal that emits the affected output. Resize the pane repeatedly, switch tabs, change terminal font size, and switch themes.
+Ask the user to restart after saving or closing sessions they need. Confirm the new Electron process started after `apps/desktop/dist/renderer/index.html` was generated.
 
-- [ ] **Step 2: Confirm fallback behavior**
+- [ ] **Step 2: Re-run the original workload**
 
-In Chromium DevTools, dispatch WebGL context loss for the terminal canvas or temporarily block WebGL initialization. Confirm the terminal remains usable through xterm's DOM renderer.
+Exercise OpenCode and at least one other incremental full-screen TUI without resizing the pane as a recovery action.
 
-- [ ] **Step 3: Record the acceptance result**
+- [ ] **Step 3: Record the outcome**
 
-Report visual verification as confirmed only if the original artifact is reproduced before the change and absent after it. Otherwise report build/unit verification separately and leave visual acceptance pending.
+If artifacts are absent, mark visual acceptance confirmed and schedule removal of the fractional-scale repaint guard as a separate follow-up. If artifacts remain, do not add another renderer workaround; instrument a diagnostic build that compares xterm buffer cells with the visible renderer surface.
