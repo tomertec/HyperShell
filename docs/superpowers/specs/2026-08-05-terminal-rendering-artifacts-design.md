@@ -2,54 +2,67 @@
 
 ## Goal
 
-Eliminate terminal ghost glyphs and row artifacts at fractional Windows display
-scaling without making terminal availability depend on GPU rendering.
+Eliminate terminal ghost text and stale row fragments during incremental TUI
+updates while preserving correct PTY cursor semantics.
+
+## Evidence and Revised Diagnosis
+
+The original renderer hypothesis is refuted by live testing. HyperShell was
+restarted from the rebuilt Electron bundle with optional WebGL rendering,
+xterm-owned screen geometry, transparent renderer canvases, and a coalesced
+full-viewport `refresh()` after parsed output at fractional display scaling.
+Artifacts still appeared, while changing the terminal dimensions cleared them.
+
+The shared configuration instead forces `convertEol: true` for every terminal.
+xterm documents this option as equivalent to converting every `\n` to `\r\n`
+and says it should normally not be used for PTY data because the PTY's termios
+settings own that translation. Forcing it means a full-screen application
+cannot preserve a nonzero cursor column across a line feed, even when its PTY
+mode requires that behavior. Incremental redraws can therefore update the wrong
+cells and leave old text behind; a resize makes the application draw the whole
+screen again.
+
+Reference: https://xtermjs.org/docs/api/terminal/interfaces/iterminaloptions/#converteol
 
 ## Scope
 
-- Prefer xterm's WebGL renderer after the terminal has opened.
-- Preserve xterm's built-in DOM renderer as the automatic fallback when the
-  WebGL module cannot load, WebGL initialization fails, or its context is lost.
-- Keep terminal backgrounds on the terminal container, xterm root, viewport,
-  and xterm theme. Never paint xterm's renderer canvases with CSS or inline
-  styles because WebGL uses transparent overlay canvases.
-- Let xterm calculate `.xterm-screen` height from its rows and cell metrics;
-  application CSS must not override that height.
-- Retain the Unicode 15 grapheme addon. It solves character-width drift and is
-  complementary to the renderer change.
+- Restore xterm's PTY-safe default by setting `convertEol` to `false`.
+- Add an automated regression test that writes `abc\nx` and proves the `x`
+  remains in column 3 instead of being forced to column 0.
+- Keep the current renderer and repaint changes unchanged for the first live
+  validation so newline handling is the only changed variable.
+- Rebuild the UI and sync it into the Electron renderer bundle.
 
 ## Design
 
-The renderer activation is isolated in a small asynchronous helper. It accepts
-an already-open xterm instance, dynamically imports `@xterm/addon-webgl`,
-registers context-loss disposal, and loads the addon. Every failure is contained
-inside the helper, leaving the already-running DOM renderer untouched. If addon
-activation fails after construction, the helper disposes the partially created
-addon.
+`terminalOptions` remains the single source of xterm defaults. Its
+`convertEol` value changes from `true` to `false`; no transport-specific branch
+is needed because every HyperShell terminal is fed a terminal-protocol byte
+stream from a PTY or terminal peer rather than plain line-oriented text.
 
-`useTerminalSession` initializes the required xterm, fit, search, and Unicode
-modules as it does today. Immediately after `open()`, it starts optional WebGL
-activation without blocking terminal input or session startup.
+The regression test opens a real xterm instance with `getTerminalOptions()`,
+writes a line feed while the cursor is at column 3, waits for parsing to finish,
+and inspects the public buffer API. This tests the externally visible terminal
+state rather than the implementation detail of the option value.
 
-## Error Handling
+## Validation and Cleanup
 
-- A WebGL import or activation failure is intentionally silent and falls back
-  to the DOM renderer.
-- A WebGL context loss disposes the addon; xterm restores its DOM renderer.
-- Terminal disposal remains the owner of successfully loaded addon cleanup.
+Automated validation covers the focused regression, all UI unit tests, browser
+tests, the production build, renderer synchronization, and the real Electron
+local-PTY smoke test. The final acceptance check remains the original streaming
+TUI reproduction because automated browser tests cannot prove the absence of a
+timing-dependent artifact in the user's SSH workload.
 
-## Testing
-
-- Unit-test successful addon activation and context-loss disposal.
-- Unit-test rejected module loading and addon activation failure to prove the
-  fallback resolves without rejecting.
-- Run terminal unit tests and the UI production build.
-- Manually verify the original reproduction at Windows 100% and 115% display
-  scaling, including resize, tab switching, font-size changes, and theme changes.
-  Automated tests cannot establish that GPU pixels are artifact-free.
+The fractional-scale repaint guard is retained only during this one-variable
+validation. If live testing confirms the PTY-semantics fix, remove that failed
+workaround in a separate follow-up and rerun the same gates. If artifacts remain,
+stop changing rendering options and add diagnostic capture that compares
+xterm's buffer contents with the visible surface.
 
 ## Non-Goals
 
+- Disabling Electron GPU acceleration globally.
 - Adding a renderer preference to Settings.
-- Changing terminal font metrics or Unicode width behavior.
-- Adding forced refresh calls after every write or resize.
+- Changing font metrics, Unicode width handling, or transport byte streams.
+- Combining cleanup of the previous renderer experiments with this hypothesis
+  test.
