@@ -324,7 +324,7 @@ export function Sidebar({
         </div>
       )}
 
-      <div className={`${restoreCount ? "" : "mt-auto "}border-t border-border px-3 pt-3 pb-2 flex items-center justify-between`}>
+      <div className={`${restoreCount ? "" : "mt-auto "}border-t border-border px-3 pt-2 pb-0.5 flex items-center justify-between`}>
         <button
           onClick={onOpenSettings}
           className="-ml-1 flex items-center gap-2 px-2 py-1 rounded-md text-text-muted/80 hover:text-text-secondary hover:bg-base-700/60 transition-all duration-150"
