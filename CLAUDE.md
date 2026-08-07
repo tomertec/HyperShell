@@ -80,20 +80,29 @@ Node entry script to its exact npm `bin` name, so apps such as Claude and Pi do
 not both collapse to `node`; unresolved scripts safely retain the executable
 name. Raw command lines never leave `session-core`. `pickForegroundName`
 returns `null` (deferring to the OSC title) for two different reasons, kept as
-separate name sets: the deepest
-process is a shell/wrapper (`SHELL_AND_WRAPPER_NAMES` — nothing is running), or
+separate name sets: the deepest process is a shell/wrapper
+(`SHELL_AND_WRAPPER_NAMES` — nothing is running), or
 it's a remote/relay client like `ssh`/`mosh`/`plink`/`telnet`
 (`PASSTHROUGH_NAMES` — something is running, but only the far end knows its
 name, e.g. `pwsh → ssh` masking a remote `llmtop`). SSH tabs instead receive a
 one-line shell hook
-(`session-core/shellIntegration/bootstrap.ts`) written into the pty on every
+(`session-core/shellIntegration/bootstrap.ts`) typed into the pty on every
 `connected` transition (including reconnects, since each is a fresh remote
 shell), which emits ordinary OSC titles per command; it is skipped for
 tmux-attach sessions and for password-authenticated hosts (the bootstrap write
-would race `sshPtyTransport`'s password-prompt watcher on the same pty). The
-write itself is debounced by `SHELL_INTEGRATION_QUIET_MS` (500ms of no `data`
-events) so it lands after the MOTD and prompt have drawn, instead of racing the
-login tty and getting echoed twice. Display order is
+would race `sshPtyTransport`'s password-prompt watcher on the same pty).
+Injection is a handshake, because typing into a tty mid-init lands in both the
+login tty's canonical buffer and the line editor's redraw (echoed twice), or
+answers an interactive question like oh-my-zsh's "update? [Y/n]": after 500ms
+of quiet (`SHELL_INTEGRATION_QUIET_MS`) *and* a prompt-shaped output tail
+(`looksLikePrompt` — last visible output doesn't end in a newline), a one-row
+self-erasing probe is typed; only when its OSC 777 marker's control bytes come
+back (echo can't fake them — it shows literal backslashes) is the real
+bootstrap written, retried up to 3 probes then given up. Both probe and
+bootstrap erase their own echo: each ends with a `printf` of cursor-up +
+erase-to-end, the bootstrap's sized from the pty width at write time (biased a
+row or two high, since the remote prompt length is unknown), so the snippet
+vanishes and the prompt redraws in place, MOTD intact. Display order is
 `processTitle ?? dynamicTitle ?? title`
 (`resolveTabTitle`), read at four sites — tab label, tab tooltip, status bar,
 broadcast bar. Per-host opt-out via the `shellIntegration` column (default on);
@@ -163,3 +172,4 @@ only the process title — an OSC shell title still shows when it's off.
 - **Auto-reconnect not triggering** — Check that `autoReconnect` is enabled on the host record (DB) and that the network monitor hasn't paused reconnection (`waiting_for_network` state). The connection pool ref-counts connections, so closing one consumer doesn't necessarily close the underlying ssh2 client.
 - **A local shell ignores your PowerShell profile** — the profile row has non-empty `args`. Detected profiles must launch bare (`args = []`); `-NoProfile`/`-Command`/`-File` all skip `$PROFILE`.
 - **WSL distros missing from the Local section** — `wsl.exe -l -q` emits UTF-16LE. Decoding it as UTF-8 yields NUL-interleaved names that match nothing.
+- **Blank terminal with the WebGL renderer** — never set a CSS/inline `background-color` on the canvases inside `.xterm-screen`. The WebGL addon stacks a transparent `.xterm-link-layer` canvas above the text canvas; painting it opaque hides every glyph. Paint the container, `.xterm` root, and `.xterm-viewport` instead (the theme background covers the cells).
