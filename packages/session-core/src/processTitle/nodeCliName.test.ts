@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { createNodeCliNameResolver } from "./nodeCliName";
 
-function createFixture(manifests: Record<string, unknown | string>) {
+function createFixture(manifests: Record<string, unknown>) {
   const files = new Map(
     Object.entries(manifests).map(([path, manifest]) => [
       win32.normalize(path).toLowerCase(),
