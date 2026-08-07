@@ -74,8 +74,13 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 **Active-process tab titles:** Local tabs get their title from the pty's process
 tree — `SessionManager` runs a 1s poller (`session-core/processTitle/`) over
 `@vscode/windows-process-tree`, takes the deepest descendant, and emits a
-`process-title` session event. `pickForegroundName` returns `null` (deferring to
-the OSC title) for two different reasons, kept as separate name sets: the deepest
+`process-title` session event. The Windows adapter requests command lines and
+uses a cached package-metadata resolver (`processTitle/nodeCliName.ts`) to map a
+Node entry script to its exact npm `bin` name, so apps such as Claude and Pi do
+not both collapse to `node`; unresolved scripts safely retain the executable
+name. Raw command lines never leave `session-core`. `pickForegroundName`
+returns `null` (deferring to the OSC title) for two different reasons, kept as
+separate name sets: the deepest
 process is a shell/wrapper (`SHELL_AND_WRAPPER_NAMES` — nothing is running), or
 it's a remote/relay client like `ssh`/`mosh`/`plink`/`telnet`
 (`PASSTHROUGH_NAMES` — something is running, but only the far end knows its

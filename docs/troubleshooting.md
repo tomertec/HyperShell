@@ -72,6 +72,12 @@ Check the terminal theme and font settings in Settings. Ensure the font supports
 
 WSL processes run inside the VM and are invisible to the Windows process tree (`@vscode/windows-process-tree`). The local process-title poller (`session-core/processTitle/`) can only see Win32 processes, so a WSL pty's tab title stays on the shell name. Expected, not a bug.
 
+### A local Node app's tab title still shows `node`
+
+HyperShell resolves npm-installed Node CLIs by matching the running JavaScript entry script against the nearest package's `bin` metadata. If the command line is unavailable or truncated, the entry script is not an absolute `.js`/`.cjs`/`.mjs` path, the package manifest is inaccessible, or its bin target does not match, the title safely falls back to `node`.
+
+This release resolves Node/npm bins only. Other runtime wrappers and applications that do not expose matching package metadata keep their executable name. Main-process changes require rebuilding `@hypershell/desktop` and restarting Electron before testing the title live.
+
 ### A remote shell prints a line of shell code right after connecting
 
 That line is the shell-integration bootstrap (`session-core/shellIntegration/bootstrap.ts`) being echoed back instead of installing silently — happens on shells it wasn't written for (fish, csh) or ones with unusual echo settings.

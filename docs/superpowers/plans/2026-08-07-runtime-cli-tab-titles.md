@@ -242,7 +242,7 @@ Run, in order:
 
 ```powershell
 pnpm vitest run packages/session-core/src/processTitle
-pnpm --filter @hypershell/session-core test
+pnpm vitest run packages/session-core/src
 pnpm --filter @hypershell/session-core build
 pnpm test
 pnpm build
