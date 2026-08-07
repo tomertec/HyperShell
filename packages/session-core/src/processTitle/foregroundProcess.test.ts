@@ -32,6 +32,23 @@ describe("pickForegroundName", () => {
     expect(pickForegroundName(tree)).toBe("pi");
   });
 
+  it("keeps a coding CLI title when it owns background helpers", () => {
+    const tree = node("claude.exe", [
+      node("cmd.exe", [node("node.exe", [], 3)], 2),
+      node("bun.exe", [node("bun.exe", [], 5)], 4)
+    ]);
+
+    expect(pickForegroundName(tree)).toBe("claude");
+  });
+
+  it("keeps a resolved Node coding CLI title when it owns a helper", () => {
+    const tree = node("pwsh.exe", [
+      node("node.exe", [node("node.exe", [], 3)], 2, "pi")
+    ]);
+
+    expect(pickForegroundName(tree)).toBe("pi");
+  });
+
   it("falls back to the runtime executable when no CLI name resolves", () => {
     const tree = node("pwsh.exe", [node("node.exe", [], 2)]);
     expect(pickForegroundName(tree)).toBe("node");

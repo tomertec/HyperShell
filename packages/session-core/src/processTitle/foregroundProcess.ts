@@ -35,6 +35,22 @@ const SHELL_AND_WRAPPER_NAMES = new Set([
  */
 const PASSTHROUGH_NAMES = new Set(["ssh", "mosh", "plink", "telnet"]);
 
+/**
+ * Interactive coding CLIs commonly keep MCP servers, plugin hosts, and other
+ * workers alive beneath themselves. Those descendants are implementation
+ * details, not the program the user is interacting with, so the CLI anchors
+ * the title once it appears anywhere in the pty tree.
+ */
+const CODING_CLI_NAMES = new Set([
+  "aider",
+  "claude",
+  "codex",
+  "gemini",
+  "goose",
+  "opencode",
+  "pi"
+]);
+
 function stripExe(name: string): string {
   return name.replace(/\.exe$/i, "");
 }
@@ -54,12 +70,41 @@ function deepest(node: ProcessNode, depth: number): { node: ProcessNode; depth: 
   return best;
 }
 
+function findCodingCli(root: ProcessNode): ProcessNode | null {
+  const pending = [root];
+
+  while (pending.length > 0) {
+    const node = pending.shift();
+    if (!node) {
+      continue;
+    }
+
+    const processName = stripExe(node.name).toLowerCase();
+    const displayName = node.displayName?.toLowerCase();
+    if (
+      CODING_CLI_NAMES.has(processName) ||
+      (displayName && CODING_CLI_NAMES.has(displayName))
+    ) {
+      return node;
+    }
+
+    pending.push(...node.children);
+  }
+
+  return null;
+}
+
 /**
  * The name to show for a pty, or null when the shell is sitting at its prompt.
  */
 export function pickForegroundName(root: ProcessNode | null): string | null {
   if (!root) {
     return null;
+  }
+
+  const codingCli = findCodingCli(root);
+  if (codingCli) {
+    return codingCli.displayName ?? stripExe(codingCli.name);
   }
 
   const { node, depth } = deepest(root, 0);
