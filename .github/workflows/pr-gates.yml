@@ -50,7 +50,10 @@ jobs:
   # modules, window security, or on-disk database behaviour. This job boots the
   # real Electron shell against a throwaway data directory and covers those.
   electron-e2e:
-    runs-on: windows-latest
+    # Pinned, not windows-latest: that label moved to Visual Studio 2026 (major
+    # version 18) in June 2026, which the node-gyp bundled with pnpm does not
+    # recognize, so @vscode/windows-process-tree fails to build.
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
@@ -91,7 +94,10 @@ jobs:
           retention-days: 7
 
   windows-build:
-    runs-on: windows-latest
+    # Pinned, not windows-latest: that label moved to Visual Studio 2026 (major
+    # version 18) in June 2026, which the node-gyp bundled with pnpm does not
+    # recognize, so @vscode/windows-process-tree fails to build.
+    runs-on: windows-2022
 
     steps:
       - name: Checkout

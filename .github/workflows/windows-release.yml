@@ -15,7 +15,12 @@ permissions:
 
 jobs:
   release:
-    runs-on: windows-latest
+    # Pinned, not windows-latest: that label moved to Visual Studio 2026 (major
+    # version 18) in June 2026, and neither the node-gyp bundled with pnpm nor
+    # @electron/rebuild recognizes it — both report "unknown version undefined"
+    # and fail to build @vscode/windows-process-tree. Unpin once both ship
+    # VS 2026 detection.
+    runs-on: windows-2022
 
     steps:
       - name: Checkout

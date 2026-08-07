@@ -45,6 +45,11 @@ mac:
   entitlementsInherit: entitlements.mac.plist
 linux:
   icon: build/icon.png
+  # Without this, electron-builder derives the binary name from the package name
+  # (@hypershell/desktop -> "@hypershelldesktop") and refuses to build: since
+  # 26.x it rejects executable names containing characters that are unsafe in
+  # file paths.
+  executableName: hypershell
   category: Development
   maintainer: HyperShell Team <team@hypershell.app>
   target:
