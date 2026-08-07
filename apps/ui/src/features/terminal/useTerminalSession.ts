@@ -13,6 +13,8 @@ import { getTerminalOptions } from "./terminalTheme";
 import { getTerminalClipboardAction } from "./terminalClipboard";
 import { getTerminalFontSizeAction } from "./terminalFontSize";
 import { TERMINAL_UNICODE_VERSION } from "./terminalUnicode";
+import { loadOptionalWebglRenderer } from "./optionalWebglRenderer";
+import { installTerminalRepaintGuard } from "./terminalRepaintGuard";
 import {
   TERMINAL_FOCUS_REQUEST_EVENT,
   shouldHandleTerminalFocusRequest,
@@ -127,10 +129,11 @@ export function useTerminalSession(
       viewport.style.backgroundColor = background;
     }
 
-    const canvases = Array.from(container.querySelectorAll(".xterm-screen canvas"));
-    for (const canvas of canvases) {
-      (canvas as HTMLCanvasElement).style.backgroundColor = background;
-    }
+    // Never set a background on the canvases inside .xterm-screen: the WebGL
+    // renderer stacks a transparent link-layer canvas above the text canvas,
+    // and an opaque CSS background on that overlay hides every glyph. (With
+    // the DOM renderer the selector matched nothing, which is why this used
+    // to look harmless.)
   }, []);
 
   const setStateSafe = useCallback((nextState: TerminalSessionState): void => {
@@ -335,6 +338,7 @@ export function useTerminalSession(
     let disposed = false;
     let disposeInput: { dispose(): void } | null = null;
     let titleDisposable: { dispose(): void } | null = null;
+    let repaintGuard: { dispose(): void } | null = null;
     let instance: Terminal | null = null;
     let container: HTMLDivElement | null = null;
     let removeFocusListeners: (() => void) | null = null;
@@ -380,6 +384,8 @@ export function useTerminalSession(
       container = containerRef.current;
       if (container) {
         instance.open(container);
+        void loadOptionalWebglRenderer(instance);
+        repaintGuard = installTerminalRepaintGuard(instance);
         applyTerminalBackground(opts.theme?.background ?? "#07111f");
         try { addon.fit(); } catch { /* container may not have dimensions yet */ }
         instance.focus();
@@ -478,6 +484,7 @@ export function useTerminalSession(
       disposed = true;
       disposeInput?.dispose();
       titleDisposable?.dispose();
+      repaintGuard?.dispose();
       removeFocusListeners?.();
       instance?.dispose();
       terminalRef.current = null;

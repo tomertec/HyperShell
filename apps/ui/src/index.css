@@ -804,13 +804,9 @@ kbd {
   background-color: var(--terminal-bg, var(--color-surface)) !important;
 }
 
-.xterm .xterm-screen {
-  height: 100% !important;
-}
-
-.xterm .xterm-screen canvas {
-  background-color: var(--terminal-bg, var(--color-surface)) !important;
-}
+/* Do NOT paint the canvases inside .xterm-screen: the WebGL renderer stacks
+   a transparent link-layer canvas above the text canvas, and an opaque
+   background on that overlay hides every glyph. */
 
 .xterm .xterm-scrollable-element>.shadow {
   display: none !important;
