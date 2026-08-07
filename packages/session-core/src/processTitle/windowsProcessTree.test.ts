@@ -16,25 +16,63 @@ describe("createWindowsProcessTreeProvider", () => {
     expect(loaded).toBe(false);
   });
 
-  it("maps the native tree shape onto ProcessNode", async () => {
+  it("requests command lines and maps a resolved CLI display name", async () => {
+    let flags: number | undefined;
     const provider = createWindowsProcessTreeProvider({
       platform: "win32",
+      resolveNodeCliName: (name, commandLine) =>
+        name === "node.exe" && commandLine?.includes("pi-coding-agent") ? "pi" : null,
       load: () => ({
-        getProcessTree(rootPid, callback) {
+        getProcessTree(rootPid, callback, requestedFlags) {
           expect(rootPid).toBe(4242);
+          flags = requestedFlags;
           callback({
             pid: 4242,
             name: "pwsh.exe",
-            children: [{ pid: 4300, name: "llmtop.exe" }]
+            commandLine: "pwsh.exe",
+            children: [
+              {
+                pid: 4300,
+                name: "node.exe",
+                commandLine:
+                  "node C:\\nvm4w\\nodejs\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js"
+              }
+            ]
           });
         }
       })
     });
 
-    await expect(provider(4242)).resolves.toEqual({
+    const tree = await provider(4242);
+
+    expect(flags).toBe(2);
+    expect(tree).toEqual({
       pid: 4242,
       name: "pwsh.exe",
-      children: [{ pid: 4300, name: "llmtop.exe", children: [] }]
+      children: [{ pid: 4300, name: "node.exe", displayName: "pi", children: [] }]
+    });
+    expect(JSON.stringify(tree)).not.toContain("commandLine");
+  });
+
+  it("omits displayName when CLI resolution has no answer", async () => {
+    const provider = createWindowsProcessTreeProvider({
+      platform: "win32",
+      resolveNodeCliName: () => null,
+      load: () => ({
+        getProcessTree(_rootPid, callback) {
+          callback({
+            pid: 1,
+            name: "pwsh.exe",
+            children: [{ pid: 2, name: "node.exe", commandLine: "node --inspect" }]
+          });
+        }
+      })
+    });
+
+    await expect(provider(1)).resolves.toEqual({
+      pid: 1,
+      name: "pwsh.exe",
+      children: [{ pid: 2, name: "node.exe", children: [] }]
     });
   });
 

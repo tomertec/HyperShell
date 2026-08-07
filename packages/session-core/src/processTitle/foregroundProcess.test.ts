@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { pickForegroundName, type ProcessNode } from "./foregroundProcess";
 
-const node = (name: string, children: ProcessNode[] = [], pid = 1): ProcessNode => ({
+const node = (
+  name: string,
+  children: ProcessNode[] = [],
+  pid = 1,
+  displayName?: string
+): ProcessNode => ({
   pid,
   name,
+  ...(displayName ? { displayName } : {}),
   children
 });
 
@@ -19,6 +25,16 @@ describe("pickForegroundName", () => {
   it("returns the deepest descendant, without the .exe suffix", () => {
     const tree = node("pwsh.exe", [node("llmtop.exe", [], 2)]);
     expect(pickForegroundName(tree)).toBe("llmtop");
+  });
+
+  it("prefers the resolved runtime CLI name", () => {
+    const tree = node("pwsh.exe", [node("node.exe", [], 2, "pi")]);
+    expect(pickForegroundName(tree)).toBe("pi");
+  });
+
+  it("falls back to the runtime executable when no CLI name resolves", () => {
+    const tree = node("pwsh.exe", [node("node.exe", [], 2)]);
+    expect(pickForegroundName(tree)).toBe("node");
   });
 
   it("prefers the deepest branch over a shallower sibling", () => {

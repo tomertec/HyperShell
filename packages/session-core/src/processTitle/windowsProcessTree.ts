@@ -1,4 +1,8 @@
 import type { ProcessNode, ProcessTreeProvider } from "./foregroundProcess";
+import {
+  createNodeCliNameResolver,
+  type NodeCliNameResolver
+} from "./nodeCliName";
 
 // Loaded via require() at runtime (provided by esbuild banner's createRequire),
 // exactly like node-pty — a static import would break the bundle on platforms
@@ -8,29 +12,39 @@ declare const require: (id: string) => unknown;
 export interface RawProcessTreeNode {
   pid: number;
   name: string;
+  commandLine?: string;
   children?: RawProcessTreeNode[];
 }
 
 export interface WindowsProcessTreeModule {
   getProcessTree(
     rootPid: number,
-    callback: (tree: RawProcessTreeNode | undefined) => void
+    callback: (tree: RawProcessTreeNode | undefined) => void,
+    flags?: number
   ): void;
 }
 
 export interface WindowsProcessTreeDeps {
   platform?: NodeJS.Platform;
   load?: () => WindowsProcessTreeModule;
+  resolveNodeCliName?: NodeCliNameResolver;
 }
 
 /** If the native module accepts a call and never invokes its callback, give up rather than hang forever. */
 const CALLBACK_TIMEOUT_MS = 2000;
+const COMMAND_LINE_PROCESS_DATA_FLAG = 2;
 
-function toProcessNode(raw: RawProcessTreeNode): ProcessNode {
+function toProcessNode(
+  raw: RawProcessTreeNode,
+  resolveNodeCliName: NodeCliNameResolver
+): ProcessNode {
+  const displayName = resolveNodeCliName(raw.name, raw.commandLine);
+
   return {
     pid: raw.pid,
     name: raw.name,
-    children: (raw.children ?? []).map(toProcessNode)
+    ...(displayName ? { displayName } : {}),
+    children: (raw.children ?? []).map((child) => toProcessNode(child, resolveNodeCliName))
   };
 }
 
@@ -48,6 +62,7 @@ export function createWindowsProcessTreeProvider(
 ): ProcessTreeProvider {
   const platform = deps.platform ?? process.platform;
   const load = deps.load ?? loadModule;
+  const resolveNodeCliName = deps.resolveNodeCliName ?? createNodeCliNameResolver();
   let cached: WindowsProcessTreeModule | null = null;
   let loadFailed = false;
 
@@ -81,9 +96,13 @@ export function createWindowsProcessTreeProvider(
       const timer = setTimeout(() => settle(null), CALLBACK_TIMEOUT_MS);
 
       try {
-        cached.getProcessTree(rootPid, (tree) => {
-          settle(tree ? toProcessNode(tree) : null);
-        });
+        cached.getProcessTree(
+          rootPid,
+          (tree) => {
+            settle(tree ? toProcessNode(tree, resolveNodeCliName) : null);
+          },
+          COMMAND_LINE_PROCESS_DATA_FLAG
+        );
       } catch {
         settle(null);
       }

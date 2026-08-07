@@ -2,6 +2,7 @@
 export interface ProcessNode {
   pid: number;
   name: string;
+  displayName?: string;
   children: ProcessNode[];
 }
 
@@ -72,5 +73,5 @@ export function pickForegroundName(root: ProcessNode | null): string | null {
     return null;
   }
 
-  return name.length > 0 ? name : null;
+  return node.displayName ?? (name.length > 0 ? name : null);
 }

@@ -39,5 +39,6 @@ export type { CreateLocalShellTransportDeps } from "./transports/localShellTrans
 export { createPtyProcess, sanitizePtyEnv } from "./transports/ptyProcess";
 export type { LocalConnectionOptions } from "./transports/transportEvents";
 export * from "./processTitle/foregroundProcess";
+export * from "./processTitle/nodeCliName";
 export * from "./processTitle/processTitlePoller";
 export * from "./processTitle/windowsProcessTree";
