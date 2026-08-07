@@ -10,6 +10,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-07
+
+### Added
+
+- **Local shell sessions** — a new **Local** transport opens PowerShell 7, Windows PowerShell, `cmd.exe`, Git Bash, and installed WSL distros as terminal tabs alongside SSH and serial. Profiles are auto-detected on startup and stored in the database (migration 015), then surface in a **Local** sidebar section (drag to reorder), the new-tab menu, the command palette, and the welcome screen. A profile editor covers name, icon, starting directory, and per-profile environment variables including `HOME`/`USERPROFILE` overrides. The renderer may only ever pass a `profileId`, never an executable, so the choice of program to run stays in the main process. Tabs close themselves when the shell exits cleanly.
+- **Dynamic tab titles** — terminal tabs now follow the OSC title the shell emits, so a tab renames itself as you change directory or start a program instead of showing the host name forever. Titles are sanitized before display, and the full host/user/path detail moved into a richer tooltip. Tabs also gained transport icons tinted by connection state, roomier spacing, and fade truncation.
+- **Active-process tab titles** — a local tab shows the program actually running in it (`vim`, `htop`, `claude`), resolved by polling the pty's process tree once a second; Node-based CLIs resolve to their npm `bin` name instead of all collapsing to `node`. SSH tabs get the same behaviour from a one-line shell hook injected on connect, which makes the remote shell emit ordinary OSC titles per command. The hook is skipped for tmux attaches and password-authenticated hosts, can be disabled per host (migration 017), and the whole display is gated by **Settings → General → Show active process**.
+- **WebGL terminal rendering** — terminals load the xterm WebGL renderer when the GPU allows it and fall back silently to the DOM renderer when it does not.
+- **Nerd Font glyphs and Unicode grapheme clustering** — the terminal font stack appends Nerd Font families so private-use glyphs from oh-my-posh, starship, and Terminal-Icons render instead of tofu, and the graphemes addon (pinned Unicode version) keeps emoji and combining sequences from splitting across cells.
+- **Collapsible host groups** — sidebar groups collapse and expand with a host count, persisted per group. Host rows gained a hover action that opens SFTP directly, and empty lists now show actionable empty states instead of blank space.
+- **Electron end-to-end tests** — a Playwright suite that boots the real shell now covers what headless Chromium cannot: preload bridge availability, IPC schema enforcement, native modules, renderer/Node isolation, SQLite persistence across restarts, editor-window creation, local shell sessions, process-title events, hosts CRUD, backup/restore, and a full session lifecycle against a local TCP echo server. Each test runs against a fresh temp data directory via `HYPERSHELL_DATA_DIR`.
+
+### Changed
+
+- **App-wide UI pass** — shared `Button`, `IconButton`, `Input`, `Select`, `SectionLabel`, `Kbd`, and `EmptyState` primitives now back the host form and dialogs, import dialogs, tmux picker, settings panel, theme editor, backup panel, and welcome screen, layered on new elevation, motion, and focus-ring design tokens. Modals share a size/footer API, settings rows share one anatomy, the tab bar and status bar moved to semantic state colors (latency tinted by threshold), tag filter chips only appear in filter mode, and host export/import moved into the Hosts header overflow menu.
+- **Preload API split into per-feature slices** — `desktopApi.ts` is now a merger over per-feature slices (sessions, hosts, SFTP, groups/tags, host profiles, serial, filesystem, workspace, SSH keys, port forwards, recording, settings, updates, system) sharing a `createSubscription` helper, instead of one long file.
+- **Dependency audit remediation** — 15 `pnpm audit` findings resolved through in-range updates.
+
+### Fixed
+
+- **Terminal rendering artifacts** — xterm no longer forces `convertEol`, which had been converting every line feed to CR+LF regardless of the pty's termios settings. Full-screen applications could not preserve a nonzero cursor column across a line feed, so incremental redraws updated the wrong cells and left stale text behind until the terminal was resized.
+- **Blank terminal under the WebGL renderer** — the CSS that painted every canvas inside `.xterm-screen` also painted the transparent link-layer canvas the WebGL addon stacks above the text, hiding every glyph. The theme background is now painted on the container, the `.xterm` root, and the viewport only.
+- **Shell-integration injection no longer lands mid-init** — typing the SSH hook into a tty that is still booting either echoed it twice or answered an interactive prompt such as oh-my-zsh's "update? [Y/n]". Injection is now a handshake: after a quiet window with a prompt-shaped output tail, a one-row self-erasing probe is typed, and the real hook is written only once the probe's control bytes come back (bounded to three attempts). Both probe and hook erase their own echo, so the prompt redraws in place with the MOTD intact.
+- **Docker Desktop internal WSL distros excluded** — `docker-desktop` and its data distro no longer appear as launchable local shells.
+- **Local profiles persist to the real database** — detected profiles were written to a fallback store; startup reconciliation is also now unbrickable when a detected profile conflicts with a stored one.
+- **SSH config import dialog resets on reopen** — the dialog no longer reopens holding the previous import's selection and results.
+- **Collapsed-group hosts excluded from the sidebar drag context** — hosts hidden inside a collapsed group are no longer registered as sortable items, which had broken drag-and-drop reordering.
+- **New-tab dropdown no longer clipped**, the reopen toggle works, and local shell rows have a dedicated drag handle instead of nesting drag listeners on the connect button (an accessibility violation, and unreliable on the disabled variant).
+
 ## [0.2.6] - 2026-06-06
 
 ### Added
