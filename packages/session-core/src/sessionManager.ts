@@ -18,7 +18,12 @@ import { createTelnetTransport } from "./transports/telnetTransport";
 import { createLocalShellTransport } from "./transports/localShellTransport";
 import type { NetworkMonitor } from "./networkMonitor";
 import type { ProcessTitlePoller } from "./processTitle/processTitlePoller";
-import { buildShellIntegrationBootstrap } from "./shellIntegration/bootstrap";
+import {
+  buildShellIntegrationBootstrap,
+  buildShellIntegrationProbe,
+  looksLikePrompt,
+  SHELL_INTEGRATION_PROBE_MARKER
+} from "./shellIntegration/bootstrap";
 
 const execFileAsync = promisify(execFile);
 
@@ -80,6 +85,19 @@ export interface SessionManager {
   execCommand(sessionId: string, command: string, options?: ExecCommandOptions): Promise<string>;
 }
 
+// Shell-integration injection is a handshake, because it is typing into a tty
+// whose reader we cannot know: mid-init a line lands in the login tty's
+// canonical buffer AND in the line editor's redraw (echoed twice), or answers
+// an interactive question like oh-my-zsh's "update? [Y/n]" — and no local
+// heuristic can tell those apart from a real prompt.
+//   probing         quiet + prompt-shaped tail → write the one-row probe
+//   awaiting-probe  the probe's marker bytes prove a shell executed it;
+//                   no marker in time → retry the probe (bounded), then give up
+//   injecting       shell is provably at a prompt → write the real bootstrap,
+//                   whose echo is now single and whose self-erase is sized right
+//   done            installed, given up, or not applicable
+type BootstrapPhase = "probing" | "awaiting-probe" | "injecting" | "done";
+
 interface ManagedSession {
   snapshot: SessionSnapshot;
   transport: TransportHandle;
@@ -89,16 +107,39 @@ interface ManagedSession {
   reconnectStabilityTimer: ReturnType<typeof setTimeout> | null;
   networkOnlineUnsub: (() => void) | null;
   bootstrapTimer: ReturnType<typeof setTimeout> | null;
+  bootstrapProbeTimer: ReturnType<typeof setTimeout> | null;
+  bootstrapPhase: BootstrapPhase;
+  bootstrapTail: string;
+  bootstrapQuietRounds: number;
+  bootstrapProbeAttempts: number;
 }
 
 const RECONNECT_STABILITY_WINDOW_MS = 5_000;
 
-// How long the session must go quiet (no "data" events) before we write the
-// shell-integration bootstrap. Writing immediately on "connected" races the
-// remote login tty — MOTD and the prompt draw are still landing — and the
-// line gets echoed twice (once truncated, once in full once bash reads the
-// buffered input). By 500ms of silence the prompt has settled.
+// How long the session must go quiet (no "data" events) before an injection
+// write. Writing immediately on "connected" races the remote login tty — MOTD
+// and the prompt draw are still landing. By 500ms of silence the prompt has
+// usually settled.
 const SHELL_INTEGRATION_QUIET_MS = 500;
+
+// Quiet alone is not proof of a prompt: a shell whose init pauses for longer
+// than the quiet window produces silence with no prompt. A quiet window only
+// writes when the output tail also looks like a prompt (looksLikePrompt);
+// otherwise it re-arms, up to this many rounds before writing anyway so an
+// exotic promptless shell still gets its probe.
+const SHELL_INTEGRATION_MAX_QUIET_ROUNDS = 10;
+
+// The prompt check only ever needs the last screen line or so of output.
+const SHELL_INTEGRATION_TAIL_CHARS = 400;
+
+// How long to wait for the probe's marker bytes before concluding the probe
+// was eaten (interactive question, canonical-mode limbo) and trying again.
+const SHELL_INTEGRATION_PROBE_TIMEOUT_MS = 2_000;
+
+// Probes after this many silent attempts stop: the far side is not a shell
+// that executes typed lines (or is drowning them), and each failed probe
+// leaves a one-line scar. Giving up degrades to OSC-only titles.
+const SHELL_INTEGRATION_MAX_PROBE_ATTEMPTS = 3;
 
 function createNoopTransport(sessionId: string): TransportHandle {
   const listeners = new Set<(event: SessionTransportEvent) => void>();
@@ -248,12 +289,30 @@ export function createSessionManager(
     session.bootstrapTimer = null;
   }
 
+  function clearBootstrapProbeTimer(session: ManagedSession): void {
+    if (session.bootstrapProbeTimer === null) {
+      return;
+    }
+
+    clearTimeout(session.bootstrapProbeTimer);
+    session.bootstrapProbeTimer = null;
+  }
+
+  function shellIntegrationApplies(session: ManagedSession): boolean {
+    return (
+      session.input.transport === "ssh" &&
+      session.input.sshOptions?.shellIntegration !== false &&
+      session.input.sshOptions?.password === undefined &&
+      session.input.tmuxAttach !== true
+    );
+  }
+
   // Debounced by SHELL_INTEGRATION_QUIET_MS: (re)scheduling cancels any
   // pending write, so a burst of "data" events collapses to a single write
   // once the session goes quiet. Guard conditions are re-checked at fire
   // time — the session may have closed or its input may no longer qualify
   // by then, not just at schedule time.
-  function scheduleShellIntegrationBootstrapWrite(sessionId: string): void {
+  function scheduleShellIntegrationWrite(sessionId: string): void {
     const session = sessions.get(sessionId);
     if (!session) {
       return;
@@ -268,14 +327,44 @@ export function createSessionManager(
 
       current.bootstrapTimer = null;
 
-      const shouldInject =
-        current.input.transport === "ssh" &&
-        current.input.sshOptions?.shellIntegration !== false &&
-        current.input.sshOptions?.password === undefined &&
-        current.input.tmuxAttach !== true;
+      if (!shellIntegrationApplies(current)) {
+        current.bootstrapPhase = "done";
+        return;
+      }
 
-      if (shouldInject) {
-        current.transport.write(buildShellIntegrationBootstrap());
+      const promptReady = looksLikePrompt(current.bootstrapTail);
+      if (!promptReady && current.bootstrapQuietRounds < SHELL_INTEGRATION_MAX_QUIET_ROUNDS) {
+        current.bootstrapQuietRounds += 1;
+        scheduleShellIntegrationWrite(sessionId);
+        return;
+      }
+
+      if (current.bootstrapPhase === "probing") {
+        current.bootstrapPhase = "awaiting-probe";
+        current.bootstrapProbeAttempts += 1;
+        current.transport.write(buildShellIntegrationProbe());
+        current.bootstrapProbeTimer = setTimeout(() => {
+          const still = sessions.get(sessionId);
+          if (!still || still.bootstrapPhase !== "awaiting-probe") {
+            return;
+          }
+
+          still.bootstrapProbeTimer = null;
+          if (still.bootstrapProbeAttempts >= SHELL_INTEGRATION_MAX_PROBE_ATTEMPTS) {
+            still.bootstrapPhase = "done";
+            return;
+          }
+
+          still.bootstrapPhase = "probing";
+          still.bootstrapQuietRounds = 0;
+          scheduleShellIntegrationWrite(sessionId);
+        }, SHELL_INTEGRATION_PROBE_TIMEOUT_MS);
+        return;
+      }
+
+      if (current.bootstrapPhase === "injecting") {
+        current.bootstrapPhase = "done";
+        current.transport.write(buildShellIntegrationBootstrap(current.snapshot.cols));
       }
     }, SHELL_INTEGRATION_QUIET_MS);
   }
@@ -303,28 +392,43 @@ export function createSessionManager(
 
       if (event.state === "connected") {
         const session = sessions.get(sessionId);
-        const shouldInject =
-          session !== undefined &&
-          session.input.transport === "ssh" &&
-          session.input.sshOptions?.shellIntegration !== false &&
-          session.input.sshOptions?.password === undefined &&
-          session.input.tmuxAttach !== true;
-
-        if (shouldInject) {
+        if (session && shellIntegrationApplies(session)) {
           // Fires on every connect, including reconnects — each one is a fresh
           // remote shell with no hook installed. The actual write is debounced;
-          // see scheduleShellIntegrationBootstrapWrite.
-          scheduleShellIntegrationBootstrapWrite(sessionId);
+          // see scheduleShellIntegrationWrite.
+          clearBootstrapProbeTimer(session);
+          session.bootstrapPhase = "probing";
+          session.bootstrapTail = "";
+          session.bootstrapQuietRounds = 0;
+          session.bootstrapProbeAttempts = 0;
+          scheduleShellIntegrationWrite(sessionId);
         }
       }
     }
 
     if (event.type === "data") {
       const session = sessions.get(sessionId);
-      if (session?.bootstrapTimer !== null && session?.bootstrapTimer !== undefined) {
-        // Still waiting to write the bootstrap — more output means the
-        // session isn't quiet yet, so push the write back out.
-        scheduleShellIntegrationBootstrapWrite(sessionId);
+      if (session && session.bootstrapPhase !== "done") {
+        // Keep the tail so the quiet handler can tell a settled prompt from a
+        // mid-init lull, and so the probe's marker can be spotted.
+        session.bootstrapTail = (session.bootstrapTail + event.data).slice(
+          -SHELL_INTEGRATION_TAIL_CHARS
+        );
+
+        if (
+          session.bootstrapPhase === "awaiting-probe" &&
+          session.bootstrapTail.includes(SHELL_INTEGRATION_PROBE_MARKER)
+        ) {
+          // Marker bytes prove a shell executed the probe at a prompt — the
+          // real bootstrap can now be typed with a single, erasable echo.
+          clearBootstrapProbeTimer(session);
+          session.bootstrapPhase = "injecting";
+          session.bootstrapQuietRounds = 0;
+          scheduleShellIntegrationWrite(sessionId);
+        } else if (session.bootstrapTimer !== null) {
+          // A pending write means the session isn't quiet yet — push it out.
+          scheduleShellIntegrationWrite(sessionId);
+        }
       }
     }
 
@@ -343,6 +447,7 @@ export function createSessionManager(
       if (session) {
         clearReconnectStabilityTimer(session);
         clearBootstrapTimer(session);
+        clearBootstrapProbeTimer(session);
         const { snapshot, input } = session;
         const maxAttempts = input.maxReconnectAttempts ?? 5;
 
@@ -468,7 +573,12 @@ export function createSessionManager(
         reconnectTimer: null,
         reconnectStabilityTimer: null,
         networkOnlineUnsub: null,
-        bootstrapTimer: null
+        bootstrapTimer: null,
+        bootstrapProbeTimer: null,
+        bootstrapPhase: "done",
+        bootstrapTail: "",
+        bootstrapQuietRounds: 0,
+        bootstrapProbeAttempts: 0
       });
 
       if (input.transport === "local" && transport.pid !== undefined) {
@@ -505,6 +615,7 @@ export function createSessionManager(
       clearReconnectTimer(session);
       clearReconnectStabilityTimer(session);
       clearBootstrapTimer(session);
+      clearBootstrapProbeTimer(session);
       if (session.networkOnlineUnsub) {
         session.networkOnlineUnsub();
         session.networkOnlineUnsub = null;
@@ -523,6 +634,7 @@ export function createSessionManager(
         clearReconnectTimer(session);
         clearReconnectStabilityTimer(session);
         clearBootstrapTimer(session);
+        clearBootstrapProbeTimer(session);
         if (session.networkOnlineUnsub) {
           session.networkOnlineUnsub();
           session.networkOnlineUnsub = null;

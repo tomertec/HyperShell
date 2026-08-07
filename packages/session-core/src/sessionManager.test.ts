@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createSessionManager } from "./sessionManager";
 import { createNetworkMonitor } from "./networkMonitor";
+import {
+  buildShellIntegrationBootstrap,
+  buildShellIntegrationProbe,
+  SHELL_INTEGRATION_PROBE_MARKER
+} from "./shellIntegration/bootstrap";
 import type {
   OpenSessionRequest,
   SessionTransportEvent,
@@ -745,7 +750,10 @@ describe("shell integration injection", () => {
     };
   }
 
-  it("writes the bootstrap only after the session goes quiet", () => {
+  const PROMPT = "user@host:~$ ";
+  const MARKER = SHELL_INTEGRATION_PROBE_MARKER;
+
+  it("probes only after the session goes quiet at a prompt", () => {
     vi.useFakeTimers();
     const transport = recordingTransport();
     const manager = createSessionManager({ createTransport: () => transport.handle });
@@ -758,6 +766,7 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
     expect(transport.writes).toHaveLength(0);
 
     vi.advanceTimersByTime(499);
@@ -765,7 +774,120 @@ describe("shell integration injection", () => {
 
     vi.advanceTimersByTime(1);
     expect(transport.writes).toHaveLength(1);
-    expect(transport.writes[0]).toContain("__HS_SI");
+    expect(transport.writes[0]).toBe(buildShellIntegrationProbe());
+
+    vi.useRealTimers();
+  });
+
+  it("writes the bootstrap once the probe's marker bytes come back", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(500);
+    expect(transport.writes).toHaveLength(1); // the probe
+
+    // The shell executes the probe: marker bytes, then a fresh prompt.
+    transport.emit({ type: "data", sessionId, data: `${MARKER}${PROMPT}` });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(2);
+    expect(transport.writes[1]).toContain("__HS_SI");
+
+    vi.useRealTimers();
+  });
+
+  it("does not mistake the probe's echoed text for the marker", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(500);
+    expect(transport.writes).toHaveLength(1);
+
+    // Echo shows literal backslash escapes, not control bytes: no handshake.
+    transport.emit({ type: "data", sessionId, data: " printf '\\033]777;hs-probe\\007...'" });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("retries an unanswered probe, then gives up for good", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+
+    // Each cycle: 500ms quiet fires the probe, 2000ms of silence abandons it.
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      vi.advanceTimersByTime(500);
+      expect(transport.writes).toHaveLength(attempt);
+      expect(transport.writes[attempt - 1]).toBe(buildShellIntegrationProbe());
+      vi.advanceTimersByTime(2000);
+    }
+
+    // Attempts exhausted: even a real marker now must not trigger anything.
+    vi.advanceTimersByTime(5000);
+    transport.emit({ type: "data", sessionId, data: `${MARKER}${PROMPT}` });
+    vi.advanceTimersByTime(5000);
+    expect(transport.writes).toHaveLength(3);
+
+    vi.useRealTimers();
+  });
+
+  it("builds the bootstrap for the session's current width", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    // A resize before the write must be reflected in the erase row count —
+    // the echo wraps at the width the terminal has at write time.
+    manager.resize(sessionId, 200, 50);
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(500);
+    transport.emit({ type: "data", sessionId, data: `${MARKER}${PROMPT}` });
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toHaveLength(2);
+    expect(transport.writes[1]).toBe(buildShellIntegrationBootstrap(200));
+    expect(transport.writes[1]).not.toBe(buildShellIntegrationBootstrap(80));
 
     vi.useRealTimers();
   });
@@ -784,12 +906,61 @@ describe("shell integration injection", () => {
 
     transport.emit({ type: "status", sessionId, state: "connected" });
     vi.advanceTimersByTime(400);
-    transport.emit({ type: "data", sessionId, data: "MOTD line\r\n" });
+    transport.emit({ type: "data", sessionId, data: "MOTD line\r\nuser@host:~$ " });
     vi.advanceTimersByTime(400);
     // 800ms since connected, but only 400ms since the last data event.
     expect(transport.writes).toHaveLength(0);
 
     vi.advanceTimersByTime(100);
+    expect(transport.writes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("holds past quiet windows until the output tail looks like a prompt", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "Last login: yesterday\r\n" });
+    // A slow shell init (oh-my-zsh update check) gives long silence with no
+    // prompt — writing here is what got the line echoed twice on screen.
+    vi.advanceTimersByTime(2000);
+    expect(transport.writes).toHaveLength(0);
+
+    transport.emit({ type: "data", sessionId, data: "➜  ~ " });
+    vi.advanceTimersByTime(500);
+    expect(transport.writes).toHaveLength(1);
+
+    vi.useRealTimers();
+  });
+
+  it("gives up waiting for a prompt after enough quiet rounds", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "banner only, no prompt\r\n" });
+    vi.advanceTimersByTime(10 * 500);
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(500);
     expect(transport.writes).toHaveLength(1);
 
     vi.useRealTimers();
@@ -812,6 +983,7 @@ describe("shell integration injection", () => {
       vi.advanceTimersByTime(100);
       transport.emit({ type: "data", sessionId, data: "chunk\r\n" });
     }
+    transport.emit({ type: "data", sessionId, data: "user@host:~$ " });
 
     vi.advanceTimersByTime(500);
     expect(transport.writes).toHaveLength(1);
@@ -854,9 +1026,11 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "user@host:~$ " });
     vi.advanceTimersByTime(500);
     transport.emit({ type: "status", sessionId, state: "reconnecting" });
     transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "user@host:~$ " });
     vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(2);
@@ -879,6 +1053,7 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "user@host:~$ " });
     vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(0);
@@ -899,6 +1074,7 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "user@host:~$ " });
     vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(0);
@@ -920,6 +1096,7 @@ describe("shell integration injection", () => {
     });
 
     transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "user@host:~$ " });
     vi.advanceTimersByTime(500);
 
     expect(transport.writes).toHaveLength(0);
