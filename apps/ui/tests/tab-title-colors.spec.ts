@@ -19,6 +19,14 @@ const profile = {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((seed) => {
     const settingsKey = "tab-title-colors-e2e";
+    if (!localStorage.getItem(settingsKey)) {
+      localStorage.setItem(
+        settingsKey,
+        JSON.stringify({
+          appearance: { appTheme: "default", tabTitleColors: {} },
+        })
+      );
+    }
     (window as unknown as { hypershell: unknown }).hypershell = {
       listLocalProfiles: async () => [seed],
       rescanLocalProfiles: async () => [seed],
@@ -32,6 +40,20 @@ test.beforeEach(async ({ page }) => {
       },
     };
   }, profile);
+});
+
+test("renders yellow as a distinct vivid preset", async ({ page }) => {
+  await page.goto("/");
+  const tab = await openClaude(page);
+
+  await tab.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Yellow" }).click();
+  await expect(tab).toHaveAttribute("data-tab-title-color", "yellow");
+
+  const title = tab.getByText("Claude", { exact: true });
+  const indicator = tab.getByTestId("active-tab-indicator");
+  await expect(title).toHaveCSS("color", "rgb(253, 224, 71)");
+  await expect(indicator).toHaveCSS("background-color", "rgb(253, 224, 71)");
 });
 
 async function openClaude(page: Page) {

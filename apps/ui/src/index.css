@@ -64,6 +64,7 @@
   --host-red: #f87171;
   --host-orange: #fb923c;
   --host-yellow: #fbbf24;
+  --tab-title-yellow: #fde047;
   --host-green: #34d399;
   --host-blue: #60a5fa;
   --host-cyan: #22d3ee;
@@ -125,6 +126,7 @@ html[data-theme="default-light"] {
   --host-red: #ef4444;
   --host-orange: #f97316;
   --host-yellow: #d97706;
+  --tab-title-yellow: #806000;
   --host-green: #059669;
   --host-blue: #2563eb;
   --host-cyan: #0891b2;
@@ -331,6 +333,7 @@ html[data-theme="latte"] {
   --host-red: #d20f39;
   --host-orange: #fe640b;
   --host-yellow: #df8e1d;
+  --tab-title-yellow: #806000;
   --host-green: #40a02b;
   --host-blue: #1e66f5;
   --host-cyan: #179299;
@@ -373,6 +376,7 @@ html[data-theme="gruvbox-light"] {
   --host-red: #9d0006;
   --host-orange: #af3a03;
   --host-yellow: #b57614;
+  --tab-title-yellow: #806000;
   --host-green: #79740e;
   --host-blue: #076678;
   --host-cyan: #427b58;
@@ -661,6 +665,7 @@ html[data-theme="rose-pine-dawn"] {
   --host-red: #b4637a;
   --host-orange: #c9892b;
   --host-yellow: #ea9d34;
+  --tab-title-yellow: #806000;
   --host-green: #56949f;
   --host-blue: #286983;
   --host-cyan: #56949f;

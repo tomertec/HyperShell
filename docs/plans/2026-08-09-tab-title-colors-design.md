@@ -14,6 +14,8 @@ every current and future tab whose displayed title is `Claude`.
 - Right-clicking a terminal tab opens a small **Tab color** menu.
 - The menu offers a fixed, theme-safe palette: orange, blue, green, purple, red,
   yellow, and pink.
+- Yellow uses a dedicated, higher-saturation tab color so it remains visibly
+  distinct from orange; light themes use a darker yellow for text contrast.
 - A **Default** option removes the saved rule for that title.
 - Color choices are named and keyboard reachable; swatches are not the only
   indication of color.

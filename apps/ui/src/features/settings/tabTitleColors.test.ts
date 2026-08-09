@@ -23,8 +23,9 @@ describe("tab title color rules", () => {
     ).toEqual({ claude: "orange" });
   });
 
-  it("maps palette ids to existing theme variables", () => {
+  it("maps palette ids to theme variables", () => {
     expect(getTabTitleColorCssValue("orange")).toBe("var(--host-orange)");
+    expect(getTabTitleColorCssValue("yellow")).toBe("var(--tab-title-yellow)");
     expect(getTabTitleColorCssValue("pink")).toBe("var(--host-pink)");
   });
 });

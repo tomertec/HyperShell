@@ -4,7 +4,7 @@ export const TAB_TITLE_COLOR_OPTIONS = [
   { id: "green", label: "Green", cssValue: "var(--host-green)" },
   { id: "purple", label: "Purple", cssValue: "var(--host-purple)" },
   { id: "red", label: "Red", cssValue: "var(--host-red)" },
-  { id: "yellow", label: "Yellow", cssValue: "var(--host-yellow)" },
+  { id: "yellow", label: "Yellow", cssValue: "var(--tab-title-yellow)" },
   { id: "pink", label: "Pink", cssValue: "var(--host-pink)" },
 ] as const;
 

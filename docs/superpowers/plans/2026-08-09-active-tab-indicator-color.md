@@ -92,3 +92,22 @@ Expected: all UI unit tests and browser tests pass, and the production build exi
 git add -- apps/ui/tests/tab-title-colors.spec.ts apps/ui/src/features/layout/TabBar.tsx
 git commit -m "fix(ui): match active tab indicator color"
 ```
+
+---
+
+### Task 2: Separate Yellow From Orange
+
+**Files:**
+- Modify: `apps/ui/src/features/settings/tabTitleColors.ts`
+- Modify: `apps/ui/src/features/settings/tabTitleColors.test.ts`
+- Modify: `apps/ui/src/index.css`
+- Modify: `apps/ui/tests/tab-title-colors.spec.ts`
+
+**Interfaces:**
+- Produces: `--tab-title-yellow`, vivid on dark themes and contrast-safe on light themes.
+
+- [ ] **Step 1:** Add failing unit and browser expectations for the dedicated yellow variable and its computed dark-theme color.
+- [ ] **Step 2:** Verify the current `--host-yellow` mapping fails both expectations.
+- [ ] **Step 3:** Map the yellow preset to `--tab-title-yellow`; define `#fde047` for dark themes and contrast-safe `#806000` for light themes.
+- [ ] **Step 4:** Run the focused unit and browser tests, then the complete UI verification suite.
+- [ ] **Step 5:** Commit with `fix(ui): distinguish yellow tab title color`.
