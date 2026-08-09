@@ -50,6 +50,20 @@ test("saves a title color, reuses it for matching tabs, and clears it", async ({
   await tab.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Orange" }).click();
   await expect(tab).toHaveAttribute("data-tab-title-color", "orange");
+  const indicator = tab.getByTestId("active-tab-indicator");
+  const title = tab.getByText("Claude", { exact: true });
+  await expect(indicator).toBeVisible();
+  await expect
+    .poll(async () => {
+      const indicatorColor = await indicator.evaluate(
+        (element) => getComputedStyle(element).backgroundColor
+      );
+      const titleColor = await title.evaluate(
+        (element) => getComputedStyle(element).color
+      );
+      return indicatorColor === titleColor;
+    })
+    .toBe(true);
 
   await page.getByRole("button", { name: "New Tab" }).click();
   await page.getByRole("menuitem", { name: "Claude" }).click();

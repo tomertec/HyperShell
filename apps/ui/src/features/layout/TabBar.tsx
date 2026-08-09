@@ -198,7 +198,11 @@ function SortableTab({
         </span>
         {/* Active indicator — accent line at top */}
         {isActive && (
-          <span className="absolute top-0 left-2 right-2 h-[2px] bg-accent rounded-b-full" />
+          <span
+            data-testid="active-tab-indicator"
+            className="absolute top-0 left-2 right-2 h-[2px] bg-accent rounded-b-full"
+            style={titleColorCss ? { backgroundColor: titleColorCss } : undefined}
+          />
         )}
         {/* Bottom edge blend for active tab */}
         {isActive && (
