@@ -20,6 +20,13 @@ import { NewTabMenu } from "./NewTabMenu";
 import { TabIcon } from "./TabIcon";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 import { settingsStore } from "../settings/settingsStore";
+import {
+  TAB_TITLE_COLOR_OPTIONS,
+  getTabTitleColorCssValue,
+  resolveTabTitleColor,
+  type TabTitleColorId,
+} from "../settings/tabTitleColors";
+import { ContextMenu, type ContextMenuAction } from "../../components/ContextMenu";
 import { IconButton } from "../../components/ui/IconButton";
 
 const tabStateColors: Record<string, string> = {
@@ -108,6 +115,8 @@ function SortableTab({
   showActiveProcess,
   onActivate,
   onClose,
+  titleColor,
+  onOpenColorMenu,
   hoveredTab,
   onMouseEnter,
   onMouseLeave,
@@ -118,6 +127,8 @@ function SortableTab({
   showActiveProcess: boolean;
   onActivate: () => void;
   onClose: () => void;
+  titleColor: TabTitleColorId | null;
+  onOpenColorMenu: (x: number, y: number) => void;
   hoveredTab: string | null;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -133,12 +144,26 @@ function SortableTab({
   };
 
   const label = resolveTabTitle(showActiveProcess ? tab : { ...tab, processTitle: undefined });
+  const titleColorCss = titleColor ? getTabTitleColorCssValue(titleColor) : undefined;
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={`flex items-end ${isDragging ? "shadow-raised" : ""}`}>
       <button
+        data-tab-title-color={titleColor ?? "default"}
         onClick={onActivate}
         onAuxClick={(e) => { if (e.button === 1) { e.preventDefault(); onClose(); } }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onOpenColorMenu(event.clientX, event.clientY);
+        }}
+        onKeyDown={(event) => {
+          if (event.shiftKey && event.key === "F10") {
+            event.preventDefault();
+            const bounds = event.currentTarget.getBoundingClientRect();
+            onOpenColorMenu(bounds.left, bounds.bottom);
+          }
+        }}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         className={`group relative flex items-center gap-1.5 px-3.5 py-2 text-[13px] rounded-t-lg transition-colors duration-(--motion-fast) ease-standard min-w-[110px] max-w-[220px] ${
@@ -147,8 +172,16 @@ function SortableTab({
             : "text-text-muted hover:text-text-primary hover:bg-base-700/40"
         }`}
       >
-        <TabIcon tab={tab} sessionState={sessionState} isActive={isActive} />
-        <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-3 [mask-image:linear-gradient(to_right,black_calc(100%-14px),transparent)]">
+        <TabIcon
+          tab={tab}
+          sessionState={sessionState}
+          isActive={isActive}
+          color={titleColorCss}
+        />
+        <span
+          className="min-w-0 flex-1 overflow-hidden whitespace-nowrap pr-3 [mask-image:linear-gradient(to_right,black_calc(100%-14px),transparent)]"
+          style={titleColorCss ? { color: titleColorCss } : undefined}
+        >
           {label}
         </span>
         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- nested inside the tab <button>, so it cannot be a button; keyboard users close the tab with Ctrl+Shift+W */}
@@ -191,8 +224,18 @@ export function TabBar({
 }: TabBarProps) {
   const sessionStates = useStore(sessionStateStore, (s) => s.sessions);
   const showActiveProcess = useStore(settingsStore, (s) => s.settings.general.showActiveProcess);
+  const tabTitleColors = useStore(
+    settingsStore,
+    (state) => state.settings.appearance.tabTitleColors
+  );
+  const updateTabTitleColor = useStore(settingsStore, (state) => state.updateTabTitleColor);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [newTabMenuOpen, setNewTabMenuOpen] = useState(false);
+  const [colorMenu, setColorMenu] = useState<{
+    x: number;
+    y: number;
+    title: string;
+  } | null>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newTabButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -200,6 +243,39 @@ export function TabBar({
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
   const tabIds = useMemo(() => tabs.map((t) => t.tabKey ?? t.sessionId), [tabs]);
+  const selectedColor = colorMenu
+    ? resolveTabTitleColor(colorMenu.title, tabTitleColors)
+    : null;
+  const colorMenuActions = useMemo<ContextMenuAction[]>(
+    () =>
+      colorMenu
+        ? [
+            {
+              label: "Default",
+              action: () => {
+                void updateTabTitleColor(colorMenu.title, null);
+              },
+              shortcut: selectedColor === null ? "Current" : undefined,
+            },
+            { label: "palette-separator", action: () => {}, separator: true },
+            ...TAB_TITLE_COLOR_OPTIONS.map((option) => ({
+              label: option.label,
+              action: () => {
+                void updateTabTitleColor(colorMenu.title, option.id);
+              },
+              shortcut: selectedColor === option.id ? "Current" : undefined,
+              icon: (
+                <span
+                  aria-hidden="true"
+                  className="h-3 w-3 rounded-full ring-1 ring-white/15"
+                  style={{ backgroundColor: option.cssValue }}
+                />
+              ),
+            })),
+          ]
+        : [],
+    [colorMenu, selectedColor, updateTabTitleColor]
+  );
 
   // Zero tabs and nothing launchable is exactly today's "nothing to show" case —
   // preserve it. Zero tabs with at least one launchable profile still needs the
@@ -253,6 +329,10 @@ export function TabBar({
             {tabs.map((tab) => {
               const isActive = tab.sessionId === activeSessionId;
               const sessionState = sessionStates[tab.sessionId]?.state;
+              const label = resolveTabTitle(
+                showActiveProcess ? tab : { ...tab, processTitle: undefined }
+              );
+              const titleColor = resolveTabTitleColor(label, tabTitleColors);
               return (
                 <SortableTab
                   key={tab.tabKey ?? tab.sessionId}
@@ -262,6 +342,8 @@ export function TabBar({
                   showActiveProcess={showActiveProcess}
                   onActivate={() => onActivate(tab.sessionId)}
                   onClose={() => onClose(tab.sessionId)}
+                  titleColor={titleColor}
+                  onOpenColorMenu={(x, y) => setColorMenu({ x, y, title: label })}
                   hoveredTab={hoveredTab}
                   onMouseEnter={() => handleMouseEnter(tab.sessionId)}
                   onMouseLeave={handleMouseLeave}
@@ -294,6 +376,14 @@ export function TabBar({
           </div>
         )}
       </div>
+      {colorMenu && (
+        <ContextMenu
+          x={colorMenu.x}
+          y={colorMenu.y}
+          actions={colorMenuActions}
+          onClose={() => setColorMenu(null)}
+        />
+      )}
     </DndContext>
   );
 }

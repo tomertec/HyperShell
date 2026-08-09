@@ -50,10 +50,12 @@ export function TabIcon({
   tab,
   sessionState,
   isActive,
+  color,
 }: {
   tab: LayoutTab;
   sessionState: string | undefined;
   isActive: boolean;
+  color?: string;
 }) {
   const profiles = useStore(localProfilesStore, (s) => s.profiles);
   const tint = stateTint(sessionState, isActive);
@@ -63,7 +65,10 @@ export function TabIcon({
       : undefined;
 
   return (
-    <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center ${tint}`}>
+    <span
+      className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center ${tint}`}
+      style={color ? { color } : undefined}
+    >
       {localProfile ? (
         <LocalProfileIcon icon={localProfile.icon} className="h-3.5 w-3.5" />
       ) : (
