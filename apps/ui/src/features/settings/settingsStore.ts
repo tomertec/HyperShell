@@ -1,5 +1,11 @@
 import { createStore } from "zustand/vanilla";
 import type { TerminalTheme } from "../terminal/terminalTheme";
+import {
+  normalizeTabTitleColorKey,
+  sanitizeTabTitleColorRules,
+  type TabTitleColorId,
+  type TabTitleColorRules,
+} from "./tabTitleColors";
 
 export type { TerminalTheme };
 
@@ -40,6 +46,7 @@ export type ThemeMode = "system" | "light" | "dark";
 export interface AppearanceSettings {
   /** App-chrome theme id (see appThemes.ts) or "system" to follow the OS. */
   appTheme: string;
+  tabTitleColors: TabTitleColorRules;
 }
 
 export interface AppSettings {
@@ -136,6 +143,7 @@ const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
 
 const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
   appTheme: "system",
+  tabTitleColors: {},
 };
 
 /**
@@ -145,16 +153,17 @@ const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
 function migrateAppearance(
   parsed: Partial<AppearanceSettings> & { themeMode?: ThemeMode }
 ): AppearanceSettings {
+  const tabTitleColors = sanitizeTabTitleColorRules(parsed.tabTitleColors);
   if (typeof parsed.appTheme === "string") {
-    return { appTheme: parsed.appTheme };
+    return { appTheme: parsed.appTheme, tabTitleColors };
   }
   if (parsed.themeMode === "light") {
-    return { appTheme: "default-light" };
+    return { appTheme: "default-light", tabTitleColors };
   }
   if (parsed.themeMode === "dark") {
-    return { appTheme: "default" };
+    return { appTheme: "default", tabTitleColors };
   }
-  return { appTheme: "system" };
+  return { appTheme: "system", tabTitleColors };
 }
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -179,6 +188,7 @@ interface SettingsState {
   updateGeneral: (partial: Partial<GeneralSettings>) => Promise<void>;
   updateSecurity: (partial: Partial<SecuritySettings>) => Promise<void>;
   updateAppearance: (partial: Partial<AppearanceSettings>) => Promise<void>;
+  updateTabTitleColor: (title: string, color: TabTitleColorId | null) => Promise<void>;
   setTerminalFontSize: (fontSize: number) => Promise<void>;
   changeTerminalFontSize: (delta: number) => Promise<number>;
   resetTerminalFontSize: () => Promise<void>;
@@ -324,6 +334,35 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
       appearance: {
         ...current.appearance,
         ...partial,
+      },
+    };
+    set({ settings: next });
+    try {
+      await persistSettings(next);
+    } catch {
+      // persist failure is non-fatal
+    }
+  },
+
+  updateTabTitleColor: async (title, color) => {
+    const key = normalizeTabTitleColorKey(title);
+    if (!key) {
+      return;
+    }
+
+    const current = get().settings;
+    const tabTitleColors = { ...current.appearance.tabTitleColors };
+    if (color === null) {
+      delete tabTitleColors[key];
+    } else {
+      tabTitleColors[key] = color;
+    }
+
+    const next: AppSettings = {
+      ...current,
+      appearance: {
+        ...current.appearance,
+        tabTitleColors,
       },
     };
     set({ settings: next });

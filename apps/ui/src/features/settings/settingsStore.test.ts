@@ -45,6 +45,10 @@ describe("settingsStore custom themes", () => {
           credentialCacheEnabled: true,
           credentialCacheTtlMinutes: 15,
         },
+        appearance: {
+          appTheme: "system",
+          tabTitleColors: {},
+        },
         customThemes: {},
       },
     }));
@@ -123,6 +127,50 @@ describe("settingsStore custom themes", () => {
     const savedValue = JSON.parse(mockSshterm.updateSetting.mock.calls[0][0].value);
     expect(savedValue.security.credentialCacheEnabled).toBe(false);
     expect(savedValue.security.credentialCacheTtlMinutes).toBe(42);
+  });
+});
+
+describe("settingsStore tab title colors", () => {
+  beforeEach(() => {
+    mockSshterm.getSetting.mockReset();
+    mockSshterm.updateSetting.mockReset();
+    mockSshterm.updateSetting.mockResolvedValue({ key: "app.settings", value: "{}" });
+    settingsStore.setState((state) => ({
+      loaded: false,
+      settings: {
+        ...state.settings,
+        appearance: { appTheme: "system", tabTitleColors: {} },
+      },
+    }));
+  });
+
+  it("loads only valid normalized title-color rules", async () => {
+    mockSshterm.getSetting.mockResolvedValue({
+      key: "app.settings",
+      value: JSON.stringify({
+        appearance: {
+          appTheme: "mocha",
+          tabTitleColors: { " Claude ": "orange", broken: "chartreuse" },
+        },
+      }),
+    });
+
+    await settingsStore.getState().load();
+
+    expect(settingsStore.getState().settings.appearance).toEqual({
+      appTheme: "mocha",
+      tabTitleColors: { claude: "orange" },
+    });
+  });
+
+  it("persists and removes a normalized title rule", async () => {
+    await settingsStore.getState().updateTabTitleColor(" Claude ", "orange");
+    let saved = JSON.parse(mockSshterm.updateSetting.mock.calls.at(-1)![0].value);
+    expect(saved.appearance.tabTitleColors).toEqual({ claude: "orange" });
+
+    await settingsStore.getState().updateTabTitleColor("CLAUDE", null);
+    saved = JSON.parse(mockSshterm.updateSetting.mock.calls.at(-1)![0].value);
+    expect(saved.appearance.tabTitleColors).toEqual({});
   });
 });
 
