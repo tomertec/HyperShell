@@ -11,6 +11,7 @@ linux-artifacts/
 CLAUDE.md
 AGENTS.md
 .claude/
+.worktrees/
 docs/plans/
 docs/_archive/
 .DS_Store
