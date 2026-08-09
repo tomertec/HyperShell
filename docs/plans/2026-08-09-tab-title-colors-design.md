@@ -31,10 +31,10 @@ with the same normalized visible title.
 
 ## Presentation
 
-The assigned color applies to the tab icon and title text. It does not replace
-the connection-status dot or the active-tab accent line, because those already
-communicate independent state. Unassigned titles retain the existing theme
-colors and hover behavior.
+The assigned color applies to the tab icon, title text, and the active tab's
+top indicator line. The connection-status dot retains its independent state
+color. Unassigned titles keep the existing accent indicator, theme colors, and
+hover behavior.
 
 ## Persistence
 
