@@ -864,6 +864,59 @@ describe("shell integration injection", () => {
     vi.useRealTimers();
   });
 
+  it("gives up when the user types while the bootstrap write is pending", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(500);
+    transport.emit({ type: "data", sessionId, data: `${MARKER}${PROMPT}` });
+
+    // The marker proved a prompt, but before the debounced bootstrap write
+    // fires the user starts a command. The line buffer now holds their text;
+    // injecting would merge into it (`cd w if [ -z ... ]; then` → syntax
+    // error, and the self-erase never runs).
+    manager.write(sessionId, "cd w");
+    transport.emit({ type: "data", sessionId, data: "cd w" });
+    vi.advanceTimersByTime(10_000);
+
+    expect(transport.writes.some((w) => w.includes("__HS_SI"))).toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it("gives up when the user types before the probe", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = manager.open({
+      transport: "ssh",
+      profileId: "hermes",
+      cols: 80,
+      rows: 24,
+      sshOptions: { hostname: "hermes" }
+    });
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    manager.write(sessionId, "cd w");
+    transport.emit({ type: "data", sessionId, data: "cd w" });
+    vi.advanceTimersByTime(10_000);
+
+    expect(transport.writes).toEqual(["cd w"]);
+
+    vi.useRealTimers();
+  });
+
   it("builds the bootstrap for the session's current width", () => {
     vi.useFakeTimers();
     const transport = recordingTransport();

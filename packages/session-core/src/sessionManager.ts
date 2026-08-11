@@ -592,7 +592,23 @@ export function createSessionManager(
     },
 
     write(sessionId: string, data: string): void {
-      sessions.get(sessionId)?.transport.write(data);
+      const session = sessions.get(sessionId);
+      if (!session) {
+        return;
+      }
+
+      if (session.bootstrapPhase !== "done") {
+        // The user typed while the handshake was pending: their text is now
+        // in the remote line buffer, and anything injected after it would
+        // merge into one broken command (`cd w if [ -z ...` → syntax error,
+        // with the self-erase never running). No later quiet window can
+        // prove the buffer emptied again, so give up — OSC titles still work.
+        clearBootstrapTimer(session);
+        clearBootstrapProbeTimer(session);
+        session.bootstrapPhase = "done";
+      }
+
+      session.transport.write(data);
     },
 
     resize(sessionId: string, cols: number, rows: number): void {

@@ -98,7 +98,10 @@ of quiet (`SHELL_INTEGRATION_QUIET_MS`) *and* a prompt-shaped output tail
 (`looksLikePrompt` — last visible output doesn't end in a newline), a one-row
 self-erasing probe is typed; only when its OSC 777 marker's control bytes come
 back (echo can't fake them — it shows literal backslashes) is the real
-bootstrap written, retried up to 3 probes then given up. Both probe and
+bootstrap written, retried up to 3 probes then given up. User input during a
+pending handshake also gives up (`SessionManager.write`): their text is in the
+remote line buffer, anything injected after it would merge into one broken
+command, and no later quiet window can prove the buffer emptied again. Both probe and
 bootstrap erase their own echo: each ends with a `printf` of cursor-up +
 erase-to-end, the bootstrap's sized from the pty width at write time (biased a
 row or two high, since the remote prompt length is unknown), so the snippet
