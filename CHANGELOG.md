@@ -10,6 +10,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-11
+
+### Added
+
+- **Tab title colors** — a tab can be assigned one of seven colors from its context menu, saved against the tab's title rather than the session, so every tab that ever carries that title comes up in the same color. The color tints the title, the transport icon, and the active-tab indicator, which makes a wall of similarly-named tabs scannable at a glance.
+- **Per-tab terminal font size** — `Ctrl+=` / `Ctrl+-` / `Ctrl+0` now resize only the focused terminal instead of moving the global setting and every other terminal with it. Each tab starts from the global default and keeps its own size, which is stored in the saved workspace layout so a restored session comes back at the sizes you left it. The step also drops from 1px to 0.5px, since 13px to 14px is a coarse jump at terminal sizes; the settings dropdown offers the same half-point grid.
+
+### Changed
+
+- **xterm pinned to the 6.1 beta line** — `@xterm/xterm` 6.1.0-beta.291 and its matching addons, for the reflow and renderer fixes the terminal work depends on. Pinned exactly rather than by caret, since betas do not follow semver ranges safely.
+
+### Fixed
+
+- **Stale rows after a local pane gets wider** — ConPTY reflows its buffer with conhost's algorithm on every width change and then emits only the rows it believes changed. xterm.js reflows differently, so the rows ConPTY skips survived as ghosts: stale fragments of a full-screen TUI left behind after a pane or window widened. Widening now triggers a two-column narrow-and-restore round trip once the resize burst settles, which makes ConPTY and the running program redraw over every stale row.
+- **Shell integration no longer corrupts the first command you type** — typing while the SSH shell-integration handshake was still pending left your text in the remote line buffer, and the hook written after it merged into one broken command whose self-erase never ran. The first keystroke now cancels the handshake outright; ordinary OSC titles still work.
+- **SFTP directory entries that escape their directory are dropped** — entry names come from the remote server and callers join them into local paths for downloads and sync, so a hostile server could answer `readdir` with `../../evil` and write outside the destination. Names that are not a single path component are now rejected at the transport boundary.
+
 ## [0.3.0] - 2026-08-07
 
 ### Added
