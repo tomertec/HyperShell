@@ -4,11 +4,10 @@ import {
   MAX_CREDENTIAL_CACHE_TTL_MINUTES,
   MAX_TERMINAL_LETTER_SPACING,
   MAX_TERMINAL_LINE_HEIGHT,
-  MAX_TERMINAL_FONT_SIZE,
   MIN_CREDENTIAL_CACHE_TTL_MINUTES,
   MIN_TERMINAL_LETTER_SPACING,
   MIN_TERMINAL_LINE_HEIGHT,
-  MIN_TERMINAL_FONT_SIZE,
+  TERMINAL_FONT_SIZE_OPTIONS,
   settingsStore
 } from "./settingsStore";
 import { APP_THEMES } from "./appThemes";
@@ -35,11 +34,6 @@ const FONT_OPTIONS: { label: string; value: string }[] = [
   { label: "Consolas", value: "Consolas, monospace" },
   { label: "Courier New", value: '"Courier New", monospace' },
 ];
-
-const FONT_SIZES = Array.from(
-  { length: MAX_TERMINAL_FONT_SIZE - MIN_TERMINAL_FONT_SIZE + 1 },
-  (_, index) => MIN_TERMINAL_FONT_SIZE + index
-);
 
 const SCROLLBACK_OPTIONS = [1000, 2000, 5000, 10000, 25000, 50000];
 
@@ -516,7 +510,7 @@ function TerminalSection() {
             value={fontSize}
             onChange={(e) => void updateTerminal({ fontSize: Number(e.target.value) })}
           >
-            {FONT_SIZES.map((s) => (
+            {TERMINAL_FONT_SIZE_OPTIONS.map((s) => (
               <option key={s} value={s}>{s}px</option>
             ))}
           </Select>

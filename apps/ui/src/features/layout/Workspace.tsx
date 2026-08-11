@@ -13,6 +13,7 @@ import { useTunnelStore } from "../tunnels/tunnelStore";
 import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
 import { useSnippetStore } from "../snippets/snippetStore";
 import { SnippetsPanel } from "../snippets/SnippetsPanel";
+import { settingsStore } from "../settings/settingsStore";
 import { type Pane, layoutStore } from "./layoutStore";
 import { PaneResizeHandle } from "./PaneResizeHandle";
 import { TabBar } from "./TabBar";
@@ -101,6 +102,12 @@ function PaneView({
               isVisible={isVisible}
               telnetOptions={tab.telnetOptions}
               tmuxAttachTarget={tab.tmuxAttachTarget}
+              fontSize={
+                tab.fontSize ?? settingsStore.getState().settings.terminal.fontSize
+              }
+              onFontSizeChange={(fontSize) => {
+                layoutStore.getState().setTabFontSize(tab.sessionId, fontSize);
+              }}
               onSessionOpened={(sessionId) => {
                 replaceSessionId(tab.sessionId, sessionId);
               }}

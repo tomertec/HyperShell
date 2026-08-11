@@ -8,10 +8,16 @@ import type { SessionEvent } from "@hypershell/shared";
 import { broadcastStore } from "../broadcast/broadcastStore";
 import { layoutStore } from "../layout/layoutStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
-import { settingsStore } from "../settings/settingsStore";
+import {
+  normalizeTerminalFontSize,
+  settingsStore,
+} from "../settings/settingsStore";
 import { getTerminalOptions } from "./terminalTheme";
 import { getTerminalClipboardAction } from "./terminalClipboard";
-import { getTerminalFontSizeAction } from "./terminalFontSize";
+import {
+  getNextTerminalFontSize,
+  getTerminalFontSizeAction,
+} from "./terminalFontSize";
 import { TERMINAL_UNICODE_VERSION } from "./terminalUnicode";
 import { loadOptionalWebglRenderer } from "./optionalWebglRenderer";
 import { installTerminalRepaintGuard } from "./terminalRepaintGuard";
@@ -37,6 +43,8 @@ export interface UseTerminalSessionInput {
   autoConnect?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   tmuxAttachTarget?: string;
+  fontSize: number;
+  onFontSizeChange: (fontSize: number) => void;
   onSessionOpened?: (sessionId: string) => void;
   onExit?: (exitCode: number | null) => void;
 }
@@ -94,6 +102,8 @@ export function useTerminalSession(
     (store) => store.targetSessionIds
   );
   const sessionIdRef = useRef<string | null>(input.sessionId ?? null);
+  const fontSizeRef = useRef(input.fontSize);
+  const onFontSizeChangeRef = useRef(input.onFontSizeChange);
   const mountedRef = useRef(true);
   const asyncOperationGuardRef = useRef(createAsyncOperationGuard());
   const broadcastEnabledRef = useRef(broadcastEnabled);
@@ -110,6 +120,8 @@ export function useTerminalSession(
   const [state, setState] = useState<TerminalSessionState>(
     input.sessionId ? "connecting" : "idle"
   );
+  fontSizeRef.current = input.fontSize;
+  onFontSizeChangeRef.current = input.onFontSizeChange;
 
   const applyTerminalBackground = useCallback((background: string): void => {
     const container = containerRef.current;
@@ -183,19 +195,39 @@ export function useTerminalSession(
   }, []);
 
   const setFontSize = useCallback((fontSize: number): void => {
-    void settingsStore.getState().setTerminalFontSize(fontSize);
+    const normalizedFontSize = normalizeTerminalFontSize(fontSize);
+    fontSizeRef.current = normalizedFontSize;
+    onFontSizeChangeRef.current(normalizedFontSize);
   }, []);
 
   const increaseFontSize = useCallback((): void => {
-    void settingsStore.getState().changeTerminalFontSize(1);
+    const nextFontSize = getNextTerminalFontSize(
+      "increase",
+      fontSizeRef.current,
+      settingsStore.getState().settings.terminal.fontSize
+    );
+    fontSizeRef.current = nextFontSize;
+    onFontSizeChangeRef.current(nextFontSize);
   }, []);
 
   const decreaseFontSize = useCallback((): void => {
-    void settingsStore.getState().changeTerminalFontSize(-1);
+    const nextFontSize = getNextTerminalFontSize(
+      "decrease",
+      fontSizeRef.current,
+      settingsStore.getState().settings.terminal.fontSize
+    );
+    fontSizeRef.current = nextFontSize;
+    onFontSizeChangeRef.current(nextFontSize);
   }, []);
 
   const resetFontSize = useCallback((): void => {
-    void settingsStore.getState().resetTerminalFontSize();
+    const nextFontSize = getNextTerminalFontSize(
+      "reset",
+      fontSizeRef.current,
+      settingsStore.getState().settings.terminal.fontSize
+    );
+    fontSizeRef.current = nextFontSize;
+    onFontSizeChangeRef.current(nextFontSize);
   }, []);
 
   const sendSessionWrite = useCallback((sessionId: string, data: string): void => {
@@ -359,7 +391,11 @@ export function useTerminalSession(
         return;
       }
 
-      const opts = getTerminalOptions({ ...terminalSettings, customThemes });
+      const opts = getTerminalOptions({
+        ...terminalSettings,
+        fontSize: fontSizeRef.current,
+        customThemes,
+      });
       instance = new XTerm(opts);
       const addon = new FitAddonClass();
       const search = new SearchAddonClass();
@@ -642,7 +678,11 @@ export function useTerminalSession(
   useEffect(() => {
     const term = terminalRef.current;
     if (!term) return;
-    const opts = getTerminalOptions({ ...terminalSettings, customThemes });
+    const opts = getTerminalOptions({
+      ...terminalSettings,
+      fontSize: input.fontSize,
+      customThemes,
+    });
     const needsRefit =
       term.options.fontFamily !== opts.fontFamily ||
       term.options.fontSize !== opts.fontSize ||
@@ -659,7 +699,7 @@ export function useTerminalSession(
     });
     applyTerminalBackground(opts.theme?.background ?? "#07111f");
     if (needsRefit) fit();
-  }, [applyTerminalBackground, terminalSettings, customThemes, fit]);
+  }, [applyTerminalBackground, terminalSettings, customThemes, fit, input.fontSize]);
 
   useEffect(() => {
     if (!terminal || input.autoConnect === false || sessionIdRef.current) {
@@ -769,7 +809,7 @@ export function useTerminalSession(
     setSearchVisible,
     sessionId: sessionIdRef.current,
     state,
-    fontSize: terminalSettings.fontSize,
+    fontSize: input.fontSize,
     setFontSize,
     increaseFontSize,
     decreaseFontSize,

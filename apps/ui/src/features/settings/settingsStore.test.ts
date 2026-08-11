@@ -7,7 +7,13 @@ const mockSshterm = {
 };
 vi.stubGlobal("window", { hypershell: mockSshterm });
 
-import { settingsStore, type TerminalTheme } from "./settingsStore";
+import {
+  MAX_TERMINAL_FONT_SIZE,
+  MIN_TERMINAL_FONT_SIZE,
+  settingsStore,
+  TERMINAL_FONT_SIZE_OPTIONS,
+  type TerminalTheme,
+} from "./settingsStore";
 
 const sampleTheme: TerminalTheme = {
   background: "#000000",
@@ -213,5 +219,51 @@ describe("settingsStore appearance migration", () => {
     });
     await settingsStore.getState().load();
     expect(settingsStore.getState().settings.appearance.appTheme).toBe("system");
+  });
+});
+
+describe("settingsStore terminal font size", () => {
+  beforeEach(() => {
+    mockSshterm.updateSetting.mockReset();
+    mockSshterm.updateSetting.mockResolvedValue({ key: "app.settings", value: "{}" });
+    settingsStore.setState((state) => ({
+      settings: {
+        ...state.settings,
+        terminal: { ...state.settings.terminal, fontSize: 13 },
+      },
+    }));
+  });
+
+  it("changes terminal font size in half-pixel increments", async () => {
+    await settingsStore.getState().changeTerminalFontSize(0.5);
+    expect(settingsStore.getState().settings.terminal.fontSize).toBe(13.5);
+
+    await settingsStore.getState().changeTerminalFontSize(-0.5);
+    expect(settingsStore.getState().settings.terminal.fontSize).toBe(13);
+  });
+
+  it("keeps half-pixel changes within the existing font-size bounds", async () => {
+    await settingsStore.getState().setTerminalFontSize(MAX_TERMINAL_FONT_SIZE);
+    await settingsStore.getState().changeTerminalFontSize(0.5);
+    expect(settingsStore.getState().settings.terminal.fontSize).toBe(32);
+
+    await settingsStore.getState().setTerminalFontSize(MIN_TERMINAL_FONT_SIZE);
+    await settingsStore.getState().changeTerminalFontSize(-0.5);
+    expect(settingsStore.getState().settings.terminal.fontSize).toBe(8);
+  });
+
+  it("normalizes terminal font sizes to the nearest half pixel", async () => {
+    await settingsStore.getState().setTerminalFontSize(13.24);
+    expect(settingsStore.getState().settings.terminal.fontSize).toBe(13);
+
+    await settingsStore.getState().setTerminalFontSize(13.26);
+    expect(settingsStore.getState().settings.terminal.fontSize).toBe(13.5);
+  });
+
+  it("offers every supported half-pixel font size to settings controls", () => {
+    expect(TERMINAL_FONT_SIZE_OPTIONS).toHaveLength(49);
+    expect(TERMINAL_FONT_SIZE_OPTIONS.slice(0, 3)).toEqual([8, 8.5, 9]);
+    expect(TERMINAL_FONT_SIZE_OPTIONS[11]).toBe(13.5);
+    expect(TERMINAL_FONT_SIZE_OPTIONS.slice(-3)).toEqual([31, 31.5, 32]);
   });
 });

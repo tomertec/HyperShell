@@ -15,6 +15,8 @@ export interface TerminalPaneProps {
   isVisible?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   tmuxAttachTarget?: string;
+  fontSize: number;
+  onFontSizeChange: (fontSize: number) => void;
   onSessionOpened?: (sessionId: string) => void;
   onProcessExit?: (exitCode: number | null) => void;
 }
@@ -27,6 +29,8 @@ export function TerminalPane({
   isVisible = true,
   telnetOptions,
   tmuxAttachTarget,
+  fontSize,
+  onFontSizeChange,
   onSessionOpened,
   onProcessExit
 }: TerminalPaneProps) {
@@ -41,6 +45,8 @@ export function TerminalPane({
     autoConnect,
     telnetOptions,
     tmuxAttachTarget,
+    fontSize,
+    onFontSizeChange,
     onSessionOpened,
     onExit: onProcessExit
   });

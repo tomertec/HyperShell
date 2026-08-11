@@ -61,6 +61,16 @@ export interface AppSettings {
 export const MIN_TERMINAL_FONT_SIZE = 8;
 export const MAX_TERMINAL_FONT_SIZE = 32;
 export const DEFAULT_TERMINAL_FONT_SIZE = 13;
+export const TERMINAL_FONT_SIZE_STEP = 0.5;
+export const TERMINAL_FONT_SIZE_OPTIONS = Array.from(
+  {
+    length:
+      (MAX_TERMINAL_FONT_SIZE - MIN_TERMINAL_FONT_SIZE) /
+        TERMINAL_FONT_SIZE_STEP +
+      1,
+  },
+  (_, index) => MIN_TERMINAL_FONT_SIZE + index * TERMINAL_FONT_SIZE_STEP
+);
 export const MIN_TERMINAL_LINE_HEIGHT = 1.0;
 export const MAX_TERMINAL_LINE_HEIGHT = 2.0;
 export const MIN_TERMINAL_LETTER_SPACING = -2;
@@ -69,14 +79,17 @@ export const DEFAULT_CREDENTIAL_CACHE_TTL_MINUTES = 15;
 export const MIN_CREDENTIAL_CACHE_TTL_MINUTES = 1;
 export const MAX_CREDENTIAL_CACHE_TTL_MINUTES = 24 * 60;
 
-function clampTerminalFontSize(value: unknown): number {
+export function normalizeTerminalFontSize(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed)) {
     return DEFAULT_TERMINAL_FONT_SIZE;
   }
   return Math.min(
     MAX_TERMINAL_FONT_SIZE,
-    Math.max(MIN_TERMINAL_FONT_SIZE, Math.round(parsed))
+    Math.max(
+      MIN_TERMINAL_FONT_SIZE,
+      Math.round(parsed / TERMINAL_FONT_SIZE_STEP) * TERMINAL_FONT_SIZE_STEP
+    )
   );
 }
 
@@ -234,7 +247,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
             appearance: migrateAppearance(parsed.appearance ?? {}),
             customThemes: parsed.customThemes ?? {}
           };
-          merged.terminal.fontSize = clampTerminalFontSize(merged.terminal.fontSize);
+          merged.terminal.fontSize = normalizeTerminalFontSize(merged.terminal.fontSize);
           merged.terminal.lineHeight = clampTerminalLineHeight(merged.terminal.lineHeight);
           merged.terminal.letterSpacing = clampTerminalLetterSpacing(
             merged.terminal.letterSpacing
@@ -257,7 +270,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
   updateTerminal: async (partial) => {
     const current = get().settings;
     const nextTerminal = { ...current.terminal, ...partial };
-    nextTerminal.fontSize = clampTerminalFontSize(nextTerminal.fontSize);
+    nextTerminal.fontSize = normalizeTerminalFontSize(nextTerminal.fontSize);
     nextTerminal.lineHeight = clampTerminalLineHeight(nextTerminal.lineHeight);
     nextTerminal.letterSpacing = clampTerminalLetterSpacing(nextTerminal.letterSpacing);
     const next: AppSettings = {
@@ -378,8 +391,8 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
   },
 
   changeTerminalFontSize: async (delta) => {
-    const currentFontSize = clampTerminalFontSize(get().settings.terminal.fontSize);
-    const nextFontSize = clampTerminalFontSize(currentFontSize + delta);
+    const currentFontSize = normalizeTerminalFontSize(get().settings.terminal.fontSize);
+    const nextFontSize = normalizeTerminalFontSize(currentFontSize + delta);
     if (nextFontSize !== currentFontSize) {
       await get().updateTerminal({ fontSize: nextFontSize });
     }

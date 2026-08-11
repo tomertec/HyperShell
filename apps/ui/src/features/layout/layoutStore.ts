@@ -1,4 +1,9 @@
 import { createStore } from "zustand/vanilla";
+import type { WorkspaceLayout, WorkspaceTab } from "@hypershell/shared";
+import {
+  normalizeTerminalFontSize,
+  settingsStore,
+} from "../settings/settingsStore";
 
 export type LayoutTab = {
   tabKey?: string;
@@ -15,6 +20,7 @@ export type LayoutTab = {
   sftpSessionId?: string;
   hostId?: string;
   tmuxAttachTarget?: string;
+  fontSize?: number;
 };
 
 export type Pane = {
@@ -39,6 +45,7 @@ export type LayoutState = {
   moveTab: (fromIndex: number, toIndex: number) => void;
   setTabDynamicTitle: (sessionId: string, title: string | null) => void;
   setTabProcessTitle: (sessionId: string, name: string | null) => void;
+  setTabFontSize: (sessionId: string, fontSize: number) => void;
 };
 
 function equalPaneSizes(count: number): number[] {
@@ -48,7 +55,10 @@ function equalPaneSizes(count: number): number[] {
   );
 }
 
-export function createLayoutStore() {
+export function createLayoutStore(
+  getDefaultTerminalFontSize: () => number = () =>
+    settingsStore.getState().settings.terminal.fontSize
+) {
   let paneCounter = 1;
 
   return createStore<LayoutState>()((set) => ({
@@ -61,9 +71,18 @@ export function createLayoutStore() {
 
     openTab: (tab) =>
       set((state) => {
+        const nextTab =
+          tab.type === "sftp"
+            ? tab
+            : {
+                ...tab,
+                fontSize: normalizeTerminalFontSize(
+                  tab.fontSize ?? getDefaultTerminalFontSize()
+                ),
+              };
         const tabs = state.tabs.some((t) => t.sessionId === tab.sessionId)
           ? state.tabs
-          : [...state.tabs, { ...tab, tabKey: tab.tabKey ?? tab.sessionId }];
+          : [...state.tabs, { ...nextTab, tabKey: tab.tabKey ?? tab.sessionId }];
         const panes = state.panes.map((p) =>
           p.paneId === state.activePaneId ? { ...p, sessionId: tab.sessionId } : p
         );
@@ -213,10 +232,63 @@ export function createLayoutStore() {
 
         return { tabs };
       }),
+
+    setTabFontSize: (sessionId, fontSize) =>
+      set((state) => {
+        const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId);
+        if (index === -1 || state.tabs[index].type === "sftp") {
+          return state;
+        }
+
+        const normalizedFontSize = normalizeTerminalFontSize(fontSize);
+        if (state.tabs[index].fontSize === normalizedFontSize) {
+          return state;
+        }
+
+        const tabs = [...state.tabs];
+        tabs[index] = { ...tabs[index], fontSize: normalizedFontSize };
+        return { tabs };
+      }),
   }));
 }
 
 export const layoutStore = createLayoutStore();
+
+export function serializeWorkspaceLayout(
+  state: Pick<
+    LayoutState,
+    "tabs" | "splitDirection" | "paneSizes" | "panes"
+  >
+): WorkspaceLayout {
+  return {
+    tabs: state.tabs.map((tab) => ({
+      transport: tab.transport ?? "ssh",
+      profileId: tab.profileId ?? tab.sessionId,
+      title: tab.title,
+      type: tab.type,
+      hostId: tab.hostId,
+      fontSize: tab.fontSize,
+    })),
+    splitDirection: state.splitDirection,
+    paneSizes: state.paneSizes,
+    paneCount: state.panes.length,
+  };
+}
+
+export function workspaceTabToLayoutTab(
+  tab: WorkspaceTab,
+  sessionId: string
+): LayoutTab {
+  return {
+    sessionId,
+    title: tab.title,
+    transport: tab.transport,
+    profileId: tab.profileId,
+    type: tab.type ?? "terminal",
+    hostId: tab.hostId,
+    fontSize: tab.fontSize,
+  };
+}
 
 /** Single source of truth for what a tab is called. */
 export function resolveTabTitle(tab: LayoutTab): string {

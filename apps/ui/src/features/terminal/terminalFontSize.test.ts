@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { getTerminalFontSizeAction } from "./terminalFontSize";
+import {
+  getNextTerminalFontSize,
+  getTerminalFontSizeAction,
+} from "./terminalFontSize";
 
 function input(
   key: string,
@@ -61,5 +64,18 @@ describe("getTerminalFontSizeAction", () => {
         input("-", { metaKey: true, altKey: true, isMacLike: true })
       )
     ).toBeNull();
+  });
+});
+
+describe("getNextTerminalFontSize", () => {
+  it("changes the current tab in half-pixel steps and resets to the global default", () => {
+    expect(getNextTerminalFontSize("increase", 13, 15)).toBe(13.5);
+    expect(getNextTerminalFontSize("decrease", 13, 15)).toBe(12.5);
+    expect(getNextTerminalFontSize("reset", 13, 15)).toBe(15);
+  });
+
+  it("keeps per-tab changes within the supported bounds", () => {
+    expect(getNextTerminalFontSize("increase", 32, 13)).toBe(32);
+    expect(getNextTerminalFontSize("decrease", 8, 13)).toBe(8);
   });
 });

@@ -728,6 +728,7 @@ export const workspaceTabSchema = z.object({
   title: z.string(),
   type: z.enum(["terminal", "sftp"]).optional(),
   hostId: z.string().optional(),
+  fontSize: z.number().min(8).max(32).multipleOf(0.5).optional(),
 });
 
 export const workspaceLayoutSchema = z.object({

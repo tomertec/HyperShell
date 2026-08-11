@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { layoutStore } from "../layout/layoutStore";
+import {
+  layoutStore,
+  serializeWorkspaceLayout,
+  workspaceTabToLayoutTab,
+} from "../layout/layoutStore";
 
 interface WorkspaceRecord {
   name: string;
@@ -54,19 +58,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
     const trimmed = newName.trim();
     if (!trimmed) return;
     setSaving(true);
-    const state = layoutStore.getState();
-    const layout = {
-      tabs: state.tabs.map((t) => ({
-        transport: t.transport ?? ("ssh" as const),
-        profileId: t.profileId ?? t.sessionId,
-        title: t.title,
-        type: t.type,
-        hostId: t.hostId,
-      })),
-      splitDirection: state.splitDirection,
-      paneSizes: state.paneSizes,
-      paneCount: state.panes.length,
-    };
+    const layout = serializeWorkspaceLayout(layoutStore.getState());
     await window.hypershell?.workspaceSave?.({ name: trimmed, layout });
     setNewName("");
     setSaving(false);
@@ -90,14 +82,12 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
 
     // Re-open sessions from workspace
     for (const tab of result.layout.tabs) {
-      layoutStore.getState().openTab({
-        sessionId: `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        title: tab.title,
-        transport: tab.transport as "ssh" | "serial" | "sftp",
-        profileId: tab.profileId,
-        type: (tab.type as "terminal" | "sftp") ?? "terminal",
-        hostId: tab.hostId,
-      });
+      layoutStore.getState().openTab(
+        workspaceTabToLayoutTab(
+          tab,
+          `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        )
+      );
     }
 
     if (result.layout.splitDirection) {

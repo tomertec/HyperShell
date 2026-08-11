@@ -17,7 +17,11 @@ import { ConnectionHistoryDialog } from "../features/hosts/ConnectionHistoryDial
 import { AppShell } from "../features/layout/AppShell";
 import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
-import { layoutStore } from "../features/layout/layoutStore";
+import {
+  layoutStore,
+  serializeWorkspaceLayout,
+  workspaceTabToLayoutTab,
+} from "../features/layout/layoutStore";
 import { handlePaneShortcut } from "../features/layout/paneShortcuts";
 import { localProfilesStore, selectLaunchableProfiles } from "../features/local/localProfilesStore";
 import { LocalProfileForm } from "../features/local/LocalProfileForm";
@@ -42,6 +46,7 @@ import type {
   PuttySession,
   SerialProfileRecord,
   TagRecord,
+  WorkspaceTab,
 } from "@hypershell/shared";
 import { EditorApp } from "../features/editor/EditorApp";
 import { TelnetQuickConnect } from "../features/telnet/TelnetQuickConnect";
@@ -304,22 +309,6 @@ function toSerialFormInitialValue(
   };
 }
 
-function serializeCurrentLayout() {
-  const state = layoutStore.getState();
-  return {
-    tabs: state.tabs.map((t) => ({
-      transport: t.transport ?? ("ssh" as const),
-      profileId: t.profileId ?? t.sessionId,
-      title: t.title,
-      type: t.type,
-      hostId: t.hostId,
-    })),
-    splitDirection: state.splitDirection,
-    paneSizes: state.paneSizes,
-    paneCount: state.panes.length,
-  };
-}
-
 function useAppTheme() {
   const appTheme = useStore(settingsStore, (s) => s.settings.appearance.appTheme);
 
@@ -372,13 +361,7 @@ function MainApp() {
   const [hostKeyVerifyFromAuth, setHostKeyVerifyFromAuth] = useState(false);
   const [kbdInteractiveRequest, setKbdInteractiveRequest] = useState<KeyboardInteractiveRequest | null>(null);
   const [restoreBannerVisible, setRestoreBannerVisible] = useState(false);
-  const [lastWorkspaceTabs, setLastWorkspaceTabs] = useState<Array<{
-    transport: string;
-    profileId: string;
-    title: string;
-    type?: string;
-    hostId?: string;
-  }>>([]);
+  const [lastWorkspaceTabs, setLastWorkspaceTabs] = useState<WorkspaceTab[]>([]);
   const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
   const [localProfileModalOpen, setLocalProfileModalOpen] = useState(false);
   const [editingLocalProfile, setEditingLocalProfile] = useState<LocalProfileRecord | null>(null);
@@ -536,7 +519,7 @@ function MainApp() {
     const handleBeforeUnload = () => {
       const state = layoutStore.getState();
       if (state.tabs.length === 0) return;
-      const layout = serializeCurrentLayout();
+      const layout = serializeWorkspaceLayout(state);
       void window.hypershell?.workspaceSaveLast?.(layout);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -1116,14 +1099,12 @@ function MainApp() {
 
   const restoreLastWorkspace = useCallback(() => {
     for (const tab of lastWorkspaceTabs) {
-      layoutStore.getState().openTab({
-        sessionId: `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        title: tab.title,
-        transport: tab.transport as "ssh" | "serial" | "sftp",
-        profileId: tab.profileId,
-        type: (tab.type as "terminal" | "sftp") ?? "terminal",
-        hostId: tab.hostId,
-      });
+      layoutStore.getState().openTab(
+        workspaceTabToLayoutTab(
+          tab,
+          `ws-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        )
+      );
     }
     setRestoreBannerVisible(false);
   }, [lastWorkspaceTabs]);

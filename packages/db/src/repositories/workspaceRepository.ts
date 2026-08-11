@@ -7,6 +7,7 @@ export interface WorkspaceLayout {
     title: string;
     type?: string;
     hostId?: string;
+    fontSize?: number;
   }>;
   splitDirection: "horizontal" | "vertical";
   paneSizes: number[];

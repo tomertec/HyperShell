@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createLayoutStore, resolveTabTitle } from "./layoutStore";
+import {
+  createLayoutStore,
+  resolveTabTitle,
+  serializeWorkspaceLayout,
+  workspaceTabToLayoutTab,
+} from "./layoutStore";
 
 describe("layoutStore", () => {
   it("opens a tab for a new session", () => {
@@ -175,5 +180,72 @@ describe("layoutStore", () => {
         resolveTabTitle({ sessionId: "s1", title: "base", dynamicTitle: "osc", processTitle: "llmtop" })
       ).toBe("llmtop");
     });
+  });
+});
+
+describe("layoutStore terminal font sizes", () => {
+  it("captures the current default for terminal tabs but not SFTP tabs", () => {
+    const store = createLayoutStore(() => 13);
+
+    store.getState().openTab({ sessionId: "terminal-1", title: "Terminal" });
+    store.getState().openTab({
+      sessionId: "sftp-1",
+      title: "SFTP",
+      type: "sftp",
+      transport: "sftp",
+    });
+
+    expect(store.getState().tabs.find((tab) => tab.sessionId === "terminal-1")?.fontSize).toBe(13);
+    expect(store.getState().tabs.find((tab) => tab.sessionId === "sftp-1")?.fontSize).toBeUndefined();
+  });
+
+  it("changes one terminal tab without affecting another and preserves it on reconnect", () => {
+    const store = createLayoutStore(() => 13);
+    store.getState().openTab({ sessionId: "terminal-1", title: "First" });
+    store.getState().openTab({ sessionId: "terminal-2", title: "Second" });
+
+    store.getState().setTabFontSize("terminal-1", 13.5);
+
+    expect(store.getState().tabs.find((tab) => tab.sessionId === "terminal-1")?.fontSize).toBe(13.5);
+    expect(store.getState().tabs.find((tab) => tab.sessionId === "terminal-2")?.fontSize).toBe(13);
+
+    store.getState().replaceSessionId("terminal-1", "terminal-1-connected");
+    expect(
+      store.getState().tabs.find((tab) => tab.sessionId === "terminal-1-connected")?.fontSize
+    ).toBe(13.5);
+  });
+});
+
+describe("layoutStore workspace persistence", () => {
+  it("serializes each terminal tab font size", () => {
+    const store = createLayoutStore(() => 13);
+    store.getState().openTab({
+      sessionId: "terminal-1",
+      title: "Production",
+      transport: "ssh",
+      profileId: "host-1",
+      fontSize: 13.5,
+    });
+    expect(serializeWorkspaceLayout(store.getState()).tabs[0]?.fontSize).toBe(13.5);
+  });
+
+  it("hydrates saved font sizes and leaves legacy values for defaulting", () => {
+    const savedTab = {
+      transport: "ssh" as const,
+      profileId: "host-1",
+      title: "Production",
+      fontSize: 14.5,
+    };
+
+    expect(workspaceTabToLayoutTab(savedTab, "restored-1")).toMatchObject({
+      sessionId: "restored-1",
+      fontSize: 14.5,
+    });
+    expect(
+      workspaceTabToLayoutTab(
+        { transport: "ssh", profileId: "host-1", title: "Legacy" },
+        "legacy-1"
+      ).fontSize
+    ).toBeUndefined();
   });
 });

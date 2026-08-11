@@ -1,4 +1,10 @@
+import {
+  normalizeTerminalFontSize,
+  TERMINAL_FONT_SIZE_STEP,
+} from "../settings/settingsStore";
+
 export type TerminalFontSizeAction = "increase" | "decrease" | "reset" | null;
+export type TerminalFontSizeChangeAction = Exclude<TerminalFontSizeAction, null>;
 
 export interface TerminalFontSizeKeyEvent {
   key: string;
@@ -41,4 +47,17 @@ export function getTerminalFontSizeAction(
   }
 
   return null;
+}
+
+export function getNextTerminalFontSize(
+  action: TerminalFontSizeChangeAction,
+  currentFontSize: number,
+  defaultFontSize: number
+): number {
+  if (action === "reset") {
+    return normalizeTerminalFontSize(defaultFontSize);
+  }
+
+  const delta = action === "increase" ? TERMINAL_FONT_SIZE_STEP : -TERMINAL_FONT_SIZE_STEP;
+  return normalizeTerminalFontSize(currentFontSize + delta);
 }
