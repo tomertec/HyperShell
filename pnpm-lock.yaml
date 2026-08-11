@@ -166,20 +166,20 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@xterm/addon-fit':
-        specifier: ^0.11.0
-        version: 0.11.0
+        specifier: 0.12.0-beta.291
+        version: 0.12.0-beta.291(@xterm/xterm@6.1.0-beta.291)
       '@xterm/addon-search':
-        specifier: ^0.16.0
-        version: 0.16.0
+        specifier: 0.17.0-beta.291
+        version: 0.17.0-beta.291(@xterm/xterm@6.1.0-beta.291)
       '@xterm/addon-unicode-graphemes':
-        specifier: ^0.4.0
-        version: 0.4.0
+        specifier: 0.5.0-beta.291
+        version: 0.5.0-beta.291(@xterm/xterm@6.1.0-beta.291)
       '@xterm/addon-webgl':
-        specifier: ^0.19.0
-        version: 0.19.0
+        specifier: 0.20.0-beta.291
+        version: 0.20.0-beta.291(@xterm/xterm@6.1.0-beta.291)
       '@xterm/xterm':
-        specifier: ^6.0.0
-        version: 6.0.0
+        specifier: 6.1.0-beta.291
+        version: 6.1.0-beta.291
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2
@@ -1288,20 +1288,28 @@ packages:
     resolution: {integrity: sha512-KRYzxepc14G/CEpEGc3Yn+JKaAeT63smlDr+vjB8jRfgTBBI9wRj/nkQEO+ucV8p8I9bfKLWp37uHgFrbntPvw==}
     engines: {node: '>=10.0.0'}
 
-  '@xterm/addon-fit@0.11.0':
-    resolution: {integrity: sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==}
+  '@xterm/addon-fit@0.12.0-beta.291':
+    resolution: {integrity: sha512-bxJ4g8YKPily7Lc8NpkYBm6QmSyNhzGo1g5uXJl1g1zSHeM0GV1/Q5BQB/Y/C340+jcNb6CsFGj/VDgsXGLzIA==}
+    peerDependencies:
+      '@xterm/xterm': ^6.1.0-beta.291
 
-  '@xterm/addon-search@0.16.0':
-    resolution: {integrity: sha512-9OeuBFu0/uZJPu+9AHKY6g/w0Czyb/Ut0A5t79I4ULoU4IfU5BEpPFVGQxP4zTTMdfZEYkVIRYbHBX1xWwjeSA==}
+  '@xterm/addon-search@0.17.0-beta.291':
+    resolution: {integrity: sha512-dDMMvklz3YflJVp6uEJVoZe6lH4X+ua5TeUO80uc4LAZrDjGX5hhGfFVWaM53Lz1Ih5teLiR1llUBm+bCuujkQ==}
+    peerDependencies:
+      '@xterm/xterm': ^6.1.0-beta.291
 
-  '@xterm/addon-unicode-graphemes@0.4.0':
-    resolution: {integrity: sha512-9+/CqwbKcnlkJU4d3wIgO+wjsL8f6vyz+UwUWLu6nADQz8Gr8ONqGCJfdDjIdI+yYZLABQqQy47FzEM6AWELjw==}
+  '@xterm/addon-unicode-graphemes@0.5.0-beta.291':
+    resolution: {integrity: sha512-dKM5YHfU3sHD2jRTNbRVxrhg6b5yMS4c3vBGO8c15a+28zPftPM+FY34guWJRTVa/xgGvbS9VaYI4K6iL2o3NA==}
+    peerDependencies:
+      '@xterm/xterm': ^6.1.0-beta.291
 
-  '@xterm/addon-webgl@0.19.0':
-    resolution: {integrity: sha512-b3fMOsyLVuCeNJWxolACEUED0vm7qC0cy4wRvf3oURSzDTYVQiGPhTnhWZwIHdvC48Y+oLhvYXnY4XDXPoJo6A==}
+  '@xterm/addon-webgl@0.20.0-beta.291':
+    resolution: {integrity: sha512-gH7r5g8f2NWMhBtaeApuwLQTJmX4uq7zT0okjeNWkFAD0nxzbUPB+kt6sogZZ5K90XYPt2OLu/bhuvF6DmKqOQ==}
+    peerDependencies:
+      '@xterm/xterm': ^6.1.0-beta.292
 
-  '@xterm/xterm@6.0.0':
-    resolution: {integrity: sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==}
+  '@xterm/xterm@6.1.0-beta.291':
+    resolution: {integrity: sha512-Q6IjxogKIu7fBkXHcn4vQhfHvtwhIv/NN8LR0knCAxPA06/jXuHwreqX9Y/4zvzj7m8u6OBndOJDCUAxLmRfQQ==}
 
   abbrev@4.0.0:
     resolution: {integrity: sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA==}
@@ -4526,15 +4534,23 @@ snapshots:
 
   '@xmldom/xmldom@0.8.13': {}
 
-  '@xterm/addon-fit@0.11.0': {}
+  '@xterm/addon-fit@0.12.0-beta.291(@xterm/xterm@6.1.0-beta.291)':
+    dependencies:
+      '@xterm/xterm': 6.1.0-beta.291
 
-  '@xterm/addon-search@0.16.0': {}
+  '@xterm/addon-search@0.17.0-beta.291(@xterm/xterm@6.1.0-beta.291)':
+    dependencies:
+      '@xterm/xterm': 6.1.0-beta.291
 
-  '@xterm/addon-unicode-graphemes@0.4.0': {}
+  '@xterm/addon-unicode-graphemes@0.5.0-beta.291(@xterm/xterm@6.1.0-beta.291)':
+    dependencies:
+      '@xterm/xterm': 6.1.0-beta.291
 
-  '@xterm/addon-webgl@0.19.0': {}
+  '@xterm/addon-webgl@0.20.0-beta.291(@xterm/xterm@6.1.0-beta.291)':
+    dependencies:
+      '@xterm/xterm': 6.1.0-beta.291
 
-  '@xterm/xterm@6.0.0': {}
+  '@xterm/xterm@6.1.0-beta.291': {}
 
   abbrev@4.0.0: {}
 
