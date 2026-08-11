@@ -137,6 +137,15 @@ function buildEntry(path: string, attrs: Stats): SftpEntry {
   };
 }
 
+// Directory entry names are chosen by the remote server, and callers join them
+// into local paths (downloads, sync). A hostile server can answer readdir with
+// "../../evil" or "..\\evil" and escape the destination directory, so names
+// that aren't a single path component are dropped at this boundary.
+function isSafeEntryName(name: string): boolean {
+  if (name === "." || name === "..") return false;
+  return !/[/\\\0]/.test(name);
+}
+
 function combineRemotePath(parentPath: string, name: string): string {
   const normalizedParent = parentPath.endsWith("/")
     ? parentPath.slice(0, -1)
@@ -363,7 +372,7 @@ export function createSftpTransport(
 
         resolve(
           (entries ?? [])
-            .filter((entry) => entry.filename !== "." && entry.filename !== "..")
+            .filter((entry) => isSafeEntryName(entry.filename))
             .map((entry) => {
               const path = combineRemotePath(remotePath, entry.filename);
               return {

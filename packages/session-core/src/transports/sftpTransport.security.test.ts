@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { buildConnectConfig, type SftpConnectionOptions } from "./sftpTransport";
+import {
+  buildConnectConfig,
+  createSftpTransport,
+  type SftpConnectionOptions
+} from "./sftpTransport";
 
 describe("buildConnectConfig", () => {
   const baseOptions: SftpConnectionOptions = {
@@ -27,5 +31,82 @@ describe("buildConnectConfig", () => {
     const hostVerifier = config.hostVerifier as (key: Buffer) => boolean;
     expect(hostVerifier(Buffer.from("trusted-host-key"))).toBe(true);
     expect(hostVerifier(Buffer.from("different-host-key"))).toBe(false);
+  });
+});
+
+describe("list", () => {
+  const baseOptions: SftpConnectionOptions = {
+    hostname: "example.com",
+    port: 22,
+    username: "testuser",
+    authMethod: "password",
+    password: "testpass",
+  };
+
+  async function connectWithListing(filenames: string[]) {
+    const sftpWrapper = {
+      readdir(
+        _path: string,
+        callback: (error: Error | undefined, entries: unknown[]) => void
+      ) {
+        callback(
+          undefined,
+          filenames.map((filename) => ({
+            filename,
+            longname: filename,
+            attrs: { mode: 0o100644, size: 1, mtime: 0, uid: 0, gid: 0 },
+          }))
+        );
+      },
+      end() {},
+    };
+
+    const pool = {
+      acquire: vi.fn().mockResolvedValue({
+        connectionId: "conn-1",
+        consumerId: "consumer-1",
+        client: {
+          sftp(callback: (error: Error | undefined, session?: unknown) => void) {
+            callback(undefined, sftpWrapper);
+          },
+        },
+      }),
+      release: vi.fn(),
+      destroy() {},
+      destroyAll() {},
+      getStats() {
+        return [];
+      },
+    };
+
+    const transport = createSftpTransport("test-session", baseOptions, {
+      pool: pool as never,
+    });
+    await transport.connect();
+    return transport;
+  }
+
+  it("drops entry names that a malicious server could use to escape the target directory", async () => {
+    const transport = await connectWithListing([
+      "safe.txt",
+      "..",
+      ".",
+      "../escaped.txt",
+      "..\\escaped.txt",
+      "nested/child.txt",
+      "with\0nul.txt",
+    ]);
+
+    const entries = await transport.list("/home/user");
+
+    expect(entries.map((entry) => entry.name)).toEqual(["safe.txt"]);
+  });
+
+  it("keeps ordinary names containing dots", async () => {
+    const transport = await connectWithListing(["...", "..hidden", "a..b"]);
+
+    const entries = await transport.list("/home/user");
+
+    expect(entries.map((entry) => entry.name)).toEqual(["...", "..hidden", "a..b"]);
   });
 });
