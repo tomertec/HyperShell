@@ -21,6 +21,7 @@ import {
 import { TERMINAL_UNICODE_VERSION } from "./terminalUnicode";
 import { loadOptionalWebglRenderer } from "./optionalWebglRenderer";
 import { installTerminalRepaintGuard } from "./terminalRepaintGuard";
+import { createConptyResyncWiggle, type ConptyResyncWiggle } from "./conptyResyncWiggle";
 import {
   TERMINAL_FOCUS_REQUEST_EVENT,
   shouldHandleTerminalFocusRequest,
@@ -104,6 +105,7 @@ export function useTerminalSession(
   const sessionIdRef = useRef<string | null>(input.sessionId ?? null);
   const fontSizeRef = useRef(input.fontSize);
   const onFontSizeChangeRef = useRef(input.onFontSizeChange);
+  const conptyWiggleRef = useRef<ConptyResyncWiggle | null>(null);
   const mountedRef = useRef(true);
   const asyncOperationGuardRef = useRef(createAsyncOperationGuard());
   const broadcastEnabledRef = useRef(broadcastEnabled);
@@ -522,6 +524,8 @@ export function useTerminalSession(
       titleDisposable?.dispose();
       repaintGuard?.dispose();
       removeFocusListeners?.();
+      conptyWiggleRef.current?.dispose();
+      conptyWiggleRef.current = null;
       instance?.dispose();
       terminalRef.current = null;
       fitAddonRef.current = null;
@@ -673,7 +677,28 @@ export function useTerminalSession(
     if (sessionId) {
       sendSessionResize(sessionId, instance.cols, instance.rows);
     }
-  }, [sendSessionResize]);
+
+    // Local shells on Windows sit on ConPTY, whose resize reflow diverges
+    // from xterm's and leaves stale rows behind after widening (see
+    // conptyResyncWiggle.ts). Watch fit()-driven resizes and resync once a
+    // widening burst settles.
+    if (input.transport === "local" && /Win/i.test(navigator.platform)) {
+      conptyWiggleRef.current ??= createConptyResyncWiggle({
+        resize: (cols, rows) => {
+          const wiggleTarget = terminalRef.current;
+          if (!wiggleTarget) {
+            return;
+          }
+          wiggleTarget.resize(cols, rows);
+          const wiggleSessionId = sessionIdRef.current;
+          if (wiggleSessionId) {
+            sendSessionResize(wiggleSessionId, cols, rows);
+          }
+        }
+      });
+      conptyWiggleRef.current.notifyResize(instance.cols, instance.rows);
+    }
+  }, [input.transport, sendSessionResize]);
 
   useEffect(() => {
     const term = terminalRef.current;
