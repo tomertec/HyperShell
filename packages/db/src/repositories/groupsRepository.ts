@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../index";
-import { openDatabase } from "../index";
+import { withOpenDatabase } from "../index";
 
 export type GroupRecord = {
   id: string;
@@ -59,7 +59,7 @@ export function createGroupsRepositoryFromDatabase(db: SqliteDatabase) {
 
 export function createGroupsRepository(databasePath = ":memory:") {
   try {
-    return createGroupsRepositoryFromDatabase(openDatabase(databasePath));
+    return withOpenDatabase(databasePath, createGroupsRepositoryFromDatabase);
   } catch (error) {
     if (databasePath !== ":memory:") throw error;
 

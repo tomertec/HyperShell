@@ -9,6 +9,24 @@ function isIgnorableMigrationError(error: unknown): boolean {
   return normalized.includes("already exists") || normalized.includes("duplicate column");
 }
 
+/**
+ * Open a database and hand it to a repository factory, closing the handle if
+ * that factory throws. Without this the handle stays open for the life of the
+ * process while the caller falls back to an in-memory repository.
+ */
+export function withOpenDatabase<T>(
+  databasePath: string,
+  create: (db: SqliteDatabase) => T
+): T {
+  const db = openDatabase(databasePath);
+  try {
+    return create(db);
+  } catch (error) {
+    db.close();
+    throw error;
+  }
+}
+
 export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
   const initSchemaSql = readFileSync(
     new URL("./migrations/001_init.sql", import.meta.url),

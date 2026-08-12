@@ -3,7 +3,7 @@ import {
   DEFAULT_RECONNECT_MAX_ATTEMPTS
 } from "@hypershell/shared";
 import type { SqliteDatabase } from "../index";
-import { openDatabase } from "../index";
+import { withOpenDatabase } from "../index";
 
 export type HostRecord = {
   id: string;
@@ -117,7 +117,7 @@ function mapRow(row: HostRow): HostRecord {
 
 export function createHostsRepository(databasePath = ":memory:") {
   try {
-    return createHostsRepositoryFromDatabase(openDatabase(databasePath));
+    return withOpenDatabase(databasePath, createHostsRepositoryFromDatabase);
   } catch (error) {
     if (databasePath !== ":memory:") {
       throw error;

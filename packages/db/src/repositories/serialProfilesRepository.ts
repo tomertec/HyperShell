@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../index";
-import { openDatabase } from "../index";
+import { withOpenDatabase } from "../index";
 
 export type SerialProfileRecord = {
   id: string;
@@ -65,7 +65,7 @@ function mapRow(row: SerialProfileRow): SerialProfileRecord {
 
 export function createSerialProfilesRepository(databasePath = ":memory:") {
   try {
-    return createSerialProfilesRepositoryFromDatabase(openDatabase(databasePath));
+    return withOpenDatabase(databasePath, createSerialProfilesRepositoryFromDatabase);
   } catch (error) {
     if (databasePath !== ":memory:") {
       throw error;

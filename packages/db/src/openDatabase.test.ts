@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { openDatabase } from "./index";
+import type { SqliteDatabase } from "./index";
+import { openDatabase, withOpenDatabase } from "./index";
 
 type PragmaRow = Record<string, unknown>;
 
@@ -55,6 +56,29 @@ describe("openDatabase pragmas", () => {
     const [{ foreign_keys }] = db.pragma("foreign_keys") as PragmaRow[];
     expect(foreign_keys).toBe(1);
     db.close();
+  });
+});
+
+describe("withOpenDatabase", () => {
+  it("returns what the factory built and leaves the handle usable", () => {
+    const db = withOpenDatabase(":memory:", (handle) => handle);
+    expect(() => db.prepare("SELECT 1").get()).not.toThrow();
+    db.close();
+  });
+
+  it("closes the handle when the repository factory throws", () => {
+    let captured: SqliteDatabase | undefined;
+
+    expect(() =>
+      withOpenDatabase(":memory:", (handle) => {
+        captured = handle;
+        throw new Error("repository construction failed");
+      })
+    ).toThrow(/repository construction failed/);
+
+    // Without the close() the caller falls back to an in-memory repository
+    // while this handle stays open for the life of the process.
+    expect(() => captured?.prepare("SELECT 1")).toThrow(/not open/i);
   });
 });
 

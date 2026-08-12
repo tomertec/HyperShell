@@ -1,6 +1,6 @@
 import type { LocalProfileColor, LocalProfileIcon } from "@hypershell/shared";
 import type { SqliteDatabase } from "../index";
-import { openDatabase } from "../index";
+import { withOpenDatabase } from "../index";
 
 export type LocalProfileRecord = {
   id: string;
@@ -90,7 +90,7 @@ function mapRow(row: LocalProfileRow): LocalProfileRecord {
 
 export function createLocalProfilesRepository(databasePath = ":memory:") {
   try {
-    return createLocalProfilesRepositoryFromDatabase(openDatabase(databasePath));
+    return withOpenDatabase(databasePath, createLocalProfilesRepositoryFromDatabase);
   } catch (error) {
     if (databasePath !== ":memory:") {
       throw error;

@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../index";
-import { openDatabase } from "../index";
+import { withOpenDatabase } from "../index";
 
 export type SnippetRecord = {
   id: string;
@@ -35,7 +35,7 @@ function mapRow(row: SnippetRow): SnippetRecord {
 
 export function createSnippetsRepository(databasePath = ":memory:") {
   try {
-    return createSnippetsRepositoryFromDatabase(openDatabase(databasePath));
+    return withOpenDatabase(databasePath, createSnippetsRepositoryFromDatabase);
   } catch (error) {
     if (databasePath !== ":memory:") {
       throw error;

@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../index";
-import { openDatabase } from "../index";
+import { withOpenDatabase } from "../index";
 
 export type TagRecord = {
   id: string;
@@ -111,7 +111,7 @@ export function createTagRepositoryFromDatabase(db: SqliteDatabase) {
 
 export function createTagRepository(databasePath = ":memory:") {
   try {
-    return createTagRepositoryFromDatabase(openDatabase(databasePath));
+    return withOpenDatabase(databasePath, createTagRepositoryFromDatabase);
   } catch (error) {
     if (databasePath !== ":memory:") {
       throw error;

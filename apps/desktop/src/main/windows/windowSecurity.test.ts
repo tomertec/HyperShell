@@ -76,4 +76,28 @@ describe("attachWindowSecurityGuards", () => {
     const handler = setWindowOpenHandler.mock.calls[0]?.[0] as ((details: { url: string }) => { action: string });
     expect(handler({ url: "http://127.0.0.1:5173/help" })).toEqual({ action: "deny" });
   });
+
+  it("fails closed on a malformed renderer url instead of throwing out of window setup", () => {
+    const willNavigateHandlers: Array<(event: { preventDefault: () => void }, url: string) => void> = [];
+    const setWindowOpenHandler = vi.fn();
+
+    const fakeWindow = {
+      webContents: {
+        on: vi.fn((event: string, handler: (event: { preventDefault: () => void }, url: string) => void) => {
+          if (event === "will-navigate") {
+            willNavigateHandlers.push(handler);
+          }
+        }),
+        setWindowOpenHandler,
+      },
+    } as const;
+
+    expect(() => attachWindowSecurityGuards(fakeWindow as never, "not a url")).not.toThrow();
+
+    // The guards must still be attached, and must block everything.
+    const preventDefault = vi.fn();
+    willNavigateHandlers[0]?.({ preventDefault }, "http://127.0.0.1:5173/");
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(setWindowOpenHandler).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,5 +1,5 @@
 import type { SqliteDatabase } from "../index";
-import { openDatabase } from "../index";
+import { withOpenDatabase } from "../index";
 
 export type HostProfileRecord = {
   id: string;
@@ -59,7 +59,7 @@ function mapRow(row: HostProfileRow): HostProfileRecord {
 
 export function createHostProfileRepository(databasePath = ":memory:") {
   try {
-    return createHostProfileRepositoryFromDatabase(openDatabase(databasePath));
+    return withOpenDatabase(databasePath, createHostProfileRepositoryFromDatabase);
   } catch (error) {
     if (databasePath !== ":memory:") {
       throw error;

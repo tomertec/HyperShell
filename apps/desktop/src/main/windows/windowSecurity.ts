@@ -57,7 +57,14 @@ export function attachWindowSecurityGuards(
   win: Pick<Electron.BrowserWindow, "webContents">,
   rendererUrl: string
 ): void {
-  const allowedRendererUrl = new URL(rendererUrl).toString();
+  // Same fail-closed rule as isAllowedNavigationTarget: an unparseable URL must
+  // still leave the guards attached, never throw out of window setup.
+  let allowedRendererUrl: string;
+  try {
+    allowedRendererUrl = new URL(rendererUrl).toString();
+  } catch {
+    allowedRendererUrl = "";
+  }
 
   win.webContents.on("will-navigate", (event, url) => {
     if (!isAllowedNavigationTarget(allowedRendererUrl, url)) {
