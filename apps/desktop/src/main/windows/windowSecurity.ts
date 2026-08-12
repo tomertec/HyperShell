@@ -36,14 +36,21 @@ export function assertAllowedRendererUrl(rawUrl: string, policy: RendererUrlPoli
 }
 
 export function isAllowedNavigationTarget(rendererUrl: string, targetUrl: string): boolean {
-  const renderer = new URL(rendererUrl);
-  const target = new URL(targetUrl);
+  // Must fail closed: this runs inside will-navigate, where a throw from
+  // `new URL()` or `fileURLToPath()` would skip the caller's preventDefault()
+  // and let the navigation through.
+  try {
+    const renderer = new URL(rendererUrl);
+    const target = new URL(targetUrl);
 
-  if (renderer.protocol === "file:") {
-    return target.protocol === "file:" && sameFilePath(target, fileURLToPath(renderer));
+    if (renderer.protocol === "file:") {
+      return target.protocol === "file:" && sameFilePath(target, fileURLToPath(renderer));
+    }
+
+    return target.origin === renderer.origin;
+  } catch {
+    return false;
   }
-
-  return target.origin === renderer.origin;
 }
 
 export function attachWindowSecurityGuards(

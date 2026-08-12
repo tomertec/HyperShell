@@ -38,6 +38,13 @@ describe("isAllowedNavigationTarget", () => {
     expect(isAllowedNavigationTarget("http://127.0.0.1:5173", "https://evil.example/")).toBe(false);
     expect(isAllowedNavigationTarget(rendererUrl, pathToFileURL(path.resolve("tmp", "renderer", "other.html")).toString())).toBe(false);
   });
+
+  it("fails closed on a malformed target instead of throwing", () => {
+    expect(isAllowedNavigationTarget("http://127.0.0.1:5173", "not a url")).toBe(false);
+    expect(isAllowedNavigationTarget("http://127.0.0.1:5173", "")).toBe(false);
+    // file: URL with a UNC-style host — fileURLToPath() rejects these
+    expect(isAllowedNavigationTarget(rendererUrl, "file://evil.example/renderer/index.html")).toBe(false);
+  });
 });
 
 describe("attachWindowSecurityGuards", () => {
@@ -61,6 +68,10 @@ describe("attachWindowSecurityGuards", () => {
     const preventDefault = vi.fn();
     willNavigateHandlers[0]?.({ preventDefault }, "https://evil.example/");
     expect(preventDefault).toHaveBeenCalledTimes(1);
+
+    // A malformed URL must be blocked, not thrown past preventDefault()
+    expect(() => willNavigateHandlers[0]?.({ preventDefault }, "http://[")).not.toThrow();
+    expect(preventDefault).toHaveBeenCalledTimes(2);
 
     const handler = setWindowOpenHandler.mock.calls[0]?.[0] as ((details: { url: string }) => { action: string });
     expect(handler({ url: "http://127.0.0.1:5173/help" })).toEqual({ action: "deny" });

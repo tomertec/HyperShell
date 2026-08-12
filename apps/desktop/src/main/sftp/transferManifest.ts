@@ -26,13 +26,25 @@ export interface TransferManifest {
 export function createTransferManifest(directory: string): TransferManifest {
   const filePath = join(directory, "transfers.json");
 
+  // A manifest we cannot read is discarded, and the next save() overwrites it —
+  // so say so, otherwise resumable-transfer history vanishes without a trace.
   function readAll(): PersistedTransfer[] {
     if (!existsSync(filePath)) return [];
+
+    let parsed: unknown;
     try {
-      return JSON.parse(readFileSync(filePath, "utf8"));
-    } catch {
+      parsed = JSON.parse(readFileSync(filePath, "utf8"));
+    } catch (e) {
+      console.warn(`[hypershell] Discarding unreadable transfer manifest ${filePath}:`, e);
       return [];
     }
+
+    if (!Array.isArray(parsed)) {
+      console.warn(`[hypershell] Discarding transfer manifest ${filePath}: expected an array`);
+      return [];
+    }
+
+    return parsed as PersistedTransfer[];
   }
 
   function writeAll(entries: PersistedTransfer[]): void {

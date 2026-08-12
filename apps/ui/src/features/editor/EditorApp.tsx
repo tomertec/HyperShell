@@ -28,9 +28,10 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
   const openFile = useCallback(
     async (remotePath: string) => {
       const s = storeRef.current.getState();
-      // Dedup check before creating tab
-      if (s.tabs.some((t) => t.remotePath === remotePath)) {
-        s.addTab({ id: "", remotePath, fileName: "", content: "", originalContent: "", dirty: false, loading: false, error: null, language: "" });
+      // Already open — focus it instead of re-reading the file
+      const existing = s.tabs.find((t) => t.remotePath === remotePath);
+      if (existing) {
+        s.setActiveTab(existing.id);
         return;
       }
 

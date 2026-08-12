@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdirSync, rmSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -66,6 +66,31 @@ describe("transferManifest", () => {
   it("returns empty array when no manifest file exists", () => {
     const manifest = createTransferManifest(dir);
     expect(manifest.load()).toEqual([]);
+  });
+
+  it("discards an unreadable manifest and says so", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    writeFileSync(join(dir, "transfers.json"), "{ not json", "utf8");
+
+    expect(createTransferManifest(dir).load()).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("unreadable transfer manifest"),
+      expect.anything()
+    );
+    warn.mockRestore();
+  });
+
+  it("discards a manifest that is valid JSON but not an array", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    writeFileSync(join(dir, "transfers.json"), JSON.stringify({ tx: 1 }), "utf8");
+
+    const manifest = createTransferManifest(dir);
+    expect(manifest.load()).toEqual([]);
+    // save() used to throw here — readAll() returned an object and .filter() blew up
+    expect(() => manifest.save(makeEntry())).not.toThrow();
+    expect(manifest.load()).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("expected an array"));
+    warn.mockRestore();
   });
 
   it("overwrites existing entry with same transferId", () => {

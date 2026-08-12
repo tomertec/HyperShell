@@ -146,53 +146,58 @@ export function registerSshManagerImportIpc(
           fileMustExist: true,
         });
 
-        let hosts: SshManagerHost[] = [];
-        let groups: SshManagerGroup[] = [];
-        let snippets: SshManagerSnippet[] = [];
-
+        // Anything thrown past this point must still release the DB handle — on
+        // Windows a leaked handle keeps a file lock on the user's sshmanager DB.
         try {
-          const hostRows = smDb
-            .prepare(
-              `SELECT Id, DisplayName, Hostname, Port, Username, AuthType, PrivateKeyPath, OnePasswordReference, GroupId, Notes, IsFavorite, SortOrder, KeepAliveIntervalSeconds, ConnectionType FROM HostEntries`
-            )
-            .all() as SshManagerHostRow[];
+          let hosts: SshManagerHost[] = [];
+          let groups: SshManagerGroup[] = [];
+          let snippets: SshManagerSnippet[] = [];
 
-          // Only import SSH hosts (ConnectionType 0 or null), skip serial (1)
-          hosts = hostRows
-            .filter(
-              (r) => r.ConnectionType === null || r.ConnectionType === 0
-            )
-            .filter((r) => r.Hostname && r.Hostname.trim().length > 0)
-            .map(parseHostRow);
-        } catch (e) {
-          console.warn("[hypershell] Failed to read HostEntries from sshmanager DB:", e);
+          try {
+            const hostRows = smDb
+              .prepare(
+                `SELECT Id, DisplayName, Hostname, Port, Username, AuthType, PrivateKeyPath, OnePasswordReference, GroupId, Notes, IsFavorite, SortOrder, KeepAliveIntervalSeconds, ConnectionType FROM HostEntries`
+              )
+              .all() as SshManagerHostRow[];
+
+            // Only import SSH hosts (ConnectionType 0 or null), skip serial (1)
+            hosts = hostRows
+              .filter(
+                (r) => r.ConnectionType === null || r.ConnectionType === 0
+              )
+              .filter((r) => r.Hostname && r.Hostname.trim().length > 0)
+              .map(parseHostRow);
+          } catch (e) {
+            console.warn("[hypershell] Failed to read HostEntries from sshmanager DB:", e);
+          }
+
+          try {
+            const groupRows = smDb
+              .prepare(`SELECT Id, Name, Description FROM HostGroups`)
+              .all() as SshManagerGroupRow[];
+            groups = groupRows.map(parseGroupRow);
+          } catch (e) {
+            console.warn("[hypershell] Failed to read HostGroups from sshmanager DB:", e);
+          }
+
+          try {
+            const snippetRows = smDb
+              .prepare(
+                `SELECT Id, Name, Command, Category, SortOrder FROM CommandSnippets`
+              )
+              .all() as SshManagerSnippetRow[];
+            snippets = snippetRows.map(parseSnippetRow);
+          } catch (e) {
+            console.warn(
+              "[hypershell] Failed to read CommandSnippets from sshmanager DB:",
+              e
+            );
+          }
+
+          return { dbPath, hosts, groups, snippets };
+        } finally {
+          smDb.close();
         }
-
-        try {
-          const groupRows = smDb
-            .prepare(`SELECT Id, Name, Description FROM HostGroups`)
-            .all() as SshManagerGroupRow[];
-          groups = groupRows.map(parseGroupRow);
-        } catch (e) {
-          console.warn("[hypershell] Failed to read HostGroups from sshmanager DB:", e);
-        }
-
-        try {
-          const snippetRows = smDb
-            .prepare(
-              `SELECT Id, Name, Command, Category, SortOrder FROM CommandSnippets`
-            )
-            .all() as SshManagerSnippetRow[];
-          snippets = snippetRows.map(parseSnippetRow);
-        } catch (e) {
-          console.warn(
-            "[hypershell] Failed to read CommandSnippets from sshmanager DB:",
-            e
-          );
-        }
-
-        smDb.close();
-        return { dbPath, hosts, groups, snippets };
       } catch (e) {
         console.error("[hypershell] Failed to open sshmanager DB:", e);
         return { dbPath, hosts: [], groups: [], snippets: [] };
@@ -224,149 +229,153 @@ export function registerSshManagerImportIpc(
         fileMustExist: true,
       });
 
-      let importedHosts = 0;
-      let importedGroups = 0;
-      let importedSnippets = 0;
-      let skippedDuplicates = 0;
+      // See the scan handler: the DB handle must be released on every exit path,
+      // including a throw from the repositories below.
+      try {
+        let importedHosts = 0;
+        let importedGroups = 0;
+        let importedSnippets = 0;
+        let skippedDuplicates = 0;
 
-      const hostIdsSet = new Set(parsed.hostIds);
-      const groupIdsSet = new Set(parsed.groupIds);
-      const snippetIdsSet = new Set(parsed.snippetIds);
+        const hostIdsSet = new Set(parsed.hostIds);
+        const groupIdsSet = new Set(parsed.groupIds);
+        const snippetIdsSet = new Set(parsed.snippetIds);
 
-      // Import groups first (hosts may reference them)
-      if (groupIdsSet.size > 0) {
-        try {
-          const groupRows = smDb
-            .prepare(`SELECT Id, Name, Description FROM HostGroups`)
-            .all() as SshManagerGroupRow[];
+        // Import groups first (hosts may reference them)
+        if (groupIdsSet.size > 0) {
+          try {
+            const groupRows = smDb
+              .prepare(`SELECT Id, Name, Description FROM HostGroups`)
+              .all() as SshManagerGroupRow[];
 
-          const groupsRepo = getGroupsRepo();
-          for (const row of groupRows) {
-            if (!groupIdsSet.has(row.Id)) continue;
-            const group = parseGroupRow(row);
-            try {
-              groupsRepo.create({
-                id: group.id,
-                name: group.name,
-                description: group.description,
-              });
-              importedGroups++;
-            } catch (e) {
-              console.warn("[hypershell] Failed to import group:", group.name, e);
+            const groupsRepo = getGroupsRepo();
+            for (const row of groupRows) {
+              if (!groupIdsSet.has(row.Id)) continue;
+              const group = parseGroupRow(row);
+              try {
+                groupsRepo.create({
+                  id: group.id,
+                  name: group.name,
+                  description: group.description,
+                });
+                importedGroups++;
+              } catch (e) {
+                console.warn("[hypershell] Failed to import group:", group.name, e);
+              }
             }
+          } catch (e) {
+            console.warn("[hypershell] Failed to read groups for import:", e);
           }
-        } catch (e) {
-          console.warn("[hypershell] Failed to read groups for import:", e);
         }
-      }
 
-      // Import hosts
-      if (hostIdsSet.size > 0) {
-        try {
-          const hostRows = smDb
-            .prepare(
-              `SELECT Id, DisplayName, Hostname, Port, Username, AuthType, PrivateKeyPath, OnePasswordReference, GroupId, Notes, IsFavorite, SortOrder, KeepAliveIntervalSeconds, ConnectionType FROM HostEntries`
-            )
-            .all() as SshManagerHostRow[];
+        // Import hosts
+        if (hostIdsSet.size > 0) {
+          try {
+            const hostRows = smDb
+              .prepare(
+                `SELECT Id, DisplayName, Hostname, Port, Username, AuthType, PrivateKeyPath, OnePasswordReference, GroupId, Notes, IsFavorite, SortOrder, KeepAliveIntervalSeconds, ConnectionType FROM HostEntries`
+              )
+              .all() as SshManagerHostRow[];
 
-          const hostsRepo = getHostsRepo();
-          const existingHosts = hostsRepo.list();
+            const hostsRepo = getHostsRepo();
+            const existingHosts = hostsRepo.list();
 
-          for (const row of hostRows) {
-            if (!hostIdsSet.has(row.Id)) continue;
-            const host = parseHostRow(row);
+            for (const row of hostRows) {
+              if (!hostIdsSet.has(row.Id)) continue;
+              const host = parseHostRow(row);
 
-            // Duplicate check: hostname + port + username
-            const isDuplicate = existingHosts.some(
-              (existing) =>
-                existing.hostname === host.hostname &&
-                existing.port === host.port &&
-                (existing.username ?? null) === (host.username ?? null)
-            );
-
-            if (isDuplicate) {
-              skippedDuplicates++;
-              continue;
-            }
-
-            const authMethod = mapAuthType(host.authType);
-
-            try {
-              hostsRepo.create({
-                id: `sm-${host.id}`,
-                name: host.displayName,
-                hostname: host.hostname,
-                port: host.port,
-                username: host.username ?? "",
-                groupId: host.groupId
-                  ? (groupIdsSet.has(host.groupId) ? host.groupId : null)
-                  : null,
-                notes: host.notes,
-                identityFile:
-                  authMethod === "keyfile" ? host.privateKeyPath : null,
-                authMethod,
-                opReference:
-                  authMethod === "op-reference" ? host.opReference : null,
-                isFavorite: host.isFavorite,
-                sortOrder: host.sortOrder,
-                keepAliveInterval: host.keepAliveIntervalSeconds,
-              });
-              importedHosts++;
-            } catch (e) {
-              console.warn(
-                "[hypershell] Failed to import host:",
-                host.displayName,
-                e
+              // Duplicate check: hostname + port + username
+              const isDuplicate = existingHosts.some(
+                (existing) =>
+                  existing.hostname === host.hostname &&
+                  existing.port === host.port &&
+                  (existing.username ?? null) === (host.username ?? null)
               );
+
+              if (isDuplicate) {
+                skippedDuplicates++;
+                continue;
+              }
+
+              const authMethod = mapAuthType(host.authType);
+
+              try {
+                hostsRepo.create({
+                  id: `sm-${host.id}`,
+                  name: host.displayName,
+                  hostname: host.hostname,
+                  port: host.port,
+                  username: host.username ?? "",
+                  groupId: host.groupId
+                    ? (groupIdsSet.has(host.groupId) ? host.groupId : null)
+                    : null,
+                  notes: host.notes,
+                  identityFile:
+                    authMethod === "keyfile" ? host.privateKeyPath : null,
+                  authMethod,
+                  opReference:
+                    authMethod === "op-reference" ? host.opReference : null,
+                  isFavorite: host.isFavorite,
+                  sortOrder: host.sortOrder,
+                  keepAliveInterval: host.keepAliveIntervalSeconds,
+                });
+                importedHosts++;
+              } catch (e) {
+                console.warn(
+                  "[hypershell] Failed to import host:",
+                  host.displayName,
+                  e
+                );
+              }
             }
+          } catch (e) {
+            console.warn("[hypershell] Failed to read hosts for import:", e);
           }
-        } catch (e) {
-          console.warn("[hypershell] Failed to read hosts for import:", e);
         }
-      }
 
-      // Import snippets
-      if (snippetIdsSet.size > 0) {
-        try {
-          const snippetRows = smDb
-            .prepare(
-              `SELECT Id, Name, Command, Category, SortOrder FROM CommandSnippets`
-            )
-            .all() as SshManagerSnippetRow[];
+        // Import snippets
+        if (snippetIdsSet.size > 0) {
+          try {
+            const snippetRows = smDb
+              .prepare(
+                `SELECT Id, Name, Command, Category, SortOrder FROM CommandSnippets`
+              )
+              .all() as SshManagerSnippetRow[];
 
-          const snippetsRepo = getSnippetsRepo();
-          for (const row of snippetRows) {
-            if (!snippetIdsSet.has(row.Id)) continue;
-            const snippet = parseSnippetRow(row);
+            const snippetsRepo = getSnippetsRepo();
+            for (const row of snippetRows) {
+              if (!snippetIdsSet.has(row.Id)) continue;
+              const snippet = parseSnippetRow(row);
 
-            try {
-              snippetsRepo.create({
-                id: `sm-${snippet.id}`,
-                name: snippet.name,
-                body: snippet.command,
-              });
-              importedSnippets++;
-            } catch (e) {
-              console.warn(
-                "[hypershell] Failed to import snippet:",
-                snippet.name,
-                e
-              );
+              try {
+                snippetsRepo.create({
+                  id: `sm-${snippet.id}`,
+                  name: snippet.name,
+                  body: snippet.command,
+                });
+                importedSnippets++;
+              } catch (e) {
+                console.warn(
+                  "[hypershell] Failed to import snippet:",
+                  snippet.name,
+                  e
+                );
+              }
             }
+          } catch (e) {
+            console.warn("[hypershell] Failed to read snippets for import:", e);
           }
-        } catch (e) {
-          console.warn("[hypershell] Failed to read snippets for import:", e);
         }
+
+        return {
+          importedHosts,
+          importedGroups,
+          importedSnippets,
+          skippedDuplicates,
+        };
+      } finally {
+        smDb.close();
       }
-
-      smDb.close();
-
-      return {
-        importedHosts,
-        importedGroups,
-        importedSnippets,
-        skippedDuplicates,
-      };
     }
   );
 }
