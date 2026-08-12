@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Overflowed tabs are reachable again** — past roughly seven tabs the tab strip scrolls, but its native scrollbar is hidden on purpose (it stole layout height and detached the active tab from the terminal below it), which left a mouse wheel gesture over the strip as the only way to reach a tab that had scrolled out of view. `‹` / `›` chevrons now appear at the strip's edges while it can scroll that way and page it by 80% of the visible width, and the active tab scrolls itself into view whenever it changes — so opening a tab or switching by keyboard no longer leaves the active tab clipped past the right edge.
+
 ## [0.3.1] - 2026-08-11
 
 ### Added

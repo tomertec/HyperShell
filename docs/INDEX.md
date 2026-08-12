@@ -101,6 +101,7 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 | Snippets manager | Complete | `ui/features/snippets/`, `db/repositories/snippetsRepository.ts` |
 | Session logging | Complete | `desktop/ipc/loggingIpc.ts`, `ui/features/terminal/LoggingButton.tsx` |
 | Tab drag-and-drop reorder | Complete | `ui/features/layout/TabBar.tsx` (dnd-kit) |
+| Tab strip overflow scrolling | Complete | `ui/features/layout/TabBar.tsx` (edge chevrons, wheel, scroll-into-view) |
 | Split pane shortcuts | Complete | `ui/features/layout/paneShortcuts.ts` |
 | Host export (JSON/CSV) | Complete | `desktop/ipc/hostsIpc.ts` (exportHostsToJson/Csv) |
 | Toast notifications | Complete | sonner `<Toaster>` in App.tsx |

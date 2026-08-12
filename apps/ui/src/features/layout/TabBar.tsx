@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import {
   DndContext,
@@ -136,6 +136,16 @@ function SortableTab({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.tabKey ?? tab.sessionId,
   });
+  const nodeRef = useRef<HTMLDivElement | null>(null);
+
+  // A tab that becomes active off-screen is unreachable: the strip's scrollbar
+  // is hidden, so nothing tells the user it scrolled past. Opening a tab and
+  // switching panes both land here. `nearest` is what keeps this from fighting
+  // the user — an already-visible tab scrolls nothing.
+  useLayoutEffect(() => {
+    if (!isActive) return;
+    nodeRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [isActive]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -147,7 +157,16 @@ function SortableTab({
   const titleColorCss = titleColor ? getTabTitleColorCssValue(titleColor) : undefined;
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={`flex items-end ${isDragging ? "shadow-raised" : ""}`}>
+    <div
+      ref={(node) => {
+        nodeRef.current = node;
+        setNodeRef(node);
+      }}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`flex items-end ${isDragging ? "shadow-raised" : ""}`}
+    >
       <button
         data-tab-title-color={titleColor ?? "default"}
         onClick={onActivate}
@@ -217,6 +236,30 @@ function SortableTab({
   );
 }
 
+function ScrollChevron({
+  direction,
+  onClick,
+}: {
+  direction: "left" | "right";
+  onClick: () => void;
+}) {
+  return (
+    <div className="flex h-full shrink-0 items-center pb-2">
+      <IconButton
+        variant="ghost"
+        onClick={onClick}
+        title={`Scroll tabs ${direction}`}
+        aria-label={`Scroll tabs ${direction}`}
+        className="h-6 w-5 animate-menu-in"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d={direction === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+        </svg>
+      </IconButton>
+    </div>
+  );
+}
+
 export function TabBar({
   tabs,
   activeSessionId,
@@ -242,6 +285,38 @@ export function TabBar({
   } | null>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newTabButtonRef = useRef<HTMLButtonElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+
+  // Sub-pixel widths make an exactly-scrolled-to-the-end strip report a
+  // fractional gap, which would leave a chevron that scrolls nowhere.
+  const syncOverflow = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setOverflow((prev) => {
+      const next = { left: el.scrollLeft > 1, right: el.scrollLeft < max - 1 };
+      return prev.left === next.left && prev.right === next.right ? prev : next;
+    });
+  }, []);
+
+  // Tab widths move on their own — titles change as the running program
+  // changes — so the strip's own resize isn't enough; observe the tabs too.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    syncOverflow();
+    const observer = new ResizeObserver(syncOverflow);
+    observer.observe(el);
+    for (const child of Array.from(el.children)) observer.observe(child);
+    return () => observer.disconnect();
+  }, [syncOverflow, tabs.length]);
+
+  const scrollByPage = (direction: -1 | 1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction * el.clientWidth * 0.8, behavior: "smooth" });
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -316,14 +391,19 @@ export function TabBar({
           outside that container means it's never clipped, and the "+" stays
           reachable even when the tab list scrolls. */}
       <div className="flex h-full items-end bg-base-800 px-1 pt-2">
+        {overflow.left && (
+          <ScrollChevron direction="left" onClick={() => scrollByPage(-1)} />
+        )}
         <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           {/* The scrollbar is hidden, not styled: a native horizontal scrollbar
               consumes layout height here, squishing the tabs and detaching the
               active tab from the terminal below it. Vertical wheel delta maps
               to horizontal scroll so overflowed tabs stay reachable. */}
           <div
+            ref={scrollRef}
             data-testid="tab-scroll-container"
             className="flex h-full min-w-0 items-end overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onScroll={syncOverflow}
             onWheel={(e) => {
               if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
                 e.currentTarget.scrollLeft += e.deltaY;
@@ -356,6 +436,9 @@ export function TabBar({
             })}
           </div>
         </SortableContext>
+        {overflow.right && (
+          <ScrollChevron direction="right" onClick={() => scrollByPage(1)} />
+        )}
         {launchableProfiles.length > 0 && (
           <div className="relative flex items-center h-full pb-2 pl-0.5 shrink-0">
             <IconButton
