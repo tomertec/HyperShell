@@ -2,6 +2,8 @@
 
 All IPC channels are defined in `packages/shared/src/ipc/channels.ts`. Schemas are in `schemas.ts` and `sftpSchemas.ts`. The preload bridge validates both requests and responses with Zod.
 
+> **`channels.ts` is the authoritative list, not this page.** Several groups added since this reference was written are not tabled here yet — `app:`, `backup:`, `connection-history:`, `editor:`, `fs:`, `host-env-vars:`, `host-fingerprint:`, `host-profiles:`, `recording:`, `tags:`, `tray:`, `updates:`, and some newer `hosts:`/`session:`/`sftp:`/`ssh-keys:` channels. Check `channels.ts` before assuming a channel doesn't exist.
+
 ## Session Channels
 
 | Channel | Direction | Request | Response | Handler |
@@ -28,6 +30,18 @@ Session states: `connecting`, `connected`, `reconnecting`, `waiting_for_network`
 | `hosts:import-ssh-config` | `{ entries }` | `{ imported }` | `sshConfigIpc.ts` |
 | `hosts:reorder` | `{ hostOrders, groupOrders }` | void | `hostsIpc.ts` |
 | `hosts:export` | `{ format: "json"\|"csv", filePath }` | `{ exported: number }` | `hostsIpc.ts` / `registerIpc.ts` |
+
+## Host Import Channels
+
+Two-step migration from another client: a `scan` reads the foreign store and returns candidates, then an `import` writes the subset the user picked.
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `hosts:scan-putty` | — | `{ sessions: PuttySession[] }` | `puttyImportIpc.ts` |
+| `hosts:scan-ssh-manager` | — | `{ dbPath, hosts, groups, snippets }` | `sshManagerImportIpc.ts` |
+| `hosts:import-ssh-manager` | `{ hostIds, groupIds, snippetIds }` | `{ importedHosts, importedGroups, importedSnippets, skippedDuplicates }` | `sshManagerImportIpc.ts` |
+
+Both sshmanager handlers open its SQLite file read-only and always close the handle via `try/finally` — a leaked handle keeps a Windows file lock on the user's sshmanager DB. A missing DB is not an error: `scan` returns empty arrays and `import` returns all-zero counts. Per-table and per-row failures are logged and skipped rather than failing the whole import, so a partial result is normal. `scan` excludes hosts with `ConnectionType: 1` (serial) and those with a blank hostname; `import` skips duplicates, matched on `hostname + port + username`, and prefixes imported ids with `sm-`.
 
 ## Group Channels
 
@@ -147,6 +161,20 @@ Session logging intercepts terminal `data` events in `registerIpc.ts` and writes
 | `ssh-keys:generate` | `{ type, path, passphrase? }` | void | `sshKeysIpc.ts` |
 | `ssh-keys:get-fingerprint` | `{ path }` | `{ fingerprint }` | `sshKeysIpc.ts` |
 | `ssh-keys:remove` | `{ path }` | void | `sshKeysIpc.ts` |
+
+## 1Password Channels
+
+Back the `op://` reference picker in the host editor. Each handler shells out to the 1Password CLI (`op`) with `--format=json`.
+
+| Channel | Request | Response | Handler |
+|---------|---------|----------|---------|
+| `op:list-vaults` | — | `{ id, name }[]` | `opIpc.ts` |
+| `op:list-items` | `{ vaultId }` | `{ id, title, category? }[]` | `opIpc.ts` |
+| `op:get-item-fields` | `{ itemId }` | `{ id, label, type? }[]` | `opIpc.ts` |
+
+`op:get-item-fields` returns only labelled fields — unlabelled ones are section internals, not user-facing. Values are never returned over IPC; the renderer picks a field and stores the `op://` reference, and resolution happens in the main process at connect time (`security/opResolver.ts`).
+
+Two failure modes reach the renderer as errors with actionable messages rather than raw exceptions: `op` not being installed (`ENOENT`), and `op` writing non-JSON to stdout — which it does when the session is signed out, so the message says so.
 
 ## Host Port Forward Channels
 

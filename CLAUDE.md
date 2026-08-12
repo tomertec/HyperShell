@@ -55,7 +55,7 @@ Dependency direction: `desktop` → `shared`, `session-core`, `db`; `ui` → `sh
 2. **Preload bridge** (`apps/desktop/src/preload/`) — exposes `window.hypershell` API to renderer with Zod-validated typed IPC methods. Both request and response are validated.
 3. **Renderer** (`apps/ui/`) — React SPA loaded by Electron. Vite dev server on port 5173.
 
-**IPC contract pattern:** All IPC channels and payloads are defined in `packages/shared/src/ipc/` using Zod schemas. Both preload and main validate against the same schemas. Types are inferred via `z.infer`. See [`docs/ipc-reference.md`](docs/ipc-reference.md) for the full channel list.
+**IPC contract pattern:** All IPC channels and payloads are defined in `packages/shared/src/ipc/` using Zod schemas. Both preload and main validate against the same schemas. Types are inferred via `z.infer`. See [`docs/ipc-reference.md`](docs/ipc-reference.md) for the channel reference — it documents the main groups, but `channels.ts` is the authoritative list.
 
 **Session transports:** `session-core` provides a `SessionManager` that creates transport instances:
 - **SSH** — spawns system `ssh` binary in node-pty (full agent/config/proxy compatibility)
