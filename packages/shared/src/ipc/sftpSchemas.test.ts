@@ -167,6 +167,21 @@ describe("write-file versioning", () => {
 
     expect(parsed.expectedSize).toBeUndefined();
     expect(parsed.expectedModifiedAt).toBeUndefined();
+    expect("expectedSize" in parsed).toBe(false);
+    expect("expectedModifiedAt" in parsed).toBe(false);
+  });
+
+  it("round-trips a write request with both expectations (conditional write)", () => {
+    const parsed = sftpWriteFileRequestSchema.parse({
+      sftpSessionId: "s1",
+      path: "/r/f",
+      content: "hi",
+      expectedSize: 42,
+      expectedModifiedAt: "2026-08-13T00:00:00.000Z"
+    });
+
+    expect(parsed.expectedSize).toBe(42);
+    expect(parsed.expectedModifiedAt).toBe("2026-08-13T00:00:00.000Z");
   });
 
   it("reports a conflict outcome", () => {

@@ -254,6 +254,23 @@ export function normalizeFileContent(buffer: Buffer): {
   }
 }
 
+/**
+ * Whether a remote file's current stat differs from what the caller expected
+ * when it read the file — the entire basis of the save-conflict check.
+ *
+ * SFTP v3 `mtime` is whole seconds, so an edit that lands within the same
+ * second as the original and happens to produce the same byte length is
+ * undetectable here. That's inherent to the protocol, not a bug in this
+ * comparison — treat this as a best-effort optimistic-concurrency check,
+ * not an exact one.
+ */
+export function isVersionMismatch(
+  current: { size: number; modifiedAt: string },
+  expected: { size: number; modifiedAt: string }
+): boolean {
+  return current.size !== expected.size || current.modifiedAt !== expected.modifiedAt;
+}
+
 function normalizeTransferStatus(status: string): "queued" | "active" | "paused" | "completed" | "failed" {
   if (
     status === "queued" ||
@@ -670,9 +687,14 @@ export function registerSftpIpc(
     const request = sftpWriteFileRequestSchema.parse(rawRequest);
     const transport = sftpSessionManager.getTransport(request.sftpSessionId);
 
+    // Stat-then-write is inherently TOCTOU: SFTP has no atomic compare-and-swap,
+    // so a change landing between this stat and the writeFile call below is not
+    // caught — the previous task's atomic writeFile (temp + rename) widens that
+    // window from a single syscall to the whole upload duration. Accepted: the
+    // alternative (locking) isn't available over SFTP either.
     if (request.expectedSize != null && request.expectedModifiedAt != null) {
       const current = await transport.stat(request.path);
-      if (current.size !== request.expectedSize || current.modifiedAt !== request.expectedModifiedAt) {
+      if (isVersionMismatch(current, { size: request.expectedSize, modifiedAt: request.expectedModifiedAt })) {
         return {
           status: "conflict" as const,
           size: current.size,

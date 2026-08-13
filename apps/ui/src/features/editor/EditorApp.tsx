@@ -50,23 +50,33 @@ function EditorContent({
   }
 
   if (activeTab.readOnly) {
+    // Two distinct reasons land a tab here: it's genuinely binary (base64
+    // encoding, download-and-view is the escape hatch), or its read failed
+    // outright (no encoding was ever determined, there's nothing to
+    // download, and the error must stay visible instead of being replaced
+    // by a misleading "binary file" notice).
+    const failedToLoad = activeTab.encoding !== "base64";
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-sm text-text-primary">
-          {activeTab.fileName} is a binary file
+          {failedToLoad ? `Failed to load ${activeTab.fileName}` : `${activeTab.fileName} is a binary file`}
         </p>
         <p className="max-w-md text-xs text-text-secondary">
-          Editing it here would corrupt its contents, so it is open read-only.
+          {failedToLoad
+            ? (activeTab.error ?? "This file could not be read from the server.")
+            : "Editing it here would corrupt its contents, so it is open read-only."}
         </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="rounded border border-accent/20 bg-sky-500/10 px-3 py-1 text-xs text-sky-100"
-            onClick={() => onDownloadBinary(activeTab.remotePath, activeTab.fileName)}
-          >
-            Download
-          </button>
-        </div>
+        {!failedToLoad && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded border border-accent/20 bg-sky-500/10 px-3 py-1 text-xs text-sky-100"
+              onClick={() => onDownloadBinary(activeTab.remotePath, activeTab.fileName)}
+            >
+              Download
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -139,8 +149,11 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         });
 
         if (!response) {
+          // No content was ever received — leaving this editable would let a
+          // save silently overwrite the remote file with an empty buffer.
           storeRef.current.getState().updateTab(tabId, {
             loading: false,
+            readOnly: true,
             error: "Failed to read file",
           });
           return;
@@ -170,7 +183,9 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load file";
-        storeRef.current.getState().updateTab(tabId, { loading: false, error: message });
+        // Same reasoning as the !response branch above: an unread file must
+        // not be savable.
+        storeRef.current.getState().updateTab(tabId, { loading: false, readOnly: true, error: message });
       }
     },
     [sftpSessionId]
@@ -191,11 +206,15 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
   // Writes a tab's content to a (possibly new) remote path. Conditional on
   // the tab's base version unless `force` is set or no base version is known
   // (e.g. a freshly-created file). On conflict, opens SaveConflictDialog
-  // instead of overwriting.
+  // instead of overwriting. This is the single write chokepoint — every
+  // caller (Ctrl+S, the toolbar, and every SaveConflictDialog action) goes
+  // through it, so the readOnly/disconnected guards live here rather than
+  // being duplicated (and risking drift) at each call site.
   const writeTab = useCallback(
-    async (tabId: string, targetPath: string, force: boolean) => {
-      const tab = storeRef.current.getState().tabs.find((t) => t.id === tabId);
-      if (!tab) return;
+    async (tabId: string, targetPath: string, force: boolean): Promise<"written" | "conflict" | "error"> => {
+      const { tabs: currentTabs, sessionDisconnected: disconnected } = storeRef.current.getState();
+      const tab = currentTabs.find((t) => t.id === tabId);
+      if (!tab || tab.readOnly || disconnected) return "error";
 
       setSaving(true);
       try {
@@ -211,11 +230,20 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
 
         if (response?.status === "conflict") {
           setConflict({ tabId });
-          return;
+          return "conflict";
         }
+
+        // Recompute fileName/language from targetPath — a no-op for an
+        // ordinary save (targetPath === tab.remotePath), but required for
+        // Save As so the tab label, close-confirm prompt, status bar, and
+        // syntax highlighting all follow the new path instead of the old one.
+        const fileName = targetPath.split("/").pop() ?? targetPath;
+        const language = getLanguageName(fileName);
 
         storeRef.current.getState().updateTab(tabId, {
           remotePath: targetPath,
+          fileName,
+          language,
           originalContent: tab.content,
           dirty: false,
           error: null,
@@ -223,9 +251,11 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
           baseModifiedAt: response?.modifiedAt ?? null,
         });
         setConflict(null);
+        return "written";
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to save file";
         storeRef.current.getState().updateTab(tabId, { error: message });
+        return "error";
       } finally {
         setSaving(false);
       }
@@ -235,10 +265,9 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
 
   // Stable save handler — reads live state to avoid re-registration on every keystroke
   const handleSave = useCallback(async () => {
-    const { tabs: currentTabs, activeTabId: currentId, sessionDisconnected: disconnected } =
-      storeRef.current.getState();
+    const { tabs: currentTabs, activeTabId: currentId } = storeRef.current.getState();
     const tab = currentTabs.find((t) => t.id === currentId);
-    if (!tab || disconnected || tab.readOnly) return;
+    if (!tab) return;
 
     await writeTab(tab.id, tab.remotePath, false);
   }, [writeTab]);
@@ -265,6 +294,11 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         return;
       }
       storeRef.current.getState().removeTab(tabId);
+      // The conflict dialog references this tab by id — closing it out from
+      // under the dialog (e.g. via the tab bar's own close button) would
+      // otherwise leave the dialog rendered with empty fileName/remotePath
+      // and buttons that silently do nothing.
+      setConflict((current) => (current?.tabId === tabId ? null : current));
       if (storeRef.current.getState().tabs.length === 0) {
         window.close();
       }
@@ -272,9 +306,13 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
     []
   );
 
-  // Stable keydown — no deps on activeTab/handleSave
+  // Stable keydown — no deps on activeTab/handleSave. While the conflict
+  // dialog is open it owns all keyboard input (see its own Escape handler);
+  // Ctrl+S here would re-run a save behind it, and Ctrl+W would close the
+  // conflicted tab out from under it.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (conflict) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         void handleSave();
@@ -287,7 +325,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, handleCloseTab]);
+  }, [handleSave, handleCloseTab, conflict]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -301,7 +339,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col bg-base-900 text-text-primary">
+    <div className="relative flex h-screen flex-col bg-base-900 text-text-primary">
       {sessionDisconnected && (
         <div className="bg-red-900/60 px-3 py-1.5 text-center text-xs text-red-200">
           SFTP session disconnected. Save is disabled.
@@ -346,8 +384,39 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
               void openFile(tab.remotePath);
             }
           }}
-          onSaveAs={(newPath) => {
-            void writeTab(conflict.tabId, newPath, true);
+          onSaveAs={async (newPath) => {
+            const tab = storeRef.current.getState().tabs.find((t) => t.id === conflict.tabId);
+            if (!tab) {
+              return { ok: false, error: "This tab is no longer open." };
+            }
+
+            const targetPath = newPath.trim();
+            if (!targetPath) {
+              return { ok: false, error: "Enter a path." };
+            }
+            if (targetPath === tab.remotePath) {
+              return { ok: false, error: "Choose a different path — that's the file that changed." };
+            }
+
+            // No-clobber check: SFTP has no exists-without-reading primitive,
+            // so a successful stat is our only signal the destination is
+            // already occupied. Refuse rather than silently overwriting an
+            // unrelated file — the user still has Overwrite for the
+            // original path if that's what they actually want.
+            try {
+              await window.hypershell?.sftpStat?.({ sftpSessionId, path: targetPath });
+              return { ok: false, error: `${targetPath} already exists — choose a different name.` };
+            } catch {
+              // stat rejecting is the expected "nothing here yet" signal.
+            }
+
+            const outcome = await writeTab(tab.id, targetPath, true);
+            if (outcome === "error") {
+              const message = storeRef.current.getState().tabs.find((t) => t.id === tab.id)?.error;
+              return { ok: false, error: message ?? "Failed to save." };
+            }
+
+            return { ok: true };
           }}
           onCancel={() => setConflict(null)}
         />
