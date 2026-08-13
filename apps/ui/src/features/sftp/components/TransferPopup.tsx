@@ -6,10 +6,13 @@ import { toast } from "sonner";
 
 import type { TransferJobStatus } from "@hypershell/shared";
 import { settingsStore } from "../../settings/settingsStore";
-import { refreshTransfers, subscribeToTransferEvents } from "../transferEventCoordinator";
+import { resolveTransferConflict } from "../resolveTransferConflict";
+import { refreshTransfers } from "../transferEventCoordinator";
 import { transferStore, type TransferStoreTransfer } from "../transferStore";
+import { transferRowControls } from "../transferRowControls";
 import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
+import { TransferConflictActions } from "./TransferConflictActions";
 
 const RECENT_TRANSFER_WINDOW_MS = 120000;
 const MAX_VISIBLE_TRANSFERS = 1;
@@ -191,7 +194,7 @@ function TransferRow({
   onResolveConflict: (transferId: string, resolution: "overwrite" | "skip" | "rename", applyToAll: boolean) => void;
 }) {
   const running = isRunningStatus(transfer.status);
-  const pausedByUser = isPausedByUser(transfer);
+  const controls = transferRowControls(transfer, hasConflict);
   const progress = percentage(transfer.bytesTransferred, transfer.totalBytes);
   const eta = formatEta(transfer);
   const progressLabel =
@@ -228,45 +231,7 @@ function TransferRow({
           <p className="mt-0.5 truncate text-[10px] text-text-secondary">{getTransferCaption(transfer)}</p>
 
           {hasConflict ? (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
-              <span className="text-[10px] text-amber-200/70">File exists:</span>
-              <button
-                type="button"
-                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100"
-                onClick={() => onResolveConflict(transfer.transferId, "overwrite", false)}
-              >
-                Overwrite
-              </button>
-              <button
-                type="button"
-                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100"
-                onClick={() => onResolveConflict(transfer.transferId, "skip", false)}
-              >
-                Skip
-              </button>
-              <button
-                type="button"
-                className="rounded border border-accent/15 bg-sky-500/8 px-2 py-0.5 text-[10px] text-sky-200/70 transition-colors hover:border-accent/30 hover:text-sky-100"
-                onClick={() => onResolveConflict(transfer.transferId, "rename", false)}
-              >
-                Rename
-              </button>
-              <span className="mx-0.5 text-[9px] text-text-secondary/50">|</span>
-              <button
-                type="button"
-                className="rounded border border-amber-400/20 bg-amber-500/8 px-2 py-0.5 text-[10px] text-amber-200/70 transition-colors hover:border-amber-400/30 hover:text-amber-100"
-                onClick={() => onResolveConflict(transfer.transferId, "overwrite", true)}
-              >
-                Overwrite all
-              </button>
-              <button
-                type="button"
-                className="rounded border border-amber-400/20 bg-amber-500/8 px-2 py-0.5 text-[10px] text-amber-200/70 transition-colors hover:border-amber-400/30 hover:text-amber-100"
-                onClick={() => onResolveConflict(transfer.transferId, "skip", true)}
-              >
-                Skip all
-              </button>
-            </div>
+            <TransferConflictActions transferId={transfer.transferId} onResolve={onResolveConflict} />
           ) : (
           <div className="mt-1.5">
             <div className="mb-1 flex items-center justify-between text-[10px] text-text-secondary">
@@ -298,9 +263,9 @@ function TransferRow({
           )}
         </div>
 
-        {!hasConflict && (transfer.status === "active" || transfer.status === "queued" || transfer.status === "paused") ? (
+        {controls.pause || controls.resume || controls.cancel ? (
           <div className="flex flex-col gap-1">
-            {(transfer.status === "active" || transfer.status === "queued") ? (
+            {controls.pause ? (
               <button
                 type="button"
                 disabled={pausing || resuming || cancelling}
@@ -312,7 +277,7 @@ function TransferRow({
                 {pausing ? "..." : "Pause"}
               </button>
             ) : null}
-            {transfer.status === "paused" && pausedByUser ? (
+            {controls.resume ? (
               <button
                 type="button"
                 disabled={resuming || pausing || cancelling}
@@ -324,20 +289,22 @@ function TransferRow({
                 {resuming ? "..." : "Resume"}
               </button>
             ) : null}
-            <button
-              type="button"
-              disabled={cancelling || pausing || resuming}
-              className="rounded border border-white/8 bg-white/4 px-2 py-0.5 text-[10px] text-text-secondary transition-colors hover:border-red-400/25 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => {
-                void onCancel(transfer.transferId);
-              }}
-            >
-              {cancelling ? "..." : "Cancel"}
-            </button>
+            {controls.cancel ? (
+              <button
+                type="button"
+                disabled={cancelling || pausing || resuming}
+                className="rounded border border-white/8 bg-white/4 px-2 py-0.5 text-[10px] text-text-secondary transition-colors hover:border-red-400/25 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  void onCancel(transfer.transferId);
+                }}
+              >
+                {cancelling ? "..." : "Cancel"}
+              </button>
+            ) : null}
           </div>
         ) : null}
 
-        {(transfer.status === "interrupted" || transfer.status === "failed") && transfer.bytesTransferred > 0 ? (
+        {controls.retry ? (
           <div className="flex flex-col gap-1">
             <button
               type="button"
@@ -373,28 +340,9 @@ export function TransferPopup() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragSession, setDragSession] = useState<DragSession | null>(null);
   const [pendingOps, setPendingOps] = useState<Map<string, "cancel" | "pause" | "resume" | "retry">>(() => new Map());
-  const [conflictIds, setConflictIds] = useState<Set<string>>(() => new Set());
+  const conflictIds = useStore(transferStore, (state) => state.conflictIds);
   const [lastInteractionAt, setLastInteractionAt] = useState(() => Date.now());
   const popupContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Store updates and transfer-list refetches are owned by the app-level
-  // coordinator; the popup only tracks which transfers are awaiting a conflict
-  // decision, which is local UI state.
-  useEffect(() => {
-    return subscribeToTransferEvents((event) => {
-      if (event.kind === "transfer-conflict") {
-        setConflictIds((prev) => new Set(prev).add(event.transferId));
-        return;
-      }
-
-      setConflictIds((prev) => {
-        if (!prev.has(event.transferId)) return prev;
-        const next = new Set(prev);
-        next.delete(event.transferId);
-        return next;
-      });
-    });
-  }, []);
 
   const { runningTransfers, queuedTransfers, pausedTransfers, recentTransfers } = useMemo(() => {
     const running: TransferStoreTransfer[] = [];
@@ -639,32 +587,6 @@ export function TransferPopup() {
     }
   }, []);
 
-  const resolveConflict = useCallback(
-    (transferId: string, resolution: "overwrite" | "skip" | "rename", applyToAll: boolean) => {
-      setConflictIds((prev) => {
-        if (!prev.has(transferId)) return prev;
-        const next = new Set(prev);
-        next.delete(transferId);
-        return next;
-      });
-
-      void (async () => {
-        try {
-          await window.hypershell?.sftpTransferResolveConflict?.({
-            transferId,
-            resolution,
-            applyToAll
-          });
-        } catch (error) {
-          toast.error(toErrorMessage(error, "Failed to resolve conflict"));
-        } finally {
-          void refreshTransfers();
-        }
-      })();
-    },
-    []
-  );
-
   const cancelAllTransfers = useCallback(async () => {
     const cancel = window.hypershell?.sftpTransferCancel;
     if (!cancel) {
@@ -846,7 +768,7 @@ export function TransferPopup() {
                   onPause={pauseTransfer}
                   onResume={resumeTransfer}
                   onRetry={retryTransfer}
-                  onResolveConflict={resolveConflict}
+                  onResolveConflict={resolveTransferConflict}
                 />
               ))}
             </div>
