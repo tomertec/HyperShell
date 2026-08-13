@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type MouseEvent as ReactMouseEvent
 } from "react";
@@ -12,6 +13,7 @@ import type { StoreApi } from "zustand";
 import type { SftpEntry } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
 import { getParentPath } from "../utils/fileUtils";
+import { createRequestGuard } from "../utils/requestGuard";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList, type FileListEntry } from "./FileList";
 import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
@@ -120,12 +122,15 @@ export function RemotePane({
 
   const [contextMenu, setContextMenu] = useState<RemoteContextMenuState | null>(null);
 
+  const requestGuard = useRef(createRequestGuard());
+
   const loadDirectory = useCallback(
     async (path: string) => {
       if (!sftpSessionId) {
         return;
       }
 
+      const token = requestGuard.current.begin();
       setLoading("remote", true);
       setError("remote", null);
 
@@ -135,15 +140,23 @@ export function RemotePane({
           throw new Error("SFTP list API is unavailable in preload bridge");
         }
         const response = await sftpList({ sftpSessionId, path });
+        if (!requestGuard.current.isCurrent(token)) {
+          return;
+        }
         const entries = extractRemoteEntries(response);
         setRemoteEntries(entries);
       } catch (loadError) {
+        if (!requestGuard.current.isCurrent(token)) {
+          return;
+        }
         const message =
           loadError instanceof Error ? loadError.message : "Failed to list remote directory";
         console.error("[sftp-ui] loadDirectory failed:", message);
         setError("remote", message);
       } finally {
-        setLoading("remote", false);
+        if (requestGuard.current.isCurrent(token)) {
+          setLoading("remote", false);
+        }
       }
     },
     [setError, setLoading, setRemoteEntries, sftpSessionId]

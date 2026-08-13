@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent
+} from "react";
 import type React from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand";
@@ -7,6 +14,7 @@ import { toast } from "sonner";
 import type { FsEntry } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
 import { getParentPath } from "../utils/fileUtils";
+import { createRequestGuard } from "../utils/requestGuard";
 import { DriveSelector } from "./DriveSelector";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList } from "./FileList";
@@ -89,25 +97,34 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
     paths: [],
   });
 
+  const requestGuard = useRef(createRequestGuard());
+
   const loadDirectory = useCallback(
     async (path: string) => {
       if (!path) {
         return;
       }
 
+      const token = requestGuard.current.begin();
       setLoading("local", true);
       setError("local", null);
 
       try {
         const response = await window.hypershell?.fsList?.({ path });
+        if (!requestGuard.current.isCurrent(token)) {
+          return;
+        }
         setLocalEntries(response?.entries ?? []);
       } catch (loadError) {
+        if (!requestGuard.current.isCurrent(token)) {
+          return;
+        }
         const message =
           loadError instanceof Error ? loadError.message : "Failed to list local directory";
         if (message.includes("outside the allowed filesystem roots")) {
           try {
             const home = await window.hypershell?.fsGetHome?.();
-            if (home?.path && home.path !== path) {
+            if (home?.path && home.path !== path && requestGuard.current.isCurrent(token)) {
               setLocalPath(home.path);
               setError("local", `Path is outside allowed roots. Returned to ${home.path}.`);
               return;
@@ -118,7 +135,9 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         }
         setError("local", message);
       } finally {
-        setLoading("local", false);
+        if (requestGuard.current.isCurrent(token)) {
+          setLoading("local", false);
+        }
       }
     },
     [setError, setLoading, setLocalEntries, setLocalPath]
