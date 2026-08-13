@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import type { Readable, Writable } from "node:stream";
-import { Client, type ConnectConfig, type OpenMode, type SFTPWrapper, type Stats } from "ssh2";
+import { Client, utils, type ConnectConfig, type OpenMode, type SFTPWrapper, type Stats } from "ssh2";
 
 import type {
   SessionState,
@@ -72,6 +72,16 @@ interface PosixRenameCapable {
   ext_openssh_rename?: (from: string, to: string, cb: (err?: Error | null) => void) => void;
 }
 
+/**
+ * Thrown by `renameWithOverwrite`'s last-resort step when the destination was
+ * already unlinked but the rename meant to replace it then also failed. At
+ * that point `from` — not `to` — holds the only surviving copy of the data,
+ * so callers must not delete it on this specific failure.
+ */
+interface OverwriteRenameError extends Error {
+  destinationRemoved?: true;
+}
+
 function callbackToPromise(
   invoke: (cb: (err?: Error | null) => void) => void
 ): Promise<void> {
@@ -98,10 +108,13 @@ export async function renameWithOverwrite(
 
   if (typeof posixRename === "function") {
     try {
+      // ext_openssh_rename throws synchronously (not via the callback) when
+      // the server hasn't advertised the extension. That throw happens
+      // inside this Promise executor, so it still lands here as a rejection.
       await callbackToPromise((cb) => posixRename.call(sftpSession, from, to, cb));
       return;
     } catch {
-      // Advertised but refused — fall through to the portable path.
+      // Advertised but refused, or unsupported — fall through to the portable path.
     }
   }
 
@@ -116,7 +129,42 @@ export async function renameWithOverwrite(
     }
   }
 
-  await callbackToPromise((cb) => sftpSession.rename(from, to, cb));
+  try {
+    await callbackToPromise((cb) => sftpSession.rename(from, to, cb));
+  } catch (finalError) {
+    // The destination is already gone — tag the error so writeFile knows
+    // `from` is now the only copy and must not be cleaned up.
+    const tagged: OverwriteRenameError =
+      finalError instanceof Error ? finalError : new Error(String(finalError));
+    tagged.destinationRemoved = true;
+    throw tagged;
+  }
+}
+
+function isPermissionDenied(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error as Error & { code?: number }).code === utils.sftp.STATUS_CODE.PERMISSION_DENIED
+  );
+}
+
+const MAX_FILENAME_BYTES = 255;
+
+/**
+ * Truncate `baseName` (by bytes, since filesystem name limits are byte-based,
+ * not character-based) so that wrapping it in the temp-file name still fits
+ * under the common 255-byte filename limit. Without this, a save that used to
+ * work for a long filename starts failing purely because of the added suffix.
+ */
+function truncateForTempName(baseName: string, reservedBytes: number): string {
+  const budget = MAX_FILENAME_BYTES - reservedBytes;
+  if (Buffer.byteLength(baseName) <= budget) {
+    return baseName;
+  }
+
+  // Slicing a UTF-8 buffer can land mid-character; toString("utf8") replaces
+  // the truncated tail with U+FFFD, so strip that before returning.
+  return Buffer.from(baseName).subarray(0, budget).toString("utf8").replace(/\uFFFD+$/, "");
 }
 
 export function buildConnectConfig(
@@ -572,22 +620,45 @@ export function createSftpTransport(
    * previous implementation streamed straight onto the live path.
    */
   async function writeFile(remotePath: string, data: Buffer): Promise<void> {
-    const slashIndex = remotePath.lastIndexOf("/");
-    const directory = slashIndex > 0 ? remotePath.slice(0, slashIndex) : "";
-    const baseName = remotePath.slice(slashIndex + 1);
-    const tempPath = `${directory}/.${baseName}.hypershell-${randomBytes(6).toString("hex")}.tmp`;
+    const sftpSession = requireSftp();
+
+    // Renaming over `remotePath` would replace a symlink with a regular file
+    // (e.g. a dotfile symlinked into a repo would silently detach from it).
+    // Resolve to the real target first so the temp write and rename land
+    // there instead, leaving the symlink itself untouched.
+    let targetPath = remotePath;
+    try {
+      const linkStats = await new Promise<Stats>((resolve, reject) => {
+        sftpSession.lstat(remotePath, (error, stats) => (error ? reject(error) : resolve(stats)));
+      });
+      if (linkStats.isSymbolicLink()) {
+        targetPath = await new Promise<string>((resolve, reject) => {
+          sftpSession.realpath(remotePath, (error, absPath) => (error ? reject(error) : resolve(absPath)));
+        });
+      }
+    } catch {
+      // New file, broken link, or the server refused lstat — write at the
+      // requested path unchanged.
+    }
+
+    const slashIndex = targetPath.lastIndexOf("/");
+    const hasDirectoryPrefix = slashIndex >= 0;
+    const directory = slashIndex > 0 ? targetPath.slice(0, slashIndex) : "";
+    const baseName = targetPath.slice(slashIndex + 1);
+    const tempSuffix = `.hypershell-${randomBytes(6).toString("hex")}.tmp`;
+    const truncatedBaseName = truncateForTempName(baseName, 1 + Buffer.byteLength(tempSuffix));
+    const tempName = `.${truncatedBaseName}${tempSuffix}`;
+    const tempPath = hasDirectoryPrefix ? `${directory}/${tempName}` : tempName;
 
     // A fresh temp file is created with default permissions, so an existing
     // file's mode has to be carried across explicitly or the rename silently
     // resets it.
-    let originalMode: number | null = null;
+    let originalMode: number | null;
     try {
-      originalMode = (await stat(remotePath)).permissions;
+      originalMode = (await stat(targetPath)).permissions;
     } catch {
       originalMode = null;
     }
-
-    const sftpSession = requireSftp();
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -596,13 +667,35 @@ export function createSftpTransport(
         stream.on("close", () => resolve());
         stream.end(data);
       });
+    } catch (error) {
+      if (isPermissionDenied(error)) {
+        const parentLabel = hasDirectoryPrefix ? `"${directory === "" ? "/" : directory}"` : "its directory";
+        throw new Error(
+          `Cannot save "${remotePath}": no write permission on ${parentLabel}. ` +
+            "An atomic save creates a temporary file next to the original first, which needs " +
+            "write access to the directory itself, not just the file.",
+          { cause: error }
+        );
+      }
+      throw error;
+    }
 
+    try {
       if (originalMode != null) {
         await chmod(tempPath, originalMode);
       }
 
-      await renameWithOverwrite(sftpSession, tempPath, remotePath);
+      await renameWithOverwrite(sftpSession, tempPath, targetPath);
     } catch (error) {
+      if (error instanceof Error && (error as OverwriteRenameError).destinationRemoved) {
+        throw new Error(
+          `Save failed while replacing "${targetPath}": the original was removed but could not ` +
+            `be restored. Your content was NOT lost — it is saved at "${tempPath}"; move it into ` +
+            "place manually.",
+          { cause: error }
+        );
+      }
+
       await new Promise<void>((resolve) => {
         sftpSession.unlink(tempPath, () => resolve());
       });
