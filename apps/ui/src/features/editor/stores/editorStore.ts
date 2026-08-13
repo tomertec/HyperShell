@@ -12,6 +12,8 @@ export interface EditorTab {
   cursorLine: number;
   cursorCol: number;
   language: string;
+  encoding: "utf-8" | "base64";
+  readOnly: boolean;
 }
 
 export interface EditorSettings {

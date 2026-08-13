@@ -1,16 +1,91 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
+import type { StoreApi } from "zustand/vanilla";
 
 import { createEditorStore } from "./stores/editorStore";
+import type { EditorState, EditorTab } from "./stores/editorStore";
 import { EditorTabBar } from "./components/EditorTabBar";
 import { EditorToolbar } from "./components/EditorToolbar";
 const EditorPane = lazy(() => import("./components/EditorPane").then((m) => ({ default: m.EditorPane })));
 import { EditorStatusBar } from "./components/EditorStatusBar";
 import { getLanguageName } from "../sftp/utils/languageDetect";
-import { decodeBase64Utf8 } from "../sftp/utils/fileUtils";
 
 interface EditorAppProps {
   sftpSessionId: string;
+}
+
+interface EditorContentProps {
+  activeTab: EditorTab | undefined;
+  store: StoreApi<EditorState>;
+  saving: boolean;
+  sessionDisconnected: boolean;
+  onSave: () => void;
+  onDownloadBinary: (remotePath: string, fileName: string) => void;
+}
+
+// Active-tab pane: no file open, loading, binary (read-only notice), or the editor itself.
+function EditorContent({
+  activeTab,
+  store,
+  saving,
+  sessionDisconnected,
+  onSave,
+  onDownloadBinary,
+}: EditorContentProps) {
+  if (!activeTab) {
+    return (
+      <div className="flex h-full items-center justify-center text-text-muted">
+        No files open
+      </div>
+    );
+  }
+
+  if (activeTab.loading) {
+    return (
+      <div className="flex h-full items-center justify-center text-text-secondary">
+        Loading {activeTab.fileName}...
+      </div>
+    );
+  }
+
+  if (activeTab.readOnly) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-sm text-text-primary">
+          {activeTab.fileName} is a binary file
+        </p>
+        <p className="max-w-md text-xs text-text-secondary">
+          Editing it here would corrupt its contents, so it is open read-only.
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="rounded border border-accent/20 bg-sky-500/10 px-3 py-1 text-xs text-sky-100"
+            onClick={() => onDownloadBinary(activeTab.remotePath, activeTab.fileName)}
+          >
+            Download
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Suspense fallback={
+      <div className="flex h-full items-center justify-center text-text-secondary">
+        Loading editor...
+      </div>
+    }>
+      <EditorPane
+        key={activeTab.id}
+        store={store}
+        tabId={activeTab.id}
+        content={activeTab.content}
+        onSave={onSave}
+        canSave={Boolean(activeTab.dirty) && !saving && !sessionDisconnected}
+      />
+    </Suspense>
+  );
 }
 
 export function EditorApp({ sftpSessionId }: EditorAppProps) {
@@ -49,6 +124,8 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         loading: true,
         error: null,
         language,
+        encoding: "utf-8",
+        readOnly: false,
       });
 
       try {
@@ -65,15 +142,23 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
           return;
         }
 
-        const content =
-          response.encoding === "base64"
-            ? decodeBase64Utf8(response.content)
-            : response.content;
+        if (response.encoding === "base64") {
+          storeRef.current.getState().updateTab(tabId, {
+            loading: false,
+            content: "",
+            originalContent: "",
+            encoding: "base64",
+            readOnly: true,
+          });
+          return;
+        }
 
         storeRef.current.getState().updateTab(tabId, {
           loading: false,
-          content,
-          originalContent: content,
+          content: response.content,
+          originalContent: response.content,
+          encoding: "utf-8",
+          readOnly: false,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load file";
@@ -99,7 +184,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
   const handleSave = useCallback(async () => {
     const { tabs: currentTabs, activeTabId: currentId, sessionDisconnected: disconnected } = storeRef.current.getState();
     const tab = currentTabs.find((t) => t.id === currentId);
-    if (!tab || disconnected) return;
+    if (!tab || disconnected || tab.readOnly) return;
 
     setSaving(true);
     try {
@@ -121,6 +206,21 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
       setSaving(false);
     }
   }, [sftpSessionId]);
+
+  const handleDownloadBinary = useCallback(
+    async (remotePath: string, fileName: string) => {
+      const targetPath = await window.hypershell?.fsShowSaveDialog?.({ defaultPath: fileName });
+      if (!targetPath) return;
+
+      await window.hypershell?.sftpTransferStart?.({
+        sftpSessionId,
+        operations: [
+          { type: "download", localPath: targetPath, remotePath, isDirectory: false },
+        ],
+      });
+    },
+    [sftpSessionId]
+  );
 
   const handleCloseTab = useCallback(
     (tabId: string) => {
@@ -178,36 +278,18 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         store={store}
         onSave={() => void handleSave()}
         saving={saving}
-        disabled={sessionDisconnected}
+        disabled={sessionDisconnected || Boolean(activeTab?.readOnly)}
       />
 
       <div className="relative flex-1 overflow-hidden">
-        {activeTab ? (
-          activeTab.loading ? (
-            <div className="flex h-full items-center justify-center text-text-secondary">
-              Loading {activeTab.fileName}...
-            </div>
-          ) : (
-            <Suspense fallback={
-              <div className="flex h-full items-center justify-center text-text-secondary">
-                Loading editor...
-              </div>
-            }>
-              <EditorPane
-                key={activeTab.id}
-                store={store}
-                tabId={activeTab.id}
-                content={activeTab.content}
-                onSave={() => void handleSave()}
-                canSave={Boolean(activeTab.dirty) && !saving && !sessionDisconnected}
-              />
-            </Suspense>
-          )
-        ) : (
-          <div className="flex h-full items-center justify-center text-text-muted">
-            No files open
-          </div>
-        )}
+        <EditorContent
+          activeTab={activeTab}
+          store={store}
+          saving={saving}
+          sessionDisconnected={sessionDisconnected}
+          onSave={() => void handleSave()}
+          onDownloadBinary={(remotePath, fileName) => void handleDownloadBinary(remotePath, fileName)}
+        />
       </div>
 
       <EditorStatusBar store={store} />
