@@ -115,6 +115,10 @@ function handleSftpEvent(event: SftpEvent): void {
     const state = transferStore.getState();
     state.setConflict(event.transferId);
     state.setPanelOpen(true);
+    // A filter left on "completed"/"failed"/"interrupted" would hide the
+    // conflicted row entirely — with maxConcurrent: 1 that leaves the whole
+    // queue blocked behind a transfer the user can neither see nor cancel.
+    state.setFilter("all");
     void refreshTransfers();
     notifyTransferEvent(event);
     return;

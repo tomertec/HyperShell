@@ -687,11 +687,20 @@ export function createSftpTransport(
       throw error;
     }
 
-    try {
-      if (originalMode != null) {
+    if (originalMode != null) {
+      try {
         await chmod(tempPath, originalMode);
+      } catch {
+        // Best-effort mode preservation, matching the stat failure above:
+        // a server that refuses SETSTAT (e.g. answers chmod with
+        // OP_UNSUPPORTED) must not fail the entire save over it. Accepted
+        // trade-off: on such a server, a file that was 0600 lands at the
+        // server's default mode (commonly 0644) after this save — worse
+        // than losing the permission bit is losing the edit outright.
       }
+    }
 
+    try {
       await renameWithOverwrite(sftpSession, tempPath, targetPath);
     } catch (error) {
       if (error instanceof Error && (error as OverwriteRenameError).destinationRemoved) {

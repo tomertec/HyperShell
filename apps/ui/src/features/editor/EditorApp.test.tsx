@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { EditorApp } from "./EditorApp";
@@ -170,6 +170,98 @@ describe("EditorApp save-conflict handling", () => {
     expect(screen.getByText("renamed.md")).toBeTruthy();
     expect(screen.getByText("/r/renamed.md")).toBeTruthy();
     expect(screen.queryByText("original.txt")).toBeNull();
+  });
+
+  it("FIX 2: a missing sftpWriteFile bridge method fails the save instead of reporting success", async () => {
+    let openFileListener: OpenFileListener | null = null;
+
+    const sftpReadFile = vi.fn().mockResolvedValue({
+      content: "hello",
+      encoding: "utf-8",
+      size: 5,
+      modifiedAt: "2026-08-13T00:00:00.000Z",
+    });
+
+    window.hypershell = mockHypershell({
+      onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
+        openFileListener = listener;
+        return () => {};
+      }),
+      sftpReadFile,
+      sftpWriteFile: undefined,
+    });
+
+    render(<EditorApp sftpSessionId="s1" />);
+
+    act(() => {
+      openFileListener?.({ remotePath: "/r/original.txt", sftpSessionId: "s1" });
+    });
+    await screen.findByTestId("editor-pane-stub");
+
+    act(() => {
+      ctrlKey("s");
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Save is unavailable in this build. Restart HyperShell.")
+      ).toBeTruthy();
+    });
+    // Must not have been mistaken for a successful save — no conflict dialog,
+    // and re-pressing Ctrl+S must still be possible (the tab wasn't marked
+    // clean behind a null base version).
+    expect(screen.queryByRole("dialog", { name: "Remote file changed" })).toBeNull();
+  });
+
+  it("FIX 5: a failed Overwrite surfaces its error in the dialog instead of appearing inert", async () => {
+    let openFileListener: OpenFileListener | null = null;
+
+    const sftpReadFile = vi.fn().mockResolvedValue({
+      content: "hello",
+      encoding: "utf-8",
+      size: 5,
+      modifiedAt: "2026-08-13T00:00:00.000Z",
+    });
+    const sftpWriteFile = vi
+      .fn()
+      .mockResolvedValueOnce({ status: "conflict", size: 999, modifiedAt: "2026-08-13T01:00:00.000Z" })
+      .mockRejectedValueOnce(new Error("disk full"));
+
+    window.hypershell = mockHypershell({
+      onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
+        openFileListener = listener;
+        return () => {};
+      }),
+      sftpReadFile,
+      sftpWriteFile,
+    });
+
+    const user = userEvent.setup();
+    render(<EditorApp sftpSessionId="s1" />);
+
+    act(() => {
+      openFileListener?.({ remotePath: "/r/original.txt", sftpSessionId: "s1" });
+    });
+    await screen.findByTestId("editor-pane-stub");
+
+    act(() => {
+      ctrlKey("s");
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Remote file changed" })).toBeTruthy();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Overwrite" }));
+
+    // "disk full" also lands on the tab's own error slot (the toolbar) via
+    // writeTab — scope to the dialog to assert on its own error display.
+    const dialog = screen.getByRole("dialog", { name: "Remote file changed" });
+    await waitFor(() => {
+      expect(within(dialog).getByText("disk full")).toBeTruthy();
+    });
+    // The dialog must stay open on failure — the user still needs to choose
+    // an option, not be left believing the click did nothing.
+    expect(screen.getByRole("dialog", { name: "Remote file changed" })).toBeTruthy();
   });
 
   it("Mn-6: Escape cancels the dialog, and Ctrl+S is suppressed while it's open", async () => {

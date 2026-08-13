@@ -216,9 +216,22 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
       const tab = currentTabs.find((t) => t.id === tabId);
       if (!tab || tab.readOnly || disconnected) return "error";
 
+      // Fail fast if the bridge lacks the method, rather than letting
+      // `await undefined?.(...)` resolve to `undefined` and fall through to
+      // the success branch below — that would mark the tab saved (and null
+      // out its base version, permanently disabling its conflict check)
+      // for a write that never happened.
+      const writeFile = window.hypershell?.sftpWriteFile;
+      if (!writeFile) {
+        storeRef.current.getState().updateTab(tabId, {
+          error: "Save is unavailable in this build. Restart HyperShell.",
+        });
+        return "error";
+      }
+
       setSaving(true);
       try {
-        const response = await window.hypershell?.sftpWriteFile?.({
+        const response = await writeFile({
           sftpSessionId,
           path: targetPath,
           content: tab.content,
@@ -372,9 +385,19 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         <SaveConflictDialog
           fileName={tabs.find((t) => t.id === conflict.tabId)?.fileName ?? ""}
           remotePath={tabs.find((t) => t.id === conflict.tabId)?.remotePath ?? ""}
-          onOverwrite={() => {
+          onOverwrite={async () => {
             const tab = storeRef.current.getState().tabs.find((t) => t.id === conflict.tabId);
-            if (tab) void writeTab(tab.id, tab.remotePath, true);
+            if (!tab) {
+              return { ok: false, error: "This tab is no longer open." };
+            }
+
+            const outcome = await writeTab(tab.id, tab.remotePath, true);
+            if (outcome === "error") {
+              const message = storeRef.current.getState().tabs.find((t) => t.id === tab.id)?.error;
+              return { ok: false, error: message ?? "Failed to save." };
+            }
+
+            return { ok: true };
           }}
           onReload={() => {
             const tab = storeRef.current.getState().tabs.find((t) => t.id === conflict.tabId);

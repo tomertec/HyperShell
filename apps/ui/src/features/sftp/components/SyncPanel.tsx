@@ -178,7 +178,12 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
               <>Syncing: {lastEvent.currentFile} ({lastEvent.filesSynced} files)</>
             )}
             {lastEvent.kind === "sync-complete" && (
-              <>Complete: {lastEvent.filesSynced} files, {(lastEvent.bytesTransferred / 1024).toFixed(1)} KB</>
+              <>
+                Complete: {lastEvent.filesSynced} files, {(lastEvent.bytesTransferred / 1024).toFixed(1)} KB
+                {lastEvent.filesFailed > 0 && (
+                  <span className="text-red-400"> ({lastEvent.filesFailed} failed)</span>
+                )}
+              </>
             )}
             {lastEvent.kind === "sync-error" && (
               <span className="text-red-400">Error: {lastEvent.error}</span>

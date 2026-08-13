@@ -8,7 +8,11 @@ export interface SaveAsOutcome {
 export interface SaveConflictDialogProps {
   fileName: string;
   remotePath: string;
-  onOverwrite: () => void;
+  // Async, like onSaveAs below, so a failed overwrite (e.g. the bridge
+  // method is missing, or the write rejects) surfaces here instead of
+  // leaving the button looking inert with the error stranded on the tab,
+  // which this dialog doesn't render.
+  onOverwrite: () => Promise<SaveAsOutcome>;
   onReload: () => void;
   // Async so the caller can refuse a destination that already exists (see
   // EditorApp) and report why, without this component knowing about SFTP.
@@ -32,6 +36,8 @@ export function SaveConflictDialog({
   const [saveAsPath, setSaveAsPath] = useState(`${remotePath}.new`);
   const [saveAsError, setSaveAsError] = useState<string | null>(null);
   const [saveAsBusy, setSaveAsBusy] = useState(false);
+  const [overwriteError, setOverwriteError] = useState<string | null>(null);
+  const [overwriteBusy, setOverwriteBusy] = useState(false);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -54,6 +60,17 @@ export function SaveConflictDialog({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onCancel]);
+
+  const handleOverwriteClick = async () => {
+    setOverwriteError(null);
+    setOverwriteBusy(true);
+    const outcome = await onOverwrite();
+    if (!isMountedRef.current) return;
+    setOverwriteBusy(false);
+    if (!outcome.ok) {
+      setOverwriteError(outcome.error ?? "Failed to save");
+    }
+  };
 
   const handleSaveAsClick = async () => {
     setSaveAsError(null);
@@ -83,10 +100,11 @@ export function SaveConflictDialog({
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className="rounded border border-red-400/30 bg-red-500/10 px-3 py-1 text-xs text-red-200"
-            onClick={onOverwrite}
+            className="rounded border border-red-400/30 bg-red-500/10 px-3 py-1 text-xs text-red-200 disabled:opacity-50"
+            disabled={overwriteBusy}
+            onClick={() => void handleOverwriteClick()}
           >
-            Overwrite
+            {overwriteBusy ? "Overwriting..." : "Overwrite"}
           </button>
           <button
             type="button"
@@ -103,6 +121,7 @@ export function SaveConflictDialog({
             Cancel
           </button>
         </div>
+        {overwriteError && <p className="mt-1 text-xs text-red-400">{overwriteError}</p>}
 
         <div className="mt-4 border-t border-base-700 pt-3">
           <label className="text-xs text-text-secondary" htmlFor="save-as-path">

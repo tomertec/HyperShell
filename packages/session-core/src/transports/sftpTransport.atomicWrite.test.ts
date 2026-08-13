@@ -277,6 +277,28 @@ describe("writeFile", () => {
     expect(unlinkCalls[0]).toMatch(/^\/dir\/\.file\.txt\.hypershell-[0-9a-f]{12}\.tmp$/);
   });
 
+  it("saves successfully even when the server refuses chmod (FIX 3, best-effort mode preservation)", async () => {
+    const chmodCalls: Array<{ path: string; mode: number }> = [];
+    const session = {
+      lstat: lstatMissing,
+      stat: (_p: string, cb: StatCb) => cb(undefined, { mode: 0o100600, mtime: 0, size: 5 }),
+      chmod: (path: string, mode: number, cb: Cb) => {
+        chmodCalls.push({ path, mode });
+        cb(new Error("OP_UNSUPPORTED"));
+      },
+      createWriteStream: (_path: string) => createFakeWriteStream("success"),
+      rename: (_f: string, _t: string, cb: Cb) => cb(null),
+      unlink: (_p: string, cb: Cb) => cb(null),
+    };
+
+    const transport = await connectWithSession(session);
+
+    await expect(transport.writeFile("/dir/file.txt", Buffer.from("data"))).resolves.toBeUndefined();
+    // The attempt happened (mode preservation is still tried) but its
+    // failure must not have propagated — the save completed anyway.
+    expect(chmodCalls).toHaveLength(1);
+  });
+
   it("writes at the requested path for a new file when lstat and stat both fail", async () => {
     const writeStreamPaths: string[] = [];
     const renameCalls: Array<{ from: string; to: string }> = [];

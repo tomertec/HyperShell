@@ -254,6 +254,20 @@ describe("transferEventCoordinator", () => {
     expect(transferStore.getState().conflictIds.has("t1")).toBe(false);
   });
 
+  it("resets the filter to \"all\" when a conflict arrives, so the panel can't hide it", () => {
+    startTransferEventCoordinator();
+    transferStore.getState().setFilter("completed");
+
+    emit({
+      kind: "transfer-conflict",
+      transferId: "t1",
+      remotePath: "/r/f",
+      localPath: "/l/f"
+    });
+
+    expect(transferStore.getState().filter).toBe("all");
+  });
+
   it("clears the conflict when the transfer completes", () => {
     startTransferEventCoordinator();
 

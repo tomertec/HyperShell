@@ -1,3 +1,8 @@
+// UNUSED — no importers anywhere in apps/ui/src. It still carries the two
+// data-integrity defects EditorApp.tsx fixed: it decodes base64 content as
+// text (see `decodeBase64Utf8` below) and writes `encoding: "utf-8"`
+// unconditionally with no version/conflict check. Both must be fixed before
+// this is wired up to anything.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorState } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
