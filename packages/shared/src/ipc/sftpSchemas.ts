@@ -89,7 +89,9 @@ export type SftpReadFileRequest = z.infer<typeof sftpReadFileRequestSchema>;
 
 export const sftpReadFileResponseSchema = z.object({
   content: z.string(),
-  encoding: z.enum(["utf-8", "base64"])
+  encoding: z.enum(["utf-8", "base64"]),
+  size: z.number(),
+  modifiedAt: z.string()
 });
 export type SftpReadFileResponse = z.infer<typeof sftpReadFileResponseSchema>;
 
@@ -97,9 +99,20 @@ export const sftpWriteFileRequestSchema = z.object({
   sftpSessionId: z.string(),
   path: z.string(),
   content: z.string(),
-  encoding: z.enum(["utf-8", "base64"]).optional().default("utf-8")
+  encoding: z.enum(["utf-8", "base64"]).optional().default("utf-8"),
+  // Omit both to force an unconditional overwrite. Supplying them makes the
+  // write conditional on the remote file being unchanged since it was read.
+  expectedSize: z.number().optional(),
+  expectedModifiedAt: z.string().optional()
 });
 export type SftpWriteFileRequest = z.infer<typeof sftpWriteFileRequestSchema>;
+
+export const sftpWriteFileResponseSchema = z.object({
+  status: z.enum(["written", "conflict"]),
+  size: z.number(),
+  modifiedAt: z.string()
+});
+export type SftpWriteFileResponse = z.infer<typeof sftpWriteFileResponseSchema>;
 
 export const transferOpSchema = z.object({
   type: z.enum(["upload", "download"]),

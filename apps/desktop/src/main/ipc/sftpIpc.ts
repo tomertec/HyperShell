@@ -654,16 +654,44 @@ export function registerSftpIpc(
 
   const handleReadFile = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpReadFileRequestSchema.parse(rawRequest);
-    const buffer = await sftpSessionManager.getTransport(request.sftpSessionId).readFile(request.path);
-    return normalizeFileContent(buffer);
+    const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+    const entry = await transport.stat(request.path);
+    const buffer = await transport.readFile(request.path);
+    const normalized = normalizeFileContent(buffer);
+
+    return {
+      ...normalized,
+      size: entry.size,
+      modifiedAt: entry.modifiedAt
+    };
   };
 
   const handleWriteFile = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpWriteFileRequestSchema.parse(rawRequest);
+    const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+
+    if (request.expectedSize != null && request.expectedModifiedAt != null) {
+      const current = await transport.stat(request.path);
+      if (current.size !== request.expectedSize || current.modifiedAt !== request.expectedModifiedAt) {
+        return {
+          status: "conflict" as const,
+          size: current.size,
+          modifiedAt: current.modifiedAt
+        };
+      }
+    }
+
     const content = request.encoding === "base64"
       ? Buffer.from(request.content, "base64")
       : Buffer.from(request.content, "utf8");
-    await sftpSessionManager.getTransport(request.sftpSessionId).writeFile(request.path, content);
+    await transport.writeFile(request.path, content);
+    const written = await transport.stat(request.path);
+
+    return {
+      status: "written" as const,
+      size: written.size,
+      modifiedAt: written.modifiedAt
+    };
   };
 
   const handleTransferStart = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {

@@ -17,7 +17,9 @@ describe("editorStore", () => {
       error: null,
       language: "plaintext",
       encoding: "base64",
-      readOnly: true
+      readOnly: true,
+      baseSize: null,
+      baseModifiedAt: null
     });
 
     const tab = store.getState().tabs[0];
@@ -39,7 +41,9 @@ describe("editorStore", () => {
       error: null,
       language: "plaintext",
       encoding: "utf-8",
-      readOnly: false
+      readOnly: false,
+      baseSize: null,
+      baseModifiedAt: null
     });
 
     expect(store.getState().tabs[0].readOnly).toBe(false);

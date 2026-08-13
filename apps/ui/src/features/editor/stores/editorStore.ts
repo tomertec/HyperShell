@@ -14,6 +14,8 @@ export interface EditorTab {
   language: string;
   encoding: "utf-8" | "base64";
   readOnly: boolean;
+  baseSize: number | null;
+  baseModifiedAt: string | null;
 }
 
 export interface EditorSettings {

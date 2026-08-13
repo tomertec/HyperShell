@@ -10,7 +10,10 @@ import {
   sftpDragOutRequestSchema,
   sftpEventSchema,
   sftpListRequestSchema,
+  sftpReadFileResponseSchema,
   sftpTransferStartRequestSchema,
+  sftpWriteFileRequestSchema,
+  sftpWriteFileResponseSchema,
   transferJobStatusSchema
 } from "./sftpSchemas";
 
@@ -139,5 +142,40 @@ describe("transferJobStatusSchema", () => {
     for (const s of ["queued", "active", "paused", "completed", "failed"]) {
       expect(transferJobStatusSchema.parse(s)).toBe(s);
     }
+  });
+});
+
+describe("write-file versioning", () => {
+  it("carries version metadata on a read response", () => {
+    const parsed = sftpReadFileResponseSchema.parse({
+      content: "hi",
+      encoding: "utf-8",
+      size: 2,
+      modifiedAt: "2026-08-13T00:00:00.000Z"
+    });
+
+    expect(parsed.size).toBe(2);
+    expect(parsed.modifiedAt).toBe("2026-08-13T00:00:00.000Z");
+  });
+
+  it("accepts a write request without expectations (force overwrite)", () => {
+    const parsed = sftpWriteFileRequestSchema.parse({
+      sftpSessionId: "s1",
+      path: "/r/f",
+      content: "hi"
+    });
+
+    expect(parsed.expectedSize).toBeUndefined();
+    expect(parsed.expectedModifiedAt).toBeUndefined();
+  });
+
+  it("reports a conflict outcome", () => {
+    const parsed = sftpWriteFileResponseSchema.parse({
+      status: "conflict",
+      size: 9,
+      modifiedAt: "2026-08-13T01:00:00.000Z"
+    });
+
+    expect(parsed.status).toBe("conflict");
   });
 });

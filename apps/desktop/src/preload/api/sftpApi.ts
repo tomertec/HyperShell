@@ -27,6 +27,7 @@ import {
   sftpTransferRetryRequestSchema,
   sftpTransferStartRequestSchema,
   sftpWriteFileRequestSchema,
+  sftpWriteFileResponseSchema,
   transferJobSchema,
   sftpSyncStatusSchema,
   sftpSyncStartRequestSchema,
@@ -63,6 +64,7 @@ import {
   type SftpTransferRetryRequest,
   type SftpTransferStartRequest,
   type SftpWriteFileRequest,
+  type SftpWriteFileResponse,
   type TransferJob,
   type SftpSyncStartRequest,
   type SftpSyncStopRequest,
@@ -87,7 +89,7 @@ export interface SftpApi {
   sftpRename(request: SftpRenameRequest): Promise<void>;
   sftpDelete(request: SftpDeleteRequest): Promise<void>;
   sftpReadFile(request: SftpReadFileRequest): Promise<SftpReadFileResponse>;
-  sftpWriteFile(request: SftpWriteFileRequest): Promise<void>;
+  sftpWriteFile(request: SftpWriteFileRequest): Promise<SftpWriteFileResponse>;
   sftpTransferStart(request: SftpTransferStartRequest): Promise<TransferJob[]>;
   sftpTransferCancel(request: SftpTransferCancelRequest): Promise<void>;
   sftpTransferPause(request: SftpTransferPauseRequest): Promise<void>;
@@ -319,9 +321,10 @@ export function createSftpApi(
       const result = await ipcRenderer.invoke(ipcChannels.sftp.readFile, parsed);
       return sftpReadFileResponseSchema.parse(result);
     },
-    async sftpWriteFile(request: SftpWriteFileRequest): Promise<void> {
+    async sftpWriteFile(request: SftpWriteFileRequest): Promise<SftpWriteFileResponse> {
       const parsed = sftpWriteFileRequestSchema.parse(request);
-      await ipcRenderer.invoke(ipcChannels.sftp.writeFile, parsed);
+      const result = await ipcRenderer.invoke(ipcChannels.sftp.writeFile, parsed);
+      return sftpWriteFileResponseSchema.parse(result);
     },
     async sftpTransferStart(request: SftpTransferStartRequest): Promise<TransferJob[]> {
       const parsed = sftpTransferStartRequestSchema.parse(request);

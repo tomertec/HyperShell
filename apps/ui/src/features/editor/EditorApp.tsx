@@ -8,6 +8,7 @@ import { EditorTabBar } from "./components/EditorTabBar";
 import { EditorToolbar } from "./components/EditorToolbar";
 const EditorPane = lazy(() => import("./components/EditorPane").then((m) => ({ default: m.EditorPane })));
 import { EditorStatusBar } from "./components/EditorStatusBar";
+import { SaveConflictDialog } from "./components/SaveConflictDialog";
 import { getLanguageName } from "../sftp/utils/languageDetect";
 
 interface EditorAppProps {
@@ -97,6 +98,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
   const activeTabId = useStore(store, (s) => s.activeTabId);
   const sessionDisconnected = useStore(store, (s) => s.sessionDisconnected);
   const [saving, setSaving] = useState(false);
+  const [conflict, setConflict] = useState<{ tabId: string } | null>(null);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
@@ -126,6 +128,8 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         language,
         encoding: "utf-8",
         readOnly: false,
+        baseSize: null,
+        baseModifiedAt: null,
       });
 
       try {
@@ -149,6 +153,8 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
             originalContent: "",
             encoding: "base64",
             readOnly: true,
+            baseSize: response.size,
+            baseModifiedAt: response.modifiedAt,
           });
           return;
         }
@@ -159,6 +165,8 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
           originalContent: response.content,
           encoding: "utf-8",
           readOnly: false,
+          baseSize: response.size,
+          baseModifiedAt: response.modifiedAt,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load file";
@@ -180,32 +188,60 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
     });
   }, []);
 
+  // Writes a tab's content to a (possibly new) remote path. Conditional on
+  // the tab's base version unless `force` is set or no base version is known
+  // (e.g. a freshly-created file). On conflict, opens SaveConflictDialog
+  // instead of overwriting.
+  const writeTab = useCallback(
+    async (tabId: string, targetPath: string, force: boolean) => {
+      const tab = storeRef.current.getState().tabs.find((t) => t.id === tabId);
+      if (!tab) return;
+
+      setSaving(true);
+      try {
+        const response = await window.hypershell?.sftpWriteFile?.({
+          sftpSessionId,
+          path: targetPath,
+          content: tab.content,
+          encoding: "utf-8",
+          ...(force || tab.baseSize == null || tab.baseModifiedAt == null
+            ? {}
+            : { expectedSize: tab.baseSize, expectedModifiedAt: tab.baseModifiedAt }),
+        });
+
+        if (response?.status === "conflict") {
+          setConflict({ tabId });
+          return;
+        }
+
+        storeRef.current.getState().updateTab(tabId, {
+          remotePath: targetPath,
+          originalContent: tab.content,
+          dirty: false,
+          error: null,
+          baseSize: response?.size ?? null,
+          baseModifiedAt: response?.modifiedAt ?? null,
+        });
+        setConflict(null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to save file";
+        storeRef.current.getState().updateTab(tabId, { error: message });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [sftpSessionId]
+  );
+
   // Stable save handler — reads live state to avoid re-registration on every keystroke
   const handleSave = useCallback(async () => {
-    const { tabs: currentTabs, activeTabId: currentId, sessionDisconnected: disconnected } = storeRef.current.getState();
+    const { tabs: currentTabs, activeTabId: currentId, sessionDisconnected: disconnected } =
+      storeRef.current.getState();
     const tab = currentTabs.find((t) => t.id === currentId);
     if (!tab || disconnected || tab.readOnly) return;
 
-    setSaving(true);
-    try {
-      await window.hypershell?.sftpWriteFile?.({
-        sftpSessionId,
-        path: tab.remotePath,
-        content: tab.content,
-        encoding: "utf-8",
-      });
-      storeRef.current.getState().updateTab(tab.id, {
-        originalContent: tab.content,
-        dirty: false,
-        error: null,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save file";
-      storeRef.current.getState().updateTab(tab.id, { error: message });
-    } finally {
-      setSaving(false);
-    }
-  }, [sftpSessionId]);
+    await writeTab(tab.id, tab.remotePath, false);
+  }, [writeTab]);
 
   const handleDownloadBinary = useCallback(
     async (remotePath: string, fileName: string) => {
@@ -293,6 +329,29 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
       </div>
 
       <EditorStatusBar store={store} />
+
+      {conflict ? (
+        <SaveConflictDialog
+          fileName={tabs.find((t) => t.id === conflict.tabId)?.fileName ?? ""}
+          remotePath={tabs.find((t) => t.id === conflict.tabId)?.remotePath ?? ""}
+          onOverwrite={() => {
+            const tab = storeRef.current.getState().tabs.find((t) => t.id === conflict.tabId);
+            if (tab) void writeTab(tab.id, tab.remotePath, true);
+          }}
+          onReload={() => {
+            const tab = storeRef.current.getState().tabs.find((t) => t.id === conflict.tabId);
+            setConflict(null);
+            if (tab) {
+              storeRef.current.getState().removeTab(tab.id);
+              void openFile(tab.remotePath);
+            }
+          }}
+          onSaveAs={(newPath) => {
+            void writeTab(conflict.tabId, newPath, true);
+          }}
+          onCancel={() => setConflict(null)}
+        />
+      ) : null}
     </div>
   );
 }
