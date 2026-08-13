@@ -33,6 +33,7 @@ function PaneView({
 }) {
   const tabs = useStore(layoutStore, (s) => s.tabs);
   const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
+  const paneLocalProfiles = useStore(localProfilesStore, (s) => s.profiles);
 
   const terminalTabs = tabs.filter((t) => !(t.type === "sftp" && t.sftpSessionId));
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftpSessionId);
@@ -102,6 +103,16 @@ function PaneView({
               isVisible={isVisible}
               telnetOptions={tab.telnetOptions}
               tmuxAttachTarget={tab.tmuxAttachTarget}
+              claudeResumeSessionId={
+                // Only a per-tab ('new' mode) profile resumes by id. A
+                // 'continue' profile re-resolves the newest conversation for
+                // the folder on its own, so an id left over from before the
+                // mode was switched must not resurrect an old conversation.
+                paneLocalProfiles.find((p) => p.id === tab.profileId)
+                  ?.claudeSessionMode === "new"
+                  ? tab.claudeSessionId
+                  : undefined
+              }
               fontSize={
                 tab.fontSize ?? settingsStore.getState().settings.terminal.fontSize
               }
@@ -110,6 +121,9 @@ function PaneView({
               }}
               onSessionOpened={(sessionId) => {
                 replaceSessionId(tab.sessionId, sessionId);
+              }}
+              onClaudeSessionId={(sessionId, claudeSessionId) => {
+                layoutStore.getState().setTabClaudeSessionId(sessionId, claudeSessionId);
               }}
               onProcessExit={(exitCode) => {
                 // Clean exit closes the tab so `exit` feels native; a failure

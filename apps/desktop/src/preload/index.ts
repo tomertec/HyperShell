@@ -1,7 +1,7 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 import { createDesktopApi } from "./desktopApi";
 
-export const desktopApi = createDesktopApi(ipcRenderer);
+export const desktopApi = createDesktopApi(ipcRenderer, console, webUtils);
 
 contextBridge.exposeInMainWorld("hypershell", desktopApi);

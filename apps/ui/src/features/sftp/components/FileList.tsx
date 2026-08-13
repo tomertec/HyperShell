@@ -7,6 +7,7 @@ import {
   type SortColumn,
   type SortDirection
 } from "../utils/fileUtils";
+import { extractDroppedPaths } from "../../../lib/droppedFilePaths";
 import { FileIcon } from "./FileIcon";
 
 export interface FileListEntry {
@@ -303,9 +304,7 @@ export function FileList({
     }
 
     // OS file drop (files dragged from Explorer/Finder)
-    const files = Array.from(event.dataTransfer.files)
-      .map((file) => (file as File & { path?: string }).path)
-      .filter((path): path is string => Boolean(path));
+    const files = extractDroppedPaths(event.dataTransfer);
     if (files.length > 0) {
       onExternalDrop(files);
     }

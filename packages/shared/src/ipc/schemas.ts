@@ -48,11 +48,18 @@ export const openSessionRequestSchema = z.object({
   reconnectBaseInterval: z.number().int().min(1).max(60).optional(),
   telnetOptions: telnetConnectionOptionsSchema.optional(),
   tmuxAttach: z.boolean().optional(),
+  // Resume an existing Claude Code conversation in this tab. Honoured only when
+  // the resolved local profile has claudeSession set; the renderer never
+  // supplies an executable or raw args, so this stays inside the IPC boundary.
+  claudeResumeSessionId: z.string().uuid().optional(),
 });
 
 export const openSessionResponseSchema = z.object({
   sessionId: z.string().min(1),
-  state: sessionStateSchema
+  state: sessionStateSchema,
+  // The Claude session id main assigned (or resumed) for this tab, so the
+  // renderer can persist it against the tab for the next restore.
+  claudeSessionId: z.string().uuid().optional()
 });
 
 export const resizeSessionRequestSchema = z.object({
@@ -79,6 +86,7 @@ export const savedSessionRecordSchema = z.object({
   title: z.string().min(1),
   wasGraceful: z.boolean(),
   savedAt: z.string(),
+  claudeSessionId: z.string().uuid().nullable(),
 });
 
 export const sessionSaveStateEntrySchema = z.object({
@@ -87,6 +95,7 @@ export const sessionSaveStateEntrySchema = z.object({
   transport: transportSchema,
   profileId: z.string().min(1),
   title: z.string().min(1),
+  claudeSessionId: z.string().uuid().nullable().optional(),
 });
 
 export const sessionSaveStateRequestSchema = z.object({
@@ -662,6 +671,10 @@ export const localProfileColorSchema = z.enum([
   "pink"
 ]);
 
+// 'continue' joins the newest conversation for the working directory (what a
+// bare `claude` in a shell would resume); 'new' gives the tab its own.
+export const claudeSessionModeSchema = z.enum(["continue", "new"]);
+
 export const localProfileRecordSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -675,7 +688,9 @@ export const localProfileRecordSchema = z.object({
   detectKey: z.string().nullable(),
   isAvailable: z.boolean(),
   isHidden: z.boolean(),
-  sortOrder: z.number().int()
+  sortOrder: z.number().int(),
+  claudeSession: z.boolean(),
+  claudeSessionMode: claudeSessionModeSchema
 });
 
 export const upsertLocalProfileRequestSchema = z.object({
@@ -688,6 +703,8 @@ export const upsertLocalProfileRequestSchema = z.object({
   color: localProfileColorSchema.nullable().optional(),
   elevated: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  claudeSession: z.boolean().optional(),
+  claudeSessionMode: claudeSessionModeSchema.optional(),
   envVars: z.array(localProfileEnvVarSchema).optional()
 });
 
@@ -720,6 +737,28 @@ export type SetLocalProfileHiddenRequest = z.infer<typeof setLocalProfileHiddenR
 export type ReorderLocalProfilesRequest = z.infer<typeof reorderLocalProfilesRequestSchema>;
 export type GetLocalProfileEnvVarsRequest = z.infer<typeof getLocalProfileEnvVarsRequestSchema>;
 
+// --- Claude Code session schemas ---
+
+export const claudeSessionInfoRequestSchema = z.object({
+  sessionId: z.string().uuid(),
+});
+
+export const claudeSessionInfoResponseSchema = z.object({
+  // null when the conversation no longer exists on disk, which means resume
+  // must not be offered.
+  info: z
+    .object({
+      sessionId: z.string().uuid(),
+      title: z.string().nullable(),
+      cwd: z.string().nullable(),
+      lastActiveAt: z.string(),
+    })
+    .nullable(),
+});
+
+export type ClaudeSessionInfoRequest = z.infer<typeof claudeSessionInfoRequestSchema>;
+export type ClaudeSessionInfoResponse = z.infer<typeof claudeSessionInfoResponseSchema>;
+
 // --- Workspace schemas ---
 
 export const workspaceTabSchema = z.object({
@@ -729,6 +768,8 @@ export const workspaceTabSchema = z.object({
   type: z.enum(["terminal", "sftp"]).optional(),
   hostId: z.string().optional(),
   fontSize: z.number().min(8).max(32).multipleOf(0.5).optional(),
+  // Optional so workspaces saved before this feature still parse.
+  claudeSessionId: z.string().uuid().optional(),
 });
 
 export const workspaceLayoutSchema = z.object({

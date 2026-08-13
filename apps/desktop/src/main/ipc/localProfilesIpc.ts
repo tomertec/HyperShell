@@ -30,7 +30,9 @@ function toRecord(profile: ReturnType<LocalProfilesRepo["list"]>[number]): Local
     detectKey: profile.detectKey,
     isAvailable: profile.isAvailable,
     isHidden: profile.isHidden,
-    sortOrder: profile.sortOrder
+    sortOrder: profile.sortOrder,
+    claudeSession: profile.claudeSession,
+    claudeSessionMode: profile.claudeSessionMode
   };
 }
 
@@ -110,7 +112,10 @@ export function registerLocalProfilesIpc(
         detectKey: existing?.detectKey ?? null,
         isAvailable: existing?.isAvailable ?? true,
         isHidden: existing?.isHidden ?? false,
-        sortOrder: parsed.sortOrder ?? existing?.sortOrder ?? 0
+        sortOrder: parsed.sortOrder ?? existing?.sortOrder ?? 0,
+        claudeSession: parsed.claudeSession ?? existing?.claudeSession ?? false,
+        claudeSessionMode:
+          parsed.claudeSessionMode ?? existing?.claudeSessionMode ?? "continue"
       });
 
       if (parsed.envVars) {

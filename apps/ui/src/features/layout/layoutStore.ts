@@ -21,6 +21,8 @@ export type LayoutTab = {
   hostId?: string;
   tmuxAttachTarget?: string;
   fontSize?: number;
+  /** Claude Code conversation running in this tab, for resume after restart. */
+  claudeSessionId?: string;
 };
 
 export type Pane = {
@@ -46,6 +48,7 @@ export type LayoutState = {
   setTabDynamicTitle: (sessionId: string, title: string | null) => void;
   setTabProcessTitle: (sessionId: string, name: string | null) => void;
   setTabFontSize: (sessionId: string, fontSize: number) => void;
+  setTabClaudeSessionId: (sessionId: string, claudeSessionId: string) => void;
 };
 
 function equalPaneSizes(count: number): number[] {
@@ -233,6 +236,18 @@ export function createLayoutStore(
         return { tabs };
       }),
 
+    setTabClaudeSessionId: (sessionId, claudeSessionId) =>
+      set((state) => {
+        const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId);
+        if (index === -1 || state.tabs[index].claudeSessionId === claudeSessionId) {
+          return state;
+        }
+
+        const tabs = [...state.tabs];
+        tabs[index] = { ...tabs[index], claudeSessionId };
+        return { tabs };
+      }),
+
     setTabFontSize: (sessionId, fontSize) =>
       set((state) => {
         const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId);
@@ -268,6 +283,7 @@ export function serializeWorkspaceLayout(
       type: tab.type,
       hostId: tab.hostId,
       fontSize: tab.fontSize,
+      claudeSessionId: tab.claudeSessionId,
     })),
     splitDirection: state.splitDirection,
     paneSizes: state.paneSizes,
@@ -287,6 +303,7 @@ export function workspaceTabToLayoutTab(
     type: tab.type ?? "terminal",
     hostId: tab.hostId,
     fontSize: tab.fontSize,
+    claudeSessionId: tab.claudeSessionId,
   };
 }
 

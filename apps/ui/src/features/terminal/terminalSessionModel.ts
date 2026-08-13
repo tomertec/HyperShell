@@ -47,6 +47,8 @@ export function createAsyncOperationGuard(): AsyncOperationGuard {
 export interface ConnectAttemptResult {
   sessionId: string;
   state: TerminalSessionState;
+  /** Present only for local profiles flagged as Claude Code launchers. */
+  claudeSessionId?: string;
 }
 
 export interface ResolveConnectAttemptInput {

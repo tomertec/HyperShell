@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   closeSessionRequestSchema,
   exportHostsRequestSchema,
@@ -69,6 +71,8 @@ import { registerSshManagerImportIpc } from "./sshManagerImportIpc";
 import { registerBackupIpc } from "./backupIpc";
 import { registerSessionRecoveryIpc } from "./sessionRecoveryIpc";
 import { registerTmuxIpc } from "./tmuxIpc";
+import { registerClaudeIpc } from "./claudeIpc";
+import { applyClaudeSessionArgs } from "./claudeSessionArgs";
 import { getUpdateService, setUpdateStateEmitter } from "../updates/updateService";
 import {
   createHostStatusService,
@@ -224,6 +228,7 @@ const registeredChannels = [
   ipcChannels.backup.list,
   ipcChannels.backup.showOpenDialog,
   ipcChannels.tmux.probe,
+  ipcChannels.claude.sessionInfo,
   ipcChannels.app.setTheme,
   ipcChannels.update.check,
   ipcChannels.update.download,
@@ -363,6 +368,8 @@ function resolveLocalProfileForSession(id: string):
       startingDirectory: string | null;
       isAvailable: boolean;
       envVars: Record<string, string>;
+      claudeSession: boolean;
+      claudeSessionMode: "continue" | "new";
     }
   | undefined {
   const repo = getLocalProfilesRepo();
@@ -384,7 +391,9 @@ function resolveLocalProfileForSession(id: string):
     args: profile.args,
     startingDirectory: profile.startingDirectory,
     isAvailable: profile.isAvailable,
-    envVars
+    envVars,
+    claudeSession: profile.claudeSession,
+    claudeSessionMode: profile.claudeSessionMode
   };
 }
 
@@ -548,6 +557,8 @@ async function openSessionHandler(
         startingDirectory: string | null;
         isAvailable: boolean;
         envVars?: Record<string, string>;
+        claudeSession?: boolean;
+        claudeSessionMode?: "continue" | "new";
       }
     | undefined
 ): Promise<OpenSessionResponse> {
@@ -687,6 +698,7 @@ async function openSessionHandler(
   let localOptions:
     | { executable: string; args?: string[]; cwd?: string; envVars?: Record<string, string> }
     | undefined;
+  let claudeSessionId: string | undefined;
 
   if (parsed.transport === "local") {
     const profile = resolveLocalProfile?.(parsed.profileId);
@@ -699,9 +711,20 @@ async function openSessionHandler(
       throw new Error(`Local shell is not available: ${profile.name}`);
     }
 
+    const claudeLaunch = applyClaudeSessionArgs(
+      {
+        args: profile.args,
+        claudeSession: profile.claudeSession ?? false,
+        claudeSessionMode: profile.claudeSessionMode ?? "continue"
+      },
+      parsed.claudeResumeSessionId,
+      () => randomUUID()
+    );
+    claudeSessionId = claudeLaunch.claudeSessionId;
+
     localOptions = {
       executable: profile.executable,
-      args: profile.args,
+      args: claudeLaunch.args,
       cwd: profile.startingDirectory ?? undefined,
       envVars: profile.envVars
     };
@@ -759,7 +782,9 @@ async function openSessionHandler(
     });
   }
 
-  return manager.open(openInput);
+  const opened = await manager.open(openInput);
+
+  return claudeSessionId ? { ...opened, claudeSessionId } : opened;
 }
 
 async function resizeSessionHandler(
@@ -1576,6 +1601,7 @@ export function registerIpc(
   registerBackupIpc(ipcMain);
   registerSessionRecoveryIpc(ipcMain, () => getDb() as SqliteDatabase);
   registerTmuxIpc(ipcMain, () => getOrCreateHostsRepo());
+  registerClaudeIpc();
 
   ipcMain.handle(ipcChannels.app.setTheme, (event: IpcMainInvokeEvent, theme: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);

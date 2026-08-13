@@ -300,6 +300,15 @@ declare global {
       openUpdateRelease?: () => Promise<void>;
       getUpdateState?: () => Promise<UpdateState>;
       onUpdateState?: (listener: (state: UpdateState) => void) => () => void;
+      getPathForFile?: (file: File) => string;
+      claudeSessionInfo?: (request: { sessionId: string }) => Promise<{
+        info: {
+          sessionId: string;
+          title: string | null;
+          cwd: string | null;
+          lastActiveAt: string;
+        } | null;
+      }>;
     };
   }
 }

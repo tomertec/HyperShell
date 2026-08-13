@@ -14,14 +14,17 @@ import { createSettingsApi, type SettingsApi } from "./api/settingsApi";
 import { createUpdateApi, type UpdateApi } from "./api/updateApi";
 import { createSystemApi, type SystemApi } from "./api/systemApi";
 import { createLocalApi, type LocalApi } from "./api/localApi";
+import { createFilesApi, type FilesApi, type FilePathResolver } from "./api/filesApi";
 
 export type { PreloadIpcRenderer, PreloadLogger } from "./api/types";
+export type { FilePathResolver } from "./api/filesApi";
 
-export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi, RecordingApi, SettingsApi, UpdateApi, SystemApi, LocalApi {}
+export interface DesktopApi extends SessionApi, HostsApi, SftpApi, GroupsTagsApi, HostProfilesApi, SerialApi, FsApi, WorkspaceApi, SshKeysApi, PortForwardApi, RecordingApi, SettingsApi, UpdateApi, SystemApi, LocalApi, FilesApi {}
 
 export function createDesktopApi(
   ipcRenderer: PreloadIpcRenderer,
-  logger: PreloadLogger = console
+  logger: PreloadLogger = console,
+  filePathResolver: FilePathResolver | null = null
 ): DesktopApi {
   return {
     ...createSessionApi(ipcRenderer, logger),
@@ -39,5 +42,6 @@ export function createDesktopApi(
     ...createUpdateApi(ipcRenderer, logger),
     ...createSystemApi(ipcRenderer, logger),
     ...createLocalApi(ipcRenderer, logger),
+    ...createFilesApi(filePathResolver),
   };
 }

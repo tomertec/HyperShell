@@ -43,6 +43,8 @@ function record(overrides: Partial<LocalProfileRecord> = {}): LocalProfileRecord
     isAvailable: true,
     isHidden: false,
     sortOrder: 0,
+    claudeSession: false,
+    claudeSessionMode: "continue" as const,
     ...overrides
   };
 }
@@ -65,7 +67,9 @@ function createFakeRepo(initial: LocalProfileRecord[] = []): LocalProfilesRepo {
         detectKey: input.detectKey ?? null,
         isAvailable: input.isAvailable ?? true,
         isHidden: input.isHidden ?? false,
-        sortOrder: input.sortOrder ?? 0
+        sortOrder: input.sortOrder ?? 0,
+        claudeSession: input.claudeSession ?? false,
+        claudeSessionMode: input.claudeSessionMode ?? "continue"
       };
       rows.set(row.id, row);
       return row;
@@ -127,6 +131,52 @@ describe("local profiles upsert", () => {
     })) as LocalProfileRecord;
 
     expect(updated.color).toBe("blue");
+  });
+
+  it("saves the Claude session flag from the request", async () => {
+    const repo = createFakeRepo([record()]);
+    const ipcMain = createFakeIpcMain();
+    registerLocalProfilesIpc(ipcMain, () => repo);
+
+    const updated = (await ipcMain.invoke(ipcChannels.localProfiles.upsert, {
+      id: "p1",
+      name: "Claude",
+      executable: "claude.exe",
+      claudeSession: true
+    })) as LocalProfileRecord;
+
+    expect(updated.claudeSession).toBe(true);
+  });
+
+  it("keeps the stored Claude session flag when the request omits it", async () => {
+    // The handler whitelists fields one by one, so an omitted flag must fall
+    // back to the stored value rather than silently resetting it to false.
+    const repo = createFakeRepo([record({ claudeSession: true })]);
+    const ipcMain = createFakeIpcMain();
+    registerLocalProfilesIpc(ipcMain, () => repo);
+
+    const updated = (await ipcMain.invoke(ipcChannels.localProfiles.upsert, {
+      id: "p1",
+      name: "Renamed",
+      executable: "claude.exe"
+    })) as LocalProfileRecord;
+
+    expect(updated.claudeSession).toBe(true);
+  });
+
+  it("turns the Claude session flag off when the request sends false", async () => {
+    const repo = createFakeRepo([record({ claudeSession: true })]);
+    const ipcMain = createFakeIpcMain();
+    registerLocalProfilesIpc(ipcMain, () => repo);
+
+    const updated = (await ipcMain.invoke(ipcChannels.localProfiles.upsert, {
+      id: "p1",
+      name: "Claude",
+      executable: "claude.exe",
+      claudeSession: false
+    })) as LocalProfileRecord;
+
+    expect(updated.claudeSession).toBe(false);
   });
 
   it("clears the starting directory when the request sends null", async () => {

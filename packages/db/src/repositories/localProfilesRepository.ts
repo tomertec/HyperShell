@@ -16,6 +16,8 @@ export type LocalProfileRecord = {
   isAvailable: boolean;
   isHidden: boolean;
   sortOrder: number;
+  claudeSession: boolean;
+  claudeSessionMode: "continue" | "new";
 };
 
 export type LocalProfileInput = {
@@ -32,6 +34,8 @@ export type LocalProfileInput = {
   isAvailable?: boolean;
   isHidden?: boolean;
   sortOrder?: number;
+  claudeSession?: boolean;
+  claudeSessionMode?: "continue" | "new";
 };
 
 export type LocalProfileEnvVar = {
@@ -54,11 +58,13 @@ type LocalProfileRow = {
   is_available: number;
   is_hidden: number;
   sort_order: number;
+  claude_session: number;
+  claude_session_mode: string;
 };
 
 const PROFILE_COLUMNS = `
   id, name, executable, args_json, starting_directory, icon, color,
-  elevated, source, detect_key, is_available, is_hidden, sort_order
+  elevated, source, detect_key, is_available, is_hidden, sort_order, claude_session, claude_session_mode
 `;
 
 function parseArgs(argsJson: string): string[] {
@@ -84,7 +90,9 @@ function mapRow(row: LocalProfileRow): LocalProfileRecord {
     detectKey: row.detect_key,
     isAvailable: row.is_available !== 0,
     isHidden: row.is_hidden !== 0,
-    sortOrder: row.sort_order
+    sortOrder: row.sort_order,
+    claudeSession: row.claude_session !== 0,
+    claudeSessionMode: row.claude_session_mode === "new" ? "new" : "continue"
   };
 }
 
@@ -104,11 +112,11 @@ export function createLocalProfilesRepositoryFromDatabase(db: SqliteDatabase) {
   const upsertProfile = db.prepare(`
     INSERT INTO local_profiles (
       id, name, executable, args_json, starting_directory, icon, color,
-      elevated, source, detect_key, is_available, is_hidden, sort_order
+      elevated, source, detect_key, is_available, is_hidden, sort_order, claude_session, claude_session_mode
     )
     VALUES (
       @id, @name, @executable, @argsJson, @startingDirectory, @icon, @color,
-      @elevated, @source, @detectKey, @isAvailable, @isHidden, @sortOrder
+      @elevated, @source, @detectKey, @isAvailable, @isHidden, @sortOrder, @claudeSession, @claudeSessionMode
     )
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -123,6 +131,8 @@ export function createLocalProfilesRepositoryFromDatabase(db: SqliteDatabase) {
       is_available = excluded.is_available,
       is_hidden = excluded.is_hidden,
       sort_order = excluded.sort_order,
+      claude_session = excluded.claude_session,
+      claude_session_mode = excluded.claude_session_mode,
       updated_at = CURRENT_TIMESTAMP
   `);
 
@@ -175,7 +185,9 @@ export function createLocalProfilesRepositoryFromDatabase(db: SqliteDatabase) {
         detectKey: input.detectKey ?? null,
         isAvailable: input.isAvailable === false ? 0 : 1,
         isHidden: input.isHidden ? 1 : 0,
-        sortOrder: input.sortOrder ?? 0
+        sortOrder: input.sortOrder ?? 0,
+        claudeSession: input.claudeSession ? 1 : 0,
+        claudeSessionMode: input.claudeSessionMode ?? "continue"
       });
 
       const created = get(input.id);
@@ -270,7 +282,9 @@ function createInMemoryLocalProfilesRepository() {
         detectKey: input.detectKey ?? null,
         isAvailable: input.isAvailable ?? true,
         isHidden: input.isHidden ?? false,
-        sortOrder: input.sortOrder ?? 0
+        sortOrder: input.sortOrder ?? 0,
+        claudeSession: input.claudeSession ?? false,
+        claudeSessionMode: input.claudeSessionMode ?? "continue"
       };
 
       profiles.set(record.id, record);

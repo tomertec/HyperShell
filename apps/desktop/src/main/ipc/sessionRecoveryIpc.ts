@@ -29,6 +29,7 @@ export function registerSessionRecoveryIpc(
           transport: session.transport,
           profileId: session.profileId,
           title: session.title,
+          claudeSessionId: session.claudeSessionId ?? null,
         }))
       );
       return sessionSaveStateResponseSchema.parse({ saved });

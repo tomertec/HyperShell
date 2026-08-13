@@ -12,6 +12,7 @@ export type SavedSessionRecord = {
   title: string;
   wasGraceful: boolean;
   savedAt: string;
+  claudeSessionId: string | null;
 };
 
 export type SavedSessionInput = {
@@ -20,6 +21,7 @@ export type SavedSessionInput = {
   transport: SavedSessionTransport;
   profileId: string;
   title: string;
+  claudeSessionId?: string | null;
 };
 
 type SavedSessionRow = {
@@ -31,6 +33,7 @@ type SavedSessionRow = {
   title: string;
   was_graceful: number;
   saved_at: string;
+  claude_session_id: string | null;
 };
 
 function mapRow(row: SavedSessionRow): SavedSessionRecord {
@@ -43,6 +46,7 @@ function mapRow(row: SavedSessionRow): SavedSessionRecord {
     title: row.title,
     wasGraceful: row.was_graceful === 1,
     savedAt: row.saved_at,
+    claudeSessionId: row.claude_session_id,
   };
 }
 
@@ -61,7 +65,8 @@ export function createSavedSessionRepositoryFromDatabase(db: SqliteDatabase) {
       profile_id,
       title,
       was_graceful,
-      saved_at
+      saved_at,
+      claude_session_id
     ) VALUES (
       @id,
       @hostId,
@@ -69,7 +74,8 @@ export function createSavedSessionRepositoryFromDatabase(db: SqliteDatabase) {
       @profileId,
       @title,
       0,
-      @savedAt
+      @savedAt,
+      @claudeSessionId
     )
   `);
 
@@ -81,7 +87,8 @@ export function createSavedSessionRepositoryFromDatabase(db: SqliteDatabase) {
            ss.profile_id,
            ss.title,
            ss.was_graceful,
-           ss.saved_at
+           ss.saved_at,
+           ss.claude_session_id
     FROM saved_sessions ss
     LEFT JOIN hosts h ON h.id = ss.host_id
     WHERE ss.was_graceful = 0
@@ -106,6 +113,7 @@ export function createSavedSessionRepositoryFromDatabase(db: SqliteDatabase) {
         profileId: session.profileId,
         title: session.title,
         savedAt,
+        claudeSessionId: session.claudeSessionId ?? null,
       });
     }
   });

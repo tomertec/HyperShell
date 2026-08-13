@@ -21,7 +21,9 @@ describe("local profile schemas", () => {
       detectKey: "pwsh7",
       isAvailable: true,
       isHidden: false,
-      sortOrder: 1
+      sortOrder: 1,
+      claudeSession: false,
+      claudeSessionMode: "continue"
     });
 
     expect(parsed.icon).toBe("powershell");

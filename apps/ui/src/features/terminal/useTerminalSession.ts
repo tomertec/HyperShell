@@ -44,9 +44,17 @@ export interface UseTerminalSessionInput {
   autoConnect?: boolean;
   telnetOptions?: { hostname: string; port: number; mode: "telnet" | "raw"; terminalType?: string };
   tmuxAttachTarget?: string;
+  /** Resume this Claude Code conversation instead of starting a new one. */
+  claudeResumeSessionId?: string;
   fontSize: number;
   onFontSizeChange: (fontSize: number) => void;
   onSessionOpened?: (sessionId: string) => void;
+  /**
+   * Reports the Claude session id main assigned, so the tab can persist it.
+   * Carries the terminal session id because `onSessionOpened` has just replaced
+   * it — the caller's captured tab id is stale by this point.
+   */
+  onClaudeSessionId?: (sessionId: string, claudeSessionId: string) => void;
   onExit?: (exitCode: number | null) => void;
 }
 
@@ -549,6 +557,7 @@ export function useTerminalSession(
   ]);
 
   const onSessionOpened = input.onSessionOpened;
+  const onClaudeSessionId = input.onClaudeSessionId;
 
   const connect = useCallback(async (): Promise<void> => {
     const instance = terminalRef.current;
@@ -570,6 +579,9 @@ export function useTerminalSession(
             cols,
             rows,
             tmuxAttach: Boolean(input.tmuxAttachTarget),
+            ...(input.claudeResumeSessionId
+              ? { claudeResumeSessionId: input.claudeResumeSessionId }
+              : {}),
             ...(input.telnetOptions ? { telnetOptions: input.telnetOptions } : {})
           }),
         isStale: () =>
@@ -588,6 +600,9 @@ export function useTerminalSession(
 
       sessionIdRef.current = result.sessionId;
       onSessionOpened?.(result.sessionId);
+      if (result.claudeSessionId) {
+        onClaudeSessionId?.(result.sessionId, result.claudeSessionId);
+      }
       // Only apply the IPC result state if the event listener hasn't
       // already advanced past it (e.g. "connected" arrived before the
       // openSession promise resolved).
@@ -617,6 +632,8 @@ export function useTerminalSession(
   }, [
     applySessionEvent,
     onSessionOpened,
+    onClaudeSessionId,
+    input.claudeResumeSessionId,
     input.profileId,
     input.telnetOptions,
     input.tmuxAttachTarget,

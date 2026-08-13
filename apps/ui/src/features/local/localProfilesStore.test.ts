@@ -22,6 +22,8 @@ function profile(overrides: Partial<LocalProfileRecord> = {}): LocalProfileRecor
     isAvailable: true,
     isHidden: false,
     sortOrder: 1,
+    claudeSession: false,
+    claudeSessionMode: "continue" as const,
     ...overrides
   };
 }

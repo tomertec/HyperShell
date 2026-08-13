@@ -76,6 +76,10 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     new URL("./migrations/017_shell_integration.sql", import.meta.url),
     "utf8"
   );
+  const claudeSessionsSql = readFileSync(
+    new URL("./migrations/018_claude_sessions.sql", import.meta.url),
+    "utf8"
+  );
 
   const db = new Database(databasePath);
 
@@ -224,6 +228,28 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
   } catch (error) {
     if (!isIgnorableMigrationError(error)) {
       throw error;
+    }
+  }
+
+  // Migration 018: Claude session resume columns. Split per statement — a single
+  // exec() would abort at the first "duplicate column" and silently skip the
+  // rest, leaving a database that has one column but not the other. Comment
+  // lines are stripped before splitting because a `;` inside a comment would
+  // otherwise cut it in half and leave a fragment that is a syntax error, not
+  // an ignorable "duplicate column".
+  for (const statement of claudeSessionsSql
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n")
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)) {
+    try {
+      db.exec(statement);
+    } catch (error) {
+      if (!isIgnorableMigrationError(error)) {
+        throw error;
+      }
     }
   }
 

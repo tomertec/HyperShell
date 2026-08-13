@@ -98,6 +98,10 @@ export function LocalProfileForm({
   const [startingDirectory, setStartingDirectory] = useState(profile?.startingDirectory ?? "");
   const [icon, setIcon] = useState<LocalProfileIconKey>(profile?.icon ?? "terminal");
   const [color, setColor] = useState<LocalProfileColor | null>(profile?.color ?? null);
+  const [claudeSession, setClaudeSession] = useState(profile?.claudeSession ?? false);
+  const [claudeSessionMode, setClaudeSessionMode] = useState<"continue" | "new">(
+    profile?.claudeSessionMode ?? "continue"
+  );
   const [envVarRows, setEnvVarRows] = useState<LocalEnvVarFormValue[]>(() =>
     envVars.map(toEnvVarFormValue)
   );
@@ -180,6 +184,8 @@ export function LocalProfileForm({
         startingDirectory: startingDirectory.trim() || null,
         icon,
         color,
+        claudeSession,
+        claudeSessionMode,
         ...(shouldIncludeEnvVarsInUpsert(!profile, envVarsLoaded)
           ? {
               envVars: envVarRows.map((row) => ({
@@ -212,6 +218,8 @@ export function LocalProfileForm({
     },
     [
       argsText,
+      claudeSession,
+      claudeSessionMode,
       color,
       envVarRows,
       envVarsLoaded,
@@ -319,6 +327,67 @@ export function LocalProfileForm({
           </button>
         </div>
       </label>
+
+      <label htmlFor={`${formId}-claudeSession`} className="flex items-start gap-2">
+        <input
+          id={`${formId}-claudeSession`}
+          type="checkbox"
+          checked={claudeSession}
+          onChange={(e) => setClaudeSession(e.target.checked)}
+          className="mt-0.5 accent-accent"
+        />
+        <span className="grid gap-0.5">
+          <span className="text-xs font-medium text-text-secondary">Claude Code session</span>
+          <span className="text-[11px] text-text-muted">
+            Reopens a previous conversation instead of starting cold.
+          </span>
+        </span>
+      </label>
+
+      {claudeSession && (
+        <div className="grid gap-1.5 pl-6">
+          <span className="text-xs font-medium text-text-secondary" id={`${formId}-claudeMode-label`}>
+            Which conversation
+          </span>
+          <div className="grid gap-2" role="radiogroup" aria-labelledby={`${formId}-claudeMode-label`}>
+            <label htmlFor={`${formId}-claudeMode-continue`} className="flex items-start gap-2">
+              <input
+                id={`${formId}-claudeMode-continue`}
+                type="radio"
+                name={`${formId}-claudeMode`}
+                checked={claudeSessionMode === "continue"}
+                onChange={() => setClaudeSessionMode("continue")}
+                className="mt-0.5 accent-accent"
+              />
+              <span className="grid gap-0.5">
+                <span className="text-xs text-text-primary">Most recent in this folder</span>
+                <span className="text-[11px] text-text-muted">
+                  Runs <code>--continue</code>. Picks up the latest conversation for the
+                  working directory even if you started it by typing{" "}
+                  <code>claude</code> in a shell.
+                </span>
+              </span>
+            </label>
+            <label htmlFor={`${formId}-claudeMode-new`} className="flex items-start gap-2">
+              <input
+                id={`${formId}-claudeMode-new`}
+                type="radio"
+                name={`${formId}-claudeMode`}
+                checked={claudeSessionMode === "new"}
+                onChange={() => setClaudeSessionMode("new")}
+                className="mt-0.5 accent-accent"
+              />
+              <span className="grid gap-0.5">
+                <span className="text-xs text-text-primary">This tab&apos;s own conversation</span>
+                <span className="text-[11px] text-text-muted">
+                  Each tab gets a private conversation that only it resumes. Use this
+                  when you run more than one Claude tab in the same folder.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-1.5">
         <span className="text-xs font-medium text-text-secondary" id={`${formId}-icon-label`}>

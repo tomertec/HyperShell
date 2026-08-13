@@ -26,6 +26,10 @@ import {
   removeSnippetRequestSchema,
   tmuxProbeRequestSchema,
   tmuxProbeResponseSchema,
+  claudeSessionInfoRequestSchema,
+  claudeSessionInfoResponseSchema,
+  type ClaudeSessionInfoRequest,
+  type ClaudeSessionInfoResponse,
   type SnippetRecord,
   type UpsertSnippetRequest,
   type RemoveSnippetRequest,
@@ -61,6 +65,8 @@ export interface SystemApi {
   backupShowOpenDialog(): Promise<string | null>;
   // Tmux detection
   tmuxProbe(request: TmuxProbeRequest): Promise<TmuxProbeResponse>;
+  // Claude Code session lookup
+  claudeSessionInfo(request: ClaudeSessionInfoRequest): Promise<ClaudeSessionInfoResponse>;
   // App theme
   setAppTheme(theme: "light" | "dark"): Promise<void>;
 }
@@ -143,6 +149,14 @@ export function createSystemApi(
       const parsed = tmuxProbeRequestSchema.parse(request);
       const raw = await ipcRenderer.invoke(ipcChannels.tmux.probe, parsed);
       return tmuxProbeResponseSchema.parse(raw);
+    },
+    // Claude Code session lookup
+    async claudeSessionInfo(
+      request: ClaudeSessionInfoRequest
+    ): Promise<ClaudeSessionInfoResponse> {
+      const parsed = claudeSessionInfoRequestSchema.parse(request);
+      const raw = await ipcRenderer.invoke(ipcChannels.claude.sessionInfo, parsed);
+      return claudeSessionInfoResponseSchema.parse(raw);
     },
     // App theme
     async setAppTheme(theme: "light" | "dark"): Promise<void> {
