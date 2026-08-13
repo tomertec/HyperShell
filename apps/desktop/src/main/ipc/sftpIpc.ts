@@ -228,14 +228,30 @@ function ensureBookmarkHost(
   });
 }
 
-function normalizeFileContent(buffer: Buffer): { content: string; encoding: "utf-8" | "base64" } {
+/**
+ * Decide how a remote file crosses the IPC boundary.
+ *
+ * NUL bytes catch obvious binaries, but a latin-1 text file has none — decoding
+ * it as UTF-8 yields U+FFFD replacement characters, and saving that back
+ * silently destroys the original bytes. Anything that is not strictly valid
+ * UTF-8 therefore travels as base64 and opens read-only.
+ */
+export function normalizeFileContent(buffer: Buffer): {
+  content: string;
+  encoding: "utf-8" | "base64";
+} {
   // Check for null bytes in first 8KB to detect binary content
   const sample = buffer.subarray(0, 8192);
   if (sample.includes(0)) {
     return { content: buffer.toString("base64"), encoding: "base64" };
   }
 
-  return { content: buffer.toString("utf8"), encoding: "utf-8" };
+  try {
+    const content = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+    return { content, encoding: "utf-8" };
+  } catch {
+    return { content: buffer.toString("base64"), encoding: "base64" };
+  }
 }
 
 function normalizeTransferStatus(status: string): "queued" | "active" | "paused" | "completed" | "failed" {
