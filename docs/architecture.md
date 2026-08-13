@@ -100,6 +100,39 @@ Uses the **ssh2 npm library** for programmatic SFTP access. This is separate fro
 
 The SFTP transport handles multi-key authentication (tries all candidate keys sequentially) and strips Windows domain prefixes from usernames. When an `Ssh2ConnectionPool` is provided, it acquires a pooled connection instead of creating a new `ssh2.Client`.
 
+#### Atomic remote writes
+
+`writeFile()` never streams onto the live file. It resolves symlinks, writes to a sibling temp file,
+copies the original's permission bits, and renames over the target — so a dropped connection leaves
+a stray temp file rather than a truncated original.
+
+Renaming over an existing file is the awkward part. **SFTP v3's `RENAME` is specified to fail when
+the destination exists, and OpenSSH honours that**, so a naive rename-over breaks against the most
+common server in the world. `renameWithOverwrite()` tries three strategies in order, and the
+ordering is load-bearing:
+
+1. `posix-rename@openssh.com` — atomic clobber. Best case.
+2. Plain `rename` — servers that allow clobbering.
+3. `unlink` the destination, then `rename` — portable last resort. It briefly leaves *no* file at
+   the target, which is why it is last.
+
+If step 3's rename fails after its unlink succeeded, the original is gone and the temp holds the
+only copy. That failure is tagged `destinationRemoved`, and `writeFile` then deliberately **skips**
+its temp cleanup and surfaces the temp path — it is the user's only route back to their data.
+
+Mode preservation is best-effort in both directions: if the original cannot be stat'd, or the temp
+cannot be chmod'd, the save still proceeds. Failing an otherwise-good save is worse than landing at
+the server's default mode. Uploads in the transfer queue and the sync engine still write directly to
+the remote path — atomicity currently covers the editor-save path only.
+
+#### Text vs binary classification
+
+`normalizeFileContent()` in `sftpIpc.ts` decides whether a file crosses the IPC boundary as UTF-8
+text or base64. NUL bytes in the first 8KB mark it binary; so does failing a strict (`fatal: true`)
+UTF-8 decode of the whole buffer. That second check matters because a latin-1 file has no NUL bytes,
+so it would otherwise decode with replacement characters and be saved back corrupted. Binary tabs
+open read-only in the editor.
+
 ### SSH2 Connection Pool
 
 `Ssh2ConnectionPool` manages shared `ssh2.Client` connections keyed by `host:port:username`. Multiple consumers (SFTP sessions, port forwards) can share a single underlying connection.
@@ -169,7 +202,7 @@ Both sides validate. The preload validates outgoing requests AND incoming respon
 | `broadcastStore` | `ui/features/broadcast/` | Broadcast mode state, target sessions |
 | `sessionRecoveryStore` | `ui/features/sessions/` | Session metadata for crash recovery |
 | `sftpStore` (per session) | `ui/features/sftp/` | SFTP pane state, entries, selection, sort |
-| `transferStore` | `ui/features/sftp/` | Active transfer jobs and progress |
+| `transferStore` | `ui/features/sftp/` | Active transfer jobs, progress, pending file conflicts |
 | `tunnelStore` | `ui/features/tunnels/` | Tunnel Manager panel state, active forwards |
 | `snippetStore` | `ui/features/snippets/` | Snippets panel state, CRUD, send-to-terminal |
 
@@ -182,6 +215,9 @@ Both sides validate. The preload validates outgoing requests AND incoming respon
 | Database | SQLite (better-sqlite3) | Self-contained, no external service, synchronous reads |
 | Validation | Zod on both sides of IPC | Type-safe contracts, runtime validation at trust boundary |
 | State | Zustand (not Redux) | Minimal boilerplate, excellent TypeScript support, vanilla store option |
+| Transfer conflict state | `transferStore` + coordinator, never a component | Both transfer monitors must offer the same choices; component-local state vanished on unmount and left conflicts unresolvable |
+| Remote save safety | Temp file + rename, with a 3-step portable fallback | Streaming onto the live path truncates the user's file if the connection drops |
+| Stale directory listings | Monotonic request token per pane | Listings resolve out of order; applying the last one shows files from a directory the user already left |
 | Styling | Tailwind CSS v4 | Rapid iteration, dark theme built-in, no CSS modules needed |
 | Terminal | xterm.js + node-pty | Industry standard pairing for web-based terminal emulation |
 | Packaging | NSIS (Windows) | Native Windows installer experience |
