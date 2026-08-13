@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { Readable, Writable } from "node:stream";
 import { Client, type ConnectConfig, type OpenMode, type SFTPWrapper, type Stats } from "ssh2";
 
@@ -66,6 +66,57 @@ function collectKeyPaths(options: SftpConnectionOptions): string[] {
     }
   }
   return paths;
+}
+
+interface PosixRenameCapable {
+  ext_openssh_rename?: (from: string, to: string, cb: (err?: Error | null) => void) => void;
+}
+
+function callbackToPromise(
+  invoke: (cb: (err?: Error | null) => void) => void
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    invoke((error) => (error ? reject(error) : resolve()));
+  });
+}
+
+/**
+ * Rename `from` over `to`, clobbering an existing destination.
+ *
+ * SFTP v3's RENAME is specified to fail when the destination exists, and
+ * OpenSSH honours that. The posix-rename@openssh.com extension does what
+ * POSIX rename(2) does; where it is unavailable the only portable option is to
+ * unlink the destination first, which briefly exposes a missing file — hence
+ * the ordering here, cheapest and safest first.
+ */
+export async function renameWithOverwrite(
+  sftpSession: SFTPWrapper,
+  from: string,
+  to: string
+): Promise<void> {
+  const posixRename = (sftpSession as SFTPWrapper & PosixRenameCapable).ext_openssh_rename;
+
+  if (typeof posixRename === "function") {
+    try {
+      await callbackToPromise((cb) => posixRename.call(sftpSession, from, to, cb));
+      return;
+    } catch {
+      // Advertised but refused — fall through to the portable path.
+    }
+  }
+
+  try {
+    await callbackToPromise((cb) => sftpSession.rename(from, to, cb));
+    return;
+  } catch (renameError) {
+    try {
+      await callbackToPromise((cb) => sftpSession.unlink(to, cb));
+    } catch {
+      throw renameError;
+    }
+  }
+
+  await callbackToPromise((cb) => sftpSession.rename(from, to, cb));
 }
 
 export function buildConnectConfig(
@@ -515,14 +566,48 @@ export function createSftpTransport(
     });
   }
 
+  /**
+   * Write via a sibling temp file and rename into place. A dropped connection
+   * then leaves a stray temp file rather than a truncated original — the
+   * previous implementation streamed straight onto the live path.
+   */
   async function writeFile(remotePath: string, data: Buffer): Promise<void> {
+    const slashIndex = remotePath.lastIndexOf("/");
+    const directory = slashIndex > 0 ? remotePath.slice(0, slashIndex) : "";
+    const baseName = remotePath.slice(slashIndex + 1);
+    const tempPath = `${directory}/.${baseName}.hypershell-${randomBytes(6).toString("hex")}.tmp`;
+
+    // A fresh temp file is created with default permissions, so an existing
+    // file's mode has to be carried across explicitly or the rename silently
+    // resets it.
+    let originalMode: number | null = null;
+    try {
+      originalMode = (await stat(remotePath)).permissions;
+    } catch {
+      originalMode = null;
+    }
+
     const sftpSession = requireSftp();
-    const stream = sftpSession.createWriteStream(remotePath);
-    await new Promise<void>((resolve, reject) => {
-      stream.on("error", reject);
-      stream.on("close", () => resolve());
-      stream.end(data);
-    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const stream = sftpSession.createWriteStream(tempPath);
+        stream.on("error", reject);
+        stream.on("close", () => resolve());
+        stream.end(data);
+      });
+
+      if (originalMode != null) {
+        await chmod(tempPath, originalMode);
+      }
+
+      await renameWithOverwrite(sftpSession, tempPath, remotePath);
+    } catch (error) {
+      await new Promise<void>((resolve) => {
+        sftpSession.unlink(tempPath, () => resolve());
+      });
+      throw error;
+    }
   }
 
   function createReadStream(remotePath: string, options?: { start?: number }): Readable {
