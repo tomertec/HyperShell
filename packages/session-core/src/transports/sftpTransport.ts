@@ -668,6 +668,13 @@ export function createSftpTransport(
         stream.end(data);
       });
     } catch (error) {
+      // The open itself may have failed (nothing to clean up) or a later
+      // write/I-O error may have left a partial temp file behind (e.g. quota
+      // exceeded) — unlink unconditionally, best-effort, before classifying.
+      await new Promise<void>((resolve) => {
+        sftpSession.unlink(tempPath, () => resolve());
+      });
+
       if (isPermissionDenied(error)) {
         const parentLabel = hasDirectoryPrefix ? `"${directory === "" ? "/" : directory}"` : "its directory";
         throw new Error(
