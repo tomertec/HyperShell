@@ -86,6 +86,7 @@ function invalidateDirectories(sftpSessionId: string): void {
 function handleSftpEvent(event: SftpEvent): void {
   if (event.kind === "transfer-progress") {
     const state = transferStore.getState();
+    state.clearConflict(event.transferId);
     const known = state.transfers.some(
       (transfer) => transfer.transferId === event.transferId
     );
@@ -111,7 +112,9 @@ function handleSftpEvent(event: SftpEvent): void {
   }
 
   if (event.kind === "transfer-conflict") {
-    transferStore.getState().setPanelOpen(true);
+    const state = transferStore.getState();
+    state.setConflict(event.transferId);
+    state.setPanelOpen(true);
     void refreshTransfers();
     notifyTransferEvent(event);
     return;
@@ -119,6 +122,7 @@ function handleSftpEvent(event: SftpEvent): void {
 
   if (event.kind === "transfer-complete") {
     const state = transferStore.getState();
+    state.clearConflict(event.transferId);
     const known = state.transfers.some(
       (transfer) => transfer.transferId === event.transferId
     );
