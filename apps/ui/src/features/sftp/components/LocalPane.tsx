@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import type { FsEntry } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
 import { getParentPath } from "../utils/fileUtils";
-import { createRequestGuard } from "../utils/requestGuard";
+import { createRequestGuard, type RequestGuard } from "../utils/requestGuard";
 import { DriveSelector } from "./DriveSelector";
 import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList } from "./FileList";
@@ -97,7 +97,10 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
     paths: [],
   });
 
-  const requestGuard = useRef(createRequestGuard());
+  const requestGuardRef = useRef<RequestGuard | null>(null);
+  if (requestGuardRef.current === null) {
+    requestGuardRef.current = createRequestGuard();
+  }
 
   const loadDirectory = useCallback(
     async (path: string) => {
@@ -105,18 +108,18 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         return;
       }
 
-      const token = requestGuard.current.begin();
+      const token = requestGuardRef.current!.begin();
       setLoading("local", true);
       setError("local", null);
 
       try {
         const response = await window.hypershell?.fsList?.({ path });
-        if (!requestGuard.current.isCurrent(token)) {
+        if (!requestGuardRef.current!.isCurrent(token)) {
           return;
         }
         setLocalEntries(response?.entries ?? []);
       } catch (loadError) {
-        if (!requestGuard.current.isCurrent(token)) {
+        if (!requestGuardRef.current!.isCurrent(token)) {
           return;
         }
         const message =
@@ -124,7 +127,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         if (message.includes("outside the allowed filesystem roots")) {
           try {
             const home = await window.hypershell?.fsGetHome?.();
-            if (home?.path && home.path !== path && requestGuard.current.isCurrent(token)) {
+            if (home?.path && home.path !== path && requestGuardRef.current!.isCurrent(token)) {
               setLocalPath(home.path);
               setError("local", `Path is outside allowed roots. Returned to ${home.path}.`);
               return;
@@ -133,9 +136,11 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
             // Fall through to the original error if home lookup fails.
           }
         }
-        setError("local", message);
+        if (requestGuardRef.current!.isCurrent(token)) {
+          setError("local", message);
+        }
       } finally {
-        if (requestGuard.current.isCurrent(token)) {
+        if (requestGuardRef.current!.isCurrent(token)) {
           setLoading("local", false);
         }
       }
