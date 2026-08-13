@@ -9,6 +9,7 @@ export default defineConfig({
       "src/**/*.test.ts",
       "src/**/*.test.tsx"
     ],
-    exclude: ["tests/**"]
+    exclude: ["tests/**"],
+    setupFiles: ["./vitest.setup.ts"]
   }
 });
