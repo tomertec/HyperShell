@@ -353,6 +353,7 @@ export const sftpSyncEventSchema = z.discriminatedUnion("kind", [
     syncId: z.string(),
     filesSynced: z.number(),
     bytesTransferred: z.number(),
+    filesFailed: z.number(),
   }),
   z.object({
     kind: z.literal("sync-error"),

@@ -1,4 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { Readable } from "node:stream";
 import { createSyncEngine, type SyncConfig } from "./syncEngine";
 
 function createMockTransport() {
@@ -92,5 +96,85 @@ describe("syncEngine", () => {
   it("stop on nonexistent syncId is a no-op", () => {
     const engine = createSyncEngine();
     expect(() => engine.stop("nonexistent")).not.toThrow();
+  });
+});
+
+describe("remote-to-local sync", () => {
+  function remoteFile(name: string, size: number) {
+    return {
+      name,
+      path: `/remote/${name}`,
+      size,
+      modifiedAt: new Date().toISOString(),
+      isDirectory: false,
+      permissions: 0o644,
+      owner: 0,
+      group: 0,
+    };
+  }
+
+  it("streams files larger than the editor read limit instead of buffering them", async () => {
+    const engine = createSyncEngine();
+    const transport = createMockTransport();
+    const localPath = mkdtempSync(path.join(tmpdir(), "hypershell-sync-test-"));
+    const big = remoteFile("big.bin", 25 * 1024 * 1024);
+
+    transport.list.mockResolvedValue([big]);
+    transport.createReadStream.mockImplementation(() => Readable.from([Buffer.alloc(1024)]));
+
+    try {
+      const syncId = engine.start(transport as any, {
+        localPath,
+        remotePath: "/remote",
+        direction: "remote-to-local",
+        excludePatterns: [],
+        deleteOrphans: false,
+      });
+
+      await engine.runOnce(syncId);
+
+      expect(transport.readFile).not.toHaveBeenCalled();
+      expect(transport.createReadStream).toHaveBeenCalledWith(big.path);
+      expect(readFileSync(path.join(localPath, "big.bin"))).toHaveLength(1024);
+    } finally {
+      rmSync(localPath, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps syncing after one file fails to download", async () => {
+    const engine = createSyncEngine();
+    const transport = createMockTransport();
+    const localPath = mkdtempSync(path.join(tmpdir(), "hypershell-sync-test-"));
+
+    transport.list.mockResolvedValue([remoteFile("bad.bin", 10), remoteFile("good.bin", 10)]);
+    transport.createReadStream
+      .mockImplementationOnce(() => {
+        const stream = new Readable({ read() {} });
+        queueMicrotask(() => stream.destroy(new Error("permission denied")));
+        return stream;
+      })
+      .mockImplementation(() => Readable.from([Buffer.alloc(10)]));
+
+    try {
+      const syncId = engine.start(transport as any, {
+        localPath,
+        remotePath: "/remote",
+        direction: "remote-to-local",
+        excludePatterns: [],
+        deleteOrphans: false,
+      });
+
+      await engine.runOnce(syncId);
+
+      const status = engine.list().find((s) => s.syncId === syncId);
+      expect(status?.status).not.toBe("error");
+      expect(transport.createReadStream).toHaveBeenCalledTimes(2);
+      expect(status?.lastError).toContain("bad.bin");
+      expect(existsSync(path.join(localPath, "bad.bin"))).toBe(false);
+      expect(existsSync(path.join(localPath, "bad.bin.hypershell-sync.tmp"))).toBe(false);
+      expect(readFileSync(path.join(localPath, "good.bin"))).toHaveLength(10);
+    } finally {
+      rmSync(localPath, { recursive: true, force: true });
+    }
   });
 });
