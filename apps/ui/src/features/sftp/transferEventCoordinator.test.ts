@@ -54,6 +54,9 @@ describe("transferEventCoordinator", () => {
     });
 
     transferStore.getState().setTransfers([]);
+    for (const id of [...transferStore.getState().conflictIds]) {
+      transferStore.getState().clearConflict(id);
+    }
   });
 
   afterEach(() => {
@@ -214,5 +217,69 @@ describe("transferEventCoordinator", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(transferListCalls).toBe(1);
+  });
+
+  it("records a conflict in the store, not in a component", () => {
+    startTransferEventCoordinator();
+
+    emit({
+      kind: "transfer-conflict",
+      transferId: "t1",
+      remotePath: "/r/f",
+      localPath: "/l/f"
+    });
+
+    expect(transferStore.getState().conflictIds.has("t1")).toBe(true);
+  });
+
+  it("clears the conflict once the transfer makes progress again", () => {
+    startTransferEventCoordinator();
+
+    emit({
+      kind: "transfer-conflict",
+      transferId: "t1",
+      remotePath: "/r/f",
+      localPath: "/l/f"
+    });
+
+    emit({
+      kind: "transfer-progress",
+      transferId: "t1",
+      bytesTransferred: 1,
+      totalBytes: 10,
+      speed: 1,
+      status: "active"
+    });
+
+    expect(transferStore.getState().conflictIds.has("t1")).toBe(false);
+  });
+
+  it("resets the filter to \"all\" when a conflict arrives, so the panel can't hide it", () => {
+    startTransferEventCoordinator();
+    transferStore.getState().setFilter("completed");
+
+    emit({
+      kind: "transfer-conflict",
+      transferId: "t1",
+      remotePath: "/r/f",
+      localPath: "/l/f"
+    });
+
+    expect(transferStore.getState().filter).toBe("all");
+  });
+
+  it("clears the conflict when the transfer completes", () => {
+    startTransferEventCoordinator();
+
+    emit({
+      kind: "transfer-conflict",
+      transferId: "t1",
+      remotePath: "/r/f",
+      localPath: "/l/f"
+    });
+
+    emit(completedEvent("s1", "t1"));
+
+    expect(transferStore.getState().conflictIds.has("t1")).toBe(false);
   });
 });

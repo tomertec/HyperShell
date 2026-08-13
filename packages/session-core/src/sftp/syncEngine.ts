@@ -1,6 +1,8 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readdir, stat as fsStat, writeFile } from "node:fs/promises";
+import { randomBytes, randomUUID } from "node:crypto";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdir, readdir, rename, rm, stat as fsStat } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
+import { pipeline } from "node:stream/promises";
 import type { SftpTransportHandle } from "../transports/sftpTransport";
 
 export interface SyncConfig {
@@ -23,7 +25,7 @@ export interface SyncStatus {
 
 export type SyncEvent =
   | { kind: "sync-progress"; syncId: string; filesScanned: number; filesSynced: number; currentFile: string }
-  | { kind: "sync-complete"; syncId: string; filesSynced: number; bytesTransferred: number }
+  | { kind: "sync-complete"; syncId: string; filesSynced: number; bytesTransferred: number; filesFailed: number }
   | { kind: "sync-error"; syncId: string; error: string };
 
 export type SyncEventListener = (event: SyncEvent) => void;
@@ -164,6 +166,7 @@ export function createSyncEngine(): SyncEngine {
 
       const { config, transport } = managed;
       managed.status.status = "scanning";
+      const failures: Array<{ path: string; error: string }> = [];
 
       try {
         if (config.direction === "local-to-remote" || config.direction === "bidirectional") {
@@ -198,22 +201,24 @@ export function createSyncEngine(): SyncEngine {
                 currentFile: file.relativePath,
               });
 
-              const remoteDir = remotePath.substring(0, remotePath.lastIndexOf("/"));
-              await ensureRemoteDirExists(transport, remoteDir);
+              try {
+                const remoteDir = remotePath.substring(0, remotePath.lastIndexOf("/"));
+                await ensureRemoteDirExists(transport, remoteDir);
 
-              const { createReadStream } = await import("node:fs");
-              const localStream = createReadStream(join(config.localPath, file.relativePath));
-              const remoteStream = transport.createWriteStream(remotePath);
-              await new Promise<void>((resolve, reject) => {
-                remoteStream.on("close", resolve);
-                remoteStream.on("error", reject);
-                localStream.on("error", reject);
-                localStream.pipe(remoteStream);
-              });
+                const localStream = createReadStream(join(config.localPath, file.relativePath));
+                const remoteStream = transport.createWriteStream(remotePath);
+                await pipeline(localStream, remoteStream);
 
-              synced++;
-              managed.status.filesSynced = synced;
-              managed.status.bytesTransferred += file.size;
+                synced++;
+                managed.status.filesSynced = synced;
+                managed.status.bytesTransferred += file.size;
+              } catch (fileError) {
+                // One unreadable/unwritable file must not abandon the rest of the run.
+                failures.push({
+                  path: file.relativePath,
+                  error: fileError instanceof Error ? fileError.message : String(fileError),
+                });
+              }
             }
           }
         }
@@ -249,23 +254,53 @@ export function createSyncEngine(): SyncEngine {
                 currentFile: file.relativePath,
               });
 
-              const data = await transport.readFile(file.path);
-              await mkdir(dirname(localFilePath), { recursive: true });
-              await writeFile(localFilePath, data);
+              // Stream rather than buffer: transport.readFile() is the editor's
+              // API and rejects anything over 10 MB, which silently made sync
+              // unusable for real payloads.
+              //
+              // The random suffix matters: a fixed name would let two syncs
+              // racing the same file (concurrent syncs, or a restart overlapping
+              // an in-flight run) clobber each other's temp file, and whichever
+              // rename lands could leave a truncated file at the real path with
+              // a fresh mtime — silently unfixable, since the mtime check would
+              // then see it as already up to date on every future sync.
+              const tempPath = `${localFilePath}.hypershell-sync-${randomBytes(6).toString("hex")}.tmp`;
+              try {
+                await mkdir(dirname(localFilePath), { recursive: true });
 
-              managed.status.filesSynced++;
-              managed.status.bytesTransferred += file.size;
+                const remoteStream = transport.createReadStream(file.path);
+                const localStream = createWriteStream(tempPath);
+                await pipeline(remoteStream, localStream);
+
+                await rename(tempPath, localFilePath);
+
+                managed.status.filesSynced++;
+                managed.status.bytesTransferred += file.size;
+              } catch (fileError) {
+                // One unreadable file must not abandon the rest of the run.
+                failures.push({
+                  path: file.relativePath,
+                  error: fileError instanceof Error ? fileError.message : String(fileError),
+                });
+                await rm(tempPath, { force: true }).catch(() => {});
+              }
             }
           }
         }
 
         managed.status.status = "idle";
         managed.status.lastSyncAt = new Date().toISOString();
+        managed.status.lastError =
+          failures.length > 0
+            ? `${failures.length} file(s) failed; first: ${failures[0].path} — ${failures[0].error}`
+            : null;
+
         emit({
           kind: "sync-complete",
           syncId,
           filesSynced: managed.status.filesSynced,
           bytesTransferred: managed.status.bytesTransferred,
+          filesFailed: failures.length,
         });
       } catch (err) {
         managed.status.status = "error";

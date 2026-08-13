@@ -83,13 +83,13 @@ Both sshmanager handlers open its SQLite file read-only and always close the han
 | `sftp:mkdir` | `{ sftpSessionId, path }` | void | `sftpIpc.ts` |
 | `sftp:rename` | `{ sftpSessionId, oldPath, newPath }` | void | `sftpIpc.ts` |
 | `sftp:delete` | `{ sftpSessionId, path, recursive? }` | void | `sftpIpc.ts` |
-| `sftp:read-file` | `{ sftpSessionId, path }` | `{ content, encoding }` | `sftpIpc.ts` |
-| `sftp:write-file` | `{ sftpSessionId, path, content, encoding }` | void | `sftpIpc.ts` |
+| `sftp:read-file` | `{ sftpSessionId, path }` | `{ content, encoding, size, modifiedAt }` | `sftpIpc.ts` |
+| `sftp:write-file` | `{ sftpSessionId, path, content, encoding, expectedSize?, expectedModifiedAt? }` | `{ status: "written" \| "conflict", size, modifiedAt }` | `sftpIpc.ts` |
 | `sftp:transfer-start` | `{ sftpSessionId, operations[] }` | `TransferJob[]` | `sftpIpc.ts` |
 | `sftp:transfer-cancel` | `{ transferId }` | void | `sftpIpc.ts` |
 | `sftp:transfer-list` | — | `{ transfers: TransferJob[] }` | `sftpIpc.ts` |
-| `sftp:transfer-resolve-conflict` | `{ transferId, resolution }` | void | `sftpIpc.ts` |
-| `sftp:event` | — | `SftpEvent` (transfer-progress\|transfer-complete) | broadcast |
+| `sftp:transfer-resolve-conflict` | `{ transferId, resolution, applyToAll? }` | void | `sftpIpc.ts` |
+| `sftp:event` | — | `SftpEvent` (transfer-progress\|transfer-complete\|transfer-conflict) | broadcast |
 | `sftp:bookmarks-list` | `{ hostId }` | `SftpBookmark[]` | `sftpIpc.ts` |
 | `sftp:bookmarks-upsert` | `{ hostId, name, remotePath }` | void | `sftpIpc.ts` |
 | `sftp:bookmarks-remove` | `{ id }` | void | `sftpIpc.ts` |
@@ -97,6 +97,18 @@ Both sshmanager handlers open its SQLite file read-only and always close the han
 | `sftp:sync-start` | `{ sftpSessionId, localPath, remotePath, direction, ... }` | `{ syncId }` | `sftpIpc.ts` |
 | `sftp:sync-stop` | `{ syncId }` | void | `sftpIpc.ts` |
 | `sftp:sync-list` | — | `{ syncs[] }` | `sftpIpc.ts` |
+
+**Conditional writes.** Supplying both `expectedSize` and `expectedModifiedAt` on
+`sftp:write-file` makes the write conditional: main re-stats the file first and returns
+`status: "conflict"` **without writing** if either value differs. Omitting them forces an
+unconditional overwrite — that is what the editor's Overwrite and Save As actions do. The editor
+records the pair from the `sftp:read-file` response when it opens a tab. The detector is
+`size` + `modifiedAt`; SFTP v3 stores mtime in whole seconds, so a same-length edit landing within
+the same second is not detectable.
+
+**Binary files.** `sftp:read-file` returns `encoding: "base64"` for content containing NUL bytes in
+the first 8KB *or* failing a strict UTF-8 decode of the whole buffer. The editor opens those tabs
+read-only — decoding them as text and saving back as UTF-8 destroys the file.
 
 ## Filesystem Channels
 

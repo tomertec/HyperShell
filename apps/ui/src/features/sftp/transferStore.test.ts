@@ -112,3 +112,49 @@ describe("transferStore", () => {
     expect(store.getState().filter).toBe("failed");
   });
 });
+
+describe("attentionCount", () => {
+  it("counts paused transfers so a conflict cannot strand the panel", () => {
+    const store = createTransferStore();
+    store.getState().setTransfers([
+      { transferId: "a", sftpSessionId: "s", type: "upload", localPath: "/l", remotePath: "/r",
+        bytesTransferred: 5, totalBytes: 10, speed: 0, status: "paused" } as never
+    ]);
+
+    expect(store.getState().activeCount).toBe(0);
+    expect(store.getState().attentionCount).toBe(1);
+  });
+
+  it("ignores completed and failed transfers", () => {
+    const store = createTransferStore();
+    store.getState().setTransfers([
+      { transferId: "a", sftpSessionId: "s", type: "upload", localPath: "/l", remotePath: "/r",
+        bytesTransferred: 10, totalBytes: 10, speed: 0, status: "completed" } as never,
+      { transferId: "b", sftpSessionId: "s", type: "upload", localPath: "/l", remotePath: "/r",
+        bytesTransferred: 1, totalBytes: 10, speed: 0, status: "failed" } as never
+    ]);
+
+    expect(store.getState().attentionCount).toBe(0);
+  });
+});
+
+describe("conflict tracking", () => {
+  it("records and clears conflict ids", () => {
+    const store = createTransferStore();
+
+    store.getState().setConflict("a");
+    expect(store.getState().conflictIds.has("a")).toBe(true);
+
+    store.getState().clearConflict("a");
+    expect(store.getState().conflictIds.has("a")).toBe(false);
+  });
+
+  it("keeps the same Set reference when clearing an unknown id", () => {
+    const store = createTransferStore();
+    const before = store.getState().conflictIds;
+
+    store.getState().clearConflict("missing");
+
+    expect(store.getState().conflictIds).toBe(before);
+  });
+});

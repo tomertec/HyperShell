@@ -228,14 +228,47 @@ function ensureBookmarkHost(
   });
 }
 
-function normalizeFileContent(buffer: Buffer): { content: string; encoding: "utf-8" | "base64" } {
+/**
+ * Decide how a remote file crosses the IPC boundary.
+ *
+ * NUL bytes catch obvious binaries, but a latin-1 text file has none — decoding
+ * it as UTF-8 yields U+FFFD replacement characters, and saving that back
+ * silently destroys the original bytes. Anything that is not strictly valid
+ * UTF-8 therefore travels as base64 and opens read-only.
+ */
+export function normalizeFileContent(buffer: Buffer): {
+  content: string;
+  encoding: "utf-8" | "base64";
+} {
   // Check for null bytes in first 8KB to detect binary content
   const sample = buffer.subarray(0, 8192);
   if (sample.includes(0)) {
     return { content: buffer.toString("base64"), encoding: "base64" };
   }
 
-  return { content: buffer.toString("utf8"), encoding: "utf-8" };
+  try {
+    const content = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+    return { content, encoding: "utf-8" };
+  } catch {
+    return { content: buffer.toString("base64"), encoding: "base64" };
+  }
+}
+
+/**
+ * Whether a remote file's current stat differs from what the caller expected
+ * when it read the file — the entire basis of the save-conflict check.
+ *
+ * SFTP v3 `mtime` is whole seconds, so an edit that lands within the same
+ * second as the original and happens to produce the same byte length is
+ * undetectable here. That's inherent to the protocol, not a bug in this
+ * comparison — treat this as a best-effort optimistic-concurrency check,
+ * not an exact one.
+ */
+export function isVersionMismatch(
+  current: { size: number; modifiedAt: string },
+  expected: { size: number; modifiedAt: string }
+): boolean {
+  return current.size !== expected.size || current.modifiedAt !== expected.modifiedAt;
 }
 
 function normalizeTransferStatus(status: string): "queued" | "active" | "paused" | "completed" | "failed" {
@@ -638,16 +671,49 @@ export function registerSftpIpc(
 
   const handleReadFile = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpReadFileRequestSchema.parse(rawRequest);
-    const buffer = await sftpSessionManager.getTransport(request.sftpSessionId).readFile(request.path);
-    return normalizeFileContent(buffer);
+    const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+    const entry = await transport.stat(request.path);
+    const buffer = await transport.readFile(request.path);
+    const normalized = normalizeFileContent(buffer);
+
+    return {
+      ...normalized,
+      size: entry.size,
+      modifiedAt: entry.modifiedAt
+    };
   };
 
   const handleWriteFile = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpWriteFileRequestSchema.parse(rawRequest);
+    const transport = sftpSessionManager.getTransport(request.sftpSessionId);
+
+    // Stat-then-write is inherently TOCTOU: SFTP has no atomic compare-and-swap,
+    // so a change landing between this stat and the writeFile call below is not
+    // caught — the previous task's atomic writeFile (temp + rename) widens that
+    // window from a single syscall to the whole upload duration. Accepted: the
+    // alternative (locking) isn't available over SFTP either.
+    if (request.expectedSize != null && request.expectedModifiedAt != null) {
+      const current = await transport.stat(request.path);
+      if (isVersionMismatch(current, { size: request.expectedSize, modifiedAt: request.expectedModifiedAt })) {
+        return {
+          status: "conflict" as const,
+          size: current.size,
+          modifiedAt: current.modifiedAt
+        };
+      }
+    }
+
     const content = request.encoding === "base64"
       ? Buffer.from(request.content, "base64")
       : Buffer.from(request.content, "utf8");
-    await sftpSessionManager.getTransport(request.sftpSessionId).writeFile(request.path, content);
+    await transport.writeFile(request.path, content);
+    const written = await transport.stat(request.path);
+
+    return {
+      status: "written" as const,
+      size: written.size,
+      modifiedAt: written.modifiedAt
+    };
   };
 
   const handleTransferStart = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {

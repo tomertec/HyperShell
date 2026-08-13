@@ -15,10 +15,14 @@ export interface TransferStoreTransfer extends TransferJob {
 export interface TransferStoreState {
   transfers: TransferStoreTransfer[];
   activeCount: number;
+  attentionCount: number;
+  conflictIds: ReadonlySet<string>;
   panelOpen: boolean;
   filter: TransferFilter;
   setTransfers: (transfers: TransferJob[]) => void;
   updateTransfer: (transferId: string, update: Partial<TransferJob>) => void;
+  setConflict: (transferId: string) => void;
+  clearConflict: (transferId: string) => void;
   setFilter: (filter: TransferFilter) => void;
   setPanelOpen: (open: boolean) => void;
 }
@@ -27,14 +31,21 @@ function deriveActiveCount(transfers: TransferJob[]): number {
   return transfers.filter((transfer) => transfer.status === "active").length;
 }
 
-function hasRunningTransfers(transfers: TransferJob[]): boolean {
-  return transfers.some(
-    (transfer) =>
-      transfer.status === "queued"
-      || transfer.status === "active"
-      || transfer.status === "paused"
-      || transfer.status === "interrupted"
+function needsAttention(transfer: TransferJob): boolean {
+  return (
+    transfer.status === "queued"
+    || transfer.status === "active"
+    || transfer.status === "paused"
+    || transfer.status === "interrupted"
   );
+}
+
+function deriveAttentionCount(transfers: TransferJob[]): number {
+  return transfers.filter(needsAttention).length;
+}
+
+function hasRunningTransfers(transfers: TransferJob[]): boolean {
+  return transfers.some(needsAttention);
 }
 
 function hydrateTransfer(
@@ -74,6 +85,8 @@ export function createTransferStore(): StoreApi<TransferStoreState> {
   return createStore<TransferStoreState>()((set) => ({
     transfers: [],
     activeCount: 0,
+    attentionCount: 0,
+    conflictIds: new Set<string>(),
     panelOpen: false,
     filter: "all",
 
@@ -92,6 +105,7 @@ export function createTransferStore(): StoreApi<TransferStoreState> {
         return {
           transfers: nextTransfers,
           activeCount: deriveActiveCount(nextTransfers),
+          attentionCount: deriveAttentionCount(nextTransfers),
           panelOpen: state.panelOpen || (!previousHadRunningTransfers && nextHasRunningTransfers)
         };
       }),
@@ -110,8 +124,29 @@ export function createTransferStore(): StoreApi<TransferStoreState> {
         return {
           transfers,
           activeCount: deriveActiveCount(transfers),
+          attentionCount: deriveAttentionCount(transfers),
           panelOpen: state.panelOpen || (!previousHadRunningTransfers && nextHasRunningTransfers)
         };
+      }),
+
+    setConflict: (transferId) =>
+      set((state) => {
+        if (state.conflictIds.has(transferId)) {
+          return {};
+        }
+        const next = new Set(state.conflictIds);
+        next.add(transferId);
+        return { conflictIds: next };
+      }),
+
+    clearConflict: (transferId) =>
+      set((state) => {
+        if (!state.conflictIds.has(transferId)) {
+          return {};
+        }
+        const next = new Set(state.conflictIds);
+        next.delete(transferId);
+        return { conflictIds: next };
       }),
 
     setFilter: (filter) => set({ filter }),

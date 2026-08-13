@@ -21,11 +21,18 @@ covers exactly those.
 # All unit tests
 pnpm test
 
-# Single workspace
+# Single workspace — only these two have their own vitest.config.ts
 pnpm --filter @hypershell/ui test
 pnpm --filter @hypershell/desktop test
-pnpm --filter @hypershell/session-core test
-pnpm --filter @hypershell/db test
+
+# session-core, shared and db have a `test` script but NO vitest.config.ts, so
+# `pnpm --filter <pkg> test` resolves the ROOT config, whose
+# projects: ["apps/*", "packages/*"] globs match nothing from inside the
+# package — it fails with "No projects were found". Run them by project from
+# the repo root instead:
+npx vitest run --project @hypershell/session-core
+npx vitest run --project @hypershell/shared
+npx vitest run --project @hypershell/db
 
 # Watch mode
 pnpm --filter @hypershell/ui test -- --watch
@@ -66,6 +73,34 @@ features/layout/
   └── TabBar.tsx
 ```
 
+## React Component Tests (`apps/ui` only)
+
+`.test.tsx` files can mount real components with React Testing Library:
+
+| Piece | Where |
+|-------|-------|
+| `@testing-library/react` 16, `@testing-library/user-event` 14, `jsdom` 30 | `apps/ui` devDependencies |
+| `environment: "jsdom"` + `@vitejs/plugin-react` | `apps/ui/vitest.config.ts` |
+| RTL cleanup between tests | `apps/ui/vitest.setup.ts` |
+| Canary that the toolchain still works | `apps/ui/src/testToolchain.smoke.test.tsx` |
+
+**Do not add `afterEach(cleanup)` to individual test files.** This project does not enable
+`test.globals`, so RTL cannot auto-register its cleanup — `vitest.setup.ts` registers it centrally
+instead. Without that, any `.test.tsx` with more than one test case leaks the previous test's DOM
+and queries fail with "found multiple elements".
+
+The jsdom environment applies to the **whole** `apps/ui` workspace, including plain `.test.ts`
+files. A test needing real Node semantics opts out per-file:
+
+```typescript
+// @vitest-environment node
+```
+
+Component tests are for logic that only exists once rendered — which control a state produces, or
+that a stale async response cannot write state. Prefer extracting a pure function and testing that
+in a `.test.ts` where the behaviour allows it; `transferRowControls.ts` and `requestGuard.ts` are
+the pattern.
+
 ## Key Test Files
 
 ### UI (`apps/ui/`)
@@ -75,6 +110,13 @@ features/layout/
 - `searchIndex.test.ts` — Quick Connect fuzzy search
 - `useFileKeyboard.test.ts` — SFTP keyboard navigation
 - `fileUtils.test.ts` — File sorting, size formatting, path utilities
+- `transferRowControls.test.ts` — Which controls a transfer row shows; the single source of truth
+  both transfer monitors consume, so they cannot disagree
+- `requestGuard.test.ts` — Monotonic request tokens used to discard superseded directory listings
+- `LocalPane.staleResponse.test.tsx` — A stale out-of-root redirect cannot write state after a
+  newer navigation
+- `EditorApp.test.tsx` — Failed reads open read-only, Save As refuses an existing destination,
+  a missing preload method is not reported as a successful save
 
 ### Desktop (`apps/desktop/`)
 - `main.lifecycle.test.ts` — App bootstrap/cleanup lifecycle
@@ -82,7 +124,9 @@ features/layout/
 - `transferManager.test.ts` — SFTP transfer queue
 
 ### Session Core (`packages/session-core/`)
-- `syncEngine.test.ts` — SFTP bidirectional sync
+- `syncEngine.test.ts` — SFTP bidirectional sync, streaming downloads, per-file failure isolation
+- `sftpTransport.atomicWrite.test.ts` — The rename fallback chain and `writeFile`'s temp-and-rename
+  path, including symlink resolution and the unwritable-directory error
 - `parseSshConfig.test.ts` — SSH config parser
 - `portForwarding.test.ts` — Port forward profile management
 

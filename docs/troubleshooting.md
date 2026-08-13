@@ -24,6 +24,60 @@
 
 **How to diagnose:** Check the Electron console output for `[sftp-auth]` log lines showing what credentials are being used.
 
+### A remote file opens read-only and says it is binary
+
+**Cause:** intended. `sftp:read-file` classified it as binary — either NUL bytes in the first 8KB,
+or the content is not valid UTF-8 (a latin-1 file has no NUL bytes but still cannot round-trip).
+Editing it as text and saving back as UTF-8 would destroy it.
+
+**Fix:** use the Download button on the notice, edit locally, and upload.
+
+**If it is genuinely UTF-8 text:** check for stray high bytes — `file <path>` and
+`iconv -f utf-8 -t utf-8 <path> >/dev/null` on the host will confirm. The classifier is
+`normalizeFileContent()` in `sftpIpc.ts`.
+
+### Saving in the editor shows a "changed on the server" dialog
+
+**Cause:** intended. The editor records `size` + `modifiedAt` when it opens a file and sends them
+back on save; main re-stats first and refuses to write if either differs, so another person's edits
+are not silently destroyed.
+
+**Options:** Overwrite (discard the server's version), Reload (discard yours), Save As, Cancel.
+
+**If it fires when nothing changed:** something else is rewriting the file — a config-management
+agent, an editor's autosave, a log rotation. Watch it on the host with
+`stat -c '%s %Y' <path>` before and after.
+
+### A saved file's permissions changed
+
+**Cause:** mode preservation is best-effort. Saving writes a temp file and renames it over the
+original, copying the original's mode first. If the server refuses SETSTAT the save still succeeds,
+and the file lands at the server's default mode instead. Failing the save outright was judged worse.
+
+**Fix:** re-apply the mode on the host (`chmod 600 <path>`). If it recurs on that server, that
+server does not support SETSTAT over SFTP.
+
+### Stray `.hypershell-*.tmp` or `.hypershell-sync-*.tmp` files
+
+**Cause:** a save or sync failed after creating its temp file, and the cleanup could not reach the
+server either (usually the connection dropped).
+
+**Important:** if the failure message named a temp path, **that file holds your only copy of the
+data** — the original was already removed and the replacement rename failed. Recover it before
+deleting anything.
+
+**Otherwise:** they are safe to delete. Remote save temps are siblings of the file, hidden, named
+`.<name>.hypershell-<hex>.tmp`; sync temps are local, named `<name>.hypershell-sync-<hex>.tmp`.
+
+### A sync reports "Complete" but files are missing
+
+**Cause:** per-file failures no longer abort the whole run — one unreadable file used to kill the
+entire sync silently. The completion line reports the failure count and the sync panel shows the
+first failure in red.
+
+**Fix:** check the panel's error text for the failing path. Usual causes are permissions on the
+remote file or a full local disk.
+
 ### SFTP works for SSH terminal but not for SFTP browser
 
 The SSH terminal uses the **system `ssh` binary** which has full access to SSH agent, `~/.ssh/config`, ProxyJump, etc. The SFTP browser uses the **ssh2 npm library** which needs credentials passed explicitly. They may resolve credentials differently.

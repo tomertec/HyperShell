@@ -2,9 +2,12 @@ import { useStore } from "zustand";
 import { toast } from "sonner";
 
 import { settingsStore } from "../../settings/settingsStore";
+import { resolveTransferConflict } from "../resolveTransferConflict";
 import { transferStore } from "../transferStore";
+import { transferRowControls } from "../transferRowControls";
 import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
+import { TransferConflictActions } from "./TransferConflictActions";
 
 function percentage(bytesTransferred: number, totalBytes: number): number {
   if (totalBytes <= 0) {
@@ -20,7 +23,8 @@ export function TransferPanel() {
     (state) => state.settings.general.usePopupTransferMonitor
   );
   const transfers = useStore(transferStore, (state) => state.transfers);
-  const activeCount = useStore(transferStore, (state) => state.activeCount);
+  const attentionCount = useStore(transferStore, (state) => state.attentionCount);
+  const conflictIds = useStore(transferStore, (state) => state.conflictIds);
   const panelOpen = useStore(transferStore, (state) => state.panelOpen);
   const filter = useStore(transferStore, (state) => state.filter);
   const setFilter = useStore(transferStore, (state) => state.setFilter);
@@ -94,13 +98,13 @@ export function TransferPanel() {
         : transfers.filter((transfer) => transfer.status === filter);
 
   if (!panelOpen) {
-    return activeCount > 0 ? (
+    return attentionCount > 0 ? (
       <button
         type="button"
         onClick={() => setPanelOpen(true)}
         className="flex items-center gap-2 border-t border-base-700 bg-base-900 px-3 py-1 text-sm text-text-secondary hover:text-text-primary"
       >
-        Transfers ({activeCount} active)
+        Transfers ({attentionCount} need attention)
       </button>
     ) : null;
   }
@@ -142,7 +146,10 @@ export function TransferPanel() {
         {filteredTransfers.length === 0 ? (
           <div className="px-3 py-4 text-center text-sm text-text-secondary">No transfers</div>
         ) : (
-          filteredTransfers.map((transfer) => (
+          filteredTransfers.map((transfer) => {
+            const hasConflict = conflictIds.has(transfer.transferId);
+            const controls = transferRowControls(transfer, hasConflict);
+            return (
             <div
               key={transfer.transferId}
               className="flex items-center gap-3 border-b border-base-800 px-3 py-1.5 text-sm"
@@ -194,7 +201,7 @@ export function TransferPanel() {
                 <span className="text-xs text-yellow-400">Interrupted</span>
               )}
 
-              {(transfer.status === "interrupted" || transfer.status === "failed") && transfer.bytesTransferred > 0 && (
+              {controls.retry && (
                 <button
                   type="button"
                   onClick={() => {
@@ -206,9 +213,16 @@ export function TransferPanel() {
                 </button>
               )}
 
-              {(transfer.status === "active" || transfer.status === "queued" || transfer.status === "paused") && (
+              {controls.conflict && (
+                <TransferConflictActions
+                  transferId={transfer.transferId}
+                  onResolve={resolveTransferConflict}
+                />
+              )}
+
+              {(controls.pause || controls.resume || controls.cancel) && (
                 <div className="flex items-center gap-2">
-                  {(transfer.status === "active" || transfer.status === "queued") && (
+                  {controls.pause && (
                     <button
                       type="button"
                       className="text-xs text-text-secondary hover:text-amber-300"
@@ -219,7 +233,7 @@ export function TransferPanel() {
                       Pause
                     </button>
                   )}
-                  {transfer.status === "paused" && (
+                  {controls.resume && (
                     <button
                       type="button"
                       className="text-xs text-text-secondary hover:text-emerald-300"
@@ -230,19 +244,22 @@ export function TransferPanel() {
                       Resume
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className="text-xs text-text-secondary hover:text-red-400"
-                    onClick={() => {
-                      void cancelTransfer(transfer.transferId);
-                    }}
-                  >
-                    Cancel
-                  </button>
+                  {controls.cancel && (
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:text-red-400"
+                      onClick={() => {
+                        void cancelTransfer(transfer.transferId);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
