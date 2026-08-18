@@ -253,12 +253,20 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
         const fileName = targetPath.split("/").pop() ?? targetPath;
         const language = getLanguageName(fileName);
 
+        // `tab` is the pre-await snapshot, so `tab.content` is what actually
+        // reached the server and is the correct new baseline — but anything
+        // typed during the write is still unsaved. Hardcoding dirty:false left
+        // the tab looking clean while holding those keystrokes, so closing it
+        // skipped the unsaved-changes confirm and dropped them.
+        const liveContent =
+          storeRef.current.getState().tabs.find((t) => t.id === tabId)?.content ?? tab.content;
+
         storeRef.current.getState().updateTab(tabId, {
           remotePath: targetPath,
           fileName,
           language,
           originalContent: tab.content,
-          dirty: false,
+          dirty: liveContent !== tab.content,
           error: null,
           baseSize: response?.size ?? null,
           baseModifiedAt: response?.modifiedAt ?? null,

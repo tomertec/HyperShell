@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import type { Readable, Writable } from "node:stream";
-import { Client, utils, type ConnectConfig, type OpenMode, type SFTPWrapper, type Stats } from "ssh2";
+import ssh2, { Client, type ConnectConfig, type OpenMode, type SFTPWrapper, type Stats } from "ssh2";
+
+// `utils` must come off the default export, not a named import. ssh2 is CommonJS
+// and defines it as a nested object literal with a spread, which Node's ESM
+// named-export detection (cjs-module-lexer) cannot see through — `Client` is
+// detected, `utils` is not. Since esbuild keeps ssh2 external and emits ESM, a
+// named `utils` import makes the bundled main process crash on load.
+const { utils } = ssh2;
 
 import type {
   SessionState,
@@ -48,6 +55,8 @@ export interface SftpTransportHandle {
   chmod(remotePath: string, permissions: number): Promise<void>;
   mkdir(remotePath: string): Promise<void>;
   rename(oldPath: string, newPath: string): Promise<void>;
+  /** Rename, clobbering an existing destination. See `renameWithOverwrite`. */
+  renameOverwrite(oldPath: string, newPath: string): Promise<void>;
   remove(remotePath: string, recursive?: boolean): Promise<void>;
   readFile(remotePath: string): Promise<Buffer>;
   writeFile(remotePath: string, data: Buffer): Promise<void>;
@@ -78,7 +87,7 @@ interface PosixRenameCapable {
  * that point `from` — not `to` — holds the only surviving copy of the data,
  * so callers must not delete it on this specific failure.
  */
-interface OverwriteRenameError extends Error {
+export interface OverwriteRenameError extends Error {
   destinationRemoved?: true;
 }
 
@@ -156,7 +165,7 @@ const MAX_FILENAME_BYTES = 255;
  * under the common 255-byte filename limit. Without this, a save that used to
  * work for a long filename starts failing purely because of the added suffix.
  */
-function truncateForTempName(baseName: string, reservedBytes: number): string {
+export function truncateForTempName(baseName: string, reservedBytes: number): string {
   const budget = MAX_FILENAME_BYTES - reservedBytes;
   if (Buffer.byteLength(baseName) <= budget) {
     return baseName;
@@ -540,6 +549,10 @@ export function createSftpTransport(
     });
   }
 
+  async function renameOverwrite(oldPath: string, newPath: string): Promise<void> {
+    await renameWithOverwrite(requireSftp(), oldPath, newPath);
+  }
+
   async function remove(remotePath: string, recursive = false): Promise<void> {
     const sftpSession = requireSftp();
     const entry = await stat(remotePath);
@@ -742,6 +755,7 @@ export function createSftpTransport(
     chmod,
     mkdir,
     rename,
+    renameOverwrite,
     remove,
     readFile,
     writeFile,

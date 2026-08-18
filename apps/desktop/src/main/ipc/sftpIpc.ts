@@ -271,6 +271,29 @@ export function isVersionMismatch(
   return current.size !== expected.size || current.modifiedAt !== expected.modifiedAt;
 }
 
+/**
+ * The size/mtime pair a later conditional write compares against, or nulls if
+ * the server won't stat the file.
+ *
+ * Statting is deliberately not fatal here. Read and stat are separate SFTP
+ * permissions, and on a server that grants the first but refuses the second a
+ * fatal stat would make the file impossible to *open* — a strictly worse
+ * outcome than opening it without conflict detection. Nulls flow through to
+ * the renderer, which then omits `expectedSize`/`expectedModifiedAt` and saves
+ * unconditionally.
+ */
+export async function readVersionToken(
+  transport: Pick<SftpTransportHandle, "stat">,
+  remotePath: string
+): Promise<{ size: number | null; modifiedAt: string | null }> {
+  try {
+    const entry = await transport.stat(remotePath);
+    return { size: entry.size, modifiedAt: entry.modifiedAt };
+  } catch {
+    return { size: null, modifiedAt: null };
+  }
+}
+
 function normalizeTransferStatus(status: string): "queued" | "active" | "paused" | "completed" | "failed" {
   if (
     status === "queued" ||
@@ -672,14 +695,14 @@ export function registerSftpIpc(
   const handleReadFile = async (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = sftpReadFileRequestSchema.parse(rawRequest);
     const transport = sftpSessionManager.getTransport(request.sftpSessionId);
-    const entry = await transport.stat(request.path);
+    const version = await readVersionToken(transport, request.path);
     const buffer = await transport.readFile(request.path);
     const normalized = normalizeFileContent(buffer);
 
     return {
       ...normalized,
-      size: entry.size,
-      modifiedAt: entry.modifiedAt
+      size: version.size,
+      modifiedAt: version.modifiedAt
     };
   };
 

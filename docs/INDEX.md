@@ -78,7 +78,7 @@ The codebase is a pnpm monorepo with five workspaces. The main process manages s
 | Welcome screen + animated logo | Complete | `ui/features/welcome/` |
 | SFTP dual-pane file browser | Complete | `ui/features/sftp/` |
 | SFTP transfer queue | Complete | `desktop/main/sftp/transferManager.ts` |
-| SFTP remote file editor | Complete | `ui/features/sftp/components/RemoteEditor.tsx` |
+| SFTP remote file editor | Complete | `ui/features/editor/EditorApp.tsx` (separate editor window) |
 | SFTP bookmarks | Complete | `db/repositories/sftpBookmarksRepository.ts` |
 | SFTP sync engine | Complete | `session-core/sftp/syncEngine.ts` |
 | Broadcast mode | Complete | `ui/features/broadcast/` |

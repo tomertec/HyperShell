@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { isVersionMismatch } from "./sftpIpc";
+import { isVersionMismatch, readVersionToken } from "./sftpIpc";
 
 describe("isVersionMismatch", () => {
   const base = { size: 100, modifiedAt: "2026-08-13T00:00:00.000Z" };
@@ -21,5 +21,29 @@ describe("isVersionMismatch", () => {
     expect(
       isVersionMismatch({ size: 999, modifiedAt: "2020-01-01T00:00:00.000Z" }, base)
     ).toBe(true);
+  });
+});
+
+describe("readVersionToken", () => {
+  it("returns the stat's size and mtime", async () => {
+    const transport = {
+      stat: vi.fn().mockResolvedValue({ size: 42, modifiedAt: "2026-08-13T00:00:00.000Z" }),
+    };
+
+    expect(await readVersionToken(transport as never, "/etc/hosts")).toEqual({
+      size: 42,
+      modifiedAt: "2026-08-13T00:00:00.000Z",
+    });
+  });
+
+  it("returns nulls when the server refuses to stat", async () => {
+    const transport = { stat: vi.fn().mockRejectedValue(new Error("permission denied")) };
+
+    // A server that permits read but refuses stat must not make the file
+    // unopenable — the version token is what's lost, not the content.
+    expect(await readVersionToken(transport as never, "/etc/hosts")).toEqual({
+      size: null,
+      modifiedAt: null,
+    });
   });
 });

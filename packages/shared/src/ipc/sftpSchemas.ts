@@ -90,8 +90,11 @@ export type SftpReadFileRequest = z.infer<typeof sftpReadFileRequestSchema>;
 export const sftpReadFileResponseSchema = z.object({
   content: z.string(),
   encoding: z.enum(["utf-8", "base64"]),
-  size: z.number(),
-  modifiedAt: z.string()
+  // Null when the server permits reading the file but refuses to stat it. The
+  // file still opens; only the save-conflict check is unavailable, and the
+  // renderer omits `expectedSize`/`expectedModifiedAt` on the write.
+  size: z.number().nullable(),
+  modifiedAt: z.string().nullable()
 });
 export type SftpReadFileResponse = z.infer<typeof sftpReadFileResponseSchema>;
 

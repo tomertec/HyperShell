@@ -31,7 +31,7 @@ HyperShell follows Electron's recommended security model with strict process iso
 │  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐  │
 │  │ TerminalPane│  │  SftpDualPane│  │  Zustand       │  │
 │  │ (xterm.js)  │  │  (FileList)  │  │  Stores        │  │
-│  │             │  │  RemoteEditor│  │                │  │
+│  │             │  │  Editor win. │  │                │  │
 │  │ TabBar      │  │  Transfers   │  │  layoutStore   │  │
 │  │ Panes       │  │  Bookmarks   │  │  settingsStore │  │
 │  │ Sidebar     │  │  Sync        │  │  broadcastStore│  │

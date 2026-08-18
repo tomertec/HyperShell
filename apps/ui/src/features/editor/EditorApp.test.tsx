@@ -2,13 +2,27 @@ import { describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import type { StoreApi } from "zustand/vanilla";
+
 import { EditorApp } from "./EditorApp";
+import type { EditorState } from "./stores/editorStore";
 
 // EditorPane pulls in CodeMirror, which isn't what these tests exercise —
 // they cover EditorApp's own save-conflict orchestration. Stub it out so
 // mounting a non-readOnly tab doesn't require a real editor surface.
+// The stub's button stands in for a keystroke: the real EditorPane also writes
+// content straight to the store for the tab it was given.
 vi.mock("./components/EditorPane", () => ({
-  EditorPane: () => <div data-testid="editor-pane-stub" />,
+  EditorPane: ({ store, tabId }: { store: StoreApi<EditorState>; tabId: string }) => (
+    <div data-testid="editor-pane-stub">
+      <button
+        type="button"
+        onClick={() => store.getState().updateTab(tabId, { content: "hello typed", dirty: true })}
+      >
+        simulate keystroke
+      </button>
+    </div>
+  ),
 }));
 
 type Hypershell = NonNullable<Window["hypershell"]>;
@@ -262,6 +276,62 @@ describe("EditorApp save-conflict handling", () => {
     // The dialog must stay open on failure — the user still needs to choose
     // an option, not be left believing the click did nothing.
     expect(screen.getByRole("dialog", { name: "Remote file changed" })).toBeTruthy();
+  });
+
+  it("keeps the tab dirty when a keystroke lands while the save is in flight", async () => {
+    type WriteResponse = { status: "written" | "conflict"; size: number; modifiedAt: string };
+    let openFileListener: OpenFileListener | null = null;
+    let resolveWrite: ((value: WriteResponse) => void) | null = null;
+
+    const sftpReadFile = vi.fn().mockResolvedValue({
+      content: "hello",
+      encoding: "utf-8",
+      size: 5,
+      modifiedAt: "2026-08-13T00:00:00.000Z",
+    });
+    const sftpWriteFile = vi.fn(
+      () =>
+        new Promise<WriteResponse>((resolve) => {
+          resolveWrite = resolve;
+        })
+    );
+
+    window.hypershell = mockHypershell({
+      onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
+        openFileListener = listener;
+        return () => {};
+      }),
+      sftpReadFile,
+      sftpWriteFile,
+    });
+
+    const user = userEvent.setup();
+    render(<EditorApp sftpSessionId="s1" />);
+
+    act(() => {
+      openFileListener?.({ remotePath: "/r/original.txt", sftpSessionId: "s1" });
+    });
+    await screen.findByTestId("editor-pane-stub");
+
+    act(() => {
+      ctrlKey("s");
+    });
+    await waitFor(() => {
+      expect(sftpWriteFile).toHaveBeenCalledTimes(1);
+    });
+
+    // Typed after the request went out, so this text is not in the payload.
+    await user.click(screen.getByRole("button", { name: "simulate keystroke" }));
+
+    await act(async () => {
+      resolveWrite?.({ status: "written", size: 5, modifiedAt: "2026-08-13T03:00:00.000Z" });
+    });
+
+    // Marking the tab clean here would drop the "unsaved changes" confirm on
+    // close and lose the keystroke silently.
+    await waitFor(() => {
+      expect(screen.getByTitle("Modified")).toBeTruthy();
+    });
   });
 
   it("Mn-6: Escape cancels the dialog, and Ctrl+S is suppressed while it's open", async () => {

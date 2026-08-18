@@ -3,7 +3,11 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, readdir, rename, rm, stat as fsStat } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 import { pipeline } from "node:stream/promises";
-import type { SftpTransportHandle } from "../transports/sftpTransport";
+import {
+  truncateForTempName,
+  type OverwriteRenameError,
+  type SftpTransportHandle
+} from "../transports/sftpTransport";
 
 export interface SyncConfig {
   localPath: string;
@@ -46,6 +50,38 @@ export interface SyncEngine {
   onEvent(listener: SyncEventListener): () => void;
 }
 
+/** Matches the temp names `buildTempPath` produces, on either side. */
+const SYNC_TEMP_NAME = /\.hypershell-sync-[0-9a-f]{12}\.tmp$/;
+
+/**
+ * Sibling temp path for an in-progress transfer of `fullPath`.
+ *
+ * The random suffix matters: a fixed name would let two syncs racing the same
+ * file (concurrent syncs, or a restart overlapping an in-flight run) clobber
+ * each other's temp file, and whichever rename lands could leave a truncated
+ * file at the real path with a fresh mtime — silently unfixable, since the
+ * mtime check would then see it as already up to date on every future sync.
+ *
+ * The base name is trimmed to keep the result inside the 255-byte filename
+ * ceiling, so an already-long name doesn't start failing to transfer.
+ *
+ * `side` decides what counts as a separator: remote SFTP paths are POSIX,
+ * where a backslash is an ordinary filename character — treating it as a
+ * separator there would compute the truncation budget against only the
+ * fragment after it, letting a long backslash-bearing name overflow the
+ * ceiling. Local paths keep both, since Windows accepts either.
+ */
+export function buildTempPath(fullPath: string, side: "local" | "remote"): string {
+  const suffix = `.hypershell-sync-${randomBytes(6).toString("hex")}.tmp`;
+  const separator =
+    side === "remote"
+      ? fullPath.lastIndexOf("/")
+      : Math.max(fullPath.lastIndexOf("/"), fullPath.lastIndexOf("\\"));
+  const directory = fullPath.slice(0, separator + 1);
+  const baseName = fullPath.slice(separator + 1);
+  return `${directory}${truncateForTempName(baseName, Buffer.byteLength(suffix))}${suffix}`;
+}
+
 export function createSyncEngine(): SyncEngine {
   const syncs = new Map<string, ManagedSync>();
   const listeners = new Set<SyncEventListener>();
@@ -56,6 +92,13 @@ export function createSyncEngine(): SyncEngine {
 
   function shouldExclude(filePath: string, patterns: string[]): boolean {
     const segments = filePath.replace(/\\/g, "/").split("/");
+
+    // Sync's own temp files are never content, in either direction. A run
+    // killed mid-transfer strands one on whichever side it was writing to, and
+    // without this the next run would treat it as a real file and copy it to
+    // the far end — where it would then look like content to the run after that.
+    if (segments.some((segment) => SYNC_TEMP_NAME.test(segment))) return true;
+
     return patterns.some((pattern) =>
       segments.some((seg) => seg === pattern || seg.startsWith(pattern + "."))
     );
@@ -181,9 +224,11 @@ export function createSyncEngine(): SyncEngine {
 
             const remotePath = `${config.remotePath}/${file.relativePath.replace(/\\/g, "/")}`;
             let needsUpload = false;
+            let existingMode: number | null = null;
 
             try {
               const remoteStat = await transport.stat(remotePath);
+              existingMode = remoteStat.permissions;
               const remoteModTime = new Date(remoteStat.modifiedAt).getTime() / 1000;
               if (file.mtime > remoteModTime) {
                 needsUpload = true;
@@ -201,23 +246,57 @@ export function createSyncEngine(): SyncEngine {
                 currentFile: file.relativePath,
               });
 
+              // Upload to a sibling temp file and rename it into place, mirroring
+              // the download leg below and sftpTransport.writeFile: streaming
+              // straight onto the live path leaves a truncated file there if the
+              // transfer dies, and the truncated copy carries a fresh mtime, so
+              // every later run considers it up to date.
+              const tempPath = buildTempPath(remotePath, "remote");
               try {
                 const remoteDir = remotePath.substring(0, remotePath.lastIndexOf("/"));
                 await ensureRemoteDirExists(transport, remoteDir);
 
                 const localStream = createReadStream(join(config.localPath, file.relativePath));
-                const remoteStream = transport.createWriteStream(remotePath);
+                const remoteStream = transport.createWriteStream(tempPath);
                 await pipeline(localStream, remoteStream);
+
+                if (existingMode != null) {
+                  // Writing in place used to keep the destination's mode; a
+                  // fresh temp file is created with the server's default umask,
+                  // so it has to be carried across or the rename silently
+                  // resets it. Best-effort for the same reason as
+                  // sftpTransport.writeFile — a server that refuses SETSTAT
+                  // must not fail an otherwise-good upload over a mode bit.
+                  await transport.chmod(tempPath, existingMode).catch(() => {});
+                }
+
+                await transport.renameOverwrite(tempPath, remotePath);
 
                 synced++;
                 managed.status.filesSynced = synced;
                 managed.status.bytesTransferred += file.size;
               } catch (fileError) {
                 // One unreadable/unwritable file must not abandon the rest of the run.
+                const message =
+                  fileError instanceof Error ? fileError.message : String(fileError);
+
+                // The rename unlinked the destination and then failed, so the
+                // temp file is the only surviving copy — deleting it here would
+                // be the data loss this whole branch exists to prevent.
+                const destinationRemoved =
+                  fileError instanceof Error &&
+                  (fileError as OverwriteRenameError).destinationRemoved === true;
+
                 failures.push({
                   path: file.relativePath,
-                  error: fileError instanceof Error ? fileError.message : String(fileError),
+                  error: destinationRemoved
+                    ? `${message} — the uploaded copy is at ${tempPath}`
+                    : message,
                 });
+
+                if (!destinationRemoved) {
+                  await transport.remove(tempPath).catch(() => {});
+                }
               }
             }
           }
@@ -257,14 +336,7 @@ export function createSyncEngine(): SyncEngine {
               // Stream rather than buffer: transport.readFile() is the editor's
               // API and rejects anything over 10 MB, which silently made sync
               // unusable for real payloads.
-              //
-              // The random suffix matters: a fixed name would let two syncs
-              // racing the same file (concurrent syncs, or a restart overlapping
-              // an in-flight run) clobber each other's temp file, and whichever
-              // rename lands could leave a truncated file at the real path with
-              // a fresh mtime — silently unfixable, since the mtime check would
-              // then see it as already up to date on every future sync.
-              const tempPath = `${localFilePath}.hypershell-sync-${randomBytes(6).toString("hex")}.tmp`;
+              const tempPath = buildTempPath(localFilePath, "local");
               try {
                 await mkdir(dirname(localFilePath), { recursive: true });
 

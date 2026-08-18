@@ -6,41 +6,56 @@ decisions survive — a reviewer finding one of these later should know it was a
 
 Ordered by what I'd pick up first.
 
-## Blocks nothing, but do these next
+## Resolved (2026-08-13, after Phase 1 merged)
 
-### 1. Sync uploads still truncate the remote file on failure
-`packages/session-core/src/sftp/syncEngine.ts` — the upload leg writes straight to the remote path
-via `transport.createWriteStream(remotePath)`. A killed upload leaves a truncated file at the real
-path. This is the same bug class Phase 1 fixed for downloads (local temp + rename) and for editor
-saves (`sftpTransport.writeFile`).
+### 1. Sync uploads truncated the remote file on failure — fixed
+`syncEngine.ts`'s upload leg wrote straight to the remote path, so a killed upload left a truncated
+file there — the same bug class Phase 1 fixed for downloads and editor saves. It now uploads to a
+sibling temp file and renames it into place via a new `renameOverwrite` on `SftpTransportHandle`
+(a thin wrapper over the already-tested `renameWithOverwrite`, which needs the raw `SFTPWrapper`
+the sync engine doesn't hold).
 
-Pre-existing and out of Phase 1's scope — H4 covered downloads only. **The fix is now cheap:**
-`renameWithOverwrite` is already exported from `sftpTransport.ts`, so the upload leg needs a
-temp-path `createWriteStream` plus that call. A small follow-up, not a design question.
+Two things came with it:
+- Both legs now build their temp path through one `buildTempPath` helper, which also trims the base
+  name to the 255-byte filename ceiling — without that, adding a suffix would have made long-named
+  files start failing to upload.
+- `shouldExclude` now filters `*.hypershell-sync-<hex>.tmp` in **both** directions. This became
+  load-bearing rather than cosmetic: before the fix, temp files only ever existed locally, so a
+  stranded one was a narrow case; now they exist remotely too, and an unexcluded stranded temp would
+  be copied to the far end and then look like real content to the run after that.
+- On the `destinationRemoved` failure (rename unlinked the destination, then failed), the temp file
+  is deliberately **not** cleaned up — it holds the only copy — and its path is reported in the
+  failure message.
 
-Call this out in the Phase 1 PR description — a reviewer will notice `writeFile` gained
-temp-then-rename while `syncEngine.ts` right beside it did not, and unexplained that reads as an
-oversight rather than a scope decision.
+### 2. `RemoteEditor.tsx` deleted
+Zero importers, and it carried both defects `EditorApp.tsx` had already fixed (base64 decoded as
+text, `encoding: "utf-8"` written with no version check). The risk was never the file itself but the
+next person wiring up an SFTP-side editor from it with every test still green. Git history keeps it.
+`docs/INDEX.md` and `docs/architecture.md` now point at the editor window instead.
 
-### 2. `RemoteEditor.tsx` is dead code carrying two fixed defects
-`apps/ui/src/features/sftp/components/RemoteEditor.tsx` has zero importers. It still decodes base64
-as text and writes `encoding: "utf-8"` with no version check — both fixed in `EditorApp.tsx`.
+### 3. Workspace `test` scripts fixed
+It was three workspaces, not two — `db` as well as `session-core` and `shared`. Each now has its own
+`vitest.config.ts`, so `pnpm --filter @hypershell/<name> test` works uniformly across all five, and
+CLAUDE.md's Testing section and gotcha entry were updated to match.
 
-Phase 1 added a header comment rather than deleting it (repo convention: mention dead code, don't
-remove it). The risk isn't the file; it's that whoever next wires up an SFTP-side editor
-reintroduces both bugs with every test still green. **Deleting it is the better end state** — git
-history keeps it.
+Note: `db`'s tests (and the two desktop tests that open a real SQLite file) still fail locally on
+the better-sqlite3 ABI mismatch — the native module is built against Electron's
+`NODE_MODULE_VERSION`, not plain Node's. That is unrelated and pre-existing; the configs fixed the
+resolution failure, not that.
 
-### 3. Two workspaces have a `test` script that cannot work
-`packages/session-core` and `packages/shared` have `"test": "vitest"` but no `vitest.config.ts`. Run
-from inside the package, vitest resolves the root config whose `projects: ["apps/*", "packages/*"]`
-globs match nothing, and reports "No projects were found". So `pnpm --filter @hypershell/session-core test`
-fails for reasons unrelated to the tests.
+### 4. `handleReadFile`'s stat is no longer fatal
+Phase 1's stat-before-read made a file unopenable on a server that permits read but refuses stat —
+a reachability regression, not just a save limitation. The stat now goes through `readVersionToken`,
+which returns `{size: null, modifiedAt: null}` on failure; `sftpReadFileResponseSchema` marks both
+nullable, and the renderer already omitted `expectedSize`/`expectedModifiedAt` when its base version
+is null. The file opens, saves work, only conflict detection is unavailable.
 
-Working form, from the repo root: `npx vitest run --project @hypershell/session-core`.
-
-Fix by adding a `vitest.config.ts` to both, or by correcting the scripts — **and update CLAUDE.md's
-Testing section**, which currently advertises the broken `pnpm --filter` form for two of five workspaces.
+### 5. Typing during a save no longer clears `dirty`
+`writeTab` marked the tab clean using content captured before the await, so a keystroke landing
+during the write left the tab looking clean while holding unsaved text — and closing it then skipped
+the unsaved-changes confirm entirely. `dirty` is now recomputed against live store state after the
+await. `originalContent` still takes the pre-await snapshot, which is correct: that is what actually
+reached the server.
 
 ## Accepted trade-offs — deliberate, not defects
 
@@ -62,9 +77,6 @@ Testing section**, which currently advertises the broken `pnpm --filter` form fo
 
 ## Known limitations worth recording
 
-- **`handleReadFile` now stats before reading.** On a server that permits read but refuses stat, a
-  file can no longer be **opened** at all — before Phase 1 it could. That is a reachability
-  regression, not merely a save limitation. Exotic, but record it accurately.
 - **A post-write stat failure reports a successful save as failed.** The write already landed;
   re-saving is idempotent. Annoying, not destructive.
 - **Conflict state does not survive a renderer reload.** `conflictIds` is renderer-only and
@@ -74,8 +86,11 @@ Testing section**, which currently advertises the broken `pnpm --filter` form fo
   dangling target, and the write replaces the link with a regular file. Per spec.
 - **The temp file is briefly world-readable** — created with the server's default umask and
   `chmod`ed only after the write completes.
-- **Sync temp files aren't excluded from the upload leg.** `.hypershell-sync-*.tmp` isn't in
-  `shouldExclude`, so in a bidirectional run a stranded temp could be uploaded. Very narrow.
+- **Sync upload mode preservation is best-effort**, same ruling as `sftpTransport.writeFile`. Temp +
+  rename does not inherit the destination's mode the way an in-place write did, so the upload leg
+  copies it from the stat it already performs — but a server refusing SETSTAT lands the file at the
+  server default rather than failing the upload. Only applies to files that already existed
+  remotely; a newly created one has no mode to preserve.
 
 ## Structural invariants a future change could break
 
