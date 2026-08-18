@@ -19,6 +19,7 @@ import { Modal } from "../features/layout/Modal";
 import { Workspace } from "../features/layout/Workspace";
 import {
   layoutStore,
+  restorableWorkspaceTabs,
   serializeWorkspaceLayout,
   workspaceTabToLayoutTab,
 } from "../features/layout/layoutStore";
@@ -30,6 +31,10 @@ import type { QuickConnectProfile } from "../features/quick-connect/searchIndex"
 import { SerialProfileForm, type SerialProfileFormValue } from "../features/serial/SerialProfileForm";
 import { sessionRecoveryStore } from "../features/sessions/sessionRecoveryStore";
 import { SessionRecoveryDialog } from "../features/sessions/SessionRecoveryDialog";
+import {
+  isRestorableSavedSession,
+  savedSessionToLayoutTab,
+} from "../features/sessions/savedSessionRestore";
 import { Sidebar } from "../features/sidebar/Sidebar";
 import { SettingsPanel } from "../features/settings/SettingsPanel";
 import { settingsStore } from "../features/settings/settingsStore";
@@ -407,31 +412,43 @@ function MainApp() {
         setTags(loadedTags);
       }
     );
-    // Load settings, then check for last workspace to restore
-    void settingsStore.getState().load().then(() => {
+    // Settings first: both the restore banner and the recovery prompt are
+    // opt-out, and asking before the stored values are known would show them
+    // once on every start regardless. One load serves both checks.
+    const settingsLoaded = settingsStore.getState().load();
+
+    void settingsLoaded.then(() => {
       if (!settingsStore.getState().settings.general.showRestoreBanner) return;
       return window.hypershell?.workspaceLoadLast?.().then((last) => {
-        if (last?.layout?.tabs && last.layout.tabs.length > 0) {
-          setLastWorkspaceTabs(last.layout.tabs);
+        // Filter here rather than at restore time so the banner's count never
+        // promises tabs that cannot come back.
+        const restorable = restorableWorkspaceTabs(last?.layout?.tabs ?? []);
+        if (restorable.length > 0) {
+          setLastWorkspaceTabs(restorable);
           setRestoreBannerVisible(true);
         }
       });
     }).catch(() => {});
 
-    if (window.hypershell?.sessionLoadSavedState) {
-      void window.hypershell
-        .sessionLoadSavedState()
-        .then((sessions) => {
-          if (sessions.length === 0) {
+    void settingsLoaded
+      .then(() => {
+        if (!settingsStore.getState().settings.general.showSessionRecoveryPrompt) {
+          return;
+        }
+        return window.hypershell?.sessionLoadSavedState?.().then((sessions) => {
+          // Same rule as the banner above: list only what Restore can actually
+          // reopen, so the dialog never promises a row that silently vanishes.
+          const restorable = sessions.filter(isRestorableSavedSession);
+          if (restorable.length === 0) {
             return;
           }
-          setSavedRecoverySessions(sessions);
+          setSavedRecoverySessions(restorable);
           setSessionRecoveryOpen(true);
-        })
-        .catch((error) => {
-          console.warn("[hypershell] failed loading saved session recovery state:", error);
         });
-    }
+      })
+      .catch((error) => {
+        console.warn("[hypershell] failed loading saved session recovery state:", error);
+      });
     return () => {
       cancelled = true;
     };
@@ -1070,21 +1087,11 @@ function MainApp() {
 
   const restoreSavedSessions = useCallback(async () => {
     for (let index = 0; index < savedRecoverySessions.length; index += 1) {
-      const session = savedRecoverySessions[index];
-      if (session.transport === "sftp") {
-        continue;
-      }
-
       const sessionId = `recovery-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`;
-      openTab({
-        tabKey: sessionId,
-        sessionId,
-        title: session.title,
-        transport: session.transport === "serial" ? "serial" : "ssh",
-        profileId: session.profileId,
-        hostId: session.hostId ?? undefined,
-        preopened: false,
-      });
+      const tab = savedSessionToLayoutTab(savedRecoverySessions[index], sessionId);
+      if (tab) {
+        openTab(tab);
+      }
     }
     setSessionRecoveryOpen(false);
     setSavedRecoverySessions([]);

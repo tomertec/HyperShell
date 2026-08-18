@@ -1,6 +1,7 @@
 import type { SavedSessionRecord } from "@hypershell/shared";
 
 import { Modal } from "../layout/Modal";
+import { resolveSavedSessionLabels, savedSessionTarget } from "./savedSessionLabels";
 
 function formatSavedAt(value: string): string {
   const parsed = new Date(value);
@@ -10,14 +11,16 @@ function formatSavedAt(value: string): string {
   return parsed.toLocaleString();
 }
 
-function formatTransport(transport: SavedSessionRecord["transport"]): string {
-  if (transport === "ssh") {
-    return "SSH";
-  }
-  if (transport === "serial") {
-    return "Serial";
-  }
-  return "SFTP";
+const TRANSPORT_LABELS: Record<SavedSessionRecord["transport"], string> = {
+  ssh: "SSH",
+  serial: "Serial",
+  sftp: "SFTP",
+  telnet: "Telnet",
+  local: "Local",
+};
+
+export function formatTransport(transport: SavedSessionRecord["transport"]): string {
+  return TRANSPORT_LABELS[transport];
 }
 
 export interface SessionRecoveryDialogProps {
@@ -33,6 +36,8 @@ export function SessionRecoveryDialog({
   onRestore,
   onDismiss,
 }: SessionRecoveryDialogProps) {
+  const labels = resolveSavedSessionLabels(sessions);
+
   return (
     <Modal
       open={open}
@@ -74,14 +79,14 @@ export function SessionRecoveryDialog({
               </tr>
             </thead>
             <tbody>
-              {sessions.map((session) => (
+              {sessions.map((session, index) => (
                 <tr key={session.id} className="border-t border-border/70">
-                  <td className="px-3 py-2 text-text-primary">{session.title}</td>
+                  <td className="px-3 py-2 text-text-primary">{labels[index]}</td>
                   <td className="px-3 py-2 text-text-muted">
                     {formatTransport(session.transport)}
                   </td>
                   <td className="px-3 py-2 text-text-muted">
-                    {session.hostName ?? session.profileId}
+                    {savedSessionTarget(session)}
                   </td>
                   <td className="px-3 py-2 text-text-muted">
                     {formatSavedAt(session.savedAt)}

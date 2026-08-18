@@ -70,6 +70,10 @@ import { registerPuttyImportIpc } from "./puttyImportIpc";
 import { registerSshManagerImportIpc } from "./sshManagerImportIpc";
 import { registerBackupIpc } from "./backupIpc";
 import { registerSessionRecoveryIpc } from "./sessionRecoveryIpc";
+import {
+  createRendererSessionOwnership,
+  type ReapableRenderer,
+} from "../rendererSessionOwnership";
 import { registerTmuxIpc } from "./tmuxIpc";
 import { registerClaudeIpc } from "./claudeIpc";
 import { applyClaudeSessionArgs } from "./claudeSessionArgs";
@@ -360,7 +364,7 @@ function getLocalProfilesRepo(): ReturnType<typeof createLocalProfilesRepository
   return localProfilesRepository;
 }
 
-function resolveLocalProfileForSession(id: string):
+export function resolveLocalProfileForSession(id: string):
   | {
       name: string;
       executable: string;
@@ -1284,6 +1288,9 @@ export function registerIpc(
   cleanupRegisteredIpc?.();
 
   const manager = options.sessionManager ?? sessionManager;
+  const rendererSessions = createRendererSessionOwnership((sessionId) =>
+    manager.close(sessionId)
+  );
   const getDb = () => options.db ?? getOrCreateDatabase();
   const recorder = recordingIpcManager;
   const hostStatusService = createHostStatusService();
@@ -1423,9 +1430,12 @@ export function registerIpc(
         sessionErrorMessages.delete(sessionId);
         sessionHostCache.delete(sessionId);
 
-        // Wait one tick to let SessionManager finalize reconnect/disconnect state.
+        // Wait one tick to let SessionManager finalize reconnect/disconnect
+        // state. A session that is only reconnecting still belongs to its
+        // renderer and must stay reapable.
         setTimeout(() => {
           if (!manager.getSession(sessionId)) {
+            rendererSessions.forget(sessionId);
             void recorder.stop({ sessionId });
           }
         }, 0);
@@ -1446,16 +1456,32 @@ export function registerIpc(
     ipcMain.removeHandler?.(channel);
   }
 
-  ipcMain.handle(ipcChannels.session.open, (event, request) =>
-    openSessionHandler(
+  ipcMain.handle(ipcChannels.session.open, async (event, request) => {
+    const opened = await openSessionHandler(
       event,
       request,
       manager,
       options.resolveHostProfile,
       (id) => serialProfilesRepo.get(id),
       resolveLocalProfileForSession
-    )
-  );
+    );
+
+    const sender = (event as { sender?: ReapableRenderer } | undefined)?.sender;
+    if (sender) {
+      if (sender.isDestroyed()) {
+        // The window died while the open was in flight, so its "destroyed"
+        // reap has already run — remembering now would register the session
+        // to a renderer that will never come back, leaking the pty until app
+        // exit. Close it here instead.
+        manager.close(opened.sessionId);
+      } else {
+        rendererSessions.watch(sender);
+        rendererSessions.remember(sender.id, opened.sessionId);
+      }
+    }
+
+    return opened;
+  });
   ipcMain.handle(ipcChannels.session.resize, (event, request) =>
     resizeSessionHandler(event, request, manager)
   );
@@ -1464,6 +1490,7 @@ export function registerIpc(
   );
   ipcMain.handle(ipcChannels.session.close, (event, request) =>
     closeSessionHandler(event, request, manager, (sessionId) => {
+      rendererSessions.forget(sessionId);
       markDisconnected(sessionId);
       recordedFailedAttemptSessions.delete(sessionId);
       sessionErrorMessages.delete(sessionId);

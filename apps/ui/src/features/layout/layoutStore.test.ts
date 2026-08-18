@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createLayoutStore,
   resolveTabTitle,
+  restorableWorkspaceTabs,
   serializeWorkspaceLayout,
   workspaceTabToLayoutTab,
 } from "./layoutStore";
@@ -229,6 +230,80 @@ describe("layoutStore workspace persistence", () => {
     expect(serializeWorkspaceLayout(store.getState()).tabs[0]?.fontSize).toBe(13.5);
   });
 
+  it("omits SFTP tabs, whose session cannot outlive the app", () => {
+    const store = createLayoutStore(() => 13);
+    store.getState().openTab({
+      sessionId: "terminal-1",
+      title: "Production",
+      transport: "ssh",
+      profileId: "host-1",
+    });
+    store.getState().openTab({
+      sessionId: "sftp-tab-abc",
+      title: "SFTP: box",
+      transport: "sftp",
+      type: "sftp",
+      sftpSessionId: "abc",
+      hostId: "host-1",
+      preopened: true,
+    });
+
+    const tabs = serializeWorkspaceLayout(store.getState()).tabs;
+
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.profileId).toBe("host-1");
+  });
+
+  it("drops the pane hosting an omitted SFTP tab from paneCount and paneSizes", () => {
+    const store = createLayoutStore(() => 13);
+    store.getState().openTab({
+      sessionId: "terminal-1",
+      title: "Production",
+      transport: "ssh",
+      profileId: "host-1",
+    });
+    // Split, then land the SFTP tab in the new (active) pane.
+    store.getState().splitPane("terminal-1");
+    store.getState().openTab({
+      sessionId: "sftp-tab-abc",
+      title: "SFTP: box",
+      transport: "sftp",
+      type: "sftp",
+      sftpSessionId: "abc",
+    });
+    store.getState().setPaneSizes([30, 70]);
+
+    const layout = serializeWorkspaceLayout(store.getState());
+
+    // Keeping paneCount 2 / sizes [30, 70] would restore the single surviving
+    // tab into a 30%-wide pane with nothing beside it.
+    expect(layout.paneCount).toBe(1);
+    expect(layout.paneSizes).toEqual([100]);
+  });
+
+  it("keeps a multi-pane terminal layout's sizes intact", () => {
+    const store = createLayoutStore(() => 13);
+    store.getState().openTab({
+      sessionId: "terminal-1",
+      title: "First",
+      transport: "ssh",
+      profileId: "host-1",
+    });
+    store.getState().splitPane("terminal-1");
+    store.getState().openTab({
+      sessionId: "terminal-2",
+      title: "Second",
+      transport: "ssh",
+      profileId: "host-2",
+    });
+    store.getState().setPaneSizes([30, 70]);
+
+    const layout = serializeWorkspaceLayout(store.getState());
+
+    expect(layout.paneCount).toBe(2);
+    expect(layout.paneSizes).toEqual([30, 70]);
+  });
+
   it("hydrates saved font sizes and leaves legacy values for defaulting", () => {
     const savedTab = {
       transport: "ssh" as const,
@@ -247,5 +322,32 @@ describe("layoutStore workspace persistence", () => {
         "legacy-1"
       ).fontSize
     ).toBeUndefined();
+  });
+});
+
+describe("restorableWorkspaceTabs", () => {
+  it("drops SFTP tabs saved before they were excluded", () => {
+    const savedTabs = [
+      { transport: "ssh" as const, profileId: "host-1", title: "Production" },
+      {
+        transport: "sftp" as const,
+        profileId: "sftp-tab-0018a6da",
+        title: "SFTP: box",
+        type: "sftp" as const,
+        hostId: "host-1",
+      },
+    ];
+
+    expect(restorableWorkspaceTabs(savedTabs)).toEqual([savedTabs[0]]);
+  });
+
+  it("keeps every non-SFTP tab untouched", () => {
+    const savedTabs = [
+      { transport: "ssh" as const, profileId: "host-1", title: "Production" },
+      { transport: "local" as const, profileId: "profile-1", title: "PowerShell" },
+      { transport: "serial" as const, profileId: "COM3", title: "COM3" },
+    ];
+
+    expect(restorableWorkspaceTabs(savedTabs)).toEqual(savedTabs);
   });
 });

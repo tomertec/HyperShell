@@ -14,7 +14,13 @@ import {
 } from "@hypershell/db";
 
 import { createHostMonitor } from "./monitoring/hostMonitor";
-import { disposeSessionRuntime, registerIpc, sessionManager } from "./ipc/registerIpc";
+import {
+  disposeSessionRuntime,
+  registerIpc,
+  resolveLocalProfileForSession,
+  sessionManager,
+} from "./ipc/registerIpc";
+import { resolveSavedSessionTitle } from "./sessionRecoveryTitle";
 import { getUpdateService } from "./updates/updateService";
 import { performAutoBackup } from "./ipc/backupIpc";
 import { createAppMenu } from "./menu/createAppMenu";
@@ -75,7 +81,15 @@ function collectSavedSessions(): SavedSessionInput[] {
       hostId: host?.id ?? null,
       transport: session.transport,
       profileId: session.profileId,
-      title: host?.name ?? session.profileId,
+      title: resolveSavedSessionTitle({
+        transport: session.transport,
+        profileId: session.profileId,
+        hostName: host?.name,
+        localProfileName:
+          session.transport === "local"
+            ? resolveLocalProfileForSession(session.profileId)?.name
+            : undefined,
+      }),
     };
   });
 }

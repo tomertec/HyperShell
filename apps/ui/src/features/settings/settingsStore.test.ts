@@ -65,6 +65,20 @@ describe("settingsStore custom themes", () => {
     expect(state.settings.customThemes).toEqual({});
   });
 
+  it("offers session recovery by default, and keeps that default for settings saved before it existed", async () => {
+    expect(settingsStore.getState().settings.general.showSessionRecoveryPrompt).toBe(true);
+
+    mockSshterm.getSetting.mockResolvedValue({
+      key: "app.settings",
+      value: JSON.stringify({ general: { showRestoreBanner: false } }),
+    });
+    await settingsStore.getState().load();
+
+    const general = settingsStore.getState().settings.general;
+    expect(general.showSessionRecoveryPrompt).toBe(true);
+    expect(general.showRestoreBanner).toBe(false);
+  });
+
   it("shows serial profiles in sidebar by default", () => {
     const state = settingsStore.getState();
     expect(state.settings.general.showSerialInSidebar).toBe(true);

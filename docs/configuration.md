@@ -53,6 +53,7 @@ User preferences are stored in the `app_settings` SQLite table as JSON key-value
 |---------|------|---------|-------------|
 | `general.showRecordingButton` | boolean | `true` | Show session recording button in terminal panes |
 | `general.showRestoreBanner` | boolean | `true` | Show "Restore sessions from last session" prompt on startup |
+| `general.showSessionRecoveryPrompt` | boolean | `true` | Offer to reopen sessions left behind by an ungraceful shutdown |
 | `general.showSerialInSidebar` | boolean | `true` | Show serial profiles section in the hosts sidebar |
 
 ### Debug Settings

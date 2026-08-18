@@ -147,6 +147,40 @@ test("opens, exchanges data on, and closes a session end to end", async () => {
   await expect.poll(() => echo.closedConnections(), { timeout: 10_000 }).toBe(1);
 });
 
+test("closes the sessions a renderer owned when that renderer reloads", async () => {
+  // A reload replaces the JS context without running React cleanup, so the
+  // terminal pane never sends session:close. Nothing else would ever close
+  // this session: it would keep running, owned by no tab, and keep showing up
+  // in the session-recovery snapshot as a phantom duplicate.
+  const opened = await launched.page.evaluate(
+    (port) =>
+      window.hypershell.openSession({
+        transport: "telnet",
+        profileId: "e2e-reload",
+        cols: 80,
+        rows: 24,
+        telnetOptions: { hostname: "127.0.0.1", port, mode: "raw" }
+      }),
+    echo.port
+  );
+
+  await expect
+    .poll(() =>
+      launched.page.evaluate(
+        (id) =>
+          (window as unknown as { __sessionEvents: { type: string; sessionId: string; state?: string }[] }).__sessionEvents
+            .filter((event) => event.sessionId === id && event.type === "status")
+            .map((event) => event.state),
+        opened.sessionId
+      )
+    )
+    .toContain("connected");
+
+  await launched.page.reload();
+
+  await expect.poll(() => echo.closedConnections(), { timeout: 10_000 }).toBe(1);
+});
+
 test("reports an error for a session whose target refuses the connection", async () => {
   // Close the listener first so the port is guaranteed to refuse.
   await new Promise<void>((resolve) => echo.server.close(() => resolve()));

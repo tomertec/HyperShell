@@ -233,6 +233,7 @@ function GeneralSection() {
   const {
     showRecordingButton,
     showRestoreBanner,
+    showSessionRecoveryPrompt,
     showSerialInSidebar,
     showLocalInSidebar,
     confirmOnClose,
@@ -265,6 +266,19 @@ function GeneralSection() {
           label="Session Restore Prompt"
           checked={showRestoreBanner}
           onChange={() => void updateGeneral({ showRestoreBanner: !showRestoreBanner })}
+        />
+      </SettingRow>
+
+      <SettingRow
+        label="Session Recovery Prompt"
+        description="Offer to reopen sessions left behind by an ungraceful shutdown"
+      >
+        <ToggleSwitch
+          label="Session Recovery Prompt"
+          checked={showSessionRecoveryPrompt}
+          onChange={() =>
+            void updateGeneral({ showSessionRecoveryPrompt: !showSessionRecoveryPrompt })
+          }
         />
       </SettingRow>
 

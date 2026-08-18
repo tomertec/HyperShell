@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   layoutStore,
+  restorableWorkspaceTabs,
   serializeWorkspaceLayout,
   workspaceTabToLayoutTab,
 } from "../layout/layoutStore";
@@ -78,10 +79,16 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
       tabs: [],
       activeSessionId: null,
       panes: [{ paneId: "pane-1", sessionId: null }],
+      // Collapsing to one pane invalidates the rest of the pane state too: a
+      // stale activePaneId from a split layout would leave openTab below with
+      // no matching pane (tabs restore but none shows), and stale sizes would
+      // render the single pane at the old first-pane width.
+      activePaneId: "pane-1",
+      paneSizes: [100],
     });
 
     // Re-open sessions from workspace
-    for (const tab of result.layout.tabs) {
+    for (const tab of restorableWorkspaceTabs(result.layout.tabs)) {
       layoutStore.getState().openTab(
         workspaceTabToLayoutTab(
           tab,
@@ -93,7 +100,12 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
     if (result.layout.splitDirection) {
       layoutStore.setState({ splitDirection: result.layout.splitDirection });
     }
-    if (result.layout.paneSizes) {
+    // Sizes only make sense for the panes that actually exist after restore
+    // (currently always the single pane reset above). Legacy layouts saved
+    // with more entries — multi-pane saves, or SFTP panes serialized before
+    // they were excluded — would leave that one pane at a fraction of the
+    // window, with nothing beside it.
+    if (result.layout.paneSizes?.length === layoutStore.getState().panes.length) {
       layoutStore.setState({ paneSizes: result.layout.paneSizes });
     }
     onClose();

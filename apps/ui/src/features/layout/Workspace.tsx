@@ -35,7 +35,10 @@ function PaneView({
   const replaceSessionId = useStore(layoutStore, (s) => s.replaceSessionId);
   const paneLocalProfiles = useStore(localProfilesStore, (s) => s.profiles);
 
-  const terminalTabs = tabs.filter((t) => !(t.type === "sftp" && t.sftpSessionId));
+  // Classified by type alone: an SFTP tab that has lost its session id (a
+  // restored one, before those were filtered out) must not fall through to the
+  // terminal list, where the transport switch below would dial it over SSH.
+  const terminalTabs = tabs.filter((t) => t.type !== "sftp");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftpSessionId);
   const hasTabForSession = (sessionId: string | null) =>
     sessionId ? tabs.some((t) => t.sessionId === sessionId) : false;

@@ -275,20 +275,58 @@ export function serializeWorkspaceLayout(
     "tabs" | "splitDirection" | "paneSizes" | "panes"
   >
 ): WorkspaceLayout {
+  // SFTP tabs are dropped: the session behind one is a live ssh2 connection
+  // owned by the main process that dies with the app, and an SFTP tab carries
+  // no profileId — the `?? tab.sessionId` fallback below would persist the
+  // synthetic `sftp-tab-<id>` string, which restore then hands to the SSH
+  // transport as a hostname.
+  const sftpSessionIds = new Set(
+    state.tabs.filter((tab) => tab.type === "sftp").map((tab) => tab.sessionId)
+  );
+
+  // Panes go with their tabs: a pane hosting a dropped SFTP tab is not counted,
+  // or paneSizes would describe panes the restored layout doesn't have — a
+  // single surviving pane rendered at its old 50% width, half the workspace
+  // blank. When any pane is dropped the remaining sizes no longer sum to 100,
+  // so they are re-derived rather than partially kept.
+  const keptPaneCount = Math.max(
+    1,
+    state.panes.filter(
+      (pane) => pane.sessionId === null || !sftpSessionIds.has(pane.sessionId)
+    ).length
+  );
+
   return {
-    tabs: state.tabs.map((tab) => ({
-      transport: tab.transport ?? "ssh",
-      profileId: tab.profileId ?? tab.sessionId,
-      title: tab.title,
-      type: tab.type,
-      hostId: tab.hostId,
-      fontSize: tab.fontSize,
-      claudeSessionId: tab.claudeSessionId,
-    })),
+    tabs: state.tabs
+      .filter((tab) => tab.type !== "sftp")
+      .map((tab) => ({
+        transport: tab.transport ?? "ssh",
+        profileId: tab.profileId ?? tab.sessionId,
+        title: tab.title,
+        type: tab.type,
+        hostId: tab.hostId,
+        fontSize: tab.fontSize,
+        claudeSessionId: tab.claudeSessionId,
+      })),
     splitDirection: state.splitDirection,
-    paneSizes: state.paneSizes,
-    paneCount: state.panes.length,
+    paneSizes:
+      keptPaneCount === state.panes.length
+        ? state.paneSizes
+        : equalPaneSizes(keptPaneCount),
+    paneCount: keptPaneCount,
   };
+}
+
+/**
+ * Filters a saved layout down to the tabs that can actually be reopened.
+ *
+ * Workspaces saved before SFTP tabs were excluded still carry them, with
+ * `profileId` holding the synthetic `sftp-tab-<id>` string. Restoring one
+ * produced an SSH tab that dialled that string as a hostname, so old rows are
+ * dropped here, on the read side, where legacy data has to be handled.
+ */
+export function restorableWorkspaceTabs(tabs: WorkspaceTab[]): WorkspaceTab[] {
+  return tabs.filter((tab) => tab.type !== "sftp");
 }
 
 export function workspaceTabToLayoutTab(

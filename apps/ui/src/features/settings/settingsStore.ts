@@ -26,6 +26,8 @@ export interface DebugSettings {
 export interface GeneralSettings {
   showRecordingButton: boolean;
   showRestoreBanner: boolean;
+  /** Offer to reopen sessions left behind by an ungraceful shutdown. */
+  showSessionRecoveryPrompt: boolean;
   showSerialInSidebar: boolean;
   showLocalInSidebar: boolean;
   confirmOnClose: boolean;
@@ -140,6 +142,7 @@ const DEFAULT_TERMINAL_SETTINGS: TerminalSettings = {
 const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   showRecordingButton: true,
   showRestoreBanner: true,
+  showSessionRecoveryPrompt: true,
   showSerialInSidebar: true,
   showLocalInSidebar: true,
   confirmOnClose: true,
