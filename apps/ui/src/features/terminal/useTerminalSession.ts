@@ -13,7 +13,7 @@ import {
   settingsStore,
 } from "../settings/settingsStore";
 import { getTerminalOptions } from "./terminalTheme";
-import { getTerminalClipboardAction } from "./terminalClipboard";
+import { getTerminalClipboardAction, getTerminalRightClickAction } from "./terminalClipboard";
 import {
   getNextTerminalFontSize,
   getTerminalFontSizeAction,
@@ -442,9 +442,39 @@ export function useTerminalSession(
         };
         container.addEventListener("mousedown", focusTerminal);
         container.addEventListener("touchstart", focusTerminal, { passive: true });
+
+        const handleContextMenu = (event: MouseEvent) => {
+          const action = getTerminalRightClickAction({
+            hasSelection: instance?.hasSelection() ?? false,
+            mouseTrackingActive: (instance?.modes.mouseTrackingMode ?? "none") !== "none"
+          });
+          if (!action) {
+            return;
+          }
+          event.preventDefault();
+
+          if (action === "copy") {
+            const selection = instance?.getSelection() ?? "";
+            if (selection) {
+              void writeClipboardText(selection);
+            }
+            instance?.clearSelection();
+            return;
+          }
+
+          void (async () => {
+            const clipboardText = await readClipboardText();
+            if (clipboardText) {
+              instance?.paste(clipboardText);
+            }
+          })();
+        };
+        container.addEventListener("contextmenu", handleContextMenu);
+
         removeFocusListeners = () => {
           container?.removeEventListener("mousedown", focusTerminal);
           container?.removeEventListener("touchstart", focusTerminal);
+          container?.removeEventListener("contextmenu", handleContextMenu);
         };
       }
 

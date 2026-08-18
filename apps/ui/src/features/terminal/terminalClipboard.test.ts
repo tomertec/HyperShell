@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getTerminalClipboardAction } from "./terminalClipboard";
+import { getTerminalClipboardAction, getTerminalRightClickAction } from "./terminalClipboard";
 
 function input(
   key: string,
@@ -76,6 +76,29 @@ describe("getTerminalClipboardAction", () => {
   it("ignores shortcuts that include Alt", () => {
     expect(
       getTerminalClipboardAction(input("v", { ctrlKey: true, altKey: true }))
+    ).toBeNull();
+  });
+});
+
+describe("getTerminalRightClickAction", () => {
+  it("pastes when there is no selection", () => {
+    expect(
+      getTerminalRightClickAction({ hasSelection: false, mouseTrackingActive: false })
+    ).toBe("paste");
+  });
+
+  it("copies the selection instead of pasting over it", () => {
+    expect(
+      getTerminalRightClickAction({ hasSelection: true, mouseTrackingActive: false })
+    ).toBe("copy");
+  });
+
+  it("defers to the remote app while mouse tracking is active", () => {
+    expect(
+      getTerminalRightClickAction({ hasSelection: false, mouseTrackingActive: true })
+    ).toBeNull();
+    expect(
+      getTerminalRightClickAction({ hasSelection: true, mouseTrackingActive: true })
     ).toBeNull();
   });
 });

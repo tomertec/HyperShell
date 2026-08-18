@@ -14,6 +14,26 @@ export interface TerminalClipboardShortcutInput {
   isMacLike: boolean;
 }
 
+export interface TerminalRightClickInput {
+  hasSelection: boolean;
+  /** True while the remote app has requested mouse reporting (vim, tmux, htop). */
+  mouseTrackingActive: boolean;
+}
+
+/**
+ * Right-click clipboard behaviour, matching Windows Terminal / conhost QuickEdit:
+ * a live selection copies, anything else pastes. Yields to the remote app when it
+ * has the mouse — it already received the click.
+ */
+export function getTerminalRightClickAction(
+  input: TerminalRightClickInput
+): TerminalClipboardAction {
+  if (input.mouseTrackingActive) {
+    return null;
+  }
+  return input.hasSelection ? "copy" : "paste";
+}
+
 export function getTerminalClipboardAction(
   input: TerminalClipboardShortcutInput
 ): TerminalClipboardAction {
