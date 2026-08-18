@@ -307,7 +307,17 @@ export function workspaceTabToLayoutTab(
   };
 }
 
+/**
+ * Processes that keep their own OSC title current (e.g. Claude Code emits the
+ * session topic). For these the generic process name would mask a better
+ * title, so the dynamic title wins when present.
+ */
+const SELF_TITLED_PROCESSES = new Set(["claude"]);
+
 /** Single source of truth for what a tab is called. */
 export function resolveTabTitle(tab: LayoutTab): string {
+  if (tab.processTitle && SELF_TITLED_PROCESSES.has(tab.processTitle) && tab.dynamicTitle) {
+    return tab.dynamicTitle;
+  }
   return tab.processTitle ?? tab.dynamicTitle ?? tab.title;
 }
