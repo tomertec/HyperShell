@@ -71,6 +71,28 @@ export function isUniqueNameConflict(error: unknown): boolean {
   return /unique constraint failed:\s*local_profiles\.name/i.test(message);
 }
 
+/** Basename, minus a Windows executable extension, lowercased. */
+function commandToken(value: string): string {
+  const bare = value.trim().replace(/^["']|["']$/g, "");
+  const base = bare.split(/[\\/]/).pop() ?? "";
+  return base.replace(/\.(exe|cmd|bat|ps1)$/i, "").toLowerCase();
+}
+
+/**
+ * Whether a profile plausibly launches Claude Code.
+ *
+ * The Claude session flag appends `--continue` / `--session-id` to whatever the
+ * profile runs, so setting it on a plain shell produces `pwsh.exe --continue`,
+ * which exits instantly. This drives a warning rather than a hard block: the
+ * args are searched too, because launching through a wrapper
+ * (`wsl.exe -d Ubuntu claude`, `pwsh -Command claude`) is legitimate and puts
+ * the flag at the end where Claude still receives it. Matching is on whole
+ * command tokens, so `ssh root@claude-host` does not count.
+ */
+export function looksLikeClaudeLauncher(executable: string, args: string[]): boolean {
+  return [executable, ...args].some((value) => commandToken(value) === "claude");
+}
+
 // Editing an existing profile whose saved env vars we could not confidently
 // load must never overwrite them with an empty array — that would silently
 // destroy data the user never touched. Creating a new profile has nothing to
@@ -109,6 +131,11 @@ export function LocalProfileForm({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const claudeLauncherLikely = useMemo(
+    () => looksLikeClaudeLauncher(executable, parseArgs(argsText)),
+    [argsText, executable]
+  );
 
   const isDetected = profile?.source === "detected";
   const envVarsKnown = shouldIncludeEnvVarsInUpsert(!profile, envVarsLoaded);
@@ -343,6 +370,15 @@ export function LocalProfileForm({
           </span>
         </span>
       </label>
+
+      {claudeSession && !claudeLauncherLikely && (
+        <p role="status" className="ml-6 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-2 text-[11px] text-warning">
+          <code>{executable.trim().split(/[\\/]/).pop() || "This profile"}</code> does not look
+          like Claude Code. The session flag appends <code>--continue</code> or{" "}
+          <code>--session-id</code> to whatever this profile runs, so a plain shell will exit
+          immediately. Leave it on only if this really starts Claude.
+        </p>
+      )}
 
       {claudeSession && (
         <div className="grid gap-1.5 pl-6">

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isUniqueNameConflict, parseArgs, shouldIncludeEnvVarsInUpsert } from "./LocalProfileForm";
+import {
+  isUniqueNameConflict,
+  looksLikeClaudeLauncher,
+  parseArgs,
+  shouldIncludeEnvVarsInUpsert
+} from "./LocalProfileForm";
 
 describe("parseArgs", () => {
   it("splits on whitespace and drops empties", () => {
@@ -41,6 +46,31 @@ describe("isUniqueNameConflict", () => {
   it("does not match unrelated errors", () => {
     expect(isUniqueNameConflict(new Error("ENOENT: no such file"))).toBe(false);
     expect(isUniqueNameConflict("some string error")).toBe(false);
+  });
+});
+
+describe("looksLikeClaudeLauncher", () => {
+  it("recognises claude as the executable", () => {
+    expect(looksLikeClaudeLauncher("C:\\Users\\me\\.local\\bin\\claude.exe", [])).toBe(true);
+    expect(looksLikeClaudeLauncher("/usr/local/bin/claude", [])).toBe(true);
+    expect(looksLikeClaudeLauncher("claude", [])).toBe(true);
+    expect(looksLikeClaudeLauncher("claude.cmd", ["--dangerously-skip-permissions"])).toBe(true);
+  });
+
+  it("recognises claude launched through a wrapper", () => {
+    expect(looksLikeClaudeLauncher("pwsh.exe", ["-Command", "claude"])).toBe(true);
+    expect(looksLikeClaudeLauncher("C:\\WINDOWS\\System32\\wsl.exe", ["-d", "Ubuntu-24.04", "claude"])).toBe(true);
+  });
+
+  it("rejects a plain shell", () => {
+    expect(looksLikeClaudeLauncher("C:\\Program Files\\PowerShell\\7\\pwsh.exe", [])).toBe(false);
+    expect(looksLikeClaudeLauncher("C:\\WINDOWS\\System32\\cmd.exe", [])).toBe(false);
+    expect(looksLikeClaudeLauncher("", [])).toBe(false);
+  });
+
+  it("does not match a mere substring", () => {
+    expect(looksLikeClaudeLauncher("ssh.exe", ["root@claude-host"])).toBe(false);
+    expect(looksLikeClaudeLauncher("C:\\tools\\claudia.exe", [])).toBe(false);
   });
 });
 
