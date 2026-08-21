@@ -25,6 +25,7 @@ import type {
   SessionSaveStateResponse,
   SessionClearSavedStateResponse,
   CloseSessionRequest,
+  PortForwardRecord,
   StartPortForwardRequest,
   StopPortForwardRequest,
   FsEntry,
@@ -252,7 +253,7 @@ declare global {
       connectionPoolStats?: () => Promise<ConnectionPoolStats[]>;
       startPortForward?: (request: StartPortForwardRequest) => Promise<{ id: string }>;
       stopPortForward?: (request: StopPortForwardRequest) => Promise<void>;
-      listPortForwards?: () => Promise<{ id: string }[]>;
+      listPortForwards?: () => Promise<PortForwardRecord[]>;
       opListVaults?: () => Promise<OpListVaultsResponse>;
       opListItems?: (request: OpListItemsRequest) => Promise<OpListItemsResponse>;
       opGetItemFields?: (request: OpGetItemFieldsRequest) => Promise<OpGetItemFieldsResponse>;

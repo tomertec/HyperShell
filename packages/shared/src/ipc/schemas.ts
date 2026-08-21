@@ -374,8 +374,30 @@ export const stopPortForwardRequestSchema = z.object({
   id: z.string().min(1)
 });
 
+// The renderer's tunnel list renders protocol/ports, so `list` returns the
+// forward's details, not just its id.
+export const portForwardRecordSchema = z.object({
+  id: z.string().min(1),
+  hostname: z.string(),
+  username: z.string().optional(),
+  port: z.number().int().min(1).max(65535).optional(),
+  protocol: z.enum(["local", "remote", "dynamic"]),
+  localAddress: z.string(),
+  localPort: z.number().int().min(1).max(65535),
+  remoteHost: z.string(),
+  remotePort: z.number().int().min(0).max(65535)
+});
+
+export const startPortForwardResponseSchema = z.object({
+  id: z.string().min(1)
+});
+
+export const listPortForwardsResponseSchema = z.array(portForwardRecordSchema);
+
 export type StartPortForwardRequest = z.infer<typeof startPortForwardRequestSchema>;
 export type StopPortForwardRequest = z.infer<typeof stopPortForwardRequestSchema>;
+export type PortForwardRecord = z.infer<typeof portForwardRecordSchema>;
+export type StartPortForwardResponse = z.infer<typeof startPortForwardResponseSchema>;
 
 // --- Host port forward schemas ---
 

@@ -6,6 +6,14 @@ import {
   removeHostPortForwardRequestSchema,
   reorderHostPortForwardsRequestSchema,
   connectionPoolStatsSchema,
+  startPortForwardRequestSchema,
+  startPortForwardResponseSchema,
+  stopPortForwardRequestSchema,
+  listPortForwardsResponseSchema,
+  type PortForwardRecord,
+  type StartPortForwardRequest,
+  type StartPortForwardResponse,
+  type StopPortForwardRequest,
   type HostPortForwardRecord,
   type UpsertHostPortForwardRequest,
   type ListHostPortForwardsRequest,
@@ -22,6 +30,10 @@ export interface PortForwardApi {
   hostPortForwardUpsert(request: UpsertHostPortForwardRequest): Promise<HostPortForwardRecord>;
   hostPortForwardRemove(request: RemoveHostPortForwardRequest): Promise<boolean>;
   hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void>;
+  // Running port forwards
+  startPortForward(request: StartPortForwardRequest): Promise<StartPortForwardResponse>;
+  stopPortForward(request: StopPortForwardRequest): Promise<void>;
+  listPortForwards(): Promise<PortForwardRecord[]>;
   // Connection pool
   connectionPoolStats(): Promise<ConnectionPoolStats[]>;
 }
@@ -54,6 +66,22 @@ export function createPortForwardApi(
     async hostPortForwardReorder(request: ReorderHostPortForwardsRequest): Promise<void> {
       const parsed = reorderHostPortForwardsRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.hostPortForward.reorder, parsed);
+    },
+    // Running port forwards
+    async startPortForward(
+      request: StartPortForwardRequest
+    ): Promise<StartPortForwardResponse> {
+      const parsed = startPortForwardRequestSchema.parse(request);
+      const result = await ipcRenderer.invoke(ipcChannels.portForward.start, parsed);
+      return startPortForwardResponseSchema.parse(result);
+    },
+    async stopPortForward(request: StopPortForwardRequest): Promise<void> {
+      const parsed = stopPortForwardRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.portForward.stop, parsed);
+    },
+    async listPortForwards(): Promise<PortForwardRecord[]> {
+      const result = await ipcRenderer.invoke(ipcChannels.portForward.list);
+      return listPortForwardsResponseSchema.parse(result);
     },
     // Connection pool stats
     async connectionPoolStats(): Promise<ConnectionPoolStats[]> {

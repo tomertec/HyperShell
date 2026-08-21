@@ -2,6 +2,7 @@ import {
   ipcChannels,
   startPortForwardRequestSchema,
   stopPortForwardRequestSchema,
+  type PortForwardRecord,
   type StartPortForwardRequest,
   type StopPortForwardRequest
 } from "@hypershell/shared";
@@ -11,7 +12,10 @@ import { randomUUID } from "node:crypto";
 import type { IpcMainLike } from "./registerIpc";
 
 export function registerPortForwardIpc(ipcMain: IpcMainLike): () => void {
-  const activeForwards = new Map<string, PortForwardHandle>();
+  const activeForwards = new Map<
+    string,
+    { handle: PortForwardHandle; record: PortForwardRecord }
+  >();
 
   ipcMain.handle(ipcChannels.portForward.start, (_event: IpcMainInvokeEvent, request: StartPortForwardRequest) => {
     const parsed = startPortForwardRequestSchema.parse(request);
@@ -36,27 +40,27 @@ export function registerPortForwardIpc(ipcMain: IpcMainLike): () => void {
     );
 
     handle.onExit(() => { activeForwards.delete(id); });
-    activeForwards.set(id, handle);
+    activeForwards.set(id, { handle, record: { id, ...parsed } });
 
     return { id };
   });
 
   ipcMain.handle(ipcChannels.portForward.stop, (_event: IpcMainInvokeEvent, request: StopPortForwardRequest) => {
     const parsed = stopPortForwardRequestSchema.parse(request);
-    const handle = activeForwards.get(parsed.id);
-    if (handle) {
-      handle.close();
+    const active = activeForwards.get(parsed.id);
+    if (active) {
+      active.handle.close();
       activeForwards.delete(parsed.id);
     }
   });
 
   ipcMain.handle(ipcChannels.portForward.list, () => {
-    return Array.from(activeForwards.keys()).map((id) => ({ id }));
+    return Array.from(activeForwards.values()).map((active) => active.record);
   });
 
   return () => {
-    for (const handle of activeForwards.values()) {
-      handle.close();
+    for (const active of activeForwards.values()) {
+      active.handle.close();
     }
     activeForwards.clear();
   };

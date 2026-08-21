@@ -324,3 +324,96 @@ describe("createDesktopApi", () => {
     });
   });
 });
+
+describe("port forward bridge", () => {
+  // Regression: the main process registered port-forward:start/stop/list and the
+  // renderer called them, but the preload never bridged them. Because every
+  // renderer call site is written `window.hypershell?.startPortForward?.(...)`,
+  // the missing methods resolved to undefined and the Tunnel Manager silently
+  // did nothing.
+  it("exposes the methods the tunnel UI calls", () => {
+    const fake = createFakeIpcRenderer();
+    const api = createDesktopApi(fake.ipcRenderer) as unknown as Record<string, unknown>;
+
+    for (const method of ["startPortForward", "stopPortForward", "listPortForwards"]) {
+      expect(typeof api[method]).toBe("function");
+    }
+  });
+
+  it("validates startPortForward request/response and routes through invoke", async () => {
+    const fake = createFakeIpcRenderer();
+    fake.invoke.mockResolvedValueOnce({ id: "fwd-1" });
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    const result = await api.startPortForward({
+      hostname: "10.10.10.54",
+      username: "hermes",
+      port: 22,
+      protocol: "local",
+      localAddress: "127.0.0.1",
+      localPort: 8080,
+      remoteHost: "localhost",
+      remotePort: 80
+    });
+
+    expect(result).toEqual({ id: "fwd-1" });
+    expect(fake.invoke).toHaveBeenCalledWith(
+      ipcChannels.portForward.start,
+      expect.objectContaining({ hostname: "10.10.10.54", localPort: 8080 })
+    );
+  });
+
+  it("rejects an invalid startPortForward before IPC invoke", async () => {
+    const fake = createFakeIpcRenderer();
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    await expect(
+      api.startPortForward({
+        hostname: "",
+        protocol: "local",
+        localAddress: "127.0.0.1",
+        localPort: 8080,
+        remoteHost: "localhost",
+        remotePort: 80
+      } as unknown as Parameters<typeof api.startPortForward>[0])
+    ).rejects.toBeTruthy();
+    expect(fake.invoke).not.toHaveBeenCalled();
+  });
+
+  it("returns the forward details the tunnel list renders", async () => {
+    const fake = createFakeIpcRenderer();
+    fake.invoke.mockResolvedValueOnce([
+      {
+        id: "fwd-1",
+        hostname: "10.10.10.54",
+        protocol: "local",
+        localAddress: "127.0.0.1",
+        localPort: 8080,
+        remoteHost: "localhost",
+        remotePort: 80
+      }
+    ]);
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    const forwards = await api.listPortForwards();
+
+    expect(forwards).toHaveLength(1);
+    expect(forwards[0]).toMatchObject({
+      id: "fwd-1",
+      protocol: "local",
+      localPort: 8080,
+      remoteHost: "localhost",
+      remotePort: 80
+    });
+    expect(fake.invoke).toHaveBeenCalledWith(ipcChannels.portForward.list);
+  });
+
+  it("validates stopPortForward and routes through invoke", async () => {
+    const fake = createFakeIpcRenderer();
+    const api = createDesktopApi(fake.ipcRenderer);
+
+    await api.stopPortForward({ id: "fwd-1" });
+
+    expect(fake.invoke).toHaveBeenCalledWith(ipcChannels.portForward.stop, { id: "fwd-1" });
+  });
+});
