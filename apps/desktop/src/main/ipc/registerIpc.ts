@@ -19,7 +19,6 @@ import type {
   OpenSessionRequest,
   OpenSessionResponse,
   ResizeSessionRequest,
-  SftpConnectRequest,
   WriteSessionRequest
 } from "@hypershell/shared";
 import {
@@ -28,7 +27,6 @@ import {
   createSessionManager,
   createSsh2ConnectionPool,
   createWindowsProcessTreeProvider,
-  parseSshConfig,
 } from "@hypershell/session-core";
 import {
   registerHostIpc,
@@ -87,6 +85,11 @@ import {
   set as setCachedCredential
 } from "../security/credentialCache";
 import {
+  createCredentialResolver,
+  type CredentialResolver
+} from "../connection/credentialResolver";
+import { resolveSftpConnectionOptions } from "../connection/sftpConnectionOptions";
+import {
   createHostEnvVarRepositoryFromDatabase,
   createConnectionHistoryRepositoryFromDatabase,
   createGroupsRepository,
@@ -101,15 +104,13 @@ import type {
   TransportHandle,
   OpenSessionInput,
   SerialConnectionOptions,
-  SftpConnectionOptions,
   TelnetConnectionOptions
 } from "@hypershell/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
 import { BrowserWindow } from "electron";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 
 const registeredChannels = [
   ipcChannels.session.open,
@@ -325,6 +326,37 @@ function getConnectionHistoryRepository():
 
   connectionHistoryRepository = createConnectionHistoryRepositoryFromDatabase(db);
   return connectionHistoryRepository;
+}
+
+let credentialResolver: CredentialResolver | null = null;
+
+/**
+ * Shared by openSessionHandler (SSH) and resolveSftpConnectionOptions (SFTP) —
+ * the two used to carry their own copies of host lookup and secret resolution,
+ * and the copies drifted. See connection/credentialResolver.ts.
+ */
+function getCredentialResolver(): CredentialResolver {
+  if (credentialResolver) {
+    return credentialResolver;
+  }
+
+  credentialResolver = createCredentialResolver({
+    hosts: () => getOrCreateHostsRepo(),
+    readStoredPassword: (host) => resolveStoredHostPassword(host),
+    readOnePasswordReference: async (reference) => {
+      const { resolveOnePasswordReference } = await import(
+        "../security/opResolver.js"
+      );
+      return resolveOnePasswordReference(reference);
+    },
+    readCachedCredential: (hostname, port, username, ttlMs) =>
+      getCachedCredential(hostname, port, username, ttlMs),
+    credentialCacheConfig: () => getCredentialCacheConfig(),
+    trace: (transport, message, details) =>
+      logAuthTrace(isAuthTraceEnabled(), transport, message, details)
+  });
+
+  return credentialResolver;
 }
 
 function getHostEnvVarRepository():
@@ -605,14 +637,9 @@ async function openSessionHandler(
     // Fall back to host record from database for identity file.
     // profileId may be a host ID or a "user@host" destination string.
     if (!sshOptions) {
-      const repo = getOrCreateHostsRepo();
-      const allHosts = repo.list();
-      const host = repo.get(parsed.profileId)
-        ?? allHosts.find((h) =>
-          parsed.profileId === `${h.username}@${h.hostname}`
-          || parsed.profileId === h.hostname
-          || parsed.profileId === h.name
-        );
+      const host = getCredentialResolver().findHost(parsed.profileId, {
+        matchDestination: true
+      });
       if (host) {
         resolvedHost = host;
         sshOptions = {
@@ -630,51 +657,19 @@ async function openSessionHandler(
           sshOptions.keepAliveSeconds = resolvedHost.keepAliveInterval;
         }
 
-        const hostRecord = host as {
-          authMethod?: string;
-          authProfileId?: string | null;
-          opReference?: string;
-        };
         logAuthTrace(authTraceEnabled, "ssh", "Resolved host from DB", {
           hostId: host.id,
-          authMethod: hostRecord.authMethod ?? "default",
-          hasAuthProfile: Boolean(hostRecord.authProfileId)
+          authMethod: host.authMethod ?? "default",
+          hasAuthProfile: Boolean(host.authProfileId)
         });
 
-        if (hostRecord.authMethod === "password") {
-          try {
-            const savedPassword = resolveStoredHostPassword(hostRecord);
-            if (savedPassword) {
-              sshOptions.password = savedPassword;
-              logAuthTrace(authTraceEnabled, "ssh", "Loaded saved password from secure storage", {
-                hostId: host.id,
-                authProfileId: hostRecord.authProfileId ?? null
-              });
-            } else {
-              logAuthTrace(authTraceEnabled, "ssh", "Password auth selected but no saved password found", {
-                hostId: host.id,
-                authProfileId: hostRecord.authProfileId ?? null
-              });
-            }
-          } catch (err) {
-            console.error("[auth] failed to resolve saved host password:", err instanceof Error ? err.message : "unknown error");
-          }
-        }
-
-        // 1Password op:// reference auth — resolve credential via the 1Password CLI.
-        if (hostRecord.authMethod === "op-reference" && hostRecord.opReference) {
-          try {
-            const { resolveOnePasswordReference } = await import("../security/opResolver.js");
-            const resolvedCredential = await resolveOnePasswordReference(hostRecord.opReference);
-            if (resolvedCredential.length > 0) {
-              sshOptions.password = resolvedCredential;
-              logAuthTrace(authTraceEnabled, "ssh", "Resolved credential from 1Password reference", {
-                hostId: host.id
-              });
-            }
-          } catch (err) {
-            console.error("[1password] failed to resolve reference:", err instanceof Error ? err.message : "unknown error");
-          }
+        // Pass 2 will also hand this a cacheLookup, so SSH consults the
+        // credential cache the way SFTP already does.
+        const password = await getCredentialResolver().resolvePassword(host, {
+          transport: "ssh"
+        });
+        if (password) {
+          sshOptions.password = password;
         }
       }
     }
@@ -821,396 +816,6 @@ async function closeSessionHandler(
   manager.close(parsed.sessionId);
 }
 
-async function resolveSftpConnectionOptions(
-  hostId: string,
-  options: RegisterIpcOptions,
-  request: SftpConnectRequest
-): Promise<SftpConnectionOptions | null> {
-  const authTraceEnabled = isAuthTraceEnabled();
-  const allHosts = getOrCreateHostsRepo().list();
-  const resolvedHost = allHosts.find(
-    (candidate) =>
-      candidate.id === hostId ||
-      candidate.name === hostId ||
-      candidate.hostname === hostId
-  );
-
-  const sshConfigPath = path.join(homedir(), ".ssh", "config");
-  let sshConfigHosts: ReturnType<typeof parseSshConfig>["hosts"];
-  try {
-    const sshConfigContent = readFileSync(sshConfigPath, "utf8");
-    sshConfigHosts = parseSshConfig(sshConfigContent).hosts;
-  } catch {
-    sshConfigHosts = [];
-  }
-
-  const profileFromResolver = options.resolveHostProfile
-    ? await options.resolveHostProfile(resolvedHost?.id ?? hostId)
-    : null;
-
-  const fromConfig = resolvedHost
-    ? sshConfigHosts.find(
-        (entry) =>
-          entry.alias === resolvedHost.name ||
-          entry.alias === resolvedHost.hostname ||
-          entry.hostName === resolvedHost.hostname
-      )
-    : sshConfigHosts.find(
-        (entry) => entry.alias === hostId || entry.hostName === hostId
-      );
-
-  const hostname =
-    profileFromResolver?.hostname ??
-    resolvedHost?.hostname ??
-    fromConfig?.hostName ??
-    fromConfig?.alias ??
-    hostId;
-  const username =
-    profileFromResolver?.username ??
-    resolvedHost?.username ??
-    fromConfig?.user ??
-    undefined;
-  const port = profileFromResolver?.port ?? resolvedHost?.port ?? fromConfig?.port ?? 22;
-
-  function resolveSshBinaryPath(): string {
-    if (process.platform !== "win32") {
-      return "ssh";
-    }
-
-    const systemRoot = process.env.SystemRoot ?? process.env.WINDIR;
-    if (!systemRoot) {
-      return "ssh";
-    }
-
-    const bundledWindowsSshPath = path.join(
-      systemRoot,
-      "System32",
-      "OpenSSH",
-      "ssh.exe"
-    );
-    return existsSync(bundledWindowsSshPath) ? bundledWindowsSshPath : "ssh";
-  }
-
-  type EffectiveSshConfig = {
-    hostname?: string;
-    user?: string;
-    port?: number;
-    proxyJump?: string;
-    identityAgent?: string;
-    identityFiles: string[];
-  };
-
-  function resolveEffectiveSshConfig(target: string): EffectiveSshConfig | null {
-    const result = spawnSync(resolveSshBinaryPath(), ["-G", target], {
-      encoding: "utf8",
-      windowsHide: true
-    });
-    if (result.status !== 0 || !result.stdout) {
-      return null;
-    }
-
-    const effective: EffectiveSshConfig = {
-      identityFiles: []
-    };
-
-    for (const line of result.stdout.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        continue;
-      }
-
-      const [rawKey, ...rest] = trimmed.split(/\s+/);
-      const key = rawKey.toLowerCase();
-      const value = rest.join(" ").trim();
-      if (!value) {
-        continue;
-      }
-
-      if (key === "hostname") {
-        effective.hostname = value;
-        continue;
-      }
-
-      if (key === "user") {
-        effective.user = value;
-        continue;
-      }
-
-      if (key === "port") {
-        const parsedPort = Number.parseInt(value, 10);
-        if (!Number.isNaN(parsedPort)) {
-          effective.port = parsedPort;
-        }
-        continue;
-      }
-
-      if (key === "proxyjump" && value.toLowerCase() !== "none") {
-        effective.proxyJump = value;
-        continue;
-      }
-
-      if (key === "identityagent" && value.toLowerCase() !== "none") {
-        effective.identityAgent = value;
-        continue;
-      }
-
-      if (key === "identityfile" && value.toLowerCase() !== "none") {
-        effective.identityFiles.push(value);
-      }
-    }
-
-    return effective;
-  }
-
-  const sshTargets = [
-    resolvedHost?.name,
-    fromConfig?.alias,
-    hostId,
-    profileFromResolver?.hostname,
-    resolvedHost?.hostname,
-    fromConfig?.hostName
-  ]
-    .filter((value): value is string => Boolean(value && value.trim().length > 0))
-    .filter((value, index, all) => all.indexOf(value) === index);
-
-  let effectiveConfig: EffectiveSshConfig | null = null;
-  let useHostRecordHostname = false;
-  for (const target of sshTargets) {
-    const candidate = resolveEffectiveSshConfig(target);
-    if (!candidate) {
-      continue;
-    }
-
-    // When ssh -G didn't resolve the hostname to something different from the
-    // target (i.e. no HostName directive), keep the host record's explicit
-    // hostname but still use user/identity/proxy info from the effective config.
-    if (
-      resolvedHost?.hostname &&
-      resolvedHost.hostname !== target &&
-      candidate.hostname === target
-    ) {
-      useHostRecordHostname = true;
-    }
-
-    effectiveConfig = candidate;
-    break;
-  }
-
-  const expandIdentityPath = (rawPath: string): string => {
-    const trimmed = rawPath.trim().replace(/^"(.*)"$/, "$1");
-    const withHome = trimmed.replace(/^~(?=$|[\\/])/, homedir());
-    if (process.platform !== "win32") {
-      return withHome;
-    }
-
-    return withHome.replace(/%([^%]+)%/g, (_full, varName) => {
-      const value = process.env[varName];
-      return value ?? _full;
-    });
-  };
-
-  const expandAgentPath = (rawPath: string): string | undefined => {
-    const trimmed = rawPath.trim().replace(/^"(.*)"$/, "$1");
-    const envRefMatch = /^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(trimmed);
-    if (envRefMatch) {
-      return process.env[envRefMatch[1]];
-    }
-
-    return expandIdentityPath(trimmed);
-  };
-
-  /** Returns [primaryKey, ...fallbackKeys] — all existing key paths in priority order. */
-  const resolveAllIdentityFiles = (): string[] => {
-    const explicitCandidates = [
-      resolvedHost?.identityFile,
-      profileFromResolver?.identityFile,
-      fromConfig?.identityFile,
-      ...(effectiveConfig?.identityFiles ?? [])
-    ]
-      .filter((value): value is string => Boolean(value && value.trim().length > 0))
-      .map(expandIdentityPath);
-
-    const home = homedir();
-    const sshDir = path.join(home, ".ssh");
-    const defaultKeyCandidates = [
-      path.join(sshDir, "id_ed25519"),
-      path.join(sshDir, "id_ecdsa"),
-      path.join(sshDir, "id_rsa"),
-      path.join(sshDir, "id_dsa"),
-      path.join(sshDir, "id_ed25519_sk"),
-      path.join(sshDir, "id_ecdsa_sk")
-    ];
-
-    const all = [...explicitCandidates, ...defaultKeyCandidates];
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const p of all) {
-      const normalized = path.resolve(p);
-      if (!seen.has(normalized) && existsSync(normalized)) {
-        seen.add(normalized);
-        result.push(normalized);
-      }
-    }
-    return result;
-  };
-
-  const resolveAgentPath = (): string | undefined => {
-    const explicitAgent = effectiveConfig?.identityAgent
-      ? expandAgentPath(effectiveConfig.identityAgent)
-      : undefined;
-    if (explicitAgent) {
-      return explicitAgent;
-    }
-
-    if (process.env.SSH_AUTH_SOCK) {
-      return process.env.SSH_AUTH_SOCK;
-    }
-
-    // Windows OpenSSH agent uses a named pipe, not SSH_AUTH_SOCK
-    if (process.platform === "win32") {
-      const windowsAgentPipe = "\\\\.\\pipe\\openssh-ssh-agent";
-      if (existsSync(windowsAgentPipe)) {
-        return windowsAgentPipe;
-      }
-    }
-
-    return undefined;
-  };
-
-  const requestedUsername =
-    "username" in request && request.username?.trim()
-      ? request.username.trim()
-      : undefined;
-  let requestedPassword =
-    "password" in request && request.password ? request.password : undefined;
-  const credentialCacheConfig = getCredentialCacheConfig();
-
-  if (requestedPassword) {
-    logAuthTrace(authTraceEnabled, "sftp", "Using explicit password from SFTP prompt", {
-      hostId
-    });
-  }
-
-  // Strip Windows domain prefix (DOMAIN\user → user) — SSH servers don't
-  // understand Windows domain usernames.
-  const stripDomain = (u: string | undefined): string | undefined => {
-    if (!u) return u;
-    return u.includes("\\") ? u.split("\\").pop() : u;
-  };
-
-  // Priority: explicit username from auth modal or host record first,
-  // then fall back to ssh -G effective config.
-  const resolvedUsername =
-    stripDomain(requestedUsername) ??
-    stripDomain(username) ??
-    stripDomain(effectiveConfig?.user);
-  const resolvedHostname = useHostRecordHostname
-    ? hostname
-    : (effectiveConfig?.hostname ?? hostname);
-  const resolvedPort = effectiveConfig?.port ?? port;
-
-  if (!requestedPassword && credentialCacheConfig.enabled && resolvedUsername) {
-    const cachedPassword = getCachedCredential(
-      resolvedHostname,
-      resolvedPort,
-      resolvedUsername,
-      credentialCacheConfig.ttlMs
-    );
-    if (cachedPassword) {
-      requestedPassword = cachedPassword;
-      logAuthTrace(authTraceEnabled, "sftp", "Loaded password from in-memory credential cache", {
-        hostId
-      });
-    }
-  }
-
-  if (!requestedPassword && resolvedHost?.authMethod === "password") {
-    try {
-      const savedPassword = resolveStoredHostPassword(resolvedHost);
-      if (savedPassword) {
-        requestedPassword = savedPassword;
-        logAuthTrace(authTraceEnabled, "sftp", "Loaded saved password from secure storage", {
-          hostId: resolvedHost.id,
-          authProfileId: resolvedHost.authProfileId ?? null
-        });
-      } else {
-        logAuthTrace(authTraceEnabled, "sftp", "Password auth selected but no saved password found", {
-          hostId: resolvedHost.id,
-          authProfileId: resolvedHost.authProfileId ?? null
-        });
-      }
-    } catch (err) {
-      console.error("[auth] failed to resolve saved host password for SFTP:", err instanceof Error ? err.message : "unknown error");
-    }
-  }
-  if (!requestedPassword && resolvedHost?.authMethod === "op-reference" && resolvedHost.opReference) {
-    try {
-      const { resolveOnePasswordReference } = await import("../security/opResolver.js");
-      const resolvedCredential = await resolveOnePasswordReference(resolvedHost.opReference);
-      if (resolvedCredential.length > 0) {
-        requestedPassword = resolvedCredential;
-        logAuthTrace(authTraceEnabled, "sftp", "Resolved credential from 1Password reference", {
-          hostId: resolvedHost.id
-        });
-      }
-    } catch (err) {
-      console.error("[1password] failed to resolve reference for SFTP:", err instanceof Error ? err.message : "unknown error");
-    }
-  }
-  const resolvedProxyJump =
-    profileFromResolver?.proxyJump ??
-    effectiveConfig?.proxyJump ??
-    fromConfig?.proxyJump;
-  const keepAliveSeconds = profileFromResolver?.keepAliveSeconds;
-
-  const allKeyPaths = resolveAllIdentityFiles();
-  const privateKeyPath = allKeyPaths[0] ?? undefined;
-  const fallbackKeyPaths = allKeyPaths.slice(1);
-  const agentPath = resolveAgentPath();
-
-
-  if (!requestedPassword && !privateKeyPath && !agentPath) {
-    throw new Error(
-      "SFTP auth unavailable: no usable private key or SSH agent was found. Configure IdentityFile in ~/.ssh/config, start an SSH agent, or retry and enter a password."
-    );
-  }
-
-  // Determine primary auth method but always include all available credentials.
-  // ssh2 will try publickey (key or agent) first, then fall back to password.
-  const hasExplicitKey = Boolean(resolvedHost?.identityFile?.trim());
-  const authMethod: "password" | "key" | "agent" =
-    hasExplicitKey && privateKeyPath
-      ? "key"
-      : agentPath
-        ? "agent"
-        : privateKeyPath
-          ? "key"
-          : "password";
-
-  logAuthTrace(authTraceEnabled, "sftp", "Resolved connection options", {
-    hostId,
-    authMethod,
-    hasPassword: Boolean(requestedPassword),
-    hasPrivateKey: Boolean(privateKeyPath),
-    hasAgent: Boolean(agentPath)
-  });
-
-  return {
-    hostname: resolvedHostname,
-    port: resolvedPort,
-    username: resolvedUsername,
-    proxyJump: resolvedProxyJump,
-    keepAliveSeconds,
-    authMethod,
-    privateKeyPath: privateKeyPath ?? undefined,
-    fallbackKeyPaths: fallbackKeyPaths.length > 0 ? fallbackKeyPaths : undefined,
-    agentPath: agentPath ?? undefined,
-    // When user provides a password, use it as both key passphrase and password
-    // fallback — ssh2 tries publickey first, then password.
-    passphrase: requestedPassword ?? undefined,
-    password: requestedPassword ?? undefined
-  };
-}
 
 const STATS_COMMAND = `echo "CPU:$(cat /proc/loadavg 2>/dev/null | cut -d' ' -f1-3 || sysctl -n vm.loadavg 2>/dev/null | tr -d '{}');MEM:$(free -m 2>/dev/null | awk 'NR==2{printf \\"%d/%dMB\\",$3,$2}' || vm_stat 2>/dev/null | awk '/Pages (active|wired|free)/{s+=$NF}END{printf \\"%dMB\\",s*4096/1048576}');DISK:$(df -h / 2>/dev/null | awk 'NR==2{print $5}');UP:$(uptime -p 2>/dev/null || uptime | sed 's/.*up/up/' | sed 's/,.*load.*//' | xargs)"`;
 
@@ -1310,14 +915,9 @@ export function registerIpc(
       return null;
     }
 
-    const profileId = session.profileId;
-    const hostsRepo = getOrCreateHostsRepo();
-    const allHosts = hostsRepo.list();
-    const host = hostsRepo.get(profileId) ?? allHosts.find((candidate) =>
-      profileId === `${candidate.username}@${candidate.hostname}`
-      || profileId === candidate.hostname
-      || profileId === candidate.name
-    );
+    const host = getCredentialResolver().findHost(session.profileId, {
+      matchDestination: true
+    });
 
     const hostId = host?.id ?? null;
     sessionHostCache.set(sessionId, hostId);
@@ -1586,7 +1186,16 @@ export function registerIpc(
     sessionManager: manager,
     connectionPool: ssh2ConnectionPool,
     resolveConnectionOptions: (hostId, request) =>
-      resolveSftpConnectionOptions(hostId, options, request),
+      resolveSftpConnectionOptions(
+        hostId,
+        {
+          credentials: getCredentialResolver(),
+          resolveHostProfile: options.resolveHostProfile,
+          trace: (transport, message, details) =>
+            logAuthTrace(isAuthTraceEnabled(), transport, message, details)
+        },
+        request
+      ),
     onConnected: ({ connectionOptions }) => {
       if (!connectionOptions.password || !connectionOptions.username) {
         return;
