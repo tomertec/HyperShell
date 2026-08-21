@@ -86,6 +86,7 @@ import {
 } from "../security/credentialCache";
 import {
   createCredentialResolver,
+  stripDomain,
   type CredentialResolver
 } from "../connection/credentialResolver";
 import { resolveSftpConnectionOptions } from "../connection/sftpConnectionOptions";
@@ -637,9 +638,7 @@ async function openSessionHandler(
     // Fall back to host record from database for identity file.
     // profileId may be a host ID or a "user@host" destination string.
     if (!sshOptions) {
-      const host = getCredentialResolver().findHost(parsed.profileId, {
-        matchDestination: true
-      });
+      const host = getCredentialResolver().findHost(parsed.profileId);
       if (host) {
         resolvedHost = host;
         sshOptions = {
@@ -663,10 +662,25 @@ async function openSessionHandler(
           hasAuthProfile: Boolean(host.authProfileId)
         });
 
-        // Pass 2 will also hand this a cacheLookup, so SSH consults the
-        // credential cache the way SFTP already does.
+        // SSH reads the credential cache but never writes it: it authenticates
+        // through sshPtyTransport's password-prompt watcher, so there is no
+        // auth-success signal to write back on. Only SFTP populates the cache.
+        // The key must therefore be spelled the way SFTP spells it — hence
+        // stripDomain. It still misses when ssh_config, not the host record,
+        // supplies the username, hostname or port, since computing those would
+        // mean running `ssh -G` here too.
+        const cacheUsername = stripDomain(host.username ?? undefined);
         const password = await getCredentialResolver().resolvePassword(host, {
-          transport: "ssh"
+          transport: "ssh",
+          ...(cacheUsername
+            ? {
+                cacheLookup: {
+                  hostname: host.hostname,
+                  port: host.port,
+                  username: cacheUsername
+                }
+              }
+            : {})
         });
         if (password) {
           sshOptions.password = password;
@@ -915,9 +929,7 @@ export function registerIpc(
       return null;
     }
 
-    const host = getCredentialResolver().findHost(session.profileId, {
-      matchDestination: true
-    });
+    const host = getCredentialResolver().findHost(session.profileId);
 
     const hostId = host?.id ?? null;
     sessionHostCache.set(sessionId, hostId);

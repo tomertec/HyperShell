@@ -7,7 +7,11 @@ import { parseSshConfig } from "@hypershell/session-core";
 import type { SftpConnectionOptions } from "@hypershell/session-core";
 import type { SftpConnectRequest } from "@hypershell/shared";
 
-import type { AuthTraceTransport, CredentialResolver } from "./credentialResolver";
+import {
+  stripDomain,
+  type AuthTraceTransport,
+  type CredentialResolver
+} from "./credentialResolver";
 
 /**
  * Turns a host id into the options ssh2 needs for an SFTP connection.
@@ -110,11 +114,7 @@ export async function resolveSftpConnectionOptions(
   deps: SftpConnectionOptionsDeps,
   request: SftpConnectRequest
 ): Promise<SftpConnectionOptions | null> {
-  // Pass 2 will flip matchDestination to true, so a "user@host" destination
-  // resolves for SFTP the way it already does for SSH.
-  const resolvedHost =
-    deps.credentials.findHost(hostId, { matchDestination: false }) ??
-    undefined;
+  const resolvedHost = deps.credentials.findHost(hostId) ?? undefined;
 
   const sshConfigPath = path.join(homedir(), ".ssh", "config");
   let sshConfigHosts: ReturnType<typeof parseSshConfig>["hosts"];
@@ -306,13 +306,6 @@ export async function resolveSftpConnectionOptions(
   // The resolver traces the explicit-password case itself.
   let requestedPassword =
     "password" in request && request.password ? request.password : undefined;
-
-  // Strip Windows domain prefix (DOMAIN\user → user) — SSH servers don't
-  // understand Windows domain usernames.
-  const stripDomain = (u: string | undefined): string | undefined => {
-    if (!u) return u;
-    return u.includes("\\") ? u.split("\\").pop() : u;
-  };
 
   // Priority: explicit username from auth modal or host record first,
   // then fall back to ssh -G effective config.

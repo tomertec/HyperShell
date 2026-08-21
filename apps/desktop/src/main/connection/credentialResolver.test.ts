@@ -3,6 +3,7 @@ import type { HostRecord as DbHostRecord } from "@hypershell/db";
 
 import {
   createCredentialResolver,
+  stripDomain,
   type CredentialResolverDeps,
   type HostLookup
 } from "./credentialResolver";
@@ -60,34 +61,26 @@ function makeDeps(
 describe("findHost", () => {
   const host = makeHost();
 
-  it("resolves by id, name and hostname for both transports", () => {
+  it("resolves by id, name and hostname", () => {
     const resolver = createCredentialResolver(makeDeps([host]));
 
-    for (const matchDestination of [true, false]) {
-      expect(resolver.findHost("host-1", { matchDestination })?.id).toBe("host-1");
-      expect(resolver.findHost("docker", { matchDestination })?.id).toBe("host-1");
-      expect(resolver.findHost("10.10.10.20", { matchDestination })?.id).toBe("host-1");
-    }
+    expect(resolver.findHost("host-1")?.id).toBe("host-1");
+    expect(resolver.findHost("docker")?.id).toBe("host-1");
+    expect(resolver.findHost("10.10.10.20")?.id).toBe("host-1");
   });
 
-  // Characterization: the SSH path accepts a `user@hostname` destination (Quick
-  // Connect builds exactly that form); the SFTP path does not. Pass 2 unifies
-  // this by making matchDestination unconditional.
-  it("matches a user@hostname destination only when asked to", () => {
+  // SSH accepted a `user@hostname` destination and SFTP did not, though Quick
+  // Connect builds exactly that form of profileId. Both resolve it now.
+  it("resolves a user@hostname destination", () => {
     const resolver = createCredentialResolver(makeDeps([host]));
 
-    expect(
-      resolver.findHost("tomer@10.10.10.20", { matchDestination: true })?.id
-    ).toBe("host-1");
-    expect(
-      resolver.findHost("tomer@10.10.10.20", { matchDestination: false })
-    ).toBeNull();
+    expect(resolver.findHost("tomer@10.10.10.20")?.id).toBe("host-1");
   });
 
   it("returns null for an unknown profileId", () => {
     const resolver = createCredentialResolver(makeDeps([host]));
 
-    expect(resolver.findHost("nope", { matchDestination: true })).toBeNull();
+    expect(resolver.findHost("nope")).toBeNull();
   });
 
   it("returns null when the hosts repository is unavailable", () => {
@@ -95,7 +88,7 @@ describe("findHost", () => {
       makeDeps([host], { hosts: () => null })
     );
 
-    expect(resolver.findHost("host-1", { matchDestination: true })).toBeNull();
+    expect(resolver.findHost("host-1")).toBeNull();
   });
 });
 
@@ -151,29 +144,48 @@ describe("resolvePassword", () => {
     ).resolves.toBeUndefined();
   });
 
-  // Characterization: only the SFTP path passes cacheLookup today, so only SFTP
-  // consults the credential cache. Pass 2 unifies this by having the SSH path
-  // pass cacheLookup too.
-  it("consults the credential cache only when cacheLookup is supplied", async () => {
-    const readCachedCredential = vi.fn(() => "cached");
-    const deps = makeDeps([], {
-      readCachedCredential,
-      credentialCacheConfig: () => ({ enabled: true, ttlMs: 60_000 })
-    });
-    const resolver = createCredentialResolver(deps);
+  // Both transports now pass cacheLookup, so a password typed into the SFTP
+  // modal is reused by a later SSH tab to the same host instead of prompting
+  // again. SSH only ever reads the cache — it has no auth-success signal to
+  // write back on, so SFTP remains the only writer.
+  it("consults the credential cache for both transports", async () => {
+    const cacheLookup = { hostname: "10.10.10.20", port: 22, username: "tomer" };
     const host = makeHost({ authMethod: "password", authProfileId: "auth-1" });
 
-    await expect(
-      resolver.resolvePassword(host, { transport: "ssh" })
-    ).resolves.toBeUndefined();
-    expect(readCachedCredential).not.toHaveBeenCalled();
+    for (const transport of ["ssh", "sftp"] as const) {
+      const readCachedCredential = vi.fn(() => "cached");
+      const resolver = createCredentialResolver(
+        makeDeps([], {
+          readCachedCredential,
+          credentialCacheConfig: () => ({ enabled: true, ttlMs: 60_000 })
+        })
+      );
+
+      await expect(
+        resolver.resolvePassword(host, { transport, cacheLookup })
+      ).resolves.toBe("cached");
+      expect(readCachedCredential).toHaveBeenCalledWith(
+        "10.10.10.20",
+        22,
+        "tomer",
+        60_000
+      );
+    }
+  });
+
+  it("skips the cache when no cacheLookup is supplied", async () => {
+    const readCachedCredential = vi.fn(() => "cached");
+    const resolver = createCredentialResolver(
+      makeDeps([], {
+        readCachedCredential,
+        credentialCacheConfig: () => ({ enabled: true, ttlMs: 60_000 })
+      })
+    );
 
     await expect(
-      resolver.resolvePassword(host, {
-        transport: "sftp",
-        cacheLookup: { hostname: "10.10.10.20", port: 22, username: "tomer" }
-      })
-    ).resolves.toBe("cached");
+      resolver.resolvePassword(makeHost(), { transport: "ssh" })
+    ).resolves.toBeUndefined();
+    expect(readCachedCredential).not.toHaveBeenCalled();
   });
 
   it("skips the cache when it is disabled in settings", async () => {
@@ -255,5 +267,27 @@ describe("resolvePassword", () => {
     await expect(
       resolver.resolvePassword(null, { transport: "ssh" })
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("stripDomain", () => {
+  // The credential cache is keyed by username. SFTP has always stripped the
+  // domain before connecting, so SSH must strip it before reading the cache or
+  // a DOMAIN\user host would never get a hit.
+  it("strips a Windows domain prefix", () => {
+    expect(stripDomain("TEC\\tomer")).toBe("tomer");
+  });
+
+  it("leaves a plain username alone", () => {
+    expect(stripDomain("tomer")).toBe("tomer");
+  });
+
+  it("keeps only the last segment of a multi-part prefix", () => {
+    expect(stripDomain("A\\B\\tomer")).toBe("tomer");
+  });
+
+  it("passes undefined and empty through untouched", () => {
+    expect(stripDomain(undefined)).toBeUndefined();
+    expect(stripDomain("")).toBe("");
   });
 });

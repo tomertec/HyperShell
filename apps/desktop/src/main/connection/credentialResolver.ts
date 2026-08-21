@@ -14,6 +14,18 @@ import type { HostRecord as DbHostRecord } from "@hypershell/db";
  * belongs to the transports, not to credentials.
  */
 
+/**
+ * Strips a Windows domain prefix (`DOMAIN\user` -> `user`) — SSH servers do not
+ * understand them. Shared so that the credential cache, which is keyed by
+ * username, is read and written under the same spelling by both transports.
+ */
+export function stripDomain(username: string | undefined): string | undefined {
+  if (!username) {
+    return username;
+  }
+  return username.includes("\\") ? username.split("\\").pop() : username;
+}
+
 /** The slice of the hosts repository this module needs. */
 export interface HostLookup {
   get(id: string): DbHostRecord | undefined;
@@ -47,14 +59,6 @@ export interface CredentialResolverDeps {
   ) => void;
 }
 
-export interface FindHostOptions {
-  /**
-   * Also match a `user@hostname` destination string, as typed into Quick
-   * Connect. Only the SSH path accepts these today.
-   */
-  matchDestination: boolean;
-}
-
 export interface ResolvePasswordOptions {
   transport: AuthTraceTransport;
   /** A password already supplied (SFTP's auth modal). Short-circuits lookup. */
@@ -67,7 +71,11 @@ export interface ResolvePasswordOptions {
 }
 
 export interface CredentialResolver {
-  findHost(profileId: string, options: FindHostOptions): DbHostRecord | null;
+  /**
+   * Resolves a profile id — a host id, name, hostname, or a `user@hostname`
+   * destination as typed into Quick Connect — to its host record.
+   */
+  findHost(profileId: string): DbHostRecord | null;
   resolvePassword(
     host: DbHostRecord | null,
     options: ResolvePasswordOptions
@@ -77,10 +85,7 @@ export interface CredentialResolver {
 export function createCredentialResolver(
   deps: CredentialResolverDeps
 ): CredentialResolver {
-  function findHost(
-    profileId: string,
-    options: FindHostOptions
-  ): DbHostRecord | null {
+  function findHost(profileId: string): DbHostRecord | null {
     const repo = deps.hosts();
     if (!repo) {
       return null;
@@ -98,8 +103,7 @@ export function createCredentialResolver(
           candidate.id === profileId ||
           candidate.name === profileId ||
           candidate.hostname === profileId ||
-          (options.matchDestination &&
-            profileId === `${candidate.username}@${candidate.hostname}`)
+          profileId === `${candidate.username}@${candidate.hostname}`
       );
 
     return match ?? null;

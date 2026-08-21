@@ -24,6 +24,21 @@ resolver are Electron-side.
 
 Deliberately excludes `~/.ssh/config`. See [Effective SSH config](#effective-ssh-config).
 
+## Credential cache
+
+An in-memory, TTL'd store of passwords the user typed, so a password entered in
+the SFTP prompt is not asked for again. Keyed by `hostname:port:username` and
+cleared on quit. Gated by `security.credentialCacheEnabled`.
+
+**SFTP is the only writer.** The SSH terminal authenticates by feeding the
+password to `sshPtyTransport`'s prompt watcher, so it has no auth-success signal
+to write back on. Both transports read it.
+
+Because SFTP writes under its post-`ssh -G`, post-`stripDomain` values, an SSH
+read only hits when the host record supplies the same username, hostname and
+port. When `ssh_config` supplies any of them, SSH misses — computing them would
+mean running `ssh -G` on the terminal path too, which it otherwise never needs.
+
 ## Effective SSH config
 
 What OpenSSH itself concludes about a host after Host patterns, `Match` blocks
