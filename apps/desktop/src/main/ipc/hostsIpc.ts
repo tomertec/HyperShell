@@ -1,12 +1,11 @@
-import { createHostsRepositoryFromDatabase, openDatabase } from "@hypershell/db";
+import { createHostsRepositoryFromDatabase, normalizeHostInput, openDatabase } from "@hypershell/db";
 import type { HostInput, HostRecord } from "@hypershell/db";
 import {
   ipcChannels,
   upsertHostRequestSchema,
   removeHostRequestSchema,
   reorderHostsRequestSchema,
-  DEFAULT_RECONNECT_BASE_INTERVAL,
-  DEFAULT_RECONNECT_MAX_ATTEMPTS,
+  HOST_OPTION_DEFAULTS,
   type UpsertHostRequest,
   type RemoveHostRequest,
   type ReorderHostsRequest
@@ -251,7 +250,7 @@ function resolveHostsFallbackPath(): string {
   return path.join(app.getPath("appData"), "HyperShell", "hosts.fallback.json");
 }
 
-function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
+export function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
   type StoredHost = HostRecord;
 
   const readHosts = (): StoredHost[] => {
@@ -271,7 +270,7 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
           id: String(item?.id ?? ""),
           name: String(item?.name ?? ""),
           hostname: String(item?.hostname ?? ""),
-          port: Number(item?.port ?? 22),
+          port: Number(item?.port ?? HOST_OPTION_DEFAULTS.port),
           username: item?.username == null ? null : String(item.username),
           identityFile:
             item?.identityFile == null ? null : String(item.identityFile),
@@ -281,20 +280,20 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
             item?.authProfileId == null ? null : String(item.authProfileId),
           groupId: item?.groupId == null ? null : String(item.groupId),
           notes: item?.notes == null ? null : String(item.notes),
-          authMethod: item?.authMethod == null ? "default" : String(item.authMethod),
-          agentKind: item?.agentKind == null ? "system" : String(item.agentKind),
+          authMethod: item?.authMethod == null ? HOST_OPTION_DEFAULTS.authMethod : String(item.authMethod),
+          agentKind: item?.agentKind == null ? HOST_OPTION_DEFAULTS.agentKind : String(item.agentKind),
           opReference: item?.opReference == null ? null : String(item.opReference),
-          isFavorite: Boolean(item?.isFavorite ?? false),
+          isFavorite: Boolean(item?.isFavorite ?? HOST_OPTION_DEFAULTS.isFavorite),
           sortOrder: item?.sortOrder == null ? null : Number(item.sortOrder),
           color: item?.color == null ? null : String(item.color),
           proxyJump: item?.proxyJump == null ? null : String(item.proxyJump),
           proxyJumpHostIds: item?.proxyJumpHostIds == null ? null : String(item.proxyJumpHostIds),
           keepAliveInterval: item?.keepAliveInterval == null ? null : Number(item.keepAliveInterval),
-          autoReconnect: Boolean(item?.autoReconnect ?? false),
-          reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS),
-          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL),
-          tmuxDetect: Boolean(item?.tmuxDetect ?? false),
-          shellIntegration: item?.shellIntegration === false ? false : true
+          autoReconnect: Boolean(item?.autoReconnect ?? HOST_OPTION_DEFAULTS.autoReconnect),
+          reconnectMaxAttempts: Number(item?.reconnectMaxAttempts ?? HOST_OPTION_DEFAULTS.reconnectMaxAttempts),
+          reconnectBaseInterval: Number(item?.reconnectBaseInterval ?? HOST_OPTION_DEFAULTS.reconnectBaseInterval),
+          tmuxDetect: Boolean(item?.tmuxDetect ?? HOST_OPTION_DEFAULTS.tmuxDetect),
+          shellIntegration: Boolean(item?.shellIntegration ?? HOST_OPTION_DEFAULTS.shellIntegration)
         }))
         .filter((item) => item.id.length > 0 && item.name.length > 0 && item.hostname.length > 0);
     } catch {
@@ -308,32 +307,7 @@ function createFileBackedHostsRepo(filePath: string): HostsRepoLike {
 
   return {
     create(input: HostInput): HostRecord {
-      const normalized: HostRecord = {
-        id: input.id,
-        name: input.name,
-        hostname: input.hostname,
-        port: input.port ?? 22,
-        username: input.username ?? null,
-        identityFile: input.identityFile ?? null,
-        hostProfileId: input.hostProfileId ?? null,
-        authProfileId: input.authProfileId ?? null,
-        groupId: input.groupId ?? null,
-        notes: input.notes ?? null,
-        authMethod: input.authMethod ?? "default",
-        agentKind: input.agentKind ?? "system",
-        opReference: input.opReference ?? null,
-        isFavorite: input.isFavorite ?? false,
-        sortOrder: input.sortOrder ?? null,
-        color: input.color ?? null,
-        proxyJump: input.proxyJump ?? null,
-        proxyJumpHostIds: input.proxyJumpHostIds ?? null,
-        keepAliveInterval: input.keepAliveInterval ?? null,
-        autoReconnect: input.autoReconnect ?? false,
-        reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
-        tmuxDetect: input.tmuxDetect ?? false,
-        shellIntegration: input.shellIntegration === false ? false : true
-      };
+      const normalized = normalizeHostInput(input);
 
       const hosts = readHosts();
       const existingIndex = hosts.findIndex((host) => host.id === normalized.id);
@@ -495,7 +469,7 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
     const parsed = upsertHostRequestSchema.parse(request);
     const repo = getOrCreateHostsRepo();
     const existing = repo.get(parsed.id);
-    const requestedAuthMethod = parsed.authMethod ?? "default";
+    const requestedAuthMethod = parsed.authMethod ?? HOST_OPTION_DEFAULTS.authMethod;
     let nextAuthProfileId = existing?.authProfileId ?? null;
 
     const password = parsed.password ?? "";
@@ -537,29 +511,31 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       nextAuthProfileId = null;
     }
 
+    // repo.create normalizes through normalizeHostInput, so no defaults are
+    // re-derived here — missing fields pass through as undefined.
     const persistedHost = repo.create({
       id: parsed.id,
       name: parsed.name,
       hostname: parsed.hostname,
       port: parsed.port,
-      username: parsed.username ?? null,
-      identityFile: parsed.identityFile ?? null,
-      hostProfileId: parsed.hostProfileId ?? null,
+      username: parsed.username,
+      identityFile: parsed.identityFile,
+      hostProfileId: parsed.hostProfileId,
       authProfileId: nextAuthProfileId,
-      notes: parsed.notes ?? null,
+      notes: parsed.notes,
       authMethod: requestedAuthMethod,
-      agentKind: parsed.agentKind ?? "system",
-      opReference: parsed.opReference ?? null,
-      isFavorite: parsed.isFavorite ?? false,
-      color: parsed.color ?? null,
-      sortOrder: parsed.sortOrder ?? null,
-      proxyJump: parsed.proxyJump ?? null,
-      proxyJumpHostIds: parsed.proxyJumpHostIds ?? null,
-      keepAliveInterval: parsed.keepAliveInterval ?? null,
-      autoReconnect: parsed.autoReconnect ?? false,
-      reconnectMaxAttempts: parsed.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
-      reconnectBaseInterval: parsed.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
-      tmuxDetect: parsed.tmuxDetect ?? false,
+      agentKind: parsed.agentKind,
+      opReference: parsed.opReference,
+      isFavorite: parsed.isFavorite,
+      color: parsed.color,
+      sortOrder: parsed.sortOrder,
+      proxyJump: parsed.proxyJump,
+      proxyJumpHostIds: parsed.proxyJumpHostIds,
+      keepAliveInterval: parsed.keepAliveInterval,
+      autoReconnect: parsed.autoReconnect,
+      reconnectMaxAttempts: parsed.reconnectMaxAttempts,
+      reconnectBaseInterval: parsed.reconnectBaseInterval,
+      tmuxDetect: parsed.tmuxDetect,
       shellIntegration: parsed.shellIntegration
     });
     return attachPasswordMetadata(persistedHost);
