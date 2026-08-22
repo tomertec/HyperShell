@@ -1,3 +1,4 @@
+import { HOST_OPTION_DEFAULTS } from "@hypershell/shared";
 import { describe, expect, it } from "vitest";
 
 import { openDatabase } from "../index";
@@ -100,5 +101,19 @@ describe("hostsRepository", () => {
       repo.create({ id: "h6", name: "off", hostname: "off", shellIntegration: false })
         .shellIntegration
     ).toBe(false);
+  });
+});
+
+describe("host option defaults", () => {
+  // Default site #1 is the SQL DDL. This pins it to the module that owns
+  // the other five sites, so the six can no longer drift silently.
+  it("hosts table DDL defaults agree with HOST_OPTION_DEFAULTS", () => {
+    const db = openDatabase(":memory:");
+    db.prepare(
+      "INSERT INTO hosts (id, name, hostname) VALUES ('raw', 'raw', 'raw.example.com')"
+    ).run();
+    const repo = createHostsRepositoryFromDatabase(db);
+    expect(repo.get("raw")).toMatchObject(HOST_OPTION_DEFAULTS);
+    db.close();
   });
 });
