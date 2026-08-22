@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { SqliteDatabase } from "./index";
 import { openDatabase, withOpenDatabase } from "./index";
@@ -88,5 +89,46 @@ describe("openDatabase migrations", () => {
     const columns = (db.pragma("table_info(hosts)") as PragmaRow[]).map((c) => c.name);
     expect(columns).toContain("shell_integration");
     db.close();
+  });
+});
+
+describe("migration files", () => {
+  it("reads every migration file in migrations/ (none are decorative)", () => {
+    const srcDir = fileURLToPath(new URL(".", import.meta.url));
+    const indexSource = readFileSync(join(srcDir, "index.ts"), "utf8");
+    const migrationFiles = readdirSync(join(srcDir, "migrations")).filter((f) =>
+      f.endsWith(".sql")
+    );
+    expect(migrationFiles.length).toBeGreaterThanOrEqual(18);
+    for (const file of migrationFiles) {
+      expect(
+        indexSource,
+        `${file} is never read by openDatabase — editing it does nothing`
+      ).toContain(file);
+    }
+  });
+
+  it("applies the file-driven migrations to a fresh database", () => {
+    const db = openDatabase(":memory:");
+    const hostCols = (db.pragma("table_info(hosts)") as PragmaRow[]).map((c) => c.name);
+    expect(hostCols).toEqual(
+      expect.arrayContaining(["is_favorite", "sort_order", "color", "tmux_detect"])
+    );
+    const groupCols = (db.pragma("table_info(host_groups)") as PragmaRow[]).map((c) => c.name);
+    expect(groupCols).toContain("sort_order");
+    const tagCols = (db.pragma("table_info(tags)") as PragmaRow[]).map((c) => c.name);
+    expect(tagCols).toContain("color");
+    db.close();
+  });
+
+  it("reopens an already-migrated database without throwing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hypershell-remigrate-"));
+    const dbPath = join(dir, "test.db");
+    try {
+      openDatabase(dbPath).close();
+      expect(() => openDatabase(dbPath).close()).not.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

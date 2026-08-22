@@ -9,6 +9,38 @@ function isIgnorableMigrationError(error: unknown): boolean {
   return normalized.includes("already exists") || normalized.includes("duplicate column");
 }
 
+function readMigration(filename: string): string {
+  return readFileSync(new URL(`./migrations/${filename}`, import.meta.url), "utf8");
+}
+
+/**
+ * Run one migration statement-by-statement, tolerating "already exists" /
+ * "duplicate column" from databases that ran a prior version. A single exec()
+ * would abort at the first duplicate and silently skip the rest, leaving a
+ * database with some of the migration's columns but not the others. Comment
+ * lines are stripped before splitting on `;` — a `;` inside a comment would
+ * otherwise cut a statement in half and produce a syntax error, which is not
+ * an ignorable duplicate.
+ */
+function execGuardedStatements(db: SqliteDatabase, sql: string): void {
+  const statements = sql
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n")
+    .split(";")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  for (const statement of statements) {
+    try {
+      db.exec(statement);
+    } catch (error) {
+      if (!isIgnorableMigrationError(error)) {
+        throw error;
+      }
+    }
+  }
+}
+
 /**
  * Open a database and hand it to a repository factory, closing the handle if
  * that factory throws. Without this the handle stays open for the life of the
@@ -28,59 +60,6 @@ export function withOpenDatabase<T>(
 }
 
 export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
-  const initSchemaSql = readFileSync(
-    new URL("./migrations/001_init.sql", import.meta.url),
-    "utf8"
-  );
-  const sftpBookmarksSql = readFileSync(
-    new URL("./migrations/002_sftp_bookmarks.sql", import.meta.url),
-    "utf8"
-  );
-  const hostAuthFieldsSql = readFileSync(
-    new URL("./migrations/003_host_auth_fields.sql", import.meta.url),
-    "utf8"
-  );
-  const advancedSshSql = readFileSync(
-    new URL("./migrations/006_advanced_ssh.sql", import.meta.url),
-    "utf8"
-  );
-  const sessionRecordingsSql = readFileSync(
-    new URL("./migrations/008_session_recordings.sql", import.meta.url),
-    "utf8"
-  );
-  const connectionHistorySql = readFileSync(
-    new URL("./migrations/009_connection_history.sql", import.meta.url),
-    "utf8"
-  );
-  const savedSessionsSql = readFileSync(
-    new URL("./migrations/010_saved_sessions.sql", import.meta.url),
-    "utf8"
-  );
-  const hostProfilesSql = readFileSync(
-    new URL("./migrations/011_host_profiles.sql", import.meta.url),
-    "utf8"
-  );
-  const hostEnvVarsSql = readFileSync(
-    new URL("./migrations/012_host_env_vars.sql", import.meta.url),
-    "utf8"
-  );
-  const localProfilesSql = readFileSync(
-    new URL("./migrations/015_local_profiles.sql", import.meta.url),
-    "utf8"
-  );
-  const savedSessionsTransportsSql = readFileSync(
-    new URL("./migrations/016_saved_sessions_transports.sql", import.meta.url),
-    "utf8"
-  );
-  const shellIntegrationSql = readFileSync(
-    new URL("./migrations/017_shell_integration.sql", import.meta.url),
-    "utf8"
-  );
-  const claudeSessionsSql = readFileSync(
-    new URL("./migrations/018_claude_sessions.sql", import.meta.url),
-    "utf8"
-  );
-
   const db = new Database(databasePath);
 
   // Performance pragmas — safe for single-process desktop app.
@@ -91,120 +70,50 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
   db.pragma("cache_size = -8000");
   db.pragma("temp_store = MEMORY");
   db.pragma("foreign_keys = ON");
-  db.exec(initSchemaSql);
-  db.exec(sftpBookmarksSql);
+  db.exec(readMigration("001_init.sql"));
+  db.exec(readMigration("002_sftp_bookmarks.sql"));
 
-  // Migration 003: add identity_file and auth fields to hosts table.
-  // Each ALTER TABLE is wrapped individually — SQLite errors if the column
-  // already exists, which is expected on databases that ran a prior version.
-  try {
-    db.exec("ALTER TABLE hosts ADD COLUMN identity_file TEXT");
-  } catch (error) {
-    if (!isIgnorableMigrationError(error)) {
-      throw error;
-    }
-  }
-  for (const statement of hostAuthFieldsSql
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)) {
-    try {
-      db.exec(statement);
-    } catch (error) {
-      if (!isIgnorableMigrationError(error)) {
-        throw error;
-      }
-    }
-  }
+  // Migration 003: add identity_file and auth fields to hosts table. The
+  // identity_file ALTER is not in the .sql file — it covers databases created
+  // before migration 001 included the column.
+  execGuardedStatements(db, "ALTER TABLE hosts ADD COLUMN identity_file TEXT");
+  execGuardedStatements(db, readMigration("003_host_auth_fields.sql"));
 
   // Migration 004: add is_favorite column to hosts table.
-  try {
-    db.exec("ALTER TABLE hosts ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0");
-  } catch (error) {
-    if (!isIgnorableMigrationError(error)) {
-      throw error;
-    }
-  }
+  execGuardedStatements(db, readMigration("004_favorites.sql"));
 
   // Migration 005: sort_order and color
-  for (const stmt of [
-    "ALTER TABLE hosts ADD COLUMN sort_order INTEGER",
-    "ALTER TABLE host_groups ADD COLUMN sort_order INTEGER",
-    "ALTER TABLE hosts ADD COLUMN color TEXT"
-  ]) {
-    try {
-      db.exec(stmt);
-    } catch (error) {
-      if (!isIgnorableMigrationError(error)) {
-        throw error;
-      }
-    }
-  }
+  execGuardedStatements(db, readMigration("005_host_enhancements.sql"));
 
   // Migration 006: advanced SSH fields + host_port_forwards table
-  for (const statement of advancedSshSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0)) {
-    try {
-      db.exec(statement);
-    } catch (error) {
-      if (!isIgnorableMigrationError(error)) {
-        throw error;
-      }
-    }
-  }
+  execGuardedStatements(db, readMigration("006_advanced_ssh.sql"));
 
   // Migration 007: host fingerprints table
-  const hostFingerprintsSql = readFileSync(
-    new URL("./migrations/007_host_fingerprints.sql", import.meta.url),
-    "utf8"
-  );
-  db.exec(hostFingerprintsSql);
+  db.exec(readMigration("007_host_fingerprints.sql"));
 
   // Migration 008: session recordings table
-  db.exec(sessionRecordingsSql);
+  db.exec(readMigration("008_session_recordings.sql"));
 
   // Migration 009: connection history table
-  db.exec(connectionHistorySql);
+  db.exec(readMigration("009_connection_history.sql"));
 
   // Migration 010: saved session recovery snapshots
-  db.exec(savedSessionsSql);
+  db.exec(readMigration("010_saved_sessions.sql"));
 
   // Migration 011: host profiles + host_profile_id link on hosts
-  for (const statement of hostProfilesSql
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)) {
-    try {
-      db.exec(statement);
-    } catch (error) {
-      if (!isIgnorableMigrationError(error)) {
-        throw error;
-      }
-    }
-  }
+  execGuardedStatements(db, readMigration("011_host_profiles.sql"));
 
   // Migration 012: per-host environment variables
-  db.exec(hostEnvVarsSql);
+  db.exec(readMigration("012_host_env_vars.sql"));
 
-  // Migration 012b: add color to tags (Task 2.10)
-  try {
-    db.exec("ALTER TABLE tags ADD COLUMN color TEXT");
-  } catch (error) {
-    if (!isIgnorableMigrationError(error)) {
-      throw error;
-    }
-  }
+  // Migration 013: add color to tags (Task 2.10)
+  execGuardedStatements(db, readMigration("013_tags_color.sql"));
 
   // Migration 014: tmux detection toggle per host
-  try {
-    db.exec("ALTER TABLE hosts ADD COLUMN tmux_detect INTEGER NOT NULL DEFAULT 0");
-  } catch (error) {
-    if (!isIgnorableMigrationError(error)) {
-      throw error;
-    }
-  }
+  execGuardedStatements(db, readMigration("014_tmux_detect.sql"));
 
   // Migration 015: local shell profiles + their environment variables
-  db.exec(localProfilesSql);
+  db.exec(readMigration("015_local_profiles.sql"));
 
   // Migration 016: widen saved_sessions.transport CHECK to allow 'telnet' and
   // 'local'. SQLite can't ALTER a CHECK constraint, so this recreates the
@@ -218,40 +127,15 @@ export function openDatabase(databasePath = ":memory:"): SqliteDatabase {
     .get() as { sql?: string } | undefined;
   if (savedSessionsTableInfo?.sql && !savedSessionsTableInfo.sql.includes("'local'")) {
     db.transaction(() => {
-      db.exec(savedSessionsTransportsSql);
+      db.exec(readMigration("016_saved_sessions_transports.sql"));
     })();
   }
 
   // Migration 017: per-host shell integration opt-out. Defaults to 1 (enabled).
-  try {
-    db.exec(shellIntegrationSql);
-  } catch (error) {
-    if (!isIgnorableMigrationError(error)) {
-      throw error;
-    }
-  }
+  execGuardedStatements(db, readMigration("017_shell_integration.sql"));
 
-  // Migration 018: Claude session resume columns. Split per statement — a single
-  // exec() would abort at the first "duplicate column" and silently skip the
-  // rest, leaving a database that has one column but not the other. Comment
-  // lines are stripped before splitting because a `;` inside a comment would
-  // otherwise cut it in half and leave a fragment that is a syntax error, not
-  // an ignorable "duplicate column".
-  for (const statement of claudeSessionsSql
-    .split("\n")
-    .filter((line) => !line.trim().startsWith("--"))
-    .join("\n")
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)) {
-    try {
-      db.exec(statement);
-    } catch (error) {
-      if (!isIgnorableMigrationError(error)) {
-        throw error;
-      }
-    }
-  }
+  // Migration 018: Claude session resume columns.
+  execGuardedStatements(db, readMigration("018_claude_sessions.sql"));
 
   return db;
 }
