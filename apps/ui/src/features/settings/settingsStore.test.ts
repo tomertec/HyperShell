@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock window.hypershell before importing store
+import { createFakeShell } from "../../lib/fakeShell";
+import { setShell } from "../../lib/shell";
+
+// Substitute the shell seam before the store is exercised.
 const mockSshterm = {
   getSetting: vi.fn().mockResolvedValue(null),
   updateSetting: vi.fn().mockResolvedValue({ key: "app.settings", value: "{}" }),
 };
-vi.stubGlobal("window", { hypershell: mockSshterm });
+setShell(createFakeShell(mockSshterm).shell);
 
 import {
   MAX_TERMINAL_FONT_SIZE,

@@ -68,6 +68,8 @@ deleting anything.
 
 **Otherwise:** they are safe to delete. Remote save temps are siblings of the file, hidden, named
 `.<name>.hypershell-<hex>.tmp`; sync temps are local, named `<name>.hypershell-sync-<hex>.tmp`.
+A hidden `.<name>.hypershell-upload.tmp` is a paused or interrupted transfer-queue upload — it is
+what resuming that transfer continues from, so delete it only if you don't intend to resume.
 
 ### A sync reports "Complete" but files are missing
 

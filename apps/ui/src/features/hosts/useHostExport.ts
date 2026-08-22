@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { getShell, hasShell } from "../../lib/shell";
 
 export type HostExportFormat = "json" | "csv" | "ssh-config";
 
@@ -16,12 +17,12 @@ export function useHostExport() {
   const exportHosts = useCallback(async (format: HostExportFormat) => {
     const option = EXPORT_OPTIONS[format];
 
-    if (!window.hypershell?.fsShowSaveDialog || !window.hypershell?.exportHosts) {
+    if (!hasShell()) {
       toast.error("Host export is unavailable in this environment.");
       return;
     }
 
-    const filePath = await window.hypershell.fsShowSaveDialog({
+    const filePath = await getShell().fsShowSaveDialog({
       defaultPath: `hosts.${option.extension}`,
       filters: [{ name: option.filterName, extensions: [option.extension] }],
     });
@@ -30,7 +31,7 @@ export function useHostExport() {
     }
 
     try {
-      const result = await window.hypershell.exportHosts({ format, filePath });
+      const result = await getShell().exportHosts({ format, filePath });
       toast.success(
         `Exported ${result.exported} host${result.exported === 1 ? "" : "s"} to ${filePath}`
       );

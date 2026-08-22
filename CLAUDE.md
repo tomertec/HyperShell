@@ -44,7 +44,7 @@ apps/desktop    → Electron main + preload (IPC boundary, window mgmt, tray, se
 apps/ui         → React workbench (xterm.js terminals, host browser, tabs/panes, Zustand state)
 packages/shared → IPC channel names, Zod request/response schemas, auth/transport enums
 packages/session-core → Transport abstraction (SSH via PTY, serial, SFTP via ssh2), session lifecycle, connection pool, network monitor, tmux probe
-packages/db     → SQLite via better-sqlite3, migrations (001-016), repositories
+packages/db     → SQLite via better-sqlite3, migrations (001-018), repositories
 ```
 
 Dependency direction: `desktop` → `shared`, `session-core`, `db`; `ui` → `shared`; `session-core` → `shared`.
@@ -53,7 +53,7 @@ Dependency direction: `desktop` → `shared`, `session-core`, `db`; `ui` → `sh
 
 **Three-layer Electron model:**
 1. **Main process** (`apps/desktop/src/main/`) — bootstraps app lifecycle, registers 40+ IPC handlers, manages sessions, tray, windows. Entry: `main.ts`.
-2. **Preload bridge** (`apps/desktop/src/preload/`) — exposes `window.hypershell` API to renderer with Zod-validated typed IPC methods. Both request and response are validated.
+2. **Preload bridge** (`apps/desktop/src/preload/`) — exposes `window.hypershell` API to renderer with Zod-validated typed IPC methods. Both request and response are validated. The renderer never touches `window.hypershell` directly: all calls go through the seam in `apps/ui/src/lib/shell.ts` (`getShell()`/`hasShell()`), whose prod adapter throws on a bridged-method gap instead of silently no-oping, and whose test adapter (`lib/fakeShell.ts`) makes renderer modules unit-testable.
 3. **Renderer** (`apps/ui/`) — React SPA loaded by Electron. Vite dev server on port 5173.
 
 **IPC contract pattern:** All IPC channels and payloads are defined in `packages/shared/src/ipc/` using Zod schemas. Both preload and main validate against the same schemas. Types are inferred via `z.infer`. See [`docs/ipc-reference.md`](docs/ipc-reference.md) for the channel reference — it documents the main groups, but `channels.ts` is the authoritative list.
@@ -71,6 +71,29 @@ The SFTP transport tries all candidate key files sequentially (like system ssh) 
 **Network-aware auto-reconnect:** `SessionManager` integrates with a `NetworkMonitor` that probes DNS every 10s. On disconnect, if the network is down, sessions enter `waiting_for_network` state (no reconnect attempts burned). When connectivity returns, attempts reset and reconnection starts immediately. Per-host config: `autoReconnect`, `reconnectMaxAttempts`, `reconnectBaseInterval`.
 
 **Tmux session detection:** Per-host opt-in (`tmuxDetect` on host record). Before connecting, spawns a one-shot `ssh host 'tmux ls -F ...'` via `child_process.execFile` (reuses `buildSshArgs()` for identical auth). Parses output into session list, shows a `TmuxSessionPicker` modal. On attach, sends `tmux attach -t '<name>'` as terminal input after SSH connects. Requires key-based auth — password-only hosts are skipped. All probe failures silently fall back to normal connection. Key files: `session-core/tmux/tmuxProbe.ts`, `desktop/ipc/tmuxIpc.ts`, `ui/features/tmux/TmuxSessionPicker.tsx`.
+
+**Claude Code session resume:** a tab that was running Claude reattaches to the
+same conversation after a restart, however it was launched. A local profile
+flagged `claudeSession` resumes through launch args (`claudeSessionArgs.ts`:
+`--continue`, or `--session-id`/`--resume` for its per-tab 'new' mode). A plain
+shell the user typed `claude` into has no launch args to carry one, so
+`claudeSessionBinder.ts` works out which conversation it is: when the
+process-title poller reports `claude` in a local tab, the binder claims the
+`~/.claude/projects/**/*.jsonl` that starts moving (one scan for what Claude
+already wrote, then a recursive `fs.watch`). It never gives one conversation to
+two tabs, prefers a tab still waiting over a bound one, and only replaces a
+binding from the same project directory — that last rule is `/clear`. A binding
+is dropped only when the tab's foreground goes empty (a shell back at its
+prompt); any other process name is a tool Claude spawned, not Claude leaving.
+The binding rides out on a `claude-session` session event and is persisted on the
+tab like any other. On restore the id (never a path — the cwd is re-read in
+main from the conversation file) becomes a single line typed into the fresh
+shell by `claudeResumeCommand.ts` + `SessionManager`'s local startup command,
+which waits for the same quiet + `looksLikePrompt` window the SSH bootstrap
+uses but skips the probe handshake: a local shell has exactly one reader and
+the command is meant to stay on screen. A conversation Claude no longer has is
+never typed — `claude --resume <missing-id>` exits and would take the shell
+with it.
 
 **Active-process tab titles:** Local tabs get their title from the pty's process
 tree — `SessionManager` runs a 1s poller (`session-core/processTitle/`) over
@@ -113,7 +136,7 @@ broadcast bar. Per-host opt-out via the `shellIntegration` column (default on);
 global display toggle via `general.showActiveProcess` (default on), which gates
 only the process title — an OSC shell title still shows when it's off.
 
-**State management:** UI uses Zustand stores — `layoutStore` (tabs/panes, drag-and-drop reorder), `settingsStore`, `sessionRecoveryStore`, `broadcastStore`, `sftpStore` (per SFTP session), `transferStore`, `tunnelStore` (port forward manager), `snippetStore` (snippets panel).
+**State management:** UI uses Zustand stores — `layoutStore` (tabs/panes, drag-and-drop reorder), `settingsStore`, `sessionRecoveryStore`, `broadcastStore`, `sftpStore` (per SFTP session), `transferStore`, `tunnelStore` (port forward manager), `snippetStore` (snippets panel), `connectionChallengeStore` (one at-a-time connection challenge — SFTP credentials, host-key trust, 2FA, tmux picker — raised as a discriminated union by the flows in `features/connection/connectionChallengeFlows.ts`; host-key details cross the IPC seam as a structured `hostKeyVerification` response field, never JSON inside an error message).
 
 **Session logging:** `loggingIpc.ts` provides a `createSessionLogger()` that intercepts terminal data events in `registerIpc.ts`, strips ANSI escape sequences, and writes to user-chosen files. Controlled per-session via recording button in TerminalPane (visibility controlled by `general.showRecordingButton` setting).
 
@@ -121,7 +144,7 @@ only the process title — an OSC shell title still shows when it's off.
 
 **Keyboard shortcuts:** Global shortcuts registered in App.tsx keydown handler: `Ctrl+Shift+S` (snippets panel), `Ctrl+Shift+D` (split horizontal), `Ctrl+Shift+E` (split vertical), `Ctrl+Shift+W` (close pane), `Ctrl+Shift+[/]` (navigate panes). Handler logic in `paneShortcuts.ts`.
 
-**Database:** SQLite with foreign keys enabled. 16 migrations in `packages/db/src/migrations/`. Repositories pattern for data access. See [`docs/data-model.md`](docs/data-model.md).
+**Database:** SQLite with foreign keys enabled. 18 migrations in `packages/db/src/migrations/`. Repositories pattern for data access. See [`docs/data-model.md`](docs/data-model.md).
 
 ## Adding New Features
 
@@ -142,7 +165,7 @@ only the process title — an OSC shell title still shows when it's off.
 1. Create directory: `apps/ui/src/features/<feature-name>/`
 2. Components, stores (Zustand), hooks in that directory
 3. Wire into `App.tsx` or relevant parent
-4. Call backend via `window.hypershell.<method>()`
+4. Call backend via `getShell().<method>()` from `apps/ui/src/lib/shell.ts` — never `window.hypershell` directly (ESLint `no-restricted-properties` enforces this). Guard bridgeless browser mode with `hasShell()`; unit-test the module by substituting `setShell(createFakeShell({...}).shell)` from `lib/fakeShell.ts`
 
 ## Testing
 
@@ -181,5 +204,5 @@ only the process title — an OSC shell title still shows when it's off.
 - **Tabs that scroll out of reach** — the tab strip overflows past ~7 tabs and its native scrollbar is hidden deliberately (a horizontal scrollbar takes layout height here, squishing the tabs and detaching the active tab from the terminal below). That makes the replacement affordances load-bearing, not decorative: the edge chevrons, the wheel-to-horizontal handler, and the `scrollIntoView` that follows the active tab are the only ways to reach an overflowed tab. Removing any of them strands tabs off-screen with nothing to drag. The chevrons and the `+` button are siblings of the scroller, not children — inside it they would scroll away and be clipped.
 - **A workspace's `test` script reports "No projects were found"** — it is missing a `vitest.config.ts`, so vitest resolves the root config whose `projects: ["apps/*", "packages/*"]` globs match nothing from inside the package. All five workspaces now have one; a new workspace needs its own. The root-level escape hatch is `npx vitest run --project @hypershell/<name>`.
 - **A `.test.tsx` with two test cases fails with "found multiple elements"** — RTL's auto-cleanup only registers when `test.globals` is on, which this repo deliberately leaves off. `apps/ui/vitest.setup.ts` registers it centrally instead; don't add `afterEach(cleanup)` per file. Note the jsdom environment covers the whole `apps/ui` workspace — a test needing real Node semantics opts out with `// @vitest-environment node`.
-- **A remote save resets a file's permissions** — mode preservation is deliberately best-effort. `sftpTransport.writeFile` writes a temp file and renames it over the target, copying the original's mode first; if the server refuses SETSTAT the save still succeeds and the file lands at the server default. Failing an otherwise-good save was judged worse. Atomicity covers editor saves and sync (both legs, via `renameOverwrite`) — transfer-queue uploads still write straight to the remote path.
+- **A remote save resets a file's permissions** — mode preservation is deliberately best-effort. Every remote write goes through `sftpTransport`'s `writeFile`/`upload`, which write a temp file and rename it over the target, copying the original's mode first; if the server refuses SETSTAT the save still succeeds and the file lands at the server default. Failing an otherwise-good save was judged worse. The transport interface deliberately has no raw write stream, so editor saves, sync, and transfer-queue uploads all inherit atomicity; the one remaining in-place writer is the native-scp fast path for key-auth transfers.
 - **Blank terminal with the WebGL renderer** — never set a CSS/inline `background-color` on the canvases inside `.xterm-screen`. The WebGL addon stacks a transparent `.xterm-link-layer` canvas above the text canvas; painting it opaque hides every glyph. Paint the container, `.xterm` root, and `.xterm-viewport` instead (the theme background covers the cells).

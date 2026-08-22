@@ -4,6 +4,7 @@ import type { TagRecord } from "@hypershell/shared";
 import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { getShell, hasShell } from "../../lib/shell";
 
 const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -52,14 +53,14 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
   const [isSaving, setIsSaving] = useState(false);
 
   const loadTags = useCallback(async () => {
-    if (!window.hypershell?.listTags) {
+    if (!hasShell()) {
       setTags([]);
       onTagsChanged?.([]);
       return;
     }
 
     try {
-      const loaded = await window.hypershell.listTags();
+      const loaded = await getShell().listTags();
       setTags(loaded);
       onTagsChanged?.(loaded);
       setSelectedId((current) => {
@@ -102,7 +103,7 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
   }, []);
 
   const saveTag = useCallback(async () => {
-    if (!window.hypershell?.upsertTag) {
+    if (!hasShell()) {
       toast.error("Tag API is unavailable.");
       return;
     }
@@ -122,7 +123,7 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
     setIsSaving(true);
     try {
       const id = selectedTag?.id ?? `tag-${Date.now()}`;
-      const saved = await window.hypershell.upsertTag({
+      const saved = await getShell().upsertTag({
         id,
         name: trimmedName,
         color: normalizedColor,
@@ -142,14 +143,14 @@ export function TagManager({ open, onClose, onTagsChanged }: TagManagerProps) {
   }, [draft.color, draft.name, loadTags, selectedTag]);
 
   const removeTag = useCallback(async () => {
-    if (!selectedTag || !window.hypershell?.removeTag) {
+    if (!selectedTag || !hasShell()) {
       return;
     }
     if (!window.confirm(`Delete tag "${selectedTag.name}"?`)) {
       return;
     }
     try {
-      await window.hypershell.removeTag({ id: selectedTag.id });
+      await getShell().removeTag({ id: selectedTag.id });
       await loadTags();
       setSelectedId(null);
       setDraft({ ...emptyDraft });

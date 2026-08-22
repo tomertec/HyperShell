@@ -403,7 +403,7 @@ describe("verifyHostKey", () => {
     const repo = makeMockRepo();
 
     await expect(verifyHostKey("example.com", 22, repo, []))
-      .rejects.toThrow(/hostKeyVerification/);
+      .rejects.toThrow(/host key verification failed/i);
   });
 
   it("throws HostKeyVerificationError when key has changed", async () => {
@@ -414,7 +414,7 @@ describe("verifyHostKey", () => {
     });
 
     await expect(verifyHostKey("example.com", 22, repo, [fp]))
-      .rejects.toThrow(/hostKeyVerification/);
+      .rejects.toThrow(/host key verification failed/i);
   });
 
   it("proceeds and updates last_seen for matching trusted key", async () => {

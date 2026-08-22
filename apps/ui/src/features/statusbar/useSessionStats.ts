@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getShell } from "../../lib/shell";
 
 export interface SessionStats {
   connectionTime: number | null; // seconds since connected
@@ -85,7 +86,7 @@ export function useSessionStats(
 
     const fetchStats = async () => {
       try {
-        const result = await window.hypershell?.getHostStats?.({ sessionId });
+        const result = await getShell().getHostStats({ sessionId });
         if (result && !cancelled) {
           setStats((prev) => ({
             ...prev,

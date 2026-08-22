@@ -1,11 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { mkdir, readdir, rename, rm, stat as fsStat } from "node:fs/promises";
 import { dirname, join, posix } from "node:path";
 import { pipeline } from "node:stream/promises";
 import {
+  REMOTE_WRITE_TEMP_NAME,
   truncateForTempName,
-  type OverwriteRenameError,
   type SftpTransportHandle
 } from "../transports/sftpTransport";
 
@@ -93,11 +93,20 @@ export function createSyncEngine(): SyncEngine {
   function shouldExclude(filePath: string, patterns: string[]): boolean {
     const segments = filePath.replace(/\\/g, "/").split("/");
 
-    // Sync's own temp files are never content, in either direction. A run
-    // killed mid-transfer strands one on whichever side it was writing to, and
+    // Temp files are never content, in either direction. A run killed
+    // mid-transfer strands one on whichever side it was writing to, and
     // without this the next run would treat it as a real file and copy it to
-    // the far end — where it would then look like content to the run after that.
-    if (segments.some((segment) => SYNC_TEMP_NAME.test(segment))) return true;
+    // the far end — where it would then look like content to the run after
+    // that. Remote uploads go through the transport now, so its temp names
+    // (including a partial left by a paused transfer-queue upload) are
+    // excluded alongside sync's own local ones.
+    if (
+      segments.some(
+        (segment) => SYNC_TEMP_NAME.test(segment) || REMOTE_WRITE_TEMP_NAME.test(segment)
+      )
+    ) {
+      return true;
+    }
 
     return patterns.some((pattern) =>
       segments.some((seg) => seg === pattern || seg.startsWith(pattern + "."))
@@ -224,11 +233,9 @@ export function createSyncEngine(): SyncEngine {
 
             const remotePath = `${config.remotePath}/${file.relativePath.replace(/\\/g, "/")}`;
             let needsUpload = false;
-            let existingMode: number | null = null;
 
             try {
               const remoteStat = await transport.stat(remotePath);
-              existingMode = remoteStat.permissions;
               const remoteModTime = new Date(remoteStat.modifiedAt).getTime() / 1000;
               if (file.mtime > remoteModTime) {
                 needsUpload = true;
@@ -246,57 +253,29 @@ export function createSyncEngine(): SyncEngine {
                 currentFile: file.relativePath,
               });
 
-              // Upload to a sibling temp file and rename it into place, mirroring
-              // the download leg below and sftpTransport.writeFile: streaming
-              // straight onto the live path leaves a truncated file there if the
-              // transfer dies, and the truncated copy carries a fresh mtime, so
-              // every later run considers it up to date.
-              const tempPath = buildTempPath(remotePath, "remote");
+              // transport.upload owns the write invariant — sibling temp file,
+              // mode preservation, rename into place, temp cleanup on failure.
+              // Streaming straight onto the live path would leave a truncated
+              // file there if the transfer dies, and the truncated copy carries
+              // a fresh mtime, so every later run considers it up to date.
               try {
                 const remoteDir = remotePath.substring(0, remotePath.lastIndexOf("/"));
                 await ensureRemoteDirExists(transport, remoteDir);
 
-                const localStream = createReadStream(join(config.localPath, file.relativePath));
-                const remoteStream = transport.createWriteStream(tempPath);
-                await pipeline(localStream, remoteStream);
-
-                if (existingMode != null) {
-                  // Writing in place used to keep the destination's mode; a
-                  // fresh temp file is created with the server's default umask,
-                  // so it has to be carried across or the rename silently
-                  // resets it. Best-effort for the same reason as
-                  // sftpTransport.writeFile — a server that refuses SETSTAT
-                  // must not fail an otherwise-good upload over a mode bit.
-                  await transport.chmod(tempPath, existingMode).catch(() => {});
-                }
-
-                await transport.renameOverwrite(tempPath, remotePath);
+                await transport.upload(join(config.localPath, file.relativePath), remotePath);
 
                 synced++;
                 managed.status.filesSynced = synced;
                 managed.status.bytesTransferred += file.size;
               } catch (fileError) {
-                // One unreadable/unwritable file must not abandon the rest of the run.
-                const message =
-                  fileError instanceof Error ? fileError.message : String(fileError);
-
-                // The rename unlinked the destination and then failed, so the
-                // temp file is the only surviving copy — deleting it here would
-                // be the data loss this whole branch exists to prevent.
-                const destinationRemoved =
-                  fileError instanceof Error &&
-                  (fileError as OverwriteRenameError).destinationRemoved === true;
-
+                // One unreadable/unwritable file must not abandon the rest of
+                // the run. When the rename unlinked the destination and then
+                // failed, the transport keeps the temp file (the only surviving
+                // copy) and its error message says where it is.
                 failures.push({
                   path: file.relativePath,
-                  error: destinationRemoved
-                    ? `${message} — the uploaded copy is at ${tempPath}`
-                    : message,
+                  error: fileError instanceof Error ? fileError.message : String(fileError),
                 });
-
-                if (!destinationRemoved) {
-                  await transport.remove(tempPath).catch(() => {});
-                }
               }
             }
           }

@@ -6,6 +6,7 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { useSnippetStore } from "./snippetStore";
 import { layoutStore } from "../layout/layoutStore";
 import { requestTerminalFocus } from "../terminal/terminalFocus";
+import { getShell } from "../../lib/shell";
 
 function SnippetForm({
   name,
@@ -109,7 +110,7 @@ export function SnippetsPanel() {
       toast.error("No active terminal session");
       return;
     }
-    void window.hypershell?.writeSession?.({ sessionId: activeSessionId, data: body });
+    void getShell().writeSession({ sessionId: activeSessionId, data: body });
     requestTerminalFocus(activeSessionId);
     toast.success("Snippet sent to terminal");
   };

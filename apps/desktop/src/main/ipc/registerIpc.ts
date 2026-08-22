@@ -74,7 +74,10 @@ import {
 } from "../rendererSessionOwnership";
 import { registerTmuxIpc } from "./tmuxIpc";
 import { registerClaudeIpc } from "./claudeIpc";
+import { buildClaudeResumeCommand } from "./claudeResumeCommand";
 import { applyClaudeSessionArgs } from "./claudeSessionArgs";
+import { createClaudeSessionBinder } from "../claudeSessionBinder";
+import { getClaudeSessionInfo, scanRecentClaudeSessions, watchClaudeSessions } from "../claudeSessions";
 import { getUpdateService, setUpdateStateEmitter } from "../updates/updateService";
 import {
   createHostStatusService,
@@ -254,12 +257,19 @@ export const sessionManager = createSessionManager({
 });
 const ssh2ConnectionPool = createSsh2ConnectionPool();
 const sessionLogger = createSessionLogger();
+// Tracks which Claude conversation each local tab is running, including ones
+// started by typing `claude` at a prompt rather than from a Claude profile.
+export const claudeSessionBinder = createClaudeSessionBinder({
+  scanRecent: scanRecentClaudeSessions,
+  watch: watchClaudeSessions,
+});
 let sessionRecorder: SessionRecordingManager | null = null;
 let connectionHistoryRepository: ReturnType<typeof createConnectionHistoryRepositoryFromDatabase> | null = null;
 let hostEnvVarRepository: ReturnType<typeof createHostEnvVarRepositoryFromDatabase> | null = null;
 let localProfilesRepository: ReturnType<typeof createLocalProfilesRepositoryFromDatabase> | null = null;
 
 export function disposeSessionRuntime(): void {
+  claudeSessionBinder.dispose();
   sessionManager.destroyAll();
   ssh2ConnectionPool.destroyAll();
   networkMonitor.dispose();
@@ -709,7 +719,13 @@ async function openSessionHandler(
   }
 
   let localOptions:
-    | { executable: string; args?: string[]; cwd?: string; envVars?: Record<string, string> }
+    | {
+        executable: string;
+        args?: string[];
+        cwd?: string;
+        envVars?: Record<string, string>;
+        startupCommand?: string;
+      }
     | undefined;
   let claudeSessionId: string | undefined;
 
@@ -735,11 +751,35 @@ async function openSessionHandler(
     );
     claudeSessionId = claudeLaunch.claudeSessionId;
 
+    // A shell profile cannot resume through launch args — the conversation was
+    // started by typing `claude` at its prompt, so it has to be reattached the
+    // same way. The working directory comes from Claude's own session file
+    // rather than the renderer; a conversation that no longer exists is left
+    // alone, since `claude --resume` would exit and take the shell with it.
+    let startupCommand: string | undefined;
+
+    if (!profile.claudeSession && parsed.claudeResumeSessionId) {
+      const info = await getClaudeSessionInfo(parsed.claudeResumeSessionId);
+      if (info) {
+        startupCommand =
+          buildClaudeResumeCommand({
+            executable: profile.executable,
+            claudeSessionId: parsed.claudeResumeSessionId,
+            cwd: info.cwd
+          }) ?? undefined;
+
+        if (startupCommand) {
+          claudeSessionId = parsed.claudeResumeSessionId;
+        }
+      }
+    }
+
     localOptions = {
       executable: profile.executable,
       args: claudeLaunch.args,
       cwd: profile.startingDirectory ?? undefined,
-      envVars: profile.envVars
+      envVars: profile.envVars,
+      startupCommand
     };
   }
 
@@ -1036,7 +1076,12 @@ export function registerIpc(
         recordFailedAttempt(sessionId, event.message);
       }
 
+      if (event.type === "process-title") {
+        claudeSessionBinder.handleProcessTitle(sessionId, event.name);
+      }
+
       if (event.type === "exit") {
+        claudeSessionBinder.forget(sessionId);
         markDisconnected(sessionId);
         recordedFailedAttemptSessions.delete(sessionId);
         sessionErrorMessages.delete(sessionId);
@@ -1060,6 +1105,15 @@ export function registerIpc(
       recorder.onSessionData(event.sessionId as string, event.data as string);
     }
   });
+  const unsubscribeClaudeBindings = claudeSessionBinder.onBinding(
+    (sessionId, claudeSessionId) => {
+      options.emitSessionEvent?.({
+        type: "claude-session",
+        sessionId,
+        claudeSessionId
+      });
+    }
+  );
   const unsubscribeHostStatusEvents = hostStatusService.onStatus((event) => {
     options.emitHostStatusEvent?.(event);
   });
@@ -1290,6 +1344,7 @@ export function registerIpc(
 
   const cleanup = () => {
     unsubscribeSessionEvents();
+    unsubscribeClaudeBindings();
     unsubscribeHostStatusEvents();
     hostStatusService.stop();
     sessionLogger.stopAll();

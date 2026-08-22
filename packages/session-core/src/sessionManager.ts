@@ -24,6 +24,7 @@ import {
   looksLikePrompt,
   SHELL_INTEGRATION_PROBE_MARKER
 } from "./shellIntegration/bootstrap";
+import { isAutomaticTerminalReply } from "./shellIntegration/terminalReplies";
 
 const execFileAsync = promisify(execFile);
 
@@ -112,6 +113,9 @@ interface ManagedSession {
   bootstrapTail: string;
   bootstrapQuietRounds: number;
   bootstrapProbeAttempts: number;
+  startupCommandTimer: ReturnType<typeof setTimeout> | null;
+  startupCommandQuietRounds: number;
+  startupCommandSent: boolean;
 }
 
 const RECONNECT_STABILITY_WINDOW_MS = 5_000;
@@ -369,6 +373,59 @@ export function createSessionManager(
     }, SHELL_INTEGRATION_QUIET_MS);
   }
 
+  function clearStartupCommandTimer(session: ManagedSession): void {
+    if (session.startupCommandTimer === null) {
+      return;
+    }
+
+    clearTimeout(session.startupCommandTimer);
+    session.startupCommandTimer = null;
+  }
+
+  function startupCommandPending(session: ManagedSession): boolean {
+    return (
+      !session.startupCommandSent &&
+      session.input.transport === "local" &&
+      Boolean(session.input.localOptions?.startupCommand)
+    );
+  }
+
+  // A local shell's startup command needs no probe handshake: unlike an SSH
+  // login there is exactly one reader (the shell we just spawned), and the
+  // command is meant to stay on screen, so a double echo is not a risk worth
+  // a scar. The quiet + prompt-shaped wait is still needed — ConPTY happily
+  // accepts input before PowerShell's profile has finished running, which
+  // splices the line into whatever the profile is doing.
+  function scheduleStartupCommandWrite(sessionId: string): void {
+    const session = sessions.get(sessionId);
+    if (!session) {
+      return;
+    }
+
+    clearStartupCommandTimer(session);
+    session.startupCommandTimer = setTimeout(() => {
+      const current = sessions.get(sessionId);
+      if (!current) {
+        return;
+      }
+
+      current.startupCommandTimer = null;
+      if (!startupCommandPending(current)) {
+        return;
+      }
+
+      const promptReady = looksLikePrompt(current.bootstrapTail);
+      if (!promptReady && current.startupCommandQuietRounds < SHELL_INTEGRATION_MAX_QUIET_ROUNDS) {
+        current.startupCommandQuietRounds += 1;
+        scheduleStartupCommandWrite(sessionId);
+        return;
+      }
+
+      current.startupCommandSent = true;
+      current.transport.write(`${current.input.localOptions?.startupCommand ?? ""}\r`);
+    }, SHELL_INTEGRATION_QUIET_MS);
+  }
+
   function handleEvent(sessionId: string, event: SessionTransportEvent): void {
     if (event.type === "status") {
       updateSession(sessionId, (session) => {
@@ -391,6 +448,13 @@ export function createSessionManager(
       });
 
       if (event.state === "connected") {
+        const startupSession = sessions.get(sessionId);
+        if (startupSession && startupCommandPending(startupSession)) {
+          startupSession.bootstrapTail = "";
+          startupSession.startupCommandQuietRounds = 0;
+          scheduleStartupCommandWrite(sessionId);
+        }
+
         const session = sessions.get(sessionId);
         if (session && shellIntegrationApplies(session)) {
           // Fires on every connect, including reconnects — each one is a fresh
@@ -407,6 +471,17 @@ export function createSessionManager(
     }
 
     if (event.type === "data") {
+      const startupSession = sessions.get(sessionId);
+      if (startupSession && startupCommandPending(startupSession)) {
+        startupSession.bootstrapTail = (startupSession.bootstrapTail + event.data).slice(
+          -SHELL_INTEGRATION_TAIL_CHARS
+        );
+
+        if (startupSession.startupCommandTimer !== null) {
+          scheduleStartupCommandWrite(sessionId);
+        }
+      }
+
       const session = sessions.get(sessionId);
       if (session && session.bootstrapPhase !== "done") {
         // Keep the tail so the quiet handler can tell a settled prompt from a
@@ -448,6 +523,7 @@ export function createSessionManager(
         clearReconnectStabilityTimer(session);
         clearBootstrapTimer(session);
         clearBootstrapProbeTimer(session);
+        clearStartupCommandTimer(session);
         const { snapshot, input } = session;
         const maxAttempts = input.maxReconnectAttempts ?? 5;
 
@@ -578,7 +654,10 @@ export function createSessionManager(
         bootstrapPhase: "done",
         bootstrapTail: "",
         bootstrapQuietRounds: 0,
-        bootstrapProbeAttempts: 0
+        bootstrapProbeAttempts: 0,
+        startupCommandTimer: null,
+        startupCommandQuietRounds: 0,
+        startupCommandSent: false
       });
 
       if (input.transport === "local" && transport.pid !== undefined) {
@@ -597,7 +676,13 @@ export function createSessionManager(
         return;
       }
 
-      if (session.bootstrapPhase !== "done") {
+      // Not every write is the user: a terminal answers focus, cursor and
+      // device queries by itself, and none of that sits in the shell's line
+      // buffer. Cancelling an injection for those cancelled it every time the
+      // window lost focus while a shell was starting.
+      const typedByUser = !isAutomaticTerminalReply(data);
+
+      if (typedByUser && session.bootstrapPhase !== "done") {
         // The user typed while the handshake was pending: their text is now
         // in the remote line buffer, and anything injected after it would
         // merge into one broken command (`cd w if [ -z ...` → syntax error,
@@ -606,6 +691,14 @@ export function createSessionManager(
         clearBootstrapTimer(session);
         clearBootstrapProbeTimer(session);
         session.bootstrapPhase = "done";
+      }
+
+      if (typedByUser && startupCommandPending(session)) {
+        // Same reason as above: the user's text is already in the shell's line
+        // buffer, so a resume command typed after it would merge into one
+        // broken command. Their input wins; the tab stays a plain shell.
+        clearStartupCommandTimer(session);
+        session.startupCommandSent = true;
       }
 
       session.transport.write(data);
@@ -632,6 +725,7 @@ export function createSessionManager(
       clearReconnectStabilityTimer(session);
       clearBootstrapTimer(session);
       clearBootstrapProbeTimer(session);
+      clearStartupCommandTimer(session);
       if (session.networkOnlineUnsub) {
         session.networkOnlineUnsub();
         session.networkOnlineUnsub = null;
@@ -651,6 +745,7 @@ export function createSessionManager(
         clearReconnectStabilityTimer(session);
         clearBootstrapTimer(session);
         clearBootstrapProbeTimer(session);
+        clearStartupCommandTimer(session);
         if (session.networkOnlineUnsub) {
           session.networkOnlineUnsub();
           session.networkOnlineUnsub = null;

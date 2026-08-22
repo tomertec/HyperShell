@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import type { SftpSyncStatus, SftpSyncEvent } from "@hypershell/shared";
+import { getShell } from "../../../lib/shell";
 
 export interface SyncPanelProps {
   sftpSessionId: string;
@@ -23,7 +24,7 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
 
   const refreshSyncs = useCallback(async () => {
     try {
-      const result = await window.hypershell?.sftpSyncList?.();
+      const result = await getShell().sftpSyncList();
       if (result) {
         setSyncs(result.syncs);
       }
@@ -37,7 +38,7 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
   }, [refreshSyncs]);
 
   useEffect(() => {
-    const unsubscribe = window.hypershell?.onSftpSyncEvent?.((event) => {
+    const unsubscribe = getShell().onSftpSyncEvent((event) => {
       setLastEvent(event);
       if (event.kind === "sync-complete" || event.kind === "sync-error") {
         setRunning(false);
@@ -58,7 +59,7 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
         .split(",")
         .map((p) => p.trim())
         .filter(Boolean);
-      const result = await window.hypershell?.sftpSyncStart?.({
+      const result = await getShell().sftpSyncStart({
         sftpSessionId,
         localPath: syncLocalPath,
         remotePath: syncRemotePath,
@@ -78,7 +79,7 @@ export function SyncPanel({ sftpSessionId, localPath, remotePath, onClose }: Syn
   const handleStop = useCallback(async () => {
     if (!activeSyncId) return;
     try {
-      await window.hypershell?.sftpSyncStop?.({ syncId: activeSyncId });
+      await getShell().sftpSyncStop({ syncId: activeSyncId });
       setActiveSyncId(null);
       setRunning(false);
       void refreshSyncs();

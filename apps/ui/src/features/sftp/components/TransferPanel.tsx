@@ -8,6 +8,7 @@ import { transferRowControls } from "../transferRowControls";
 import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
 import { TransferConflictActions } from "./TransferConflictActions";
+import { getShell, hasShell } from "../../../lib/shell";
 
 function percentage(bytesTransferred: number, totalBytes: number): number {
   if (totalBytes <= 0) {
@@ -31,42 +32,39 @@ export function TransferPanel() {
   const setPanelOpen = useStore(transferStore, (state) => state.setPanelOpen);
 
   const cancelTransfer = async (transferId: string) => {
-    const cancel = window.hypershell?.sftpTransferCancel;
-    if (!cancel) {
+    if (!hasShell()) {
       toast.error("Cancel transfer is unavailable in this build. Restart HyperShell.");
       return;
     }
 
     try {
-      await cancel({ transferId });
+      await getShell().sftpTransferCancel({ transferId });
     } catch (error) {
       toast.error(toErrorMessage(error, "Failed to cancel transfer"));
     }
   };
 
   const pauseTransfer = async (transferId: string) => {
-    const pause = window.hypershell?.sftpTransferPause;
-    if (!pause) {
+    if (!hasShell()) {
       toast.error("Pause transfer is unavailable in this build. Restart HyperShell.");
       return;
     }
 
     try {
-      await pause({ transferId });
+      await getShell().sftpTransferPause({ transferId });
     } catch (error) {
       toast.error(toErrorMessage(error, "Failed to pause transfer"));
     }
   };
 
   const resumeTransfer = async (transferId: string) => {
-    const resume = window.hypershell?.sftpTransferResume;
-    if (!resume) {
+    if (!hasShell()) {
       toast.error("Resume transfer is unavailable in this build. Restart HyperShell.");
       return;
     }
 
     try {
-      await resume({ transferId });
+      await getShell().sftpTransferResume({ transferId });
     } catch (error) {
       toast.error(toErrorMessage(error, "Failed to resume transfer"));
     }
@@ -74,7 +72,7 @@ export function TransferPanel() {
 
   const retryTransfer = async (transferId: string) => {
     try {
-      await window.hypershell?.sftpTransferRetry?.({ transferId });
+      await getShell().sftpTransferRetry({ transferId });
       toast.success("Transfer resumed");
     } catch (err) {
       toast.error(toErrorMessage(err, "Resume failed"));

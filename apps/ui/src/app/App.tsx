@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { toast, Toaster } from "sonner";
+import { getShell, hasShell } from "../lib/shell";
 
 import { broadcastStore } from "../features/broadcast/broadcastStore";
 import { useSnippetStore } from "../features/snippets/snippetStore";
@@ -55,13 +56,12 @@ import type {
 } from "@hypershell/shared";
 import { EditorApp } from "../features/editor/EditorApp";
 import { TelnetQuickConnect } from "../features/telnet/TelnetQuickConnect";
-import { TmuxSessionPicker } from "../features/tmux/TmuxSessionPicker";
+import { ConnectionChallengeDialogs } from "../features/connection/ConnectionChallengeDialogs";
 import {
-  HostKeyVerificationDialog,
-  type HostKeyVerificationInfo,
-} from "../features/hosts/HostKeyVerificationDialog";
-import { KeyboardInteractiveDialog } from "../features/hosts/KeyboardInteractiveDialog";
-import type { KeyboardInteractiveRequest } from "@hypershell/shared";
+  answerKeyboardInteractive,
+  connectSftpWithChallenges,
+  pickTmuxSession,
+} from "../features/connection/connectionChallengeFlows";
 import { CommandPalette } from "../features/command-palette/CommandPalette";
 import { useCommandPaletteStore } from "../features/command-palette/commandPaletteStore";
 import { createCommands, type CommandContext } from "../features/command-palette/commandRegistry";
@@ -98,7 +98,7 @@ function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
     identityFile: h.identityFile == null ? "" : String(h.identityFile),
     hostProfileId: h.hostProfileId == null ? "" : String(h.hostProfileId),
     envVars: [],
-    group: "",
+    group: h.group == null ? "" : String(h.group),
     tags: "",
     tagIds: [],
     authMethod: (h.authMethod as HostRecord["authMethod"]) ?? "default",
@@ -131,12 +131,12 @@ function mapDbHostToUiHost(h: Record<string, unknown>): HostRecord {
 }
 
 async function loadHosts(): Promise<HostRecord[]> {
-  if (!window.hypershell?.listHosts) {
-    console.warn("[hypershell] listHosts not available on window.hypershell");
+  if (!hasShell()) {
+    console.warn("[hypershell] preload bridge not available — skipping host list");
     return [];
   }
   try {
-    const dbHosts = await window.hypershell.listHosts();
+    const dbHosts = await getShell().listHosts();
     return dbHosts.map((h: Record<string, unknown>) => mapDbHostToUiHost(h));
   } catch (err) {
     console.error("[hypershell] failed to load hosts:", err);
@@ -145,11 +145,11 @@ async function loadHosts(): Promise<HostRecord[]> {
 }
 
 async function loadSerialProfiles(): Promise<SerialProfileRecord[]> {
-  if (!window.hypershell?.listSerialProfiles) {
+  if (!hasShell()) {
     return [];
   }
   try {
-    return await window.hypershell.listSerialProfiles();
+    return await getShell().listSerialProfiles();
   } catch (err) {
     console.error("[hypershell] failed to load serial profiles:", err);
     return [];
@@ -157,11 +157,11 @@ async function loadSerialProfiles(): Promise<SerialProfileRecord[]> {
 }
 
 async function loadTags(): Promise<TagRecord[]> {
-  if (!window.hypershell?.listTags) {
+  if (!hasShell()) {
     return [];
   }
   try {
-    return await window.hypershell.listTags();
+    return await getShell().listTags();
   } catch (err) {
     console.error("[hypershell] failed to load tags:", err);
     return [];
@@ -169,7 +169,7 @@ async function loadTags(): Promise<TagRecord[]> {
 }
 
 async function attachHostTags(hosts: HostRecord[]): Promise<HostRecord[]> {
-  if (!window.hypershell?.tagsGetHostTags) {
+  if (!hasShell()) {
     return hosts.map((host) => ({
       ...host,
       tagIds: host.tagIds ?? [],
@@ -180,7 +180,7 @@ async function attachHostTags(hosts: HostRecord[]): Promise<HostRecord[]> {
   const hostTagsById = await Promise.all(
     hosts.map(async (host) => {
       try {
-        const hostTags = await window.hypershell?.tagsGetHostTags?.({
+        const hostTags = await getShell().tagsGetHostTags({
           hostId: host.id,
         });
         const safeHostTags = hostTags ?? [];
@@ -214,16 +214,16 @@ async function attachHostTags(hosts: HostRecord[]): Promise<HostRecord[]> {
 }
 
 async function persistSerialProfile(profile: SerialProfileRecord): Promise<void> {
-  if (!window.hypershell?.upsertSerialProfile) return;
+  if (!hasShell()) return;
   try {
-    await window.hypershell.upsertSerialProfile(profile);
+    await getShell().upsertSerialProfile(profile);
   } catch (err) {
     console.error("[hypershell] failed to persist serial profile:", err);
   }
 }
 
 async function persistHost(host: HostRecord): Promise<HostRecord | null> {
-  if (!window.hypershell?.upsertHost) {
+  if (!hasShell()) {
     console.warn("[hypershell] upsertHost not available");
     return null;
   }
@@ -255,7 +255,7 @@ async function persistHost(host: HostRecord): Promise<HostRecord | null> {
     const password = host.password ?? "";
     const hasPasswordForSave = password.trim().length > 0;
 
-    const result = await window.hypershell.upsertHost({
+    const result = await getShell().upsertHost({
       id: host.id,
       name: host.name,
       hostname: host.hostname,
@@ -324,7 +324,7 @@ function useAppTheme() {
       const variant = appThemeVariant(id);
       document.documentElement.dataset.theme = id;
       document.documentElement.dataset.variant = variant;
-      void window.hypershell?.setAppTheme?.(variant);
+      void getShell().setAppTheme(variant);
     }
 
     apply();
@@ -351,20 +351,9 @@ function MainApp() {
   const [serialModalOpen, setSerialModalOpen] = useState(false);
   const [editingSerial, setEditingSerial] = useState<SerialProfileRecord | null>(null);
   const [availablePorts, setAvailablePorts] = useState<string[]>([]);
-  const [sftpAuthModalOpen, setSftpAuthModalOpen] = useState(false);
-  const [sftpAuthHost, setSftpAuthHost] = useState<HostRecord | null>(null);
-  const [sftpAuthUsername, setSftpAuthUsername] = useState("");
-  const [sftpAuthPassword, setSftpAuthPassword] = useState("");
-  const [sftpAuthError, setSftpAuthError] = useState<string | null>(null);
-  const [sftpAuthSubmitting, setSftpAuthSubmitting] = useState(false);
   const [connectingHostIds, setConnectingHostIds] = useState<Set<string>>(() => new Set());
   const [lastConnectedAtByHostId, setLastConnectedAtByHostId] = useState<Record<string, string | null>>({});
   const [connectionHistoryHost, setConnectionHistoryHost] = useState<HostRecord | null>(null);
-  const [hostKeyVerifyOpen, setHostKeyVerifyOpen] = useState(false);
-  const [hostKeyVerifyInfo, setHostKeyVerifyInfo] = useState<HostKeyVerificationInfo | null>(null);
-  const [hostKeyVerifyHost, setHostKeyVerifyHost] = useState<HostRecord | null>(null);
-  const [hostKeyVerifyFromAuth, setHostKeyVerifyFromAuth] = useState(false);
-  const [kbdInteractiveRequest, setKbdInteractiveRequest] = useState<KeyboardInteractiveRequest | null>(null);
   const [restoreBannerVisible, setRestoreBannerVisible] = useState(false);
   const [lastWorkspaceTabs, setLastWorkspaceTabs] = useState<WorkspaceTab[]>([]);
   const [sessionRecoveryOpen, setSessionRecoveryOpen] = useState(false);
@@ -373,11 +362,6 @@ function MainApp() {
   const [editingLocalProfileEnvVars, setEditingLocalProfileEnvVars] = useState<LocalProfileEnvVar[]>([]);
   const [editingLocalProfileEnvVarsLoaded, setEditingLocalProfileEnvVarsLoaded] = useState(true);
   const [telnetDialogOpen, setTelnetDialogOpen] = useState(false);
-  const [tmuxPickerState, setTmuxPickerState] = useState<{
-    open: boolean;
-    sessions: Array<{ name: string; windowCount: number; createdAt: string; attached: boolean }>;
-    host: HostRecord;
-  } | null>(null);
   const tmuxProbeGenRef = useRef(0);
   const backupRestoreInFlightRef = useRef(false);
   const [savedRecoverySessions, setSavedRecoverySessions] = useState<SavedSessionRecord[]>([]);
@@ -419,7 +403,7 @@ function MainApp() {
 
     void settingsLoaded.then(() => {
       if (!settingsStore.getState().settings.general.showRestoreBanner) return;
-      return window.hypershell?.workspaceLoadLast?.().then((last) => {
+      return getShell().workspaceLoadLast().then((last) => {
         // Filter here rather than at restore time so the banner's count never
         // promises tabs that cannot come back.
         const restorable = restorableWorkspaceTabs(last?.layout?.tabs ?? []);
@@ -435,7 +419,7 @@ function MainApp() {
         if (!settingsStore.getState().settings.general.showSessionRecoveryPrompt) {
           return;
         }
-        return window.hypershell?.sessionLoadSavedState?.().then((sessions) => {
+        return getShell().sessionLoadSavedState().then((sessions) => {
           // Same rule as the banner above: list only what Restore can actually
           // reopen, so the dialog never promises a row that silently vanishes.
           const restorable = sessions.filter(isRestorableSavedSession);
@@ -459,13 +443,13 @@ function MainApp() {
   }, []);
 
   const refreshConnectionHistorySummary = useCallback(async () => {
-    if (!window.hypershell?.connectionHistoryListRecent) {
+    if (!hasShell()) {
       return;
     }
 
     try {
       const recent: ConnectionHistoryRecord[] =
-        await window.hypershell.connectionHistoryListRecent({ limit: 1000 });
+        await getShell().connectionHistoryListRecent({ limit: 1000 });
       const next: Record<string, string | null> = {};
       for (const host of hosts) {
         next[host.id] = null;
@@ -490,12 +474,12 @@ function MainApp() {
   }, [refreshConnectionHistorySummary]);
 
   useEffect(() => {
-    if (!window.hypershell?.onSessionEvent) {
+    if (!hasShell()) {
       return;
     }
 
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const unsubscribe = window.hypershell.onSessionEvent((event) => {
+    const unsubscribe = getShell().onSessionEvent((event) => {
       const shouldRefresh =
         (event.type === "status" && event.state === "connected") ||
         event.type === "error" ||
@@ -523,10 +507,10 @@ function MainApp() {
     const store = useUpdateStore.getState();
     void store.refresh();
 
-    if (!window.hypershell?.onUpdateState) {
+    if (!hasShell()) {
       return;
     }
-    return window.hypershell.onUpdateState((state) => {
+    return getShell().onUpdateState((state) => {
       useUpdateStore.getState().applyState(state);
     });
   }, []);
@@ -537,7 +521,7 @@ function MainApp() {
       const state = layoutStore.getState();
       if (state.tabs.length === 0) return;
       const layout = serializeWorkspaceLayout(state);
-      void window.hypershell?.workspaceSaveLast?.(layout);
+      void getShell().workspaceSaveLast(layout);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -609,35 +593,17 @@ function MainApp() {
   }, [toggleBroadcast]);
 
   useEffect(() => {
-    return window.hypershell?.onQuickConnect?.(() => {
+    return getShell().onQuickConnect(() => {
       setIsQuickConnectOpen(true);
     });
   }, []);
 
   // Keyboard-interactive auth (2FA) relay
   useEffect(() => {
-    return window.hypershell?.onKeyboardInteractive?.((request) => {
-      setKbdInteractiveRequest(request);
+    return getShell().onKeyboardInteractive((request) => {
+      void answerKeyboardInteractive(request);
     });
   }, []);
-
-  const handleKbdInteractiveSubmit = useCallback(
-    (requestId: string, responses: string[]) => {
-      void window.hypershell?.keyboardInteractiveRespond?.({ requestId, responses });
-      setKbdInteractiveRequest(null);
-    },
-    []
-  );
-
-  const handleKbdInteractiveCancel = useCallback(
-    (requestId: string) => {
-      // Send empty strings for each prompt so the server rejects auth cleanly
-      const emptyResponses = (kbdInteractiveRequest?.prompts ?? []).map(() => "");
-      void window.hypershell?.keyboardInteractiveRespond?.({ requestId, responses: emptyResponses });
-      setKbdInteractiveRequest(null);
-    },
-    [kbdInteractiveRequest]
-  );
 
   useAppTheme();
 
@@ -647,7 +613,7 @@ function MainApp() {
   }, [terminalThemeName, customThemes]);
 
   const refreshPorts = useCallback(() => {
-    window.hypershell?.listSerialPorts?.()
+    getShell().listSerialPorts()
       .then(ports => setAvailablePorts(ports.map(p => p.path)))
       .catch(console.error);
   }, []);
@@ -699,7 +665,7 @@ function MainApp() {
       let envVars: LocalProfileEnvVar[] = [];
       let loaded = false;
       try {
-        const result = await window.hypershell?.getLocalProfileEnvVars?.({ id: profile.id });
+        const result = await getShell().getLocalProfileEnvVars({ id: profile.id });
         if (result) {
           envVars = result;
           loaded = true;
@@ -738,16 +704,19 @@ function MainApp() {
     async (host: HostRecord) => {
       // Tmux probe requires non-interactive auth (key-based or agent).
       // Password-only hosts can't authenticate a one-shot SSH command.
-      const tmuxProbe = window.hypershell?.tmuxProbe;
-      const canProbe = host.tmuxDetect && host.authMethod !== "password" && tmuxProbe;
+      const canProbe = host.tmuxDetect && host.authMethod !== "password" && hasShell();
       if (canProbe) {
         const gen = ++tmuxProbeGenRef.current;
         try {
-          const result = await tmuxProbe({ hostId: host.id });
+          const result = await getShell().tmuxProbe({ hostId: host.id });
           // If another probe was started while this one was in-flight, discard
           if (gen !== tmuxProbeGenRef.current) return;
           if (result.sessions.length > 0) {
-            setTmuxPickerState({ open: true, sessions: result.sessions, host });
+            const choice = await pickTmuxSession(host, result.sessions);
+            // null: superseded by a newer challenge — open nothing.
+            if (choice) {
+              openHostTab(host, choice.attachTo ?? undefined);
+            }
             return;
           }
         } catch {
@@ -759,23 +728,6 @@ function MainApp() {
     },
     [openHostTab]
   );
-
-  const handleTmuxAttach = useCallback(
-    (sessionName: string) => {
-      if (tmuxPickerState?.host) {
-        openHostTab(tmuxPickerState.host, sessionName);
-      }
-      setTmuxPickerState(null);
-    },
-    [tmuxPickerState, openHostTab]
-  );
-
-  const handleTmuxSkip = useCallback(() => {
-    if (tmuxPickerState?.host) {
-      openHostTab(tmuxPickerState.host);
-    }
-    setTmuxPickerState(null);
-  }, [tmuxPickerState, openHostTab]);
 
   const connectSshAdHoc = useCallback(
     (host: string, port: number, username: string, _password: string) => {
@@ -847,107 +799,15 @@ function MainApp() {
     [openTab]
   );
 
-  const closeSftpAuthModal = useCallback(() => {
-    setSftpAuthModalOpen(false);
-    setSftpAuthHost(null);
-    setSftpAuthPassword("");
-    setSftpAuthError(null);
-    setSftpAuthSubmitting(false);
-  }, []);
-
-  const parseHostKeyVerificationError = useCallback(
-    (error: unknown): HostKeyVerificationInfo | null => {
-      const message = error instanceof Error ? error.message : String(error);
-      // Electron wraps IPC errors: "Error invoking remote method '...': ClassName: {json}"
-      // Extract the JSON substring from the message
-      const jsonStart = message.indexOf("{");
-      const jsonEnd = message.lastIndexOf("}");
-      if (jsonStart === -1 || jsonEnd === -1 || jsonEnd < jsonStart) return null;
-      try {
-        const parsed = JSON.parse(message.slice(jsonStart, jsonEnd + 1));
-        if (parsed && parsed.__hostKeyVerification) {
-          return {
-            hostname: parsed.hostname,
-            port: parsed.port,
-            algorithm: parsed.algorithm,
-            fingerprint: parsed.fingerprint,
-            verificationStatus: parsed.verificationStatus,
-            previousFingerprint: parsed.previousFingerprint,
-          };
-        }
-      } catch {
-        // Not a host key verification error
-      }
-      return null;
-    },
-    []
-  );
-
-  const openSftpAuthModal = useCallback(
-    (host: HostRecord, errorMessage?: string) => {
-      setSftpAuthHost(host);
-      setSftpAuthUsername(host.username?.trim() ?? "");
-      setSftpAuthPassword("");
-      setSftpAuthError(errorMessage ?? null);
-      setSftpAuthModalOpen(true);
-    },
-    []
-  );
-
-  const connectSftpWithPassword = useCallback(async () => {
-    if (!window.hypershell?.sftpConnect || !sftpAuthHost) {
-      return;
-    }
-
-    const username = sftpAuthUsername.trim();
-    if (!username) {
-      setSftpAuthError("Username is required.");
-      return;
-    }
-
-    setSftpAuthSubmitting(true);
-    setSftpAuthError(null);
-    try {
-      const { sftpSessionId } = await window.hypershell.sftpConnect({
-        hostId: sftpAuthHost.id,
-        username,
-        ...(sftpAuthPassword ? { password: sftpAuthPassword } : {})
-      });
-      openSftpTab(sftpAuthHost, sftpSessionId);
-      closeSftpAuthModal();
-    } catch (error) {
-      const verifyInfo = parseHostKeyVerificationError(error);
-      if (verifyInfo) {
-        closeSftpAuthModal();
-        setHostKeyVerifyInfo(verifyInfo);
-        setHostKeyVerifyHost(sftpAuthHost);
-        setHostKeyVerifyFromAuth(true);
-        setHostKeyVerifyOpen(true);
-        return;
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      setSftpAuthError(message);
-    } finally {
-      setSftpAuthSubmitting(false);
-    }
-  }, [
-    closeSftpAuthModal,
-    openSftpTab,
-    parseHostKeyVerificationError,
-    sftpAuthHost,
-    sftpAuthPassword,
-    sftpAuthUsername
-  ]);
-
   const duplicateHost = useCallback((host: HostRecord) => {
     const newHost: HostRecord = { ...host, id: `host-${Date.now()}`, name: `${host.name} (copy)` };
     setHosts((prev) => [...prev, newHost]);
     void persistHost(newHost).then(async () => {
-      if (!window.hypershell?.tagsSetHostTags) {
+      if (!hasShell()) {
         return;
       }
       try {
-        await window.hypershell.tagsSetHostTags({
+        await getShell().tagsSetHostTags({
           hostId: newHost.id,
           tagIds: newHost.tagIds ?? [],
         });
@@ -960,7 +820,7 @@ function MainApp() {
   const deleteHost = useCallback(async (host: HostRecord) => {
     setHosts((prev) => prev.filter((h) => h.id !== host.id));
     setConnectionHistoryHost((current) => (current?.id === host.id ? null : current));
-    await window.hypershell?.removeHost?.({ id: host.id });
+    await getShell().removeHost({ id: host.id });
   }, []);
 
   const toggleFavoriteHost = useCallback(
@@ -991,95 +851,27 @@ function MainApp() {
         (a.sortOrder ?? 999999) - (b.sortOrder ?? 999999)
       );
     });
-    void window.hypershell?.reorderHosts?.({
-      items: items.map((i) => ({ id: i.id, sortOrder: i.sortOrder, groupId: null }))
+    void getShell().reorderHosts({
+      items: items.map((i) => ({ id: i.id, sortOrder: i.sortOrder, groupId: null, group: i.group }))
     });
-  }, []);
-
-  const handleHostKeyTrust = useCallback(async () => {
-    if (!hostKeyVerifyInfo || !hostKeyVerifyHost || !window.hypershell?.hostFingerprintTrust) {
-      setHostKeyVerifyOpen(false);
-      return;
-    }
-
-    const id = `fp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    await window.hypershell.hostFingerprintTrust({
-      id,
-      hostname: hostKeyVerifyInfo.hostname,
-      port: hostKeyVerifyInfo.port,
-      algorithm: hostKeyVerifyInfo.algorithm,
-      fingerprint: hostKeyVerifyInfo.fingerprint,
-    });
-
-    const host = hostKeyVerifyHost;
-    const fromAuth = hostKeyVerifyFromAuth;
-    setHostKeyVerifyOpen(false);
-    setHostKeyVerifyInfo(null);
-    setHostKeyVerifyHost(null);
-    setHostKeyVerifyFromAuth(false);
-
-    // Retry the connection now that the key is trusted
-    if (fromAuth) {
-      // Re-open the auth modal to let the user retry with credentials
-      openSftpAuthModal(host);
-    } else {
-      // Retry the direct connect
-      if (!window.hypershell?.sftpConnect) return;
-      try {
-        const { sftpSessionId } = await window.hypershell.sftpConnect({
-          hostId: host.id,
-        });
-        openSftpTab(host, sftpSessionId);
-      } catch (retryError) {
-        const message = retryError instanceof Error ? retryError.message : String(retryError);
-        console.warn("[sftp] connect failed after trust, prompting for credentials:", message);
-        openSftpAuthModal(host, message);
-      }
-    }
-  }, [hostKeyVerifyInfo, hostKeyVerifyHost, hostKeyVerifyFromAuth, openSftpAuthModal, openSftpTab]);
-
-  const handleHostKeyReject = useCallback(() => {
-    setHostKeyVerifyOpen(false);
-    setHostKeyVerifyInfo(null);
-    setHostKeyVerifyHost(null);
-    setHostKeyVerifyFromAuth(false);
   }, []);
 
   const openSftpHost = useCallback(
     async (host: HostRecord) => {
-      if (!window.hypershell?.sftpConnect) {
-        return;
-      }
-
-      try {
-        const { sftpSessionId } = await window.hypershell.sftpConnect({
-          hostId: host.id
-        });
+      const sftpSessionId = await connectSftpWithChallenges(host);
+      if (sftpSessionId) {
         openSftpTab(host, sftpSessionId);
-      } catch (error) {
-        const verifyInfo = parseHostKeyVerificationError(error);
-        if (verifyInfo) {
-          setHostKeyVerifyInfo(verifyInfo);
-          setHostKeyVerifyHost(host);
-          setHostKeyVerifyFromAuth(false);
-          setHostKeyVerifyOpen(true);
-          return;
-        }
-        const message =
-          error instanceof Error ? error.message : String(error);
-        console.warn("[sftp] connect failed, prompting for credentials:", message);
-        openSftpAuthModal(host, message);
       }
     },
-    [openSftpAuthModal, openSftpTab, parseHostKeyVerificationError]
+    [openSftpTab]
   );
 
   const clearSavedSessionRecoveryState = useCallback(async () => {
-    if (!window.hypershell?.sessionClearSavedState) {
+    if (!hasShell()) {
       return;
     }
     try {
-      await window.hypershell.sessionClearSavedState();
+      await getShell().sessionClearSavedState();
     } catch (error) {
       console.warn("[hypershell] failed clearing saved session recovery state:", error);
     }
@@ -1192,7 +984,7 @@ function MainApp() {
       hasActiveSession: () => layoutStore.getState().activeSessionId !== null,
       disconnectActiveSession: () => {
         const sid = layoutStore.getState().activeSessionId;
-        if (sid) void window.hypershell?.closeSession?.({ sessionId: sid });
+        if (sid) void getShell().closeSession({ sessionId: sid });
       },
       reconnectActiveSession: () => {
         const state = layoutStore.getState();
@@ -1207,10 +999,10 @@ function MainApp() {
       },
       createBackup: () => {
         void (async () => {
-          const filePath = await window.hypershell?.fsShowSaveDialog?.({
+          const filePath = await getShell().fsShowSaveDialog({
             filters: [{ name: "SQLite Database", extensions: ["db"] }],
           });
-          if (filePath) void window.hypershell?.backupCreate?.({ filePath });
+          if (filePath) void getShell().backupCreate({ filePath });
         })();
       },
       restoreBackup: () => {
@@ -1220,13 +1012,13 @@ function MainApp() {
         void (async () => {
           backupRestoreInFlightRef.current = true;
           try {
-            const filePath = await window.hypershell?.backupShowOpenDialog?.();
+            const filePath = await getShell().backupShowOpenDialog();
             if (!filePath) return;
             const confirmed = window.confirm(
               "Restoring a backup will replace your current database. The app will need to restart. Continue?"
             );
             if (!confirmed) return;
-            const result = await window.hypershell?.backupRestore?.({ filePath });
+            const result = await getShell().backupRestore({ filePath });
             if (result?.requiresRestart) {
               toast.success("Database restored. Please restart the application.");
             }
@@ -1321,13 +1113,7 @@ function MainApp() {
         onConnect={connectTelnet}
       />
 
-      <TmuxSessionPicker
-        open={tmuxPickerState?.open ?? false}
-        sessions={tmuxPickerState?.sessions ?? []}
-        hostName={tmuxPickerState?.host.name ?? ""}
-        onAttach={handleTmuxAttach}
-        onSkip={handleTmuxSkip}
-      />
+      <ConnectionChallengeDialogs />
 
       <Modal
         open={hostModalOpen}
@@ -1390,9 +1176,9 @@ function MainApp() {
               if (!persisted) {
                 return;
               }
-              if (window.hypershell?.replaceHostEnvVars) {
+              if (hasShell()) {
                 try {
-                  await window.hypershell.replaceHostEnvVars({
+                  await getShell().replaceHostEnvVars({
                     hostId: id,
                     envVars: normalizedEnvVars.map((item) => ({
                       id: item.id,
@@ -1408,9 +1194,9 @@ function MainApp() {
               }
 
               let persistedHostTags: TagRecord[] = [];
-              if (window.hypershell?.tagsSetHostTags) {
+              if (hasShell()) {
                 try {
-                  persistedHostTags = await window.hypershell.tagsSetHostTags({
+                  persistedHostTags = await getShell().tagsSetHostTags({
                     hostId: id,
                     tagIds: normalizedTagIds,
                   });
@@ -1598,84 +1384,6 @@ function MainApp() {
         open={connectionHistoryHost !== null}
         host={connectionHistoryHost}
         onClose={() => setConnectionHistoryHost(null)}
-      />
-
-      <Modal
-        open={sftpAuthModalOpen}
-        onClose={closeSftpAuthModal}
-        title={sftpAuthHost ? `SFTP Credentials: ${sftpAuthHost.name}` : "SFTP Credentials"}
-      >
-        <form
-          className="grid gap-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void connectSftpWithPassword();
-          }}
-        >
-          {sftpAuthHost ? (
-            <p className="text-xs text-text-muted">
-              Connect to `{sftpAuthHost.hostname}:{sftpAuthHost.port}`
-            </p>
-          ) : null}
-
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-text-secondary">Username</span>
-            <input
-              value={sftpAuthUsername}
-              onChange={(event) => setSftpAuthUsername(event.target.value)}
-              className="w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright"
-              autoComplete="username"
-              disabled={sftpAuthSubmitting}
-            />
-          </label>
-
-          <label className="grid gap-1.5">
-            <span className="text-xs font-medium text-text-secondary">Password / Key Passphrase</span>
-            <input
-              type="password"
-              value={sftpAuthPassword}
-              onChange={(event) => setSftpAuthPassword(event.target.value)}
-              className="w-full rounded-lg border border-border bg-surface/80 px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/60 transition-all duration-150 focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/20 focus:bg-surface hover:border-border-bright"
-              autoComplete="current-password"
-              disabled={sftpAuthSubmitting}
-            />
-          </label>
-
-          {sftpAuthError ? (
-            <p className="text-xs text-danger">{sftpAuthError}</p>
-          ) : null}
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-border bg-base-700/60 px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
-              onClick={closeSftpAuthModal}
-              disabled={sftpAuthSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="rounded-lg bg-accent/15 border border-accent/30 px-5 py-2 text-sm font-medium text-accent hover:bg-accent/25 hover:border-accent/40 disabled:opacity-60"
-              disabled={sftpAuthSubmitting}
-            >
-              {sftpAuthSubmitting ? "Connecting..." : "Connect SFTP"}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <HostKeyVerificationDialog
-        open={hostKeyVerifyOpen}
-        info={hostKeyVerifyInfo}
-        onTrust={handleHostKeyTrust}
-        onReject={handleHostKeyReject}
-      />
-
-      <KeyboardInteractiveDialog
-        request={kbdInteractiveRequest}
-        onSubmit={handleKbdInteractiveSubmit}
-        onCancel={handleKbdInteractiveCancel}
       />
 
       <SessionRecoveryDialog

@@ -1177,3 +1177,146 @@ describe("shell integration injection", () => {
     vi.useRealTimers();
   });
 });
+
+describe("local startup command", () => {
+  function recordingTransport() {
+    const listeners = new Set<(event: SessionTransportEvent) => void>();
+    const writes: string[] = [];
+    return {
+      writes,
+      emit(event: SessionTransportEvent) {
+        for (const listener of listeners) listener(event);
+      },
+      handle: {
+        write(data: string) {
+          writes.push(data);
+        },
+        resize() {},
+        close() {},
+        onEvent(listener: (event: SessionTransportEvent) => void) {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        }
+      }
+    };
+  }
+
+  const PROMPT = "PS C:\\work> ";
+  const RESUME = "claude --resume 5f6a1b2c-3d4e-4f50-8a1b-2c3d4e5f6a7b";
+  const FOCUS_OUT = `${String.fromCharCode(27)}[O`;
+
+  function openLocal(
+    manager: ReturnType<typeof createSessionManager>,
+    startupCommand?: string
+  ) {
+    return manager.open({
+      transport: "local",
+      profileId: "pwsh",
+      cols: 80,
+      rows: 24,
+      localOptions: { executable: "pwsh.exe", startupCommand }
+    });
+  }
+
+  it("types the command once the shell settles at a prompt", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = openLocal(manager, RESUME);
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(499);
+    expect(transport.writes).toHaveLength(0);
+
+    vi.advanceTimersByTime(1);
+    expect(transport.writes).toEqual([`${RESUME}\r`]);
+
+    vi.useRealTimers();
+  });
+
+  it("waits out a shell that is still printing", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = openLocal(manager, RESUME);
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: "loading profile...\n" });
+    vi.advanceTimersByTime(400);
+    transport.emit({ type: "data", sessionId, data: "still loading...\n" });
+    vi.advanceTimersByTime(499);
+    expect(transport.writes).toHaveLength(0);
+
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(500);
+    expect(transport.writes).toEqual([`${RESUME}\r`]);
+
+    vi.useRealTimers();
+  });
+
+  it("types the command exactly once", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = openLocal(manager, RESUME);
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(500);
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(5_000);
+
+    expect(transport.writes).toEqual([`${RESUME}\r`]);
+    vi.useRealTimers();
+  });
+
+  it("gives up when the user types first", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = openLocal(manager, RESUME);
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    manager.write(sessionId, "git status");
+    vi.advanceTimersByTime(5_000);
+
+    expect(transport.writes).toEqual(["git status"]);
+    vi.useRealTimers();
+  });
+
+  it("survives the terminal reporting focus while the write is pending", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = openLocal(manager, RESUME);
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    // ConPTY enables focus reporting, so xterm reports focus-out as soon as the
+    // user clicks anything outside the terminal — a dialog button, another app.
+    // That is the terminal talking, not the user, and must not cancel the write.
+    manager.write(sessionId, FOCUS_OUT);
+    vi.advanceTimersByTime(500);
+
+    expect(transport.writes).toEqual([FOCUS_OUT, `${RESUME}\r`]);
+    vi.useRealTimers();
+  });
+
+  it("writes nothing for a shell with no command to resume", () => {
+    vi.useFakeTimers();
+    const transport = recordingTransport();
+    const manager = createSessionManager({ createTransport: () => transport.handle });
+    const { sessionId } = openLocal(manager);
+
+    transport.emit({ type: "status", sessionId, state: "connected" });
+    transport.emit({ type: "data", sessionId, data: PROMPT });
+    vi.advanceTimersByTime(5_000);
+
+    expect(transport.writes).toHaveLength(0);
+    vi.useRealTimers();
+  });
+});

@@ -40,6 +40,7 @@ export function savedSessionToLayoutTab(
     transport: session.transport,
     profileId: session.profileId,
     hostId: session.hostId ?? undefined,
+    claudeSessionId: session.claudeSessionId ?? undefined,
     preopened: false,
   };
 }

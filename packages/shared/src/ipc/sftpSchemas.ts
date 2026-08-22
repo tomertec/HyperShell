@@ -27,9 +27,27 @@ export const sftpConnectRequestSchema = z.union([
 ]);
 export type SftpConnectRequest = z.infer<typeof sftpConnectRequestSchema>;
 
-export const sftpConnectResponseSchema = z.object({
-  sftpSessionId: z.string()
+// Host key details returned when the remote key is unknown or has changed.
+// Sent as a structured response field — never encoded inside an error message —
+// so the renderer can raise a host-key challenge without parsing error text.
+export const hostKeyVerificationInfoSchema = z.object({
+  hostname: z.string(),
+  port: z.number(),
+  algorithm: z.string(),
+  fingerprint: z.string(),
+  verificationStatus: z.enum(["new_host", "key_changed"]),
+  previousFingerprint: z.string().optional(),
 });
+export type HostKeyVerificationInfo = z.infer<typeof hostKeyVerificationInfoSchema>;
+
+export const sftpConnectResponseSchema = z.union([
+  z.object({
+    sftpSessionId: z.string()
+  }),
+  z.object({
+    hostKeyVerification: hostKeyVerificationInfoSchema
+  })
+]);
 export type SftpConnectResponse = z.infer<typeof sftpConnectResponseSchema>;
 
 export const sftpDisconnectRequestSchema = z.object({

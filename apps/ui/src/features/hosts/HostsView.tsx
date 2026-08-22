@@ -7,6 +7,7 @@ import {
   type SshConfigImportItem
 } from "./SshConfigImportDialog";
 import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
+import { getShell } from "../../lib/shell";
 
 export type HostRecord = HostFormValue & {
   id: string;
@@ -74,13 +75,13 @@ export function HostsView() {
 
   const handleExport = async (format: "json" | "csv") => {
     const ext = format === "json" ? "json" : "csv";
-    const filePath = await window.hypershell?.fsShowSaveDialog?.({
+    const filePath = await getShell().fsShowSaveDialog({
       defaultPath: `hosts.${ext}`,
       filters: [{ name: format.toUpperCase(), extensions: [ext] }],
     });
     if (!filePath) return;
     try {
-      const result = await window.hypershell?.exportHosts?.({ format, filePath });
+      const result = await getShell().exportHosts({ format, filePath });
       if (result) {
         toast.success(`Exported ${result.exported} hosts to ${filePath}`);
       }

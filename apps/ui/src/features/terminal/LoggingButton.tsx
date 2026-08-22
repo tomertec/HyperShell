@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getShell } from "../../lib/shell";
 import { toast } from "sonner";
 
 import { RecordingBrowserDialog } from "../recording/RecordingBrowserDialog";
@@ -25,13 +26,13 @@ export function LoggingButton({
   const [playbackRecordingId, setPlaybackRecordingId] = useState<string | null>(null);
 
   useEffect(() => {
-    window.hypershell?.loggingGetState?.({ sessionId }).then((state) => {
+    getShell().loggingGetState({ sessionId }).then((state) => {
       setLoggingActive(state.active);
     }).catch(() => {
       setLoggingActive(false);
     });
 
-    window.hypershell?.recordingGetState?.({ sessionId }).then((state) => {
+    getShell().recordingGetState({ sessionId }).then((state) => {
       setRecordingActive(state.active);
     }).catch(() => {
       setRecordingActive(false);
@@ -41,17 +42,17 @@ export function LoggingButton({
   const toggleLogging = async () => {
     try {
       if (loggingActive) {
-        await window.hypershell?.loggingStop?.({ sessionId });
+        await getShell().loggingStop({ sessionId });
         setLoggingActive(false);
         toast.success("Session text logging stopped");
       } else {
         const defaultName = `session-${new Date().toISOString().replace(/[:.]/g, "-")}.log`;
-        const filePath = await window.hypershell?.fsShowSaveDialog?.({
+        const filePath = await getShell().fsShowSaveDialog({
           defaultPath: defaultName,
           filters: [{ name: "Log Files", extensions: ["log", "txt"] }],
         });
         if (!filePath) return;
-        await window.hypershell?.loggingStart?.({ sessionId, filePath });
+        await getShell().loggingStart({ sessionId, filePath });
         setLoggingActive(true);
         toast.success("Session text logging started");
       }
@@ -63,11 +64,11 @@ export function LoggingButton({
   const toggleRecording = async () => {
     try {
       if (recordingActive) {
-        await window.hypershell?.recordingStop?.({ sessionId });
+        await getShell().recordingStop({ sessionId });
         setRecordingActive(false);
         toast.success("Session recording stopped");
       } else {
-        await window.hypershell?.recordingStart?.({
+        await getShell().recordingStart({
           sessionId,
           hostId: hostId ?? null,
           title,

@@ -4,6 +4,7 @@ import type { SshManagerHost, SshManagerGroup, SshManagerSnippet } from "@hypers
 import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
 import { SectionLabel } from "../../components/ui/SectionLabel";
+import { getShell } from "../../lib/shell";
 
 export interface SshManagerImportDialogProps {
   open: boolean;
@@ -39,7 +40,7 @@ export function SshManagerImportDialog({ open, onImported, onClose }: SshManager
 
     async function scan() {
       try {
-        const result = await window.hypershell?.scanSshManager?.();
+        const result = await getShell().scanSshManager();
         if (cancelled) return;
         if (!result || (result.hosts.length === 0 && result.groups.length === 0 && result.snippets.length === 0)) {
           setError("No SshManager database found or it contains no data.");
@@ -116,7 +117,7 @@ export function SshManagerImportDialog({ open, onImported, onClose }: SshManager
   const handleImport = useCallback(async () => {
     setImporting(true);
     try {
-      const result = await window.hypershell?.importSshManager?.({
+      const result = await getShell().importSshManager({
         hostIds: Array.from(selectedHosts),
         groupIds: Array.from(selectedGroups),
         snippetIds: Array.from(selectedSnippets),

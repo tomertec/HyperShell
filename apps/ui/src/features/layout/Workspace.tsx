@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { getShell } from "../../lib/shell";
 import { useStore } from "zustand";
 import type { LocalProfileRecord } from "@hypershell/shared";
 
@@ -8,6 +9,7 @@ import { BroadcastBar, BroadcastButton } from "../broadcast/BroadcastBar";
 import { localProfilesStore, selectLaunchableProfiles } from "../local/localProfilesStore";
 import { SftpTab } from "../sftp";
 import { TerminalPane } from "../terminal/TerminalPane";
+import { resolveClaudeResumeSessionId } from "../terminal/claudeResumeTarget";
 import { requestTerminalFocus } from "../terminal/terminalFocus";
 import { useTunnelStore } from "../tunnels/tunnelStore";
 import { WorkspaceMenu } from "../workspace/WorkspaceMenu";
@@ -106,16 +108,11 @@ function PaneView({
               isVisible={isVisible}
               telnetOptions={tab.telnetOptions}
               tmuxAttachTarget={tab.tmuxAttachTarget}
-              claudeResumeSessionId={
-                // Only a per-tab ('new' mode) profile resumes by id. A
-                // 'continue' profile re-resolves the newest conversation for
-                // the folder on its own, so an id left over from before the
-                // mode was switched must not resurrect an old conversation.
-                paneLocalProfiles.find((p) => p.id === tab.profileId)
-                  ?.claudeSessionMode === "new"
-                  ? tab.claudeSessionId
-                  : undefined
-              }
+              claudeResumeSessionId={resolveClaudeResumeSessionId({
+                transport: tab.transport,
+                profile: paneLocalProfiles.find((p) => p.id === tab.profileId),
+                claudeSessionId: tab.claudeSessionId,
+              })}
               fontSize={
                 tab.fontSize ?? settingsStore.getState().settings.terminal.fontSize
               }
@@ -207,9 +204,9 @@ export function Workspace({ availablePorts, onRefreshPorts, onConnectSsh, onConn
   const closeTab = (sessionId: string) => {
     const tab = layoutStore.getState().tabs.find((candidate) => candidate.sessionId === sessionId);
     if (tab?.type === "sftp" && tab.sftpSessionId) {
-      void window.hypershell?.sftpDisconnect?.({ sftpSessionId: tab.sftpSessionId }).catch(() => {});
+      void getShell().sftpDisconnect({ sftpSessionId: tab.sftpSessionId }).catch(() => {});
     } else {
-      void window.hypershell?.closeSession?.({ sessionId }).catch(() => {});
+      void getShell().closeSession({ sessionId }).catch(() => {});
     }
 
     layoutStore.setState((state) => {

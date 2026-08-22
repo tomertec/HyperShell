@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { getShell } from "../../lib/shell";
 
 type Step = "vaults" | "items" | "fields";
 
@@ -45,7 +46,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.hypershell?.opListVaults?.();
+      const result = await getShell().opListVaults();
       setVaults(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to list vaults");
@@ -58,7 +59,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.hypershell?.opListItems?.({ vaultId });
+      const result = await getShell().opListItems({ vaultId });
       setItems(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to list items");
@@ -71,7 +72,7 @@ export function OpPickerModal({ open, onClose, onSelect }: OpPickerModalProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.hypershell?.opGetItemFields?.({ itemId });
+      const result = await getShell().opGetItemFields({ itemId });
       setFields(result ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load item fields");

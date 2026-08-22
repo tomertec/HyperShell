@@ -22,6 +22,7 @@ import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
 import { SftpStatusBar } from "./SftpStatusBar";
 import { ConfirmDialog } from "../../../components/ConfirmDialog";
 import { PromptDialog } from "../../../components/PromptDialog";
+import { getShell } from "../../../lib/shell";
 
 export interface LocalPaneProps {
   store: StoreApi<SftpStoreState>;
@@ -113,7 +114,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
       setError("local", null);
 
       try {
-        const response = await window.hypershell?.fsList?.({ path });
+        const response = await getShell().fsList({ path });
         if (!requestGuardRef.current!.isCurrent(token)) {
           return;
         }
@@ -126,7 +127,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
           loadError instanceof Error ? loadError.message : "Failed to list local directory";
         if (message.includes("outside the allowed filesystem roots")) {
           try {
-            const home = await window.hypershell?.fsGetHome?.();
+            const home = await getShell().fsGetHome();
             if (home?.path && home.path !== path && requestGuardRef.current!.isCurrent(token)) {
               setLocalPath(home.path);
               setError("local", `Path is outside allowed roots. Returned to ${home.path}.`);
@@ -157,7 +158,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
 
     async function loadHome() {
       try {
-        const home = await window.hypershell?.fsGetHome?.();
+        const home = await getShell().fsGetHome();
         if (disposed) {
           return;
         }
@@ -240,7 +241,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         : `${parentPath}\\${newName}`;
 
       try {
-        await window.hypershell?.fsRename?.({ oldPath: filePath, newPath });
+        await getShell().fsRename({ oldPath: filePath, newPath });
         await loadDirectory(localPath);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to rename");
@@ -264,7 +265,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
     let failed = 0;
     for (const filePath of paths) {
       try {
-        await window.hypershell?.fsTrash?.({ path: filePath });
+        await getShell().fsTrash({ path: filePath });
       } catch {
         failed += 1;
       }
@@ -298,7 +299,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
             if (entry.isDirectory) {
               handleNavigate(entry.path);
             } else {
-              void window.hypershell?.fsOpenItem?.({ path: entry.path });
+              void getShell().fsOpenItem({ path: entry.path });
             }
           }
         },
@@ -327,7 +328,7 @@ export function LocalPane({ store, onTransfer, onDownload, isActive, onActivate,
         {
           label: "Show in Explorer",
           action: () => {
-            void window.hypershell?.fsShowInFolder?.({ path: entry.path });
+            void getShell().fsShowInFolder({ path: entry.path });
           }
         }
       ];

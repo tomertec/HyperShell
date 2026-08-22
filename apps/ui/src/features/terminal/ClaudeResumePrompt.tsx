@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getShell, hasShell } from "../../lib/shell";
 
 import { formatLastActive } from "./claudeResumeTime";
 
@@ -30,14 +31,12 @@ export function ClaudeResumePrompt({
 
   useEffect(() => {
     let cancelled = false;
-    const lookup = window.hypershell?.claudeSessionInfo;
-
-    if (!lookup) {
+    if (!hasShell()) {
       onFresh();
       return;
     }
 
-    void lookup({ sessionId: claudeSessionId })
+    void getShell().claudeSessionInfo({ sessionId: claudeSessionId })
       .then((result) => {
         if (cancelled) {
           return;

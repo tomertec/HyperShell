@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getShell } from "../../lib/shell";
 
 type SnippetRecord = {
   id: string;
@@ -36,15 +37,15 @@ export const useSnippetStore = create<SnippetStore>((set, get) => ({
   close: () => set({ isOpen: false }),
   load: async () => {
     set({ loading: true });
-    const snippets = await window.hypershell?.snippetsList?.() ?? [];
+    const snippets = await getShell().snippetsList() ?? [];
     set({ snippets, loading: false });
   },
   upsert: async (id, name, body) => {
-    await window.hypershell?.snippetsUpsert?.({ id, name, body });
+    await getShell().snippetsUpsert({ id, name, body });
     void get().load();
   },
   remove: async (id) => {
-    await window.hypershell?.snippetsRemove?.({ id });
+    await getShell().snippetsRemove({ id });
     void get().load();
   },
 }));

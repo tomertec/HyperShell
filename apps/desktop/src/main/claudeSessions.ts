@@ -1,6 +1,9 @@
+import { watch, type FSWatcher } from "node:fs";
 import { readdir, open, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+import type { ClaudeSessionFile } from "./claudeSessionBinder";
 
 /**
  * Reads metadata for a Claude Code conversation so a restored tab can offer
@@ -141,5 +144,116 @@ export async function getClaudeSessionInfo(
     title,
     cwd,
     lastActiveAt: stats.mtime.toISOString(),
+  };
+}
+
+/** Conversation files are named for their id; anything else is not one. */
+const SESSION_FILE_PATTERN =
+  /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
+
+/**
+ * Conversation files touched at or after `sinceMs`, across every project.
+ *
+ * Runs once per Claude launch rather than on a timer: a full walk of the
+ * session store is cheap enough occasionally and far too expensive to poll.
+ * Live changes are picked up by watchClaudeSessions instead.
+ */
+export async function scanRecentClaudeSessions(
+  sinceMs: number
+): Promise<ClaudeSessionFile[]> {
+  const root = projectsRoot();
+  const directories = await readdir(root, { withFileTypes: true });
+
+  const perDirectory = await Promise.all(
+    directories
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        let names: string[];
+        try {
+          names = await readdir(join(root, entry.name));
+        } catch {
+          return [];
+        }
+
+        const files = await Promise.all(
+          names.map(async (name) => {
+            const match = SESSION_FILE_PATTERN.exec(name);
+            if (!match) {
+              return null;
+            }
+
+            try {
+              const stats = await stat(join(root, entry.name, name));
+              if (stats.mtimeMs < sinceMs) {
+                return null;
+              }
+
+              return {
+                claudeSessionId: match[1],
+                directory: entry.name,
+                mtimeMs: stats.mtimeMs,
+              };
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        return files.filter((file): file is ClaudeSessionFile => file !== null);
+      })
+  );
+
+  return perDirectory.flat();
+}
+
+/**
+ * Reports conversation files as they are written.
+ *
+ * Returns null when the session store cannot be watched — no Claude directory
+ * yet, or a platform that refuses a recursive watch. Callers degrade to the
+ * one-shot scan, which is enough for a conversation that has already begun.
+ */
+export function watchClaudeSessions(
+  onChange: (file: ClaudeSessionFile) => void
+): (() => void) | null {
+  let watcher: FSWatcher;
+
+  try {
+    watcher = watch(projectsRoot(), { recursive: true, persistent: false });
+  } catch {
+    return null;
+  }
+
+  watcher.on("error", () => {
+    watcher.close();
+  });
+
+  watcher.on("change", (_event, filename) => {
+    if (typeof filename !== "string") {
+      return;
+    }
+
+    const segments = filename.split(/[\\/]/);
+    const name = segments.pop();
+    const directory = segments.pop();
+    if (!name || !directory) {
+      return;
+    }
+
+    const match = SESSION_FILE_PATTERN.exec(name);
+    if (!match) {
+      return;
+    }
+
+    onChange({
+      claudeSessionId: match[1],
+      directory,
+      // The event is the write, so "now" is the modification time.
+      mtimeMs: Date.now(),
+    });
+  });
+
+  return () => {
+    watcher.close();
   };
 }

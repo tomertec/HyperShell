@@ -5,6 +5,7 @@ import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
+import { getShell, hasShell } from "../../lib/shell";
 
 type ProfileDraft = {
   name: string;
@@ -64,7 +65,7 @@ export function HostProfileManagerDialog({
 
   const loadProfiles = useCallback(async () => {
     try {
-      const items = (await window.hypershell?.listHostProfiles?.()) ?? [];
+      const items = (await getShell().listHostProfiles()) ?? [];
       setProfiles(items);
       onProfilesChanged?.(items);
       setSelectedId((current) => {
@@ -103,7 +104,7 @@ export function HostProfileManagerDialog({
   }, []);
 
   const saveProfile = useCallback(async () => {
-    if (!window.hypershell?.upsertHostProfile) {
+    if (!hasShell()) {
       toast.error("Host profile API is unavailable.");
       return;
     }
@@ -131,7 +132,7 @@ export function HostProfileManagerDialog({
     setIsSaving(true);
     try {
       const id = selectedProfile?.id ?? `profile-${Date.now()}`;
-      const saved = await window.hypershell.upsertHostProfile({
+      const saved = await getShell().upsertHostProfile({
         id,
         name: trimmedName,
         description: draft.description.trim() || null,
@@ -153,14 +154,14 @@ export function HostProfileManagerDialog({
   }, [draft, loadProfiles, selectedProfile]);
 
   const removeProfile = useCallback(async () => {
-    if (!selectedProfile || !window.hypershell?.removeHostProfile) {
+    if (!selectedProfile || !hasShell()) {
       return;
     }
     if (!window.confirm(`Delete host profile "${selectedProfile.name}"?`)) {
       return;
     }
     try {
-      await window.hypershell.removeHostProfile({ id: selectedProfile.id });
+      await getShell().removeHostProfile({ id: selectedProfile.id });
       await loadProfiles();
       setSelectedId(null);
       setDraft({ ...emptyDraft });

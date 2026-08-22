@@ -1,15 +1,9 @@
 import { useState } from "react";
 import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
+import type { HostKeyVerificationInfo } from "@hypershell/shared";
 
-export interface HostKeyVerificationInfo {
-  hostname: string;
-  port: number;
-  algorithm: string;
-  fingerprint: string;
-  verificationStatus: "new_host" | "key_changed";
-  previousFingerprint?: string;
-}
+export type { HostKeyVerificationInfo };
 
 interface HostKeyVerificationDialogProps {
   open: boolean;

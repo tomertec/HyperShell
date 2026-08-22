@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { installFakeBridge } from "./support/fakeBridge";
 
 const profile = {
   id: "claude",
@@ -17,8 +18,7 @@ const profile = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript((seed) => {
-    const settingsKey = "tab-title-colors-e2e";
+  await page.addInitScript((settingsKey) => {
     if (!localStorage.getItem(settingsKey)) {
       localStorage.setItem(
         settingsKey,
@@ -27,19 +27,8 @@ test.beforeEach(async ({ page }) => {
         })
       );
     }
-    (window as unknown as { hypershell: unknown }).hypershell = {
-      listLocalProfiles: async () => [seed],
-      rescanLocalProfiles: async () => [seed],
-      getSetting: async ({ key }: { key: string }) => {
-        const value = localStorage.getItem(settingsKey);
-        return key === "app.settings" && value ? { key, value } : null;
-      },
-      updateSetting: async ({ key, value }: { key: string; value: string }) => {
-        localStorage.setItem(settingsKey, value);
-        return { key, value };
-      },
-    };
-  }, profile);
+  }, "tab-title-colors-e2e");
+  await page.addInitScript(installFakeBridge, { profiles: [profile], settingsKey: "tab-title-colors-e2e" });
 });
 
 test("renders yellow as a distinct vivid preset", async ({ page }) => {

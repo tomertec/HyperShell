@@ -3,8 +3,7 @@ import { toast } from "sonner";
 import type { HostEnvVarRecord, HostProfileRecord, TagRecord } from "@hypershell/shared";
 import {
   ENV_VAR_NAME_REGEX,
-  DEFAULT_RECONNECT_BASE_INTERVAL,
-  DEFAULT_RECONNECT_MAX_ATTEMPTS,
+  HOST_OPTION_DEFAULTS,
   isValidHostname,
   isValidPort
 } from "@hypershell/shared";
@@ -16,6 +15,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { SectionLabel } from "../../components/ui/SectionLabel";
+import { getShell, hasShell } from "../../lib/shell";
 
 // --- Validation helpers ---
 
@@ -100,7 +100,7 @@ export interface HostFormProps {
 const defaultValue: HostFormValue = {
   name: "",
   hostname: "",
-  port: 22,
+  port: HOST_OPTION_DEFAULTS.port,
   username: "",
   identityFile: "",
   hostProfileId: "",
@@ -114,14 +114,14 @@ const defaultValue: HostFormValue = {
   proxyJump: "",
   proxyJumpHostIds: "",
   keepAliveInterval: "",
-  autoReconnect: false,
-  reconnectMaxAttempts: DEFAULT_RECONNECT_MAX_ATTEMPTS,
-  reconnectBaseInterval: DEFAULT_RECONNECT_BASE_INTERVAL,
+  autoReconnect: HOST_OPTION_DEFAULTS.autoReconnect,
+  reconnectMaxAttempts: HOST_OPTION_DEFAULTS.reconnectMaxAttempts,
+  reconnectBaseInterval: HOST_OPTION_DEFAULTS.reconnectBaseInterval,
   password: "",
   savePassword: true,
   clearSavedPassword: false,
-  tmuxDetect: false,
-  shellIntegration: true,
+  tmuxDetect: HOST_OPTION_DEFAULTS.tmuxDetect,
+  shellIntegration: HOST_OPTION_DEFAULTS.shellIntegration,
   hasSavedPassword: false,
   passwordSavedAt: null,
 };
@@ -305,7 +305,7 @@ export function HostForm({
     if (!value.identityFile) return;
     setPpkConverting(true);
     try {
-      const result = await window.hypershell?.sshKeysConvertPpk?.({ ppkPath: value.identityFile });
+      const result = await getShell().sshKeysConvertPpk({ ppkPath: value.identityFile });
       if (!result) {
         toast.error("PPK conversion not available.");
         return;
@@ -385,7 +385,7 @@ export function HostForm({
   useEffect(() => {
     async function loadKeys() {
       try {
-        const keys = await window.hypershell?.fsListSshKeys?.();
+        const keys = await getShell().fsListSshKeys();
         if (keys?.length) setSshKeys(keys);
       } catch { /* ignore */ }
     }
@@ -395,7 +395,7 @@ export function HostForm({
   useEffect(() => {
     async function loadHostProfiles() {
       try {
-        const profiles = await window.hypershell?.listHostProfiles?.();
+        const profiles = await getShell().listHostProfiles();
         setHostProfiles(profiles ?? []);
       } catch {
         setHostProfiles([]);
@@ -407,7 +407,7 @@ export function HostForm({
   useEffect(() => {
     let cancelled = false;
     async function loadTags() {
-      if (!window.hypershell?.listTags) {
+      if (!hasShell()) {
         if (!cancelled) {
           setTags([]);
           onTagsChanged?.([]);
@@ -416,7 +416,7 @@ export function HostForm({
       }
 
       try {
-        const loadedTags = await window.hypershell.listTags();
+        const loadedTags = await getShell().listTags();
         if (cancelled) {
           return;
         }
@@ -443,12 +443,11 @@ export function HostForm({
 
   useEffect(() => {
     const currentHostId = hostId;
-    const tagsGetHostTags = window.hypershell?.tagsGetHostTags;
-    if (!currentHostId || !tagsGetHostTags) {
+    if (!currentHostId || !hasShell()) {
       return;
     }
     const hostIdForLoad = currentHostId;
-    const getHostTagsForLoad = tagsGetHostTags;
+    const getHostTagsForLoad = getShell().tagsGetHostTags;
     let cancelled = false;
     async function loadHostTags() {
       try {
@@ -508,12 +507,11 @@ export function HostForm({
 
   useEffect(() => {
     const currentHostId = hostId;
-    const listHostEnvVars = window.hypershell?.listHostEnvVars;
-    if (!currentHostId || !listHostEnvVars) {
+    if (!currentHostId || !hasShell()) {
       return;
     }
     const hostIdForLoad = currentHostId;
-    const listHostEnvVarsForLoad = listHostEnvVars;
+    const listHostEnvVarsForLoad = getShell().listHostEnvVars;
     let cancelled = false;
     async function loadHostEnvVars() {
       try {
@@ -628,7 +626,7 @@ export function HostForm({
                 min={1}
                 max={65535}
                 value={value.port}
-                onChange={(e) => setValue({ ...value, port: Number(e.target.value) || 22 })}
+                onChange={(e) => setValue({ ...value, port: Number(e.target.value) || HOST_OPTION_DEFAULTS.port })}
                 onBlur={() => setTouched((t) => ({ ...t, port: true }))}
               />
               {touched.port && errors.port && (
@@ -804,7 +802,7 @@ export function HostForm({
                   size="sm"
                   onClick={() => {
                     void (async () => {
-                      const filePath = await window.hypershell?.fsShowOpenDialog?.({
+                      const filePath = await getShell().fsShowOpenDialog({
                         title: "Select SSH Key File",
                         filters: [{ name: "All Files", extensions: ["*"] }],
                       });
@@ -1080,7 +1078,7 @@ export function HostForm({
                   min={1}
                   max={50}
                   value={value.reconnectMaxAttempts}
-                  onChange={(e) => setValue({ ...value, reconnectMaxAttempts: Number(e.target.value) || DEFAULT_RECONNECT_MAX_ATTEMPTS })}
+                  onChange={(e) => setValue({ ...value, reconnectMaxAttempts: Number(e.target.value) || HOST_OPTION_DEFAULTS.reconnectMaxAttempts })}
                 />
               </label>
               <label htmlFor={`${formId}-baseInterval`} className="flex flex-col gap-1">
@@ -1092,7 +1090,7 @@ export function HostForm({
                     min={1}
                     max={60}
                     value={value.reconnectBaseInterval}
-                    onChange={(e) => setValue({ ...value, reconnectBaseInterval: Number(e.target.value) || DEFAULT_RECONNECT_BASE_INTERVAL })}
+                    onChange={(e) => setValue({ ...value, reconnectBaseInterval: Number(e.target.value) || HOST_OPTION_DEFAULTS.reconnectBaseInterval })}
                   />
                   <span className="text-[11px] text-text-muted shrink-0">sec</span>
                 </div>

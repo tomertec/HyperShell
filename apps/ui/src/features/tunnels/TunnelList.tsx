@@ -1,3 +1,4 @@
+import { getShell } from "../../lib/shell";
 import { useEffect } from "react";
 import { useTunnelStore } from "./tunnelStore";
 import { protocolBadgeClasses } from "../../lib/formStyles";
@@ -8,7 +9,7 @@ export function TunnelList() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const handleStop = async (id: string) => {
-    await window.hypershell?.stopPortForward?.({ id });
+    await getShell().stopPortForward({ id });
     await refresh();
   };
 

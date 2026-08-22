@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { installFakeBridge } from "./support/fakeBridge";
 
 const profiles = [
   {
@@ -19,12 +20,7 @@ const profiles = [
 ];
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript((seed) => {
-    (window as unknown as { hypershell: unknown }).hypershell = {
-      listLocalProfiles: async () => seed,
-      rescanLocalProfiles: async () => seed
-    };
-  }, profiles);
+  await page.addInitScript(installFakeBridge, { profiles });
 });
 
 test("xterm owns screen geometry and renderer canvases stay transparent", async ({ page }) => {

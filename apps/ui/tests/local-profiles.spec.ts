@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+import { installFakeBridge } from "./support/fakeBridge";
 import { expect, test, type Page } from "@playwright/test";
 
 // Matches the convention in accessibility.spec.ts: color contrast is tracked
@@ -51,12 +52,7 @@ const profiles = [
 ];
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript((seed) => {
-    (window as unknown as { hypershell: unknown }).hypershell = {
-      listLocalProfiles: async () => seed,
-      rescanLocalProfiles: async () => seed
-    };
-  }, profiles);
+  await page.addInitScript(installFakeBridge, { profiles });
 });
 
 test("lists local profiles in the sidebar", async ({ page }) => {

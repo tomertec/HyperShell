@@ -14,6 +14,7 @@ import { SyncPanel } from "./components/SyncPanel";
 import { SftpPropertiesDialog } from "./components/SftpPropertiesDialog";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { PromptDialog } from "../../components/PromptDialog";
+import { getShell, hasShell } from "../../lib/shell";
 
 export interface SftpTabProps {
   sftpSessionId: string;
@@ -138,11 +139,10 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   });
 
   const refreshRemoteDirectory = useCallback(async () => {
-    const sftpList = window.hypershell?.sftpList;
-    if (!sftpList) {
+    if (!hasShell()) {
       throw new Error("SFTP list API is unavailable in preload bridge");
     }
-    const response = await sftpList({ sftpSessionId, path: remotePath });
+    const response = await getShell().sftpList({ sftpSessionId, path: remotePath });
     store.getState().setRemoteEntries(extractSftpEntries(response));
   }, [remotePath, sftpSessionId, store]);
 
@@ -150,7 +150,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
     const currentLocalPath = store.getState().localPath;
     if (!currentLocalPath) return;
     try {
-      const response = await window.hypershell?.fsList?.({ path: currentLocalPath });
+      const response = await getShell().fsList({ path: currentLocalPath });
       store.getState().setLocalEntries(response?.entries ?? []);
     } catch {
       // ignore — non-critical refresh
@@ -186,7 +186,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
             let isDirectory: boolean;
 
             try {
-              const stat = await window.hypershell?.fsStat?.({ path: localPath });
+              const stat = await getShell().fsStat({ path: localPath });
               isDirectory = Boolean(stat?.isDirectory);
             } catch {
               isDirectory = false;
@@ -204,7 +204,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         );
 
         const created =
-          (await window.hypershell?.sftpTransferStart?.({
+          (await getShell().sftpTransferStart({
             sftpSessionId,
             operations
           })) ?? [];
@@ -233,7 +233,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
           return;
         }
 
-        const localStat = await window.hypershell?.fsStat?.({ path: localPath });
+        const localStat = await getShell().fsStat({ path: localPath });
         if (!localStat?.isDirectory) {
           store.getState().setError("local", `Local destination is not a folder: ${localPath}`);
           return;
@@ -248,7 +248,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
             let isDirectory = entriesByPath.get(remoteFilePath)?.isDirectory ?? false;
             if (!entriesByPath.has(remoteFilePath)) {
               try {
-                const stat = await window.hypershell?.sftpStat?.({
+                const stat = await getShell().sftpStat({
                   sftpSessionId,
                   path: remoteFilePath
                 });
@@ -270,7 +270,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         );
 
         const created =
-          (await window.hypershell?.sftpTransferStart?.({
+          (await getShell().sftpTransferStart({
             sftpSessionId,
             operations
           })) ?? [];
@@ -304,7 +304,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       const parentPath = getParentPath(path);
       const newPath = joinRemotePath(parentPath, newName);
 
-      await window.hypershell?.sftpRename?.({
+      await getShell().sftpRename({
         sftpSessionId,
         oldPath: path,
         newPath
@@ -329,7 +329,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
 
     await Promise.all(
       paths.map((path) =>
-        window.hypershell?.sftpDelete?.({ sftpSessionId, path, recursive: true })
+        getShell().sftpDelete({ sftpSessionId, path, recursive: true })
       )
     );
 
@@ -345,7 +345,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       setMkdirDialog(false);
 
       const nextPath = joinRemotePath(remotePath, name);
-      await window.hypershell?.sftpMkdir?.({
+      await getShell().sftpMkdir({
         sftpSessionId,
         path: nextPath
       });
@@ -369,7 +369,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       const { path } = bookmarkDialog;
       setBookmarkDialog({ open: false, path: "", defaultName: "" });
 
-      await window.hypershell?.sftpBookmarksUpsert?.({
+      await getShell().sftpBookmarksUpsert({
         hostId,
         name,
         remotePath: path
@@ -403,12 +403,11 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       });
 
       try {
-        const sftpStat = window.hypershell?.sftpStat;
-        if (!sftpStat) {
+        if (!hasShell()) {
           throw new Error("SFTP stat API is unavailable in preload bridge");
         }
 
-        const entry = await sftpStat({ sftpSessionId, path });
+        const entry = await getShell().sftpStat({ sftpSessionId, path });
         if (!entry) {
           throw new Error("File details are unavailable");
         }
@@ -449,19 +448,17 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         throw new Error("No file selected");
       }
 
-      const sftpChmod = window.hypershell?.sftpChmod;
-      const sftpStat = window.hypershell?.sftpStat;
-      if (!sftpChmod || !sftpStat) {
+      if (!hasShell()) {
         throw new Error("SFTP chmod/stat APIs are unavailable in preload bridge");
       }
 
-      await sftpChmod({
+      await getShell().sftpChmod({
         sftpSessionId,
         path,
         permissions
       });
 
-      const refreshed = await sftpStat({ sftpSessionId, path });
+      const refreshed = await getShell().sftpStat({ sftpSessionId, path });
       if (!refreshed) {
         throw new Error("Failed to refresh file details after permission update");
       }
@@ -498,7 +495,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
       const currentLocalPath = state.localPath;
       if (currentLocalPath) {
         try {
-          const response = await window.hypershell?.fsList?.({ path: currentLocalPath });
+          const response = await getShell().fsList({ path: currentLocalPath });
           store.getState().setLocalEntries(response?.entries ?? []);
         } catch {
           // ignore
@@ -508,7 +505,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
   }, [refreshRemoteDirectory, store]);
 
   const handleDisconnect = useCallback(async () => {
-    await window.hypershell?.sftpDisconnect?.({ sftpSessionId });
+    await getShell().sftpDisconnect({ sftpSessionId });
     onClose();
   }, [onClose, sftpSessionId]);
 
@@ -536,7 +533,7 @@ export function SftpTab({ sftpSessionId, hostId, onClose }: SftpTabProps) {
         onUpload={(localPaths, remoteTargetPath) => { void handleUpload(localPaths, remoteTargetPath); }}
         onDownload={(remotePaths, localTargetPath) => { void handleDownload(remotePaths, localTargetPath); }}
         onEdit={(remotePath: string) => {
-          void window.hypershell?.editorOpen?.({ sftpSessionId, remotePath });
+          void getShell().editorOpen({ sftpSessionId, remotePath });
         }}
         onProperties={(entryPath) => { void handleProperties(entryPath); }}
         onRename={handleRename}

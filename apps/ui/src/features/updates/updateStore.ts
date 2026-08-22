@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { UpdateState } from "@hypershell/shared";
+import { getShell } from "../../lib/shell";
 
 interface UpdateStoreState {
   update: UpdateState | null;
@@ -46,7 +47,7 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
   },
   async refresh() {
     try {
-      const state = await window.hypershell?.getUpdateState?.();
+      const state = await getShell().getUpdateState();
       if (state) {
         set({ update: state });
       }
@@ -56,28 +57,28 @@ export const useUpdateStore = create<UpdateStoreState>((set, get) => ({
   },
   async check() {
     try {
-      await window.hypershell?.checkForUpdates?.();
+      await getShell().checkForUpdates();
     } catch {
       /* ignore */
     }
   },
   async download() {
     try {
-      await window.hypershell?.downloadUpdate?.();
+      await getShell().downloadUpdate();
     } catch {
       /* ignore */
     }
   },
   async install() {
     try {
-      await window.hypershell?.installUpdate?.();
+      await getShell().installUpdate();
     } catch {
       /* ignore */
     }
   },
   async openRelease() {
     try {
-      await window.hypershell?.openUpdateRelease?.();
+      await getShell().openUpdateRelease();
     } catch {
       /* ignore */
     }

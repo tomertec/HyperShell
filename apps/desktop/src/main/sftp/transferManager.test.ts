@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTransferManager } from "./transferManager";
@@ -7,7 +10,7 @@ describe("TransferManager", () => {
   const mockSftpTransport = {
     stat: vi.fn().mockResolvedValue({ size: 1024, isDirectory: false }),
     createReadStream: vi.fn(),
-    createWriteStream: vi.fn(),
+    upload: vi.fn().mockResolvedValue(undefined),
     list: vi.fn().mockResolvedValue([])
   };
 
@@ -228,5 +231,41 @@ describe("TransferManager", () => {
     expect(first?.status).toBe("failed");
     expect(second?.status).toBe("failed");
     expect(other?.status).toBe("queued");
+  });
+
+  it("runs upload jobs through transport.upload with a resume offset", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "hypershell-transfer-test-"));
+    const localPath = join(dir, "file.txt");
+    writeFileSync(localPath, "payload");
+    const transport = {
+      stat: vi.fn().mockRejectedValue(new Error("no such file")),
+      upload: vi.fn().mockResolvedValue(undefined),
+      createReadStream: vi.fn(),
+      list: vi.fn().mockResolvedValue([])
+    };
+
+    try {
+      const autoManager = createTransferManager({ autoStart: true });
+      const completed = new Promise<void>((resolve) => {
+        autoManager.onEvent((event) => {
+          if (event.kind === "transfer-complete") resolve();
+        });
+      });
+      autoManager.enqueue("sftp-1", transport as any, [
+        { type: "upload", localPath, remotePath: "/dir/file.txt", isDirectory: false }
+      ]);
+      await completed;
+
+      // Atomicity (temp-and-rename, mode preservation) is the transport's
+      // guarantee now — the queue only states intent and passes resume state.
+      expect(transport.upload).toHaveBeenCalledTimes(1);
+      const [calledLocal, calledRemote, options] = transport.upload.mock.calls[0];
+      expect(calledLocal).toBe(localPath);
+      expect(calledRemote).toBe("/dir/file.txt");
+      expect(options.resumeOffset).toBe(0);
+      expect(autoManager.list()[0].status).toBe("completed");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

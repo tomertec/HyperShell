@@ -1,12 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, waitFor } from "@testing-library/react";
 
 import type { FsEntry } from "@hypershell/shared";
+import { createFakeShell } from "../../../lib/fakeShell";
+import { setShell } from "../../../lib/shell";
 import { createSftpStore } from "../sftpStore";
 import { LocalPane } from "./LocalPane";
 
 // jsdom doesn't implement scrollIntoView; FileList's cursor-row ref callback
 // calls it unconditionally on mount. Not related to what this test verifies.
+afterEach(() => {
+  setShell(null);
+});
+
 if (typeof Element.prototype.scrollIntoView !== "function") {
   Element.prototype.scrollIntoView = () => {};
 }
@@ -37,7 +43,7 @@ describe("LocalPane stale response handling", () => {
     });
     const fsGetHome = vi.fn(() => homePromise);
 
-    window.hypershell = { fsList, fsGetHome };
+    setShell(createFakeShell({ fsList, fsGetHome }).shell);
 
     render(<LocalPane store={store} onTransfer={() => {}} onDownload={() => {}} isActive onActivate={() => {}} />);
 

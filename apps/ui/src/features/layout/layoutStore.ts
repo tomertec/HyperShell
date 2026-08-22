@@ -48,7 +48,10 @@ export type LayoutState = {
   setTabDynamicTitle: (sessionId: string, title: string | null) => void;
   setTabProcessTitle: (sessionId: string, name: string | null) => void;
   setTabFontSize: (sessionId: string, fontSize: number) => void;
-  setTabClaudeSessionId: (sessionId: string, claudeSessionId: string) => void;
+  setTabClaudeSessionId: (
+    sessionId: string,
+    claudeSessionId: string | null
+  ) => void;
 };
 
 function equalPaneSizes(count: number): number[] {
@@ -236,15 +239,18 @@ export function createLayoutStore(
         return { tabs };
       }),
 
+    // Null clears the tab's conversation: Claude is no longer running there,
+    // so a restore must bring back a plain shell.
     setTabClaudeSessionId: (sessionId, claudeSessionId) =>
       set((state) => {
+        const next = claudeSessionId ?? undefined;
         const index = state.tabs.findIndex((tab) => tab.sessionId === sessionId);
-        if (index === -1 || state.tabs[index].claudeSessionId === claudeSessionId) {
+        if (index === -1 || state.tabs[index].claudeSessionId === next) {
           return state;
         }
 
         const tabs = [...state.tabs];
-        tabs[index] = { ...tabs[index], claudeSessionId };
+        tabs[index] = { ...tabs[index], claudeSessionId: next };
         return { tabs };
       }),
 

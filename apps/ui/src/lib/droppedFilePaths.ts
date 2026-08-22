@@ -1,3 +1,4 @@
+import { getShell, hasShell } from "./shell";
 /**
  * Turning an OS drag-and-drop into usable absolute paths.
  *
@@ -6,13 +7,12 @@
  * synthesised blobs, dragged text — resolve to "" and are dropped.
  */
 export function extractDroppedPaths(dataTransfer: DataTransfer | null): string[] {
-  const resolve = window.hypershell?.getPathForFile;
-  if (!dataTransfer || !resolve) {
+  if (!dataTransfer || !hasShell()) {
     return [];
   }
 
   return Array.from(dataTransfer.files)
-    .map((file) => resolve(file))
+    .map((file) => getShell().getPathForFile(file))
     .filter((path): path is string => Boolean(path));
 }
 

@@ -107,6 +107,17 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error",
 
+      // The bridge is reached only through the lib/shell seam; a direct
+      // window.hypershell call is a silent no-op the moment the preload drifts.
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "window",
+          property: "hypershell",
+          message: "Use getShell()/hasShell() from lib/shell instead of window.hypershell.",
+        },
+      ],
+
       // Checkbox rows here wrap their input and put the visible text one level
       // deeper than the rule's default search depth.
       "jsx-a11y/label-has-associated-control": ["error", { depth: 3 }],
@@ -125,6 +136,13 @@ export default tseslint.config(
         { tags: [], roles: ["tabpanel", "application"], allowExpressionValues: true },
       ],
     },
+  },
+
+  // The seam itself and its adapter test are the only places allowed to touch
+  // the real bridge global.
+  {
+    files: ["apps/ui/src/lib/shell.ts", "apps/ui/src/lib/shell.test.ts"],
+    rules: { "no-restricted-properties": "off" },
   },
 
   // Vitest specs: assertions and fixtures legitimately traffic in `any`.

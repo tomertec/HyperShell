@@ -82,6 +82,12 @@ export interface LocalConnectionOptions {
   args?: string[];
   cwd?: string;
   envVars?: Record<string, string>;
+  /**
+   * A single line typed into the shell once it reaches its first prompt. Used
+   * to reattach a restored tab to the Claude conversation it was running; the
+   * command is built in the main process, never supplied by the renderer.
+   */
+  startupCommand?: string;
 }
 
 export interface SftpConnectionOptions {

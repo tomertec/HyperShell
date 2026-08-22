@@ -15,6 +15,7 @@ import {
 
 import { createHostMonitor } from "./monitoring/hostMonitor";
 import {
+  claudeSessionBinder,
   disposeSessionRuntime,
   registerIpc,
   resolveLocalProfileForSession,
@@ -90,6 +91,9 @@ function collectSavedSessions(): SavedSessionInput[] {
             ? resolveLocalProfileForSession(session.profileId)?.name
             : undefined,
       }),
+      // Crash recovery is written from main, so the conversation a tab was
+      // running has to come from the binder rather than the renderer's tab.
+      claudeSessionId: claudeSessionBinder.get(session.sessionId) ?? null,
     };
   });
 }

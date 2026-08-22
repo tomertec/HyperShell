@@ -1,6 +1,7 @@
 import type { SftpEvent } from "@hypershell/shared";
 
 import { transferStore } from "./transferStore";
+import { getShell } from "../../lib/shell";
 
 /**
  * Single owner of the SFTP transfer event stream.
@@ -38,7 +39,7 @@ async function runRefresh(): Promise<void> {
   try {
     do {
       refreshQueued = false;
-      const response = await window.hypershell?.sftpTransferList?.();
+      const response = await getShell().sftpTransferList();
       if (response) {
         transferStore.getState().setTransfers(response.transfers);
       }
@@ -157,7 +158,7 @@ export function startTransferEventCoordinator(): () => void {
   startCount += 1;
 
   if (startCount === 1) {
-    bridgeUnsubscribe = window.hypershell?.onSftpEvent?.(handleSftpEvent) ?? null;
+    bridgeUnsubscribe = getShell().onSftpEvent(handleSftpEvent) ?? null;
     void refreshTransfers();
   }
 

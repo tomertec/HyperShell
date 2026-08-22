@@ -1,5 +1,11 @@
-import { createHostsRepositoryFromDatabase, normalizeHostInput, openDatabase } from "@hypershell/db";
+import {
+  createGroupsRepositoryFromDatabase,
+  createHostsRepositoryFromDatabase,
+  normalizeHostInput,
+  openDatabase
+} from "@hypershell/db";
 import type { HostInput, HostRecord } from "@hypershell/db";
+import { randomUUID } from "node:crypto";
 import {
   ipcChannels,
   upsertHostRequestSchema,
@@ -186,11 +192,52 @@ function resolvePasswordSavedAt(host: {
 
 function attachPasswordMetadata(host: HostRecord): HostRecord & {
   passwordSavedAt: string | null;
+  group: string;
 } {
   return {
     ...host,
-    passwordSavedAt: resolvePasswordSavedAt(host)
+    passwordSavedAt: resolvePasswordSavedAt(host),
+    group: resolveGroupName(host.groupId)
   };
+}
+
+type GroupsRepoLike = ReturnType<typeof createGroupsRepositoryFromDatabase>;
+
+let groupsRepo: GroupsRepoLike | null = null;
+
+function getGroupsRepoOrNull(): GroupsRepoLike | null {
+  if (!groupsRepo) {
+    const db = getDatabaseOrNull();
+    if (!db) {
+      return null; // JSON-fallback mode: groups stay unpersisted.
+    }
+    groupsRepo = createGroupsRepositoryFromDatabase(db);
+  }
+  return groupsRepo;
+}
+
+/** Resolve a group name to its host_groups id, creating the row for a new name. */
+function resolveGroupIdByName(name: string | undefined): string | null {
+  const trimmed = name?.trim() ?? "";
+  if (!trimmed) {
+    return null;
+  }
+  const repo = getGroupsRepoOrNull();
+  if (!repo) {
+    return null;
+  }
+  const existing = repo.list().find((group) => group.name === trimmed);
+  if (existing) {
+    return existing.id;
+  }
+  return repo.create({ id: `group-${randomUUID()}`, name: trimmed }).id;
+}
+
+function resolveGroupName(groupId: string | null | undefined): string {
+  if (!groupId) {
+    return "";
+  }
+  return getGroupsRepoOrNull()?.get(groupId)?.name ?? "";
 }
 
 /** Returns the shared SQLite database instance, creating it on first call. */
@@ -219,6 +266,7 @@ export function closeSharedDatabase(): void {
   } finally {
     sharedDb = null;
     hostsRepo = null;
+    groupsRepo = null;
     settingsRepo = null;
   }
 }
@@ -521,6 +569,7 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
       username: parsed.username,
       identityFile: parsed.identityFile,
       hostProfileId: parsed.hostProfileId,
+      groupId: resolveGroupIdByName(parsed.group),
       authProfileId: nextAuthProfileId,
       notes: parsed.notes,
       authMethod: requestedAuthMethod,
@@ -545,7 +594,13 @@ export function registerHostIpc(ipcMain: IpcMainLike): void {
     const parsed = reorderHostsRequestSchema.parse(request);
     const repo = getOrCreateHostsRepo();
     if ('updateSortOrders' in repo) {
-      (repo as any).updateSortOrders(parsed.items);
+      (repo as any).updateSortOrders(
+        parsed.items.map((item) => ({
+          id: item.id,
+          sortOrder: item.sortOrder,
+          groupId: item.group !== undefined ? resolveGroupIdByName(item.group) : item.groupId,
+        }))
+      );
     }
     return { success: true };
   });

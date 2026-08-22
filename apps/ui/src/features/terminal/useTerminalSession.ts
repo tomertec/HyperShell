@@ -4,6 +4,7 @@ import type { Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import type { SearchAddon } from "@xterm/addon-search";
 import type { SessionEvent } from "@hypershell/shared";
+import { getShell, hasShell } from "../../lib/shell";
 
 import { broadcastStore } from "../broadcast/broadcastStore";
 import { layoutStore } from "../layout/layoutStore";
@@ -241,11 +242,11 @@ export function useTerminalSession(
   }, []);
 
   const sendSessionWrite = useCallback((sessionId: string, data: string): void => {
-    if (!window.hypershell?.writeSession) {
+    if (!hasShell()) {
       return;
     }
 
-    void window.hypershell.writeSession({ sessionId, data }).catch((error) => {
+    void getShell().writeSession({ sessionId, data }).catch((error) => {
       if (sessionId === sessionIdRef.current) {
         setStateSafe("failed");
         writeTerminalError(error);
@@ -256,11 +257,11 @@ export function useTerminalSession(
 
   const sendSessionResize = useCallback(
     (sessionId: string, cols: number, rows: number): void => {
-      if (!window.hypershell?.resizeSession) {
+      if (!hasShell()) {
         return;
       }
 
-      void window.hypershell.resizeSession({ sessionId, cols, rows }).catch((error) => {
+      void getShell().resizeSession({ sessionId, cols, rows }).catch((error) => {
         if (sessionId === sessionIdRef.current) {
           setStateSafe("failed");
           writeTerminalError(error);
@@ -285,7 +286,7 @@ export function useTerminalSession(
       tmuxAttachSentRef.current = true;
       const safeName = `'${input.tmuxAttachTarget.replace(/'/g, "'\\''")}'`;
       const cmd = `tmux attach -t ${safeName}\r`;
-      void window.hypershell?.writeSession?.({
+      void getShell().writeSession({
         sessionId: sessionIdRef.current,
         data: cmd,
       });
@@ -297,6 +298,12 @@ export function useTerminalSession(
 
     if (effect.exitCode !== undefined) {
       onExitRef.current?.(effect.exitCode ?? null);
+    }
+
+    if (effect.claudeSessionId !== undefined && sessionIdRef.current) {
+      layoutStore
+        .getState()
+        .setTabClaudeSessionId(sessionIdRef.current, effect.claudeSessionId);
     }
 
     if (effect.processTitle !== undefined && sessionIdRef.current) {
@@ -337,7 +344,7 @@ export function useTerminalSession(
       if (sessionId) {
         sessionStateStore.getState().removeSession(sessionId);
         // Close the session on the main process side
-        window.hypershell?.closeSession?.({ sessionId })?.catch((error) => {
+        getShell().closeSession({ sessionId }).catch((error) => {
           logAsyncError("closeSession on unmount failed", error);
         });
         sessionIdRef.current = null;
@@ -541,7 +548,7 @@ export function useTerminalSession(
       disposeInput = instance.onData((data) => {
         const activeSessionId = sessionIdRef.current;
 
-        if (!activeSessionId || !window.hypershell?.writeSession) {
+        if (!activeSessionId || !hasShell()) {
           return;
         }
 
@@ -591,8 +598,7 @@ export function useTerminalSession(
 
   const connect = useCallback(async (): Promise<void> => {
     const instance = terminalRef.current;
-    const openSession = window.hypershell?.openSession;
-    if (!instance || !openSession) {
+    if (!instance || !hasShell()) {
       return;
     }
 
@@ -603,7 +609,7 @@ export function useTerminalSession(
       const rows = instance.rows || 40;
       const result = await resolveConnectAttempt({
         openSession: () =>
-          openSession({
+          getShell().openSession({
             transport: input.transport,
             profileId: input.profileId,
             cols,
@@ -618,7 +624,7 @@ export function useTerminalSession(
           !mountedRef.current ||
           !asyncOperationGuardRef.current.isCurrent(attemptId),
         closeSession: (sessionId) => {
-          window.hypershell?.closeSession?.({ sessionId })?.catch((error) => {
+          getShell().closeSession({ sessionId }).catch((error) => {
             logAsyncError("closeSession for stale connect attempt failed", error);
           });
         }
@@ -675,13 +681,13 @@ export function useTerminalSession(
   const disconnect = useCallback(async (): Promise<void> => {
     asyncOperationGuardRef.current.issueToken();
     const sessionId = sessionIdRef.current;
-    if (!sessionId || !window.hypershell?.closeSession) {
+    if (!sessionId || !hasShell()) {
       setStateSafe("disconnected");
       return;
     }
 
     try {
-      await window.hypershell.closeSession({ sessionId });
+      await getShell().closeSession({ sessionId });
       if (!mountedRef.current) {
         return;
       }
@@ -782,11 +788,11 @@ export function useTerminalSession(
   }, [connect, input.autoConnect, terminal]);
 
   useEffect(() => {
-    if (!window.hypershell?.onSessionEvent) {
+    if (!hasShell()) {
       return;
     }
 
-    const unsubscribe = window.hypershell.onSessionEvent((event) => {
+    const unsubscribe = getShell().onSessionEvent((event) => {
       if (!sessionIdRef.current) {
         const queue = pendingSessionEventsRef.current;
         queue.push(event);

@@ -4,6 +4,7 @@ import type { ConnectionHistoryRecord } from "@hypershell/shared";
 import type { HostRecord } from "./HostsView";
 import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
+import { getShell, hasShell } from "../../lib/shell";
 
 function formatDateTime(value: string): string {
   const parsed = new Date(value);
@@ -49,7 +50,7 @@ export function ConnectionHistoryDialog({
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!host?.id || !window.hypershell?.connectionHistoryListByHost) {
+    if (!host?.id || !hasShell()) {
       setRows([]);
       return;
     }
@@ -57,7 +58,7 @@ export function ConnectionHistoryDialog({
     setLoading(true);
     setError(null);
     try {
-      const data = await window.hypershell.connectionHistoryListByHost({
+      const data = await getShell().connectionHistoryListByHost({
         hostId: host.id,
         limit: 200,
       });

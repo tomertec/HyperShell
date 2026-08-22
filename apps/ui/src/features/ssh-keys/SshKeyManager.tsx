@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
+import { getShell } from "../../lib/shell";
 
 interface SshKeyInfo {
   path: string;
@@ -39,7 +40,7 @@ export function SshKeyManager() {
   const [converting, setConverting] = useState(false);
 
   const refresh = async () => {
-    const result = await window.hypershell?.sshKeysList?.();
+    const result = await getShell().sshKeysList();
     if (result) setKeys(result);
   };
 
@@ -51,7 +52,7 @@ export function SshKeyManager() {
     if (!genName.trim()) return;
     setGenerating(true);
     try {
-      await window.hypershell?.sshKeysGenerate?.({
+      await getShell().sshKeysGenerate({
         type: genType,
         name: genName.trim(),
         passphrase: genPassphrase || undefined,
@@ -70,7 +71,7 @@ export function SshKeyManager() {
 
   const handleRemove = async (path: string, name: string) => {
     if (!confirm(`Delete key "${name}" and its public key?`)) return;
-    await window.hypershell?.sshKeysRemove?.({ path });
+    await getShell().sshKeysRemove({ path });
     await refresh();
   };
 
@@ -90,7 +91,7 @@ export function SshKeyManager() {
       }
       setConverting(true);
       try {
-        const result = await window.hypershell?.sshKeysConvertPpk?.({ ppkPath });
+        const result = await getShell().sshKeysConvertPpk({ ppkPath });
         if (!result) {
           toast.error("PPK conversion not available.");
           return;

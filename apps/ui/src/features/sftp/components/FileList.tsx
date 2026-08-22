@@ -9,6 +9,7 @@ import {
 } from "../utils/fileUtils";
 import { extractDroppedPaths } from "../../../lib/droppedFilePaths";
 import { FileIcon } from "./FileIcon";
+import { getShell, hasShell } from "../../../lib/shell";
 
 export interface FileListEntry {
   name: string;
@@ -132,8 +133,7 @@ export function FileList({
 
   const prepareNativeDirectoryDragOut = useCallback(
     (entry: FileListEntry) => {
-      const dragOut = window.hypershell?.sftpDragOut;
-      if (!sftpSessionId || !dragOut || !entry.isDirectory) return;
+      if (!sftpSessionId || !hasShell() || !entry.isDirectory) return;
 
       const key = createNativeDragOutKey(entry.path);
       if (preparedNativeDragOutRef.current.has(key) || pendingNativeDragOutRef.current.has(key)) {
@@ -143,7 +143,7 @@ export function FileList({
       pendingNativeDragOutRef.current.add(key);
       toast(`Preparing ${entry.name} for drag-out...`);
 
-      void dragOut({
+      void getShell().sftpDragOut({
         sftpSessionId,
         remotePath: entry.path,
         fileName: entry.name,
@@ -255,7 +255,7 @@ export function FileList({
         return;
       }
 
-      window.hypershell?.sftpStartNativeDragOut?.({
+      getShell().sftpStartNativeDragOut({
         sftpSessionId,
         remotePath: paths[0],
         fileName: entry.name,
@@ -271,7 +271,7 @@ export function FileList({
 
     // For remote pane: fire-and-forget IPC to initiate native OS drag
     if (sftpSessionId && paths.length === 1) {
-      void window.hypershell?.sftpDragOut?.({
+      void getShell().sftpDragOut({
         sftpSessionId,
         remotePath: paths[0],
         fileName: entry.name,

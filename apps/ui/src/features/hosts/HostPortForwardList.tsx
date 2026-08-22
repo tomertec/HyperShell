@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { HostPortForwardRecord } from "@hypershell/shared";
 import { inputClasses, protocolBadgeClasses } from "../../lib/formStyles";
+import { getShell } from "../../lib/shell";
 
 interface HostPortForwardListProps {
   hostId: string;
@@ -21,7 +22,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
 
   const refresh = useCallback(async () => {
     try {
-      const result = await window.hypershell?.hostPortForwardList?.({ hostId });
+      const result = await getShell().hostPortForwardList({ hostId });
       if (result) setForwards(result);
     } catch { /* ignore */ }
   }, [hostId]);
@@ -36,7 +37,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
 
   const handleSave = async () => {
     const id = editId ?? crypto.randomUUID();
-    await window.hypershell?.hostPortForwardUpsert?.({
+    await getShell().hostPortForwardUpsert({
       id,
       hostId,
       name: form.name || `Forward :${form.localPort}`,
@@ -53,7 +54,7 @@ export function HostPortForwardList({ hostId }: HostPortForwardListProps) {
   };
 
   const handleDelete = async (id: string) => {
-    await window.hypershell?.hostPortForwardRemove?.({ id });
+    await getShell().hostPortForwardRemove({ id });
     await refresh();
   };
 

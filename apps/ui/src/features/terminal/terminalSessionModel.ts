@@ -17,6 +17,11 @@ export interface SessionEventEffect {
   errorMessage?: string;
   exitCode?: number | null;
   processTitle?: string | null;
+  /**
+   * The Claude Code conversation the session is now running, or null when it
+   * stopped running one. Undefined means the event said nothing about it.
+   */
+  claudeSessionId?: string | null;
 }
 
 export interface AsyncOperationGuard {
@@ -47,7 +52,7 @@ export function createAsyncOperationGuard(): AsyncOperationGuard {
 export interface ConnectAttemptResult {
   sessionId: string;
   state: TerminalSessionState;
-  /** Present only for local profiles flagged as Claude Code launchers. */
+  /** The Claude Code conversation the session launched into, if any. */
   claudeSessionId?: string;
 }
 
@@ -113,6 +118,13 @@ export function mapSessionEvent(
     return {
       handled: true,
       processTitle: event.name
+    };
+  }
+
+  if (event.type === "claude-session") {
+    return {
+      handled: true,
+      claudeSessionId: event.claudeSessionId
     };
   }
 

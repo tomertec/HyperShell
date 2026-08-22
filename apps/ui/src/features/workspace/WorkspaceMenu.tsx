@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { getShell } from "../../lib/shell";
 import {
   layoutStore,
   restorableWorkspaceTabs,
@@ -18,7 +19,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const refresh = async () => {
-    const list = await window.hypershell?.workspaceList?.();
+    const list = await getShell().workspaceList();
     if (list) setWorkspaces(list.filter((w: WorkspaceRecord) => w.name !== "__last__"));
   };
 
@@ -60,20 +61,20 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
     if (!trimmed) return;
     setSaving(true);
     const layout = serializeWorkspaceLayout(layoutStore.getState());
-    await window.hypershell?.workspaceSave?.({ name: trimmed, layout });
+    await getShell().workspaceSave({ name: trimmed, layout });
     setNewName("");
     setSaving(false);
     await refresh();
   };
 
   const handleLoad = async (name: string) => {
-    const result = await window.hypershell?.workspaceLoad?.({ name });
+    const result = await getShell().workspaceLoad({ name });
     if (!result?.layout) return;
 
     // Close existing tabs
     const currentTabs = layoutStore.getState().tabs;
     for (const tab of currentTabs) {
-      void window.hypershell?.closeSession?.({ sessionId: tab.sessionId }).catch(() => {});
+      void getShell().closeSession({ sessionId: tab.sessionId }).catch(() => {});
     }
     layoutStore.setState({
       tabs: [],
@@ -112,7 +113,7 @@ export function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   };
 
   const handleRemove = async (name: string) => {
-    await window.hypershell?.workspaceRemove?.({ name });
+    await getShell().workspaceRemove({ name });
     await refresh();
   };
 

@@ -18,6 +18,7 @@ import { FileContextMenu, type FileContextMenuAction } from "./FileContextMenu";
 import { FileList, type FileListEntry } from "./FileList";
 import { PathBreadcrumb, type PathBreadcrumbHandle } from "./PathBreadcrumb";
 import { SftpStatusBar } from "./SftpStatusBar";
+import { getShell, hasShell } from "../../../lib/shell";
 
 export interface RemotePaneProps {
   store: StoreApi<SftpStoreState>;
@@ -138,11 +139,10 @@ export function RemotePane({
       setError("remote", null);
 
       try {
-        const sftpList = window.hypershell?.sftpList;
-        if (!sftpList) {
+        if (!hasShell()) {
           throw new Error("SFTP list API is unavailable in preload bridge");
         }
-        const response = await sftpList({ sftpSessionId, path });
+        const response = await getShell().sftpList({ sftpSessionId, path });
         if (!requestGuardRef.current!.isCurrent(token)) {
           return;
         }

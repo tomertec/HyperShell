@@ -28,8 +28,8 @@ describe("createSftpTransport", () => {
     expect(transport.remove).toBeTypeOf("function");
     expect(transport.readFile).toBeTypeOf("function");
     expect(transport.writeFile).toBeTypeOf("function");
+    expect(transport.upload).toBeTypeOf("function");
     expect(transport.createReadStream).toBeTypeOf("function");
-    expect(transport.createWriteStream).toBeTypeOf("function");
   });
 
   it("ends the SFTP channel before releasing pooled connections", async () => {

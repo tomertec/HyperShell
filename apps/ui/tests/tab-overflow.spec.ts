@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { installFakeBridge } from "./support/fakeBridge";
 
 const profile = {
   id: "claude",
@@ -17,12 +18,7 @@ const profile = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript((seed) => {
-    (window as unknown as { hypershell: unknown }).hypershell = {
-      listLocalProfiles: async () => [seed],
-      rescanLocalProfiles: async () => [seed],
-    };
-  }, profile);
+  await page.addInitScript(installFakeBridge, { profiles: [profile] });
 });
 
 const strip = (page: Page) => page.getByTestId("tab-scroll-container");

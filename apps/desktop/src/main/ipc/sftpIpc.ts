@@ -33,6 +33,8 @@ import {
   type SftpEvent,
   type SftpSyncEvent,
   type SftpConnectRequest,
+  type SftpConnectResponse,
+  type HostKeyVerificationInfo,
   type SftpTransferPauseRequest,
   type SftpTransferResumeRequest,
   type KeyboardInteractiveRequest,
@@ -79,44 +81,20 @@ export function resolveSafeDragOutPath(tempDir: string, fileName: string): strin
 }
 
 /**
- * Error subclass thrown when host key verification fails.
- * Contains the fingerprint details so the renderer can show the appropriate dialog.
+ * Error subclass thrown when host key verification fails. `handleConnect`
+ * catches it and returns the details as a structured `hostKeyVerification`
+ * response field — errors crossing Electron IPC keep only their message, so
+ * the challenge must travel in the response, not in a thrown error.
  */
 class HostKeyVerificationError extends Error {
-  public readonly hostname: string;
-  public readonly port: number;
-  public readonly algorithm: string;
-  public readonly fingerprint: string;
-  public readonly verificationStatus: "new_host" | "key_changed";
-  public readonly previousFingerprint?: string;
+  public readonly info: HostKeyVerificationInfo;
 
-  constructor(opts: {
-    hostname: string;
-    port: number;
-    algorithm: string;
-    fingerprint: string;
-    verificationStatus: "new_host" | "key_changed";
-    previousFingerprint?: string;
-  }) {
-    // Encode structured data in the error message so the renderer can parse it.
-    // Electron serializes errors across IPC as plain Error objects with only the message.
-    const payload = {
-      __hostKeyVerification: true,
-      hostname: opts.hostname,
-      port: opts.port,
-      algorithm: opts.algorithm,
-      fingerprint: opts.fingerprint,
-      verificationStatus: opts.verificationStatus,
-      previousFingerprint: opts.previousFingerprint,
-    };
-    super(JSON.stringify(payload));
+  constructor(info: HostKeyVerificationInfo) {
+    super(
+      `Host key verification failed for ${info.hostname}:${info.port} (${info.verificationStatus})`
+    );
     this.name = "HostKeyVerificationError";
-    this.hostname = opts.hostname;
-    this.port = opts.port;
-    this.algorithm = opts.algorithm;
-    this.fingerprint = opts.fingerprint;
-    this.verificationStatus = opts.verificationStatus;
-    this.previousFingerprint = opts.previousFingerprint;
+    this.info = info;
   }
 }
 
@@ -633,7 +611,16 @@ export function registerSftpIpc(
       .filter((record) => record.isTrusted)
       .map((record) => record.fingerprint);
 
-    await verifyHostKey(hostname, port, fingerprintRepo, trustedFingerprints);
+    try {
+      await verifyHostKey(hostname, port, fingerprintRepo, trustedFingerprints);
+    } catch (error) {
+      if (error instanceof HostKeyVerificationError) {
+        // Not a failure — a challenge. The renderer shows the trust dialog
+        // and retries the connect once the fingerprint is trusted.
+        return { hostKeyVerification: error.info } satisfies SftpConnectResponse;
+      }
+      throw error;
+    }
 
     ensureBookmarkHost(hostId, connectOptions, hostsRepo);
 

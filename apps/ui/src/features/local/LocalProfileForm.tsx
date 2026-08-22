@@ -10,6 +10,7 @@ import { ENV_VAR_NAME_REGEX } from "@hypershell/shared";
 import { inputClasses } from "../../lib/formStyles";
 import { localProfilesStore } from "./localProfilesStore";
 import { LocalProfileIcon } from "./LocalProfileIcon";
+import { getShell } from "../../lib/shell";
 
 export interface LocalProfileFormProps {
   profile: LocalProfileRecord | null;
@@ -173,7 +174,7 @@ export function LocalProfileForm({
 
   const handleBrowseExecutable = useCallback(() => {
     void (async () => {
-      const filePath = await window.hypershell?.fsShowOpenDialog?.({
+      const filePath = await getShell().fsShowOpenDialog({
         title: "Select Executable",
         filters: [{ name: "Executable", extensions: ["exe"] }]
       });
@@ -185,7 +186,7 @@ export function LocalProfileForm({
 
   const handleBrowseStartingDirectory = useCallback(() => {
     void (async () => {
-      const dirPath = await window.hypershell?.fsShowOpenDialog?.({
+      const dirPath = await getShell().fsShowOpenDialog({
         title: "Select Starting Directory",
         directory: true
       });

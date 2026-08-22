@@ -5,6 +5,7 @@ import type { StoreApi } from "zustand";
 
 import type { SftpBookmark } from "@hypershell/shared";
 import type { SftpStoreState } from "../sftpStore";
+import { getShell } from "../../../lib/shell";
 
 export interface SftpToolbarProps {
   store: StoreApi<SftpStoreState>;
@@ -55,7 +56,7 @@ export function SftpToolbar({
     }
 
     try {
-      const list = await window.hypershell?.sftpBookmarksList?.({ hostId });
+      const list = await getShell().sftpBookmarksList({ hostId });
       setBookmarks(list ?? []);
     } catch {
       setBookmarks([]);

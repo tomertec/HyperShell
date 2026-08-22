@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getShell } from "../../lib/shell";
 
 interface ActiveForward {
   id: string;
@@ -29,7 +30,7 @@ export const useTunnelStore = create<TunnelState>((set) => ({
 
   async refresh() {
     try {
-      const result = await window.hypershell?.listPortForwards?.();
+      const result = await getShell().listPortForwards();
       if (result) {
         set({
           activeForwards: result.map((f: { id: string; hostname?: string; protocol?: string; localPort?: number; remoteHost?: string; remotePort?: number }) => ({

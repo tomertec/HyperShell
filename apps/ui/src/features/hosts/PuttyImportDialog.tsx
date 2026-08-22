@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PuttySession } from "@hypershell/shared";
 import { Modal } from "../layout/Modal";
 import { Button } from "../../components/ui/Button";
+import { getShell } from "../../lib/shell";
 
 export interface PuttyImportDialogProps {
   open: boolean;
@@ -27,7 +28,7 @@ export function PuttyImportDialog({ open, onImport, onClose }: PuttyImportDialog
 
     async function scan() {
       try {
-        const result = await window.hypershell?.scanPuttySessions?.();
+        const result = await getShell().scanPuttySessions();
         if (cancelled) return;
         if (!result || result.sessions.length === 0) {
           setError("No PuTTY SSH sessions found in the Windows registry.");

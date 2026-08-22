@@ -13,6 +13,7 @@ import { transferRowControls } from "../transferRowControls";
 import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
 import { TransferConflictActions } from "./TransferConflictActions";
+import { getShell, hasShell } from "../../../lib/shell";
 
 const RECENT_TRANSFER_WINDOW_MS = 120000;
 const MAX_VISIBLE_TRANSFERS = 1;
@@ -517,8 +518,7 @@ export function TransferPopup() {
   }, []);
 
   const cancelTransfer = useCallback(async (transferId: string) => {
-    const cancel = window.hypershell?.sftpTransferCancel;
-    if (!cancel) {
+    if (!hasShell()) {
       toast.error("Cancel transfer is unavailable in this build. Restart HyperShell.");
       return;
     }
@@ -526,7 +526,7 @@ export function TransferPopup() {
     setPendingOps((current) => new Map(current).set(transferId, "cancel"));
 
     try {
-      await cancel({ transferId });
+      await getShell().sftpTransferCancel({ transferId });
     } catch (error) {
       toast.error(toErrorMessage(error, "Failed to cancel transfer"));
     } finally {
@@ -536,8 +536,7 @@ export function TransferPopup() {
   }, []);
 
   const pauseTransfer = useCallback(async (transferId: string) => {
-    const pause = window.hypershell?.sftpTransferPause;
-    if (!pause) {
+    if (!hasShell()) {
       toast.error("Pause transfer is unavailable in this build. Restart HyperShell.");
       return;
     }
@@ -545,7 +544,7 @@ export function TransferPopup() {
     setPendingOps((current) => new Map(current).set(transferId, "pause"));
 
     try {
-      await pause({ transferId });
+      await getShell().sftpTransferPause({ transferId });
     } catch (error) {
       toast.error(toErrorMessage(error, "Failed to pause transfer"));
     } finally {
@@ -555,8 +554,7 @@ export function TransferPopup() {
   }, []);
 
   const resumeTransfer = useCallback(async (transferId: string) => {
-    const resume = window.hypershell?.sftpTransferResume;
-    if (!resume) {
+    if (!hasShell()) {
       toast.error("Resume transfer is unavailable in this build. Restart HyperShell.");
       return;
     }
@@ -564,7 +562,7 @@ export function TransferPopup() {
     setPendingOps((current) => new Map(current).set(transferId, "resume"));
 
     try {
-      await resume({ transferId });
+      await getShell().sftpTransferResume({ transferId });
     } catch (error) {
       toast.error(toErrorMessage(error, "Failed to resume transfer"));
     } finally {
@@ -577,7 +575,7 @@ export function TransferPopup() {
     setPendingOps((current) => new Map(current).set(transferId, "retry"));
 
     try {
-      await window.hypershell?.sftpTransferRetry?.({ transferId });
+      await getShell().sftpTransferRetry({ transferId });
       toast.success("Transfer resumed");
     } catch (err) {
       toast.error(toErrorMessage(err, "Resume failed"));
@@ -588,8 +586,7 @@ export function TransferPopup() {
   }, []);
 
   const cancelAllTransfers = useCallback(async () => {
-    const cancel = window.hypershell?.sftpTransferCancel;
-    if (!cancel) {
+    if (!hasShell()) {
       toast.error("Cancel transfer is unavailable in this build. Restart HyperShell.");
       return;
     }
@@ -615,7 +612,7 @@ export function TransferPopup() {
     let failedCancels = 0;
     for (const transferId of transferIds) {
       try {
-        await cancel({ transferId });
+        await getShell().sftpTransferCancel({ transferId });
       } catch {
         failedCancels += 1;
       }

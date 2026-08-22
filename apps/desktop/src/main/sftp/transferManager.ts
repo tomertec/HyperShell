@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, extname, join, posix } from "node:path";
 
 import { buildScpCommand, type SftpConnectionOptions, type SftpTransportHandle } from "@hypershell/session-core";
@@ -629,31 +629,13 @@ export function createTransferManager(
         return;
       }
 
-      const resumeOffset = job.bytesTransferred;
-      let isResuming = false;
-      if (resumeOffset > 0) {
-        try {
-          const remoteStat = await transport.stat(job.remotePath);
-          isResuming = remoteStat.size === resumeOffset;
-        } catch {
-          // Remote file doesn't exist — start fresh
-        }
-      }
-      const localStream = isResuming
-        ? createReadStream(job.localPath, { start: resumeOffset })
-        : createReadStream(job.localPath);
-      const remoteStream = isResuming
-        ? transport.createWriteStream(job.remotePath, { start: resumeOffset, flags: "r+" })
-        : transport.createWriteStream(job.remotePath);
-
-      let bytesTransferred = isResuming ? resumeOffset : 0;
       let lastEmit = Date.now();
       const startedAt = Date.now();
       const emitProgress = (status: "active" | "paused" = "active") => {
         emit({
           kind: "transfer-progress",
           transferId: job.transferId,
-          bytesTransferred,
+          bytesTransferred: job.bytesTransferred,
           totalBytes: job.totalBytes,
           speed: job.speed,
           status
@@ -662,21 +644,16 @@ export function createTransferManager(
 
       emitProgress();
 
-      await new Promise<void>((resolve, reject) => {
-        let settled = false;
-        const signal = job.abortController?.signal;
-        const cleanup = () => {
-          localStream.removeAllListeners();
-          remoteStream.removeAllListeners();
-        };
-        const settle = (fn: () => void) => {
-          if (settled) return;
-          settled = true;
-          fn();
-        };
-
-        localStream.on("data", (chunk: string | Buffer) => {
-          bytesTransferred += chunk.length;
+      // transport.upload owns the write invariant (sibling temp file, mode
+      // preservation, rename into place) and the resume handshake: passing
+      // resumeOffset makes the temp name deterministic, so a partial left by
+      // a paused or dropped attempt is found and continued. The real path is
+      // only ever touched by the final rename — an interrupted upload can no
+      // longer leave a truncated file where the original was.
+      await transport.upload(job.localPath, job.remotePath, {
+        resumeOffset: job.bytesTransferred,
+        signal: job.abortController?.signal,
+        onProgress: (bytesTransferred) => {
           job.bytesTransferred = bytesTransferred;
           const elapsed = (Date.now() - startedAt) / 1000;
           job.speed = elapsed > 0 ? bytesTransferred / elapsed : 0;
@@ -685,57 +662,11 @@ export function createTransferManager(
             lastEmit = Date.now();
             emitProgress();
           }
-        });
-
-        const abortHandler = () => {
-          settle(() => {
-            // Break the pipe first to prevent further writes into a destroyed stream.
-            localStream.unpipe(remoteStream);
-            // Swallow expected stream teardown errors after cancellation.
-            localStream.once("error", () => {});
-            remoteStream.once("error", () => {});
-            localStream.destroy();
-            remoteStream.destroy();
-            cleanup();
-            reject(new Error("Cancelled by user"));
-          });
-        };
-
-        if (signal?.aborted) {
-          abortHandler();
-          return;
         }
-        signal?.addEventListener("abort", abortHandler, { once: true });
-
-        remoteStream.on("close", () => {
-          signal?.removeEventListener("abort", abortHandler);
-          if (signal?.aborted) {
-            settle(() => {
-              cleanup();
-              reject(new Error("Cancelled by user"));
-            });
-            return;
-          }
-          settle(() => {
-            bytesTransferred = job.totalBytes;
-            job.bytesTransferred = job.totalBytes;
-            emitProgress();
-            cleanup();
-            resolve();
-          });
-        });
-        remoteStream.on("error", (error) => {
-          signal?.removeEventListener("abort", abortHandler);
-          settle(() => { cleanup(); reject(error); });
-        });
-        localStream.on("error", (error) => {
-          signal?.removeEventListener("abort", abortHandler);
-          settle(() => { cleanup(); reject(error); });
-        });
-
-        localStream.pipe(remoteStream);
       });
 
+      job.bytesTransferred = job.totalBytes;
+      emitProgress();
       return;
     }
 

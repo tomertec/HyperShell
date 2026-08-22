@@ -25,6 +25,7 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { IconButton } from "../../components/ui/IconButton";
 import type { HostRecord } from "../hosts/HostsView";
 import { loadCollapsedGroups, saveCollapsedGroups } from "./collapsedGroups";
+import { getShell, hasShell } from "../../lib/shell";
 
 export interface SidebarHostListProps {
   hosts: HostRecord[];
@@ -321,18 +322,18 @@ export function SidebarHostList({
   const activeHost = activeId ? hosts.find((h) => h.id === activeId) : null;
 
   const setStatusTargets = useCallback((hostIds: string[]) => {
-    if (!window.hypershell?.setHostStatusTargets) {
+    if (!hasShell()) {
       return;
     }
-    void window.hypershell.setHostStatusTargets({ hostIds });
+    void getShell().setHostStatusTargets({ hostIds });
   }, []);
 
   useEffect(() => {
-    if (!window.hypershell?.onHostStatus) {
+    if (!hasShell()) {
       return;
     }
 
-    return window.hypershell.onHostStatus((event) => {
+    return getShell().onHostStatus((event) => {
       setHostReachabilityById((prev) => {
         const next = event.online ? "online" : "offline";
         if (prev[event.hostId] === next) {
@@ -385,11 +386,12 @@ export function SidebarHostList({
       moved.group = overHost.group;
     }
 
-    // Emit new sort orders
+    // Emit new sort orders. Ungrouped hosts keep an empty group name — main
+    // resolves "" to no group, so no literal "Ungrouped" row is ever created.
     const items = flatHosts.map((h, i) => ({
       id: h.id,
       sortOrder: i,
-      group: h.group || "Ungrouped",
+      group: h.group,
     }));
     onReorder(items);
   }

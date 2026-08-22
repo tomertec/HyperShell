@@ -1,3 +1,4 @@
+import { getShell, hasShell } from "../../lib/shell";
 import { createStore } from "zustand/vanilla";
 import type { TerminalTheme } from "../terminal/terminalTheme";
 import {
@@ -213,9 +214,8 @@ interface SettingsState {
 }
 
 async function persistSettings(settings: AppSettings): Promise<void> {
-  const updateSetting = window.hypershell?.updateSetting;
-  if (updateSetting) {
-    await updateSetting({ key: SETTINGS_KEY, value: JSON.stringify(settings) });
+  if (hasShell()) {
+    await getShell().updateSetting({ key: SETTINGS_KEY, value: JSON.stringify(settings) });
   }
 }
 
@@ -225,8 +225,7 @@ export const settingsStore = createStore<SettingsState>()((set, get) => ({
 
   load: async () => {
     try {
-      const getSetting = window.hypershell?.getSetting;
-      const result = getSetting ? await getSetting({ key: SETTINGS_KEY }) : null;
+      const result = hasShell() ? await getShell().getSetting({ key: SETTINGS_KEY }) : null;
       if (result?.value) {
         try {
           const parsed = JSON.parse(result.value) as Partial<AppSettings>;

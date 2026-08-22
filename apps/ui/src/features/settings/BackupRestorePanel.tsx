@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { BackupInfo } from "@hypershell/shared";
 import { Button } from "../../components/ui/Button";
 import { SectionLabel } from "../../components/ui/SectionLabel";
+import { getShell } from "../../lib/shell";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -25,7 +26,7 @@ export function BackupRestorePanel() {
 
   const refreshBackups = useCallback(async () => {
     try {
-      const result = await window.hypershell?.backupList?.();
+      const result = await getShell().backupList();
       if (result) {
         setBackups(result.backups);
       }
@@ -44,7 +45,7 @@ export function BackupRestorePanel() {
       const ts = now.toISOString().replace(/:/g, "-").replace(/\.\d{3}Z$/, "");
       const defaultName = `hypershell-backup-${ts}.db`;
 
-      const filePath = await window.hypershell?.fsShowSaveDialog?.({
+      const filePath = await getShell().fsShowSaveDialog({
         defaultPath: defaultName,
         filters: [{ name: "SQLite Database", extensions: ["db"] }],
       });
@@ -52,7 +53,7 @@ export function BackupRestorePanel() {
       if (!filePath) return;
 
       setLoading(true);
-      const result = await window.hypershell?.backupCreate?.({ filePath });
+      const result = await getShell().backupCreate({ filePath });
       if (result) {
         toast.success(`Backup created (${formatFileSize(result.size)})`);
         void refreshBackups();
@@ -69,7 +70,7 @@ export function BackupRestorePanel() {
       let selectedPath = filePath;
 
       if (!selectedPath) {
-        selectedPath = (await window.hypershell?.backupShowOpenDialog?.()) ?? undefined;
+        selectedPath = (await getShell().backupShowOpenDialog()) ?? undefined;
         if (!selectedPath) return;
       }
 
@@ -79,7 +80,7 @@ export function BackupRestorePanel() {
       if (!confirmed) return;
 
       setLoading(true);
-      const result = await window.hypershell?.backupRestore?.({ filePath: selectedPath });
+      const result = await getShell().backupRestore({ filePath: selectedPath });
       if (result?.requiresRestart) {
         setRestartRequired(true);
         toast.success("Database restored. Please restart the application.");

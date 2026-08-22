@@ -14,11 +14,13 @@ All IPC channels are defined in `packages/shared/src/ipc/channels.ts`. Schemas a
 | `session:close` | renderer → main | `{ sessionId }` | void | `registerIpc.ts` |
 | `session:set-signals` | renderer → main | `{ sessionId, signals }` | void | `registerIpc.ts` |
 | `session:host-stats` | renderer → main | `{ sessionId }` | `{ cpuLoad, memUsage, diskUsage, uptime, latencyMs }` | `registerIpc.ts` |
-| `session:event` | main → renderer | — | `SessionEvent` (data\|status\|exit\|error\|process-title) | broadcast |
+| `session:event` | main → renderer | — | `SessionEvent` (data\|status\|exit\|error\|process-title\|claude-session) | broadcast |
 
 Session states: `connecting`, `connected`, `reconnecting`, `waiting_for_network`, `disconnected`, `failed`.
 
 `process-title` payload: `{ sessionId, name: string \| null }` — the foreground program on a local pty's process tree; `null` means the shell is at its prompt. SSH sessions never emit this event; their titles arrive as ordinary OSC-title `data`.
+
+`claude-session` payload: `{ sessionId, claudeSessionId: string \| null }` — the Claude Code conversation a local tab is running, worked out by `claudeSessionBinder.ts` from Claude's own session store. `null` means the tab stopped running Claude, so a restore must bring back a plain shell.
 
 ## Host Channels
 

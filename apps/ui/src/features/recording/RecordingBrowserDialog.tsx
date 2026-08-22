@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { SessionRecordingRecord } from "@hypershell/shared";
 
 import { Modal } from "../layout/Modal";
+import { getShell, hasShell } from "../../lib/shell";
 
 function formatDate(value: string): string {
   try {
@@ -50,12 +51,12 @@ export function RecordingBrowserDialog({
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!window.hypershell?.recordingList) {
+    if (!hasShell()) {
       return;
     }
     setLoading(true);
     try {
-      const list = await window.hypershell.recordingList();
+      const list = await getShell().recordingList();
       setRecordings(list);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to load recordings");
@@ -73,7 +74,7 @@ export function RecordingBrowserDialog({
 
   const handleDelete = async (recordingId: string) => {
     try {
-      const response = await window.hypershell?.recordingDelete?.({ id: recordingId });
+      const response = await getShell().recordingDelete({ id: recordingId });
       if (!response?.deleted) {
         toast.error("Recording was not found");
         return;
@@ -87,14 +88,14 @@ export function RecordingBrowserDialog({
 
   const handleExport = async (recording: SessionRecordingRecord) => {
     try {
-      const destination = await window.hypershell?.fsShowSaveDialog?.({
+      const destination = await getShell().fsShowSaveDialog({
         defaultPath: recording.fileName,
         filters: [{ name: "ASCIINEMA Cast", extensions: ["cast"] }],
       });
       if (!destination) {
         return;
       }
-      const result = await window.hypershell?.recordingExport?.({
+      const result = await getShell().recordingExport({
         id: recording.id,
         filePath: destination,
       });

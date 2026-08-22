@@ -139,6 +139,14 @@ export const sessionEventSchema = z.discriminatedUnion("type", [
     type: z.literal("process-title"),
     sessionId: z.string().min(1),
     name: z.string().min(1).nullable()
+  }),
+  // Reports the Claude Code conversation a local tab is currently running, so
+  // a restored tab can reattach to it. Null means the tab stopped running
+  // Claude — a restore must then bring back a plain shell, not a conversation.
+  z.object({
+    type: z.literal("claude-session"),
+    sessionId: z.string().min(1),
+    claudeSessionId: z.string().uuid().nullable()
   })
 ]);
 
@@ -172,6 +180,7 @@ export const hostRecordSchema = z.object({
   hostProfileId: z.string().nullable().optional(),
   authProfileId: z.string().nullable(),
   groupId: z.string().nullable(),
+  group: z.string().optional(),
   notes: z.string().nullable(),
   authMethod: z.enum(["default", "password", "keyfile", "agent", "op-reference"]).optional(),
   agentKind: z.enum(["system", "pageant", "1password"]).optional(),
@@ -227,7 +236,8 @@ export const reorderHostsRequestSchema = z.object({
   items: z.array(z.object({
     id: z.string().min(1),
     sortOrder: z.number().int(),
-    groupId: z.string().nullable()
+    groupId: z.string().nullable(),
+    group: z.string().optional()
   }))
 });
 export type ReorderHostsRequest = z.infer<typeof reorderHostsRequestSchema>;

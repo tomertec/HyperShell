@@ -10,6 +10,7 @@ const EditorPane = lazy(() => import("./components/EditorPane").then((m) => ({ d
 import { EditorStatusBar } from "./components/EditorStatusBar";
 import { SaveConflictDialog } from "./components/SaveConflictDialog";
 import { getLanguageName } from "../sftp/utils/languageDetect";
+import { getShell, hasShell } from "../../lib/shell";
 
 interface EditorAppProps {
   sftpSessionId: string;
@@ -143,7 +144,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
       });
 
       try {
-        const response = await window.hypershell?.sftpReadFile?.({
+        const response = await getShell().sftpReadFile({
           sftpSessionId,
           path: remotePath,
         });
@@ -192,13 +193,13 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
   );
 
   useEffect(() => {
-    return window.hypershell?.onEditorOpenFile?.((event) => {
+    return getShell().onEditorOpenFile((event) => {
       void openFile(event.remotePath);
     });
   }, [openFile]);
 
   useEffect(() => {
-    return window.hypershell?.onEditorSessionClosed?.(() => {
+    return getShell().onEditorSessionClosed(() => {
       storeRef.current.getState().setSessionDisconnected();
     });
   }, []);
@@ -216,13 +217,12 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
       const tab = currentTabs.find((t) => t.id === tabId);
       if (!tab || tab.readOnly || disconnected) return "error";
 
-      // Fail fast if the bridge lacks the method, rather than letting
-      // `await undefined?.(...)` resolve to `undefined` and fall through to
-      // the success branch below — that would mark the tab saved (and null
-      // out its base version, permanently disabling its conflict check)
-      // for a write that never happened.
-      const writeFile = window.hypershell?.sftpWriteFile;
-      if (!writeFile) {
+      // Never let a save that can't happen fall through to the success branch
+      // below — that would mark the tab saved (and null out its base version,
+      // permanently disabling its conflict check) for a write that never
+      // happened. Bridgeless (plain browser) fails fast here; a drifted
+      // bridge method throws inside the try and lands in the catch.
+      if (!hasShell()) {
         storeRef.current.getState().updateTab(tabId, {
           error: "Save is unavailable in this build. Restart HyperShell.",
         });
@@ -231,7 +231,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
 
       setSaving(true);
       try {
-        const response = await writeFile({
+        const response = await getShell().sftpWriteFile({
           sftpSessionId,
           path: targetPath,
           content: tab.content,
@@ -295,10 +295,10 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
 
   const handleDownloadBinary = useCallback(
     async (remotePath: string, fileName: string) => {
-      const targetPath = await window.hypershell?.fsShowSaveDialog?.({ defaultPath: fileName });
+      const targetPath = await getShell().fsShowSaveDialog({ defaultPath: fileName });
       if (!targetPath) return;
 
-      await window.hypershell?.sftpTransferStart?.({
+      await getShell().sftpTransferStart({
         sftpSessionId,
         operations: [
           { type: "download", localPath: targetPath, remotePath, isDirectory: false },
@@ -435,7 +435,7 @@ export function EditorApp({ sftpSessionId }: EditorAppProps) {
             // unrelated file — the user still has Overwrite for the
             // original path if that's what they actually want.
             try {
-              await window.hypershell?.sftpStat?.({ sftpSessionId, path: targetPath });
+              await getShell().sftpStat({ sftpSessionId, path: targetPath });
               return { ok: false, error: `${targetPath} already exists — choose a different name.` };
             } catch {
               // stat rejecting is the expected "nothing here yet" signal.

@@ -2,6 +2,7 @@ import { toast } from "sonner";
 
 import { refreshTransfers } from "./transferEventCoordinator";
 import { toErrorMessage } from "./utils/errorUtils";
+import { getShell } from "../../lib/shell";
 
 export type TransferConflictResolution = "overwrite" | "skip" | "rename";
 
@@ -17,7 +18,7 @@ export function resolveTransferConflict(
 ): void {
   void (async () => {
     try {
-      await window.hypershell?.sftpTransferResolveConflict?.({
+      await getShell().sftpTransferResolveConflict({
         transferId,
         resolution,
         applyToAll

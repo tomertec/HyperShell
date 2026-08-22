@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { RecordingFrame, RecordingFramesResponse } from "@hypershell/shared";
 
 import { Modal } from "../layout/Modal";
+import { getShell, hasShell } from "../../lib/shell";
 
 const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const;
 
@@ -73,7 +74,7 @@ export function RecordingPlaybackDialog({
       return;
     }
 
-    if (!recordingId || !window.hypershell?.recordingGetFrames) {
+    if (!recordingId || !hasShell()) {
       return;
     }
 
@@ -81,7 +82,7 @@ export function RecordingPlaybackDialog({
     setPlaying(false);
     setCursor(0);
 
-    void window.hypershell
+    void getShell()
       .recordingGetFrames({ id: recordingId })
       .then((response) => {
         setPayload(response);

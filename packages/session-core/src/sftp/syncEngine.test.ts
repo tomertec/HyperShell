@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { createWriteStream, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Readable, Writable } from "node:stream";
+import { Readable } from "node:stream";
 import { buildTempPath, createSyncEngine, type SyncConfig } from "./syncEngine";
 
 // node:fs is a built-in whose ESM namespace is non-configurable, so
@@ -33,12 +33,11 @@ function createMockTransport() {
     chmod: vi.fn().mockResolvedValue(undefined),
     mkdir: vi.fn().mockResolvedValue(undefined),
     rename: vi.fn().mockResolvedValue(undefined),
-    renameOverwrite: vi.fn().mockResolvedValue(undefined),
     remove: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue(Buffer.from("")),
     writeFile: vi.fn().mockResolvedValue(undefined),
+    upload: vi.fn().mockResolvedValue(undefined),
     createReadStream: vi.fn(),
-    createWriteStream: vi.fn(),
     onEvent: vi.fn().mockReturnValue(() => {}),
   };
 }
@@ -287,122 +286,42 @@ describe("local-to-remote sync", () => {
     });
   }
 
-  function acceptingWriteStream() {
-    return new Writable({
-      write(_chunk, _encoding, callback) {
-        callback();
-      },
-    });
-  }
-
-  it("uploads via a temp path and renames it into place", async () => {
+  it("delegates uploads to transport.upload, which owns the write invariant", async () => {
     const engine = createSyncEngine();
     const transport = createMockTransport();
     const localPath = mkdtempSync(path.join(tmpdir(), "hypershell-sync-test-"));
 
     try {
       writeFileSync(path.join(localPath, "notes.txt"), "content");
-      transport.createWriteStream.mockImplementation(acceptingWriteStream);
 
       await engine.runOnce(startUpload(engine, transport, localPath));
 
-      const openedPath = transport.createWriteStream.mock.calls[0][0] as string;
-      // Writing straight to /remote/notes.txt would leave it truncated if the
-      // transfer died mid-stream — the same failure the download leg avoids.
-      expect(openedPath).not.toBe("/remote/notes.txt");
-      expect(openedPath).toMatch(/^\/remote\/notes\.txt\.hypershell-sync-[0-9a-f]{12}\.tmp$/);
-      expect(transport.renameOverwrite).toHaveBeenCalledWith(openedPath, "/remote/notes.txt");
+      // Temp-and-rename, mode preservation, and cleanup are the transport's
+      // guarantee (sftpTransport.upload.test.ts) — sync only states intent.
+      expect(transport.upload).toHaveBeenCalledWith(
+        path.join(localPath, "notes.txt"),
+        "/remote/notes.txt"
+      );
       expect(engine.list()[0].filesSynced).toBe(1);
     } finally {
       rmSync(localPath, { recursive: true, force: true });
     }
   });
 
-  it("carries the destination's mode onto the temp file before renaming", async () => {
-    const engine = createSyncEngine();
-    const transport = createMockTransport();
-    const localPath = mkdtempSync(path.join(tmpdir(), "hypershell-sync-test-"));
-
-    try {
-      writeFileSync(path.join(localPath, "secret.env"), "content");
-      transport.createWriteStream.mockImplementation(acceptingWriteStream);
-      // Existing remote file, older than the local one, mode 0600.
-      transport.stat.mockResolvedValue({
-        name: "secret.env",
-        path: "/remote/secret.env",
-        size: 1,
-        modifiedAt: new Date(0).toISOString(),
-        isDirectory: false,
-        permissions: 0o600,
-        owner: 0,
-        group: 0,
-      });
-
-      const syncId = engine.start(transport as any, {
-        localPath,
-        remotePath: "/remote",
-        direction: "local-to-remote",
-        excludePatterns: [],
-        deleteOrphans: false,
-      });
-      await engine.runOnce(syncId);
-
-      // Writing in place kept the destination's mode; renaming a fresh temp
-      // over it would silently reset 0600 to the server default.
-      const tempPath = transport.createWriteStream.mock.calls[0][0] as string;
-      expect(transport.chmod).toHaveBeenCalledWith(tempPath, 0o600);
-      expect(transport.renameOverwrite).toHaveBeenCalledWith(tempPath, "/remote/secret.env");
-    } finally {
-      rmSync(localPath, { recursive: true, force: true });
-    }
-  });
-
-  it("removes the remote temp file when an upload fails", async () => {
+  it("records a failure and keeps the run alive when an upload fails", async () => {
     const engine = createSyncEngine();
     const transport = createMockTransport();
     const localPath = mkdtempSync(path.join(tmpdir(), "hypershell-sync-test-"));
 
     try {
       writeFileSync(path.join(localPath, "notes.txt"), "content");
-      transport.createWriteStream.mockImplementation(
-        () =>
-          new Writable({
-            write(_chunk, _encoding, callback) {
-              callback(new Error("no space left on device"));
-            },
-          })
-      );
+      transport.upload.mockRejectedValue(new Error("no space left on device"));
 
       await engine.runOnce(startUpload(engine, transport, localPath));
 
-      const tempPath = transport.createWriteStream.mock.calls[0][0] as string;
-      expect(transport.renameOverwrite).not.toHaveBeenCalled();
-      expect(transport.remove).toHaveBeenCalledWith(tempPath);
+      expect(engine.list()[0].status).toBe("idle");
       expect(engine.list()[0].lastError).toContain("notes.txt");
-    } finally {
-      rmSync(localPath, { recursive: true, force: true });
-    }
-  });
-
-  it("keeps the temp file when the rename already removed the destination", async () => {
-    const engine = createSyncEngine();
-    const transport = createMockTransport();
-    const localPath = mkdtempSync(path.join(tmpdir(), "hypershell-sync-test-"));
-
-    try {
-      writeFileSync(path.join(localPath, "notes.txt"), "content");
-      transport.createWriteStream.mockImplementation(acceptingWriteStream);
-      const failure: Error & { destinationRemoved?: true } = new Error("rename failed");
-      failure.destinationRemoved = true;
-      transport.renameOverwrite.mockRejectedValue(failure);
-
-      await engine.runOnce(startUpload(engine, transport, localPath));
-
-      const tempPath = transport.createWriteStream.mock.calls[0][0] as string;
-      // The destination is already unlinked, so the temp file holds the only
-      // copy of the data — cleaning it up here would be the data loss.
-      expect(transport.remove).not.toHaveBeenCalled();
-      expect(engine.list()[0].lastError).toContain(tempPath);
+      expect(engine.list()[0].lastError).toContain("no space left on device");
     } finally {
       rmSync(localPath, { recursive: true, force: true });
     }
@@ -414,12 +333,15 @@ describe("local-to-remote sync", () => {
     const localPath = mkdtempSync(path.join(tmpdir(), "hypershell-sync-test-"));
 
     try {
+      // One stranded by a killed sync run, one by the transport's own atomic
+      // writes (e.g. a paused transfer-queue upload) — neither is content.
       writeFileSync(path.join(localPath, "notes.txt.hypershell-sync-0123456789ab.tmp"), "partial");
-      transport.createWriteStream.mockImplementation(acceptingWriteStream);
+      writeFileSync(path.join(localPath, ".notes.txt.hypershell-upload.tmp"), "partial");
+      writeFileSync(path.join(localPath, ".notes.txt.hypershell-0123456789ab.tmp"), "partial");
 
       await engine.runOnce(startUpload(engine, transport, localPath));
 
-      expect(transport.createWriteStream).not.toHaveBeenCalled();
+      expect(transport.upload).not.toHaveBeenCalled();
       expect(engine.list()[0].filesSynced).toBe(0);
     } finally {
       rmSync(localPath, { recursive: true, force: true });
@@ -450,16 +372,9 @@ describe("bidirectional sync", () => {
       writeFileSync(path.join(localPath, "local-bad.txt"), "local content");
 
       // Force needsUpload/needsDownload true for both directions, and make
-      // the upload fail mid-write.
+      // the upload fail.
       transport.stat.mockRejectedValue(new Error("remote stat failed"));
-      transport.createWriteStream.mockImplementation(
-        () =>
-          new Writable({
-            write(_chunk, _encoding, callback) {
-              callback(new Error("no space left on device"));
-            },
-          })
-      );
+      transport.upload.mockRejectedValue(new Error("no space left on device"));
       transport.list.mockResolvedValue([remoteFile("remote-good.bin", 10)]);
       transport.createReadStream.mockImplementation(() => Readable.from([Buffer.alloc(10)]));
 
@@ -475,7 +390,7 @@ describe("bidirectional sync", () => {
 
       const status = engine.list().find((s) => s.syncId === syncId);
       expect(status?.status).not.toBe("error");
-      expect(transport.createWriteStream).toHaveBeenCalledTimes(1);
+      expect(transport.upload).toHaveBeenCalledTimes(1);
       expect(transport.createReadStream).toHaveBeenCalledTimes(1);
       expect(status?.lastError).toContain("local-bad.txt");
       expect(readFileSync(path.join(localPath, "remote-good.bin"))).toHaveLength(10);

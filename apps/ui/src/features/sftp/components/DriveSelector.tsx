@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getShell } from "../../../lib/shell";
 
 export interface DriveSelectorProps {
   currentPath: string;
@@ -19,7 +20,7 @@ export function DriveSelector({ currentPath, onSelect }: DriveSelectorProps) {
 
     async function loadDrives() {
       try {
-        const response = await window.hypershell?.fsGetDrives?.();
+        const response = await getShell().fsGetDrives();
         if (disposed) {
           return;
         }

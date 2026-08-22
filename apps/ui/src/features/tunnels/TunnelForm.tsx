@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { getShell } from "../../lib/shell";
 import { inputClasses } from "../../lib/formStyles";
 
 interface TunnelFormProps {
@@ -18,7 +19,7 @@ export function TunnelForm({ onSubmit, onCancel }: TunnelFormProps) {
   });
 
   const handleStart = async () => {
-    await window.hypershell?.startPortForward?.({
+    await getShell().startPortForward({
       hostname: form.hostname,
       username: form.username || undefined,
       port: Number(form.port) || undefined,

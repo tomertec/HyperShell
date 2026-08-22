@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -6,6 +6,8 @@ import type { StoreApi } from "zustand/vanilla";
 
 import { EditorApp } from "./EditorApp";
 import type { EditorState } from "./stores/editorStore";
+import { createFakeShell } from "../../lib/fakeShell";
+import { setShell, type ShellApi } from "../../lib/shell";
 
 // EditorPane pulls in CodeMirror, which isn't what these tests exercise —
 // they cover EditorApp's own save-conflict orchestration. Stub it out so
@@ -28,6 +30,14 @@ vi.mock("./components/EditorPane", () => ({
 type Hypershell = NonNullable<Window["hypershell"]>;
 type OpenFileListener = (event: { remotePath: string; sftpSessionId: string }) => void;
 
+function installHypershell(overrides: Partial<Hypershell>): void {
+  setShell(createFakeShell(mockHypershell(overrides) as Partial<ShellApi>).shell);
+}
+
+afterEach(() => {
+  setShell(null);
+});
+
 function mockHypershell(overrides: Partial<Hypershell>): Hypershell {
   return {
     onEditorOpenFile: vi.fn(() => () => {}),
@@ -49,7 +59,7 @@ describe("EditorApp save-conflict handling", () => {
   it("I-1: a failed read leaves the tab read-only, shows the real error (not the binary notice), and blocks save", async () => {
     let openFileListener: OpenFileListener | null = null;
     const sftpWriteFile = vi.fn();
-    window.hypershell = mockHypershell({
+    installHypershell({
       onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
         openFileListener = listener;
         return () => {};
@@ -116,7 +126,7 @@ describe("EditorApp save-conflict handling", () => {
       // Second attempted destination is free.
       .mockRejectedValueOnce(new Error("No such file"));
 
-    window.hypershell = mockHypershell({
+    installHypershell({
       onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
         openFileListener = listener;
         return () => {};
@@ -196,7 +206,7 @@ describe("EditorApp save-conflict handling", () => {
       modifiedAt: "2026-08-13T00:00:00.000Z",
     });
 
-    window.hypershell = mockHypershell({
+    installHypershell({
       onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
         openFileListener = listener;
         return () => {};
@@ -217,9 +227,9 @@ describe("EditorApp save-conflict handling", () => {
     });
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Save is unavailable in this build. Restart HyperShell.")
-      ).toBeTruthy();
+      // The seam throws on the drifted method; the save path surfaces it as
+      // the tab's error instead of falling through to the success branch.
+      expect(screen.getByText(/sftpWriteFile/)).toBeTruthy();
     });
     // Must not have been mistaken for a successful save — no conflict dialog,
     // and re-pressing Ctrl+S must still be possible (the tab wasn't marked
@@ -241,7 +251,7 @@ describe("EditorApp save-conflict handling", () => {
       .mockResolvedValueOnce({ status: "conflict", size: 999, modifiedAt: "2026-08-13T01:00:00.000Z" })
       .mockRejectedValueOnce(new Error("disk full"));
 
-    window.hypershell = mockHypershell({
+    installHypershell({
       onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
         openFileListener = listener;
         return () => {};
@@ -296,7 +306,7 @@ describe("EditorApp save-conflict handling", () => {
         })
     );
 
-    window.hypershell = mockHypershell({
+    installHypershell({
       onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
         openFileListener = listener;
         return () => {};
@@ -347,7 +357,7 @@ describe("EditorApp save-conflict handling", () => {
       .fn()
       .mockResolvedValueOnce({ status: "conflict", size: 999, modifiedAt: "2026-08-13T01:00:00.000Z" });
 
-    window.hypershell = mockHypershell({
+    installHypershell({
       onEditorOpenFile: vi.fn((listener: OpenFileListener) => {
         openFileListener = listener;
         return () => {};

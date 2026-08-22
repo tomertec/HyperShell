@@ -1,3 +1,4 @@
+import { getShell, hasShell } from "../../lib/shell";
 import { createStore } from "zustand/vanilla";
 import { toast } from "sonner";
 import type {
@@ -32,26 +33,25 @@ export const localProfilesStore = createStore<LocalProfilesState>()((set, get) =
   loading: false,
 
   load: async () => {
-    const list = window.hypershell?.listLocalProfiles;
-    if (!list) {
+    if (!hasShell()) {
       return;
     }
 
     set({ loading: true });
     try {
-      set({ profiles: await list(), loading: false });
+      set({ profiles: await getShell().listLocalProfiles(), loading: false });
     } catch {
       set({ loading: false });
     }
   },
 
   save: async (input) => {
-    await window.hypershell?.upsertLocalProfile?.(input);
+    await getShell().upsertLocalProfile(input);
     await get().load();
   },
 
   remove: async (id) => {
-    await window.hypershell?.removeLocalProfile?.({ id });
+    await getShell().removeLocalProfile({ id });
     await get().load();
   },
 
@@ -61,7 +61,7 @@ export const localProfilesStore = createStore<LocalProfilesState>()((set, get) =
   // back to whatever the main process actually has.
   setHidden: async (id, hidden) => {
     try {
-      await window.hypershell?.setLocalProfileHidden?.({ id, hidden });
+      await getShell().setLocalProfileHidden({ id, hidden });
     } catch (error) {
       toast.error(`Failed to ${hidden ? "hide" : "unhide"} profile: ${errorMessage(error)}`);
     }
@@ -70,7 +70,7 @@ export const localProfilesStore = createStore<LocalProfilesState>()((set, get) =
 
   reorder: async (items) => {
     try {
-      await window.hypershell?.reorderLocalProfiles?.({ items });
+      await getShell().reorderLocalProfiles({ items });
     } catch (error) {
       toast.error(`Failed to reorder profiles: ${errorMessage(error)}`);
     }
@@ -79,7 +79,7 @@ export const localProfilesStore = createStore<LocalProfilesState>()((set, get) =
 
   rescan: async () => {
     try {
-      const profiles = await window.hypershell?.rescanLocalProfiles?.();
+      const profiles = await getShell().rescanLocalProfiles();
       if (profiles) {
         set({ profiles });
       }

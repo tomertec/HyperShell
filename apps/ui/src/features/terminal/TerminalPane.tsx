@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type DragEvent } from "react";
 import { useStore } from "zustand";
 
 import { extractDroppedPaths, formatPathsForTerminal } from "../../lib/droppedFilePaths";
+import { getShell } from "../../lib/shell";
 import { useTerminalSession } from "./useTerminalSession";
 import { TerminalReconnectOverlay } from "./TerminalReconnectOverlay";
 import { TerminalSearchBar } from "./TerminalSearchBar";
@@ -141,7 +142,7 @@ export function TerminalPane({
                 onClick={() => {
                   const next = !value;
                   setter(next);
-                  void window.hypershell?.setSessionSignals?.({
+                  void getShell().setSessionSignals({
                     sessionId: session.sessionId!,
                     signals: { [signal]: next }
                   });

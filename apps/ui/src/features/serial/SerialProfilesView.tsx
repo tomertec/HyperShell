@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SerialProfileRecord } from "@hypershell/shared";
 
 import { SerialProfileForm, type SerialProfileFormValue } from "./SerialProfileForm";
+import { getShell } from "../../lib/shell";
 
 export function SerialProfilesView() {
   const [profiles, setProfiles] = useState<SerialProfileRecord[]>([]);
@@ -10,12 +11,12 @@ export function SerialProfilesView() {
   const [availablePorts, setAvailablePorts] = useState<string[]>([]);
 
   useEffect(() => {
-    window.hypershell?.listSerialProfiles?.().then(setProfiles).catch(console.error);
+    getShell().listSerialProfiles().then(setProfiles).catch(console.error);
   }, []);
 
   const refreshPorts = useCallback(() => {
-    window.hypershell
-      ?.listSerialPorts?.()
+    getShell()
+      .listSerialPorts()
       .then((ports) => setAvailablePorts(ports.map((p) => p.path)))
       .catch(console.error);
   }, []);
@@ -27,8 +28,8 @@ export function SerialProfilesView() {
 
   function handleSubmit(value: SerialProfileFormValue) {
     const id = selectedProfile?.id ?? `serial-${Date.now()}`;
-    window.hypershell
-      ?.upsertSerialProfile?.({
+    getShell()
+      .upsertSerialProfile({
         id,
         name: value.name,
         path: value.path,
@@ -59,8 +60,8 @@ export function SerialProfilesView() {
   function handleDelete() {
     if (!selectedProfile) return;
     if (!window.confirm(`Delete profile "${selectedProfile.name}"?`)) return;
-    window.hypershell
-      ?.removeSerialProfile?.({ id: selectedProfile.id })
+    getShell()
+      .removeSerialProfile({ id: selectedProfile.id })
       .then(() => {
         setProfiles((current) => current.filter((p) => p.id !== selectedProfile.id));
         setSelectedId("");
