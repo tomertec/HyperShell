@@ -2,7 +2,11 @@ import { HOST_OPTION_DEFAULTS } from "@hypershell/shared";
 import { describe, expect, it } from "vitest";
 
 import { openDatabase } from "../index";
-import { createHostsRepository, createHostsRepositoryFromDatabase } from "./hostsRepository";
+import {
+  createHostsRepository,
+  createHostsRepositoryFromDatabase,
+  normalizeHostInput
+} from "./hostsRepository";
 
 describe("hostsRepository", () => {
   it("creates and lists hosts", () => {
@@ -115,5 +119,27 @@ describe("host option defaults", () => {
     const repo = createHostsRepositoryFromDatabase(db);
     expect(repo.get("raw")).toMatchObject(HOST_OPTION_DEFAULTS);
     db.close();
+  });
+
+  it("normalizeHostInput fills every option from HOST_OPTION_DEFAULTS", () => {
+    expect(
+      normalizeHostInput({ id: "n1", name: "n", hostname: "n.example.com" })
+    ).toMatchObject(HOST_OPTION_DEFAULTS);
+  });
+
+  it("normalizeHostInput nulls the nullable fields and keeps explicit values", () => {
+    const record = normalizeHostInput({
+      id: "n2",
+      name: "n",
+      hostname: "n.example.com",
+      notes: "hi",
+      shellIntegration: false,
+    });
+    expect(record.username).toBeNull();
+    expect(record.groupId).toBeNull();
+    expect(record.sortOrder).toBeNull();
+    expect(record.keepAliveInterval).toBeNull();
+    expect(record.notes).toBe("hi");
+    expect(record.shellIntegration).toBe(false);
   });
 });

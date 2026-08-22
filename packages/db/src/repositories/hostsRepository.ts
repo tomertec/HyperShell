@@ -1,7 +1,4 @@
-import {
-  DEFAULT_RECONNECT_BASE_INTERVAL,
-  DEFAULT_RECONNECT_MAX_ATTEMPTS
-} from "@hypershell/shared";
+import { HOST_OPTION_DEFAULTS } from "@hypershell/shared";
 import type { SqliteDatabase } from "../index";
 import { withOpenDatabase } from "../index";
 
@@ -86,6 +83,54 @@ type HostRow = {
   shell_integration: number;
 };
 
+/**
+ * Apply every host-option default in one place. All three host stores — the
+ * SQLite repository, the in-memory fallback below, and the JSON-file fallback
+ * in apps/desktop hostsIpc.ts — normalize through this function, so each
+ * default is written exactly once (in HOST_OPTION_DEFAULTS).
+ */
+export function normalizeHostInput(input: HostInput): HostRecord {
+  return {
+    id: input.id,
+    name: input.name,
+    hostname: input.hostname,
+    port: input.port ?? HOST_OPTION_DEFAULTS.port,
+    username: input.username ?? null,
+    identityFile: input.identityFile ?? null,
+    hostProfileId: input.hostProfileId ?? null,
+    authProfileId: input.authProfileId ?? null,
+    groupId: input.groupId ?? null,
+    notes: input.notes ?? null,
+    authMethod: input.authMethod ?? HOST_OPTION_DEFAULTS.authMethod,
+    agentKind: input.agentKind ?? HOST_OPTION_DEFAULTS.agentKind,
+    opReference: input.opReference ?? null,
+    isFavorite: input.isFavorite ?? HOST_OPTION_DEFAULTS.isFavorite,
+    sortOrder: input.sortOrder ?? null,
+    color: input.color ?? null,
+    proxyJump: input.proxyJump ?? null,
+    proxyJumpHostIds: input.proxyJumpHostIds ?? null,
+    keepAliveInterval: input.keepAliveInterval ?? null,
+    autoReconnect: input.autoReconnect ?? HOST_OPTION_DEFAULTS.autoReconnect,
+    reconnectMaxAttempts:
+      input.reconnectMaxAttempts ?? HOST_OPTION_DEFAULTS.reconnectMaxAttempts,
+    reconnectBaseInterval:
+      input.reconnectBaseInterval ?? HOST_OPTION_DEFAULTS.reconnectBaseInterval,
+    tmuxDetect: input.tmuxDetect ?? HOST_OPTION_DEFAULTS.tmuxDetect,
+    shellIntegration: input.shellIntegration ?? HOST_OPTION_DEFAULTS.shellIntegration,
+  };
+}
+
+/** SQLite stores booleans as 0/1; everything else binds as-is. */
+function toRowParams(record: HostRecord) {
+  return {
+    ...record,
+    isFavorite: record.isFavorite ? 1 : 0,
+    autoReconnect: record.autoReconnect ? 1 : 0,
+    tmuxDetect: record.tmuxDetect ? 1 : 0,
+    shellIntegration: record.shellIntegration ? 1 : 0,
+  };
+}
+
 function mapRow(row: HostRow): HostRecord {
   return {
     id: row.id,
@@ -98,8 +143,8 @@ function mapRow(row: HostRow): HostRecord {
     authProfileId: row.auth_profile_id,
     groupId: row.group_id,
     notes: row.notes,
-    authMethod: row.auth_method ?? "default",
-    agentKind: row.agent_kind ?? "system",
+    authMethod: row.auth_method ?? HOST_OPTION_DEFAULTS.authMethod,
+    agentKind: row.agent_kind ?? HOST_OPTION_DEFAULTS.agentKind,
     opReference: row.op_reference ?? null,
     isFavorite: Boolean(row.is_favorite),
     sortOrder: row.sort_order ?? null,
@@ -108,8 +153,8 @@ function mapRow(row: HostRow): HostRecord {
     proxyJumpHostIds: row.proxy_jump_host_ids ?? null,
     keepAliveInterval: row.keep_alive_interval ?? null,
     autoReconnect: Boolean(row.auto_reconnect),
-    reconnectMaxAttempts: row.reconnect_max_attempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
-    reconnectBaseInterval: row.reconnect_base_interval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
+    reconnectMaxAttempts: row.reconnect_max_attempts ?? HOST_OPTION_DEFAULTS.reconnectMaxAttempts,
+    reconnectBaseInterval: row.reconnect_base_interval ?? HOST_OPTION_DEFAULTS.reconnectBaseInterval,
     tmuxDetect: Boolean(row.tmux_detect),
     shellIntegration: Boolean(row.shell_integration),
   };
@@ -197,32 +242,7 @@ export function createHostsRepositoryFromDatabase(db: SqliteDatabase) {
 
   return {
     create(input: HostInput): HostRecord {
-      const normalized = {
-        ...input,
-        port: input.port ?? 22,
-        username: input.username ?? null,
-        identityFile: input.identityFile ?? null,
-        hostProfileId: input.hostProfileId ?? null,
-        authProfileId: input.authProfileId ?? null,
-        groupId: input.groupId ?? null,
-        notes: input.notes ?? null,
-        authMethod: input.authMethod ?? "default",
-        agentKind: input.agentKind ?? "system",
-        opReference: input.opReference ?? null,
-        isFavorite: input.isFavorite ? 1 : 0,
-        sortOrder: input.sortOrder ?? null,
-        color: input.color ?? null,
-        proxyJump: input.proxyJump ?? null,
-        proxyJumpHostIds: input.proxyJumpHostIds ?? null,
-        keepAliveInterval: input.keepAliveInterval ?? null,
-        autoReconnect: input.autoReconnect ? 1 : 0,
-        reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
-        tmuxDetect: input.tmuxDetect ? 1 : 0,
-        shellIntegration: input.shellIntegration === false ? 0 : 1,
-      };
-
-      insertHost.run(normalized);
+      insertHost.run(toRowParams(normalizeHostInput(input)));
       const row = getHostById.get(input.id) as HostRow | undefined;
       if (!row) {
         throw new Error(`Host ${input.id} was not persisted`);
@@ -258,32 +278,7 @@ function createInMemoryHostsRepository() {
 
   return {
     create(input: HostInput): HostRecord {
-      const record: HostRecord = {
-        id: input.id,
-        name: input.name,
-        hostname: input.hostname,
-        port: input.port ?? 22,
-        username: input.username ?? null,
-        identityFile: input.identityFile ?? null,
-        hostProfileId: input.hostProfileId ?? null,
-        authProfileId: input.authProfileId ?? null,
-        groupId: input.groupId ?? null,
-        notes: input.notes ?? null,
-        authMethod: input.authMethod ?? "default",
-        agentKind: input.agentKind ?? "system",
-        opReference: input.opReference ?? null,
-        isFavorite: input.isFavorite ?? false,
-        sortOrder: input.sortOrder ?? null,
-        color: input.color ?? null,
-        proxyJump: input.proxyJump ?? null,
-        proxyJumpHostIds: input.proxyJumpHostIds ?? null,
-        keepAliveInterval: input.keepAliveInterval ?? null,
-        autoReconnect: input.autoReconnect ?? false,
-        reconnectMaxAttempts: input.reconnectMaxAttempts ?? DEFAULT_RECONNECT_MAX_ATTEMPTS,
-        reconnectBaseInterval: input.reconnectBaseInterval ?? DEFAULT_RECONNECT_BASE_INTERVAL,
-        tmuxDetect: input.tmuxDetect ?? false,
-        shellIntegration: input.shellIntegration === false ? false : true,
-      };
+      const record = normalizeHostInput(input);
 
       hosts.set(record.id, record);
       return record;
