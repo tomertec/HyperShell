@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useOverlayGuard } from "../../terminal/nativeOverlayGuard";
 
 export interface FileContextMenuAction {
   label: string;
@@ -23,6 +24,14 @@ export function FileContextMenu({
 }: FileContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y, ready: false });
+
+  // Every hook must run unconditionally before the `actions.length === 0`
+  // early return below (Rules of Hooks) — keyed on that same condition
+  // rather than assumed true, same as components/ContextMenu.tsx. This is a
+  // createPortal to document.body with position:fixed mouse-driven x/y, so
+  // in a split layout (e.g. an SFTP pane beside a terminal pane) it can
+  // render directly over a neighboring terminal's native HWND.
+  useOverlayGuard(actions.length > 0);
 
   useLayoutEffect(() => {
     const menu = ref.current;
