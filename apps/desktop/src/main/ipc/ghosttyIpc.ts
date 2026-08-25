@@ -8,12 +8,17 @@ import {
   ghosttySurfaceVisibleRequestSchema,
   ghosttySurfaceFocusRequestSchema,
   ghosttySurfaceCommandRequestSchema,
+  ghosttySurfaceConfigRequestSchema,
   ghosttyOverlayGuardRequestSchema,
   ghosttyUpdateConfigRequestSchema,
+  ghosttyReplayOpenRequestSchema,
+  ghosttyReplayControlRequestSchema,
+  ghosttyReplayCloseRequestSchema,
   setBroadcastTargetsRequestSchema,
   type SetBroadcastTargetsRequest
 } from "@hypershell/shared";
 import type { GhosttyHostClient } from "../ghosttyHost/ghosttyHostClient";
+import type { ReplayDriver } from "../ghosttyHost/replayDriver";
 import { ghosttyConfigFromSettings, type ResolvedGhosttyTheme } from "../ghosttyHost/ghosttyConfigFromSettings";
 import type { IpcMainLike } from "./registerIpc";
 
@@ -74,6 +79,9 @@ export interface RegisterGhosttyIpcOptions {
    * silently no-oping, so a missing terminal renderer is never mistaken for
    * one that's merely idle. */
   client: GhosttyHostClient | null;
+  /** Same null-when-unavailable contract as `client` — constructed from the
+   * same client instance, so it's null exactly when `client` is. */
+  replayDriver: ReplayDriver | null;
   /** Lazily starts the host process; resolves once, or rejects if the host
    * process is unavailable. Called before the first surface is created. */
   ensureHostStarted: () => Promise<void>;
@@ -88,6 +96,15 @@ function requireClient(client: GhosttyHostClient | null): GhosttyHostClient {
     );
   }
   return client;
+}
+
+function requireReplayDriver(driver: ReplayDriver | null): ReplayDriver {
+  if (!driver) {
+    throw new Error(
+      "ghostty is unavailable: the host process path could not be resolved (see GHOSTTY_HOST_PATH)"
+    );
+  }
+  return driver;
 }
 
 export function registerGhosttyIpc(
@@ -130,6 +147,11 @@ export function registerGhosttyIpc(
     requireClient(options.client).sendCommand(request.sessionId, request.command);
   });
 
+  ipcMain.handle(ipcChannels.ghostty.surfaceConfig, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttySurfaceConfigRequestSchema.parse(rawRequest);
+    requireClient(options.client).updateSurfaceConfig(request.sessionId, request.config);
+  });
+
   ipcMain.handle(ipcChannels.ghostty.overlayGuard, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = ghosttyOverlayGuardRequestSchema.parse(rawRequest);
     requireClient(options.client).setOverlayVisible(!request.hidden);
@@ -148,6 +170,28 @@ export function registerGhosttyIpc(
     });
     options.setGlobalConfigBlob(blob);
     client.updateGlobalConfig();
+  });
+
+  ipcMain.handle(
+    ipcChannels.ghostty.replayOpen,
+    async (event: IpcMainInvokeEvent, rawRequest: unknown) => {
+      const request = ghosttyReplayOpenRequestSchema.parse(rawRequest);
+      const driver = requireReplayDriver(options.replayDriver);
+      const parentHwnd = resolveParentHwnd(event);
+      await options.ensureHostStarted();
+      const replayId = await driver.open(request.recordingId, parentHwnd, request.bounds);
+      return { replayId };
+    }
+  );
+
+  ipcMain.handle(ipcChannels.ghostty.replayControl, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttyReplayControlRequestSchema.parse(rawRequest);
+    requireReplayDriver(options.replayDriver).control(request.replayId, request.action, request.frameIndex);
+  });
+
+  ipcMain.handle(ipcChannels.ghostty.replayClose, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttyReplayCloseRequestSchema.parse(rawRequest);
+    requireReplayDriver(options.replayDriver).close(request.replayId);
   });
 
   ipcMain.handle(ipcChannels.session.broadcastTargets, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {

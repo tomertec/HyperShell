@@ -6,10 +6,15 @@ import {
   ghosttyEventSchema,
   ghosttyOverlayGuardRequestSchema,
   ghosttyUpdateConfigRequestSchema,
+  ghosttySurfaceConfigRequestSchema,
+  ghosttyReplayOpenRequestSchema,
+  ghosttyReplayControlRequestSchema,
+  ghosttyReplayCloseRequestSchema,
   setBroadcastTargetsRequestSchema,
   ipcChannels
 } from "@hypershell/shared";
 import type { GhosttyHostClient } from "../ghosttyHost/ghosttyHostClient";
+import type { ReplayDriver } from "../ghosttyHost/replayDriver";
 
 const fromWebContents = vi.fn();
 vi.mock("electron", () => ({
@@ -72,6 +77,14 @@ function createFakeClient(): GhosttyHostClient {
     dispose: vi.fn(),
     onFrame: vi.fn(),
     onRestart: vi.fn()
+  };
+}
+
+function createFakeReplayDriver(): ReplayDriver {
+  return {
+    open: vi.fn(async () => "replay:1"),
+    control: vi.fn(),
+    close: vi.fn()
   };
 }
 
@@ -175,11 +188,45 @@ describe("ghostty schemas", () => {
       setBroadcastTargetsRequestSchema.parse({ enabled: true, targetSessionIds: ["a", "b"] })
     ).toEqual({ enabled: true, targetSessionIds: ["a", "b"] });
   });
+
+  it("parses a valid surface-config request", () => {
+    expect(
+      ghosttySurfaceConfigRequestSchema.parse({ sessionId: "s1", config: "font-size = 13" })
+    ).toEqual({ sessionId: "s1", config: "font-size = 13" });
+  });
+
+  it("parses a valid replay-open request", () => {
+    const parsed = ghosttyReplayOpenRequestSchema.parse({ recordingId: "rec-1", bounds: validBounds });
+    expect(parsed).toEqual({ recordingId: "rec-1", bounds: validBounds });
+  });
+
+  it("parses each valid replay-control action, with frameIndex only meaningful for seek", () => {
+    expect(ghosttyReplayControlRequestSchema.parse({ replayId: "replay:1", action: "play" })).toEqual({
+      replayId: "replay:1",
+      action: "play"
+    });
+    expect(
+      ghosttyReplayControlRequestSchema.parse({ replayId: "replay:1", action: "seek", frameIndex: 3 })
+    ).toEqual({ replayId: "replay:1", action: "seek", frameIndex: 3 });
+  });
+
+  it("rejects an unknown replay-control action", () => {
+    expect(() =>
+      ghosttyReplayControlRequestSchema.parse({ replayId: "replay:1", action: "rewind" })
+    ).toThrow();
+  });
+
+  it("parses a valid replay-close request", () => {
+    expect(ghosttyReplayCloseRequestSchema.parse({ replayId: "replay:1" })).toEqual({
+      replayId: "replay:1"
+    });
+  });
 });
 
 describe("registerGhosttyIpc handler delegation", () => {
   let ipcMain: ReturnType<typeof createFakeIpcMain>;
   let client: GhosttyHostClient;
+  let replayDriver: ReplayDriver;
   let options: RegisterGhosttyIpcOptions;
   let setGlobalConfigBlob: ReturnType<typeof vi.fn>;
   let setBroadcastState: ReturnType<typeof vi.fn>;
@@ -197,11 +244,13 @@ describe("registerGhosttyIpc handler delegation", () => {
 
     ipcMain = createFakeIpcMain();
     client = createFakeClient();
+    replayDriver = createFakeReplayDriver();
     setGlobalConfigBlob = vi.fn();
     setBroadcastState = vi.fn();
     ensureHostStarted = vi.fn().mockResolvedValue(undefined);
     options = {
       client,
+      replayDriver,
       ensureHostStarted,
       setGlobalConfigBlob,
       setBroadcastState
@@ -274,6 +323,36 @@ describe("registerGhosttyIpc handler delegation", () => {
     expect(client.updateGlobalConfig).toHaveBeenCalledTimes(1);
   });
 
+  it("surfaceConfig delegates to client.updateSurfaceConfig", async () => {
+    await ipcMain.invoke(ipcChannels.ghostty.surfaceConfig, { sessionId: "s1", config: "font-size = 15" });
+    expect(client.updateSurfaceConfig).toHaveBeenCalledWith("s1", "font-size = 15");
+  });
+
+  it("replayOpen resolves the parent HWND, ensures the host started, and returns the driver's replayId", async () => {
+    const result = await ipcMain.invoke(ipcChannels.ghostty.replayOpen, {
+      recordingId: "rec-1",
+      bounds: validBounds
+    });
+
+    expect(ensureHostStarted).toHaveBeenCalledTimes(1);
+    expect(replayDriver.open).toHaveBeenCalledWith("rec-1", "12345", validBounds);
+    expect(result).toEqual({ replayId: "replay:1" });
+  });
+
+  it("replayControl delegates to the driver with the parsed action and frameIndex", async () => {
+    await ipcMain.invoke(ipcChannels.ghostty.replayControl, {
+      replayId: "replay:1",
+      action: "seek",
+      frameIndex: 4
+    });
+    expect(replayDriver.control).toHaveBeenCalledWith("replay:1", "seek", 4);
+  });
+
+  it("replayClose delegates to the driver", async () => {
+    await ipcMain.invoke(ipcChannels.ghostty.replayClose, { replayId: "replay:1" });
+    expect(replayDriver.close).toHaveBeenCalledWith("replay:1");
+  });
+
   it("session:set-broadcast-targets delegates to setBroadcastState", async () => {
     await ipcMain.invoke(ipcChannels.session.broadcastTargets, {
       enabled: true,
@@ -306,6 +385,7 @@ describe("registerGhosttyIpc with an unavailable client", () => {
     const ipcMain = createFakeIpcMain();
     registerGhosttyIpc(ipcMain as any, {
       client: null,
+      replayDriver: null,
       ensureHostStarted: vi.fn().mockResolvedValue(undefined),
       setGlobalConfigBlob: vi.fn(),
       setBroadcastState: vi.fn()
@@ -313,6 +393,27 @@ describe("registerGhosttyIpc with an unavailable client", () => {
 
     await expect(
       ipcMain.invoke(ipcChannels.ghostty.surfaceDestroy, { sessionId: "s1" })
+    ).rejects.toThrow(/ghostty is unavailable/);
+  });
+
+  it("replay channels also fail loudly when the driver is unavailable", async () => {
+    const ipcMain = createFakeIpcMain();
+    registerGhosttyIpc(ipcMain as any, {
+      client: null,
+      replayDriver: null,
+      ensureHostStarted: vi.fn().mockResolvedValue(undefined),
+      setGlobalConfigBlob: vi.fn(),
+      setBroadcastState: vi.fn()
+    });
+
+    await expect(
+      ipcMain.invoke(ipcChannels.ghostty.replayOpen, { recordingId: "rec-1", bounds: validBounds })
+    ).rejects.toThrow(/ghostty is unavailable/);
+    await expect(
+      ipcMain.invoke(ipcChannels.ghostty.replayControl, { replayId: "replay:1", action: "play" })
+    ).rejects.toThrow(/ghostty is unavailable/);
+    await expect(
+      ipcMain.invoke(ipcChannels.ghostty.replayClose, { replayId: "replay:1" })
     ).rejects.toThrow(/ghostty is unavailable/);
   });
 });

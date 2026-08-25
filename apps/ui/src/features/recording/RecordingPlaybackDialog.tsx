@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Terminal } from "@xterm/xterm";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { RecordingFrame, RecordingFramesResponse } from "@hypershell/shared";
 
 import { Modal } from "../layout/Modal";
 import { getShell, hasShell } from "../../lib/shell";
-
-const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const;
+import { useReplaySurface } from "./useReplaySurface";
 
 function formatDurationFromFrames(frames: RecordingFrame[]): string {
   if (frames.length === 0) {
@@ -24,53 +22,41 @@ export interface RecordingPlaybackDialogProps {
   onClose: () => void;
 }
 
+/**
+ * Plays a recording back through a native replay surface (Task 3/10)
+ * instead of an in-renderer xterm instance: main paces the recorded frames
+ * through client.feedData on their own recorded timestamps, so this
+ * component's job is just the surface's container + bounds reporting
+ * (useReplaySurface) and forwarding play/pause/seek button presses to
+ * ghosttyReplayControl. It still fetches the recording's frames once — not
+ * to render them, only for the duration/frame-count metadata the transport
+ * controls display.
+ */
 export function RecordingPlaybackDialog({
   open,
   recordingId,
   onClose,
 }: RecordingPlaybackDialogProps) {
-  const terminalContainerRef = useRef<HTMLDivElement | null>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const [payload, setPayload] = useState<RecordingFramesResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // Renderer-local only: reflects the last explicit seek, not a live-updating
+  // playhead — the driver doesn't report per-frame playback progress back
+  // (out of this task's scope), so during Play this number just stays put
+  // rather than pretending to track the native surface frame-by-frame.
   const [cursor, setCursor] = useState(0);
-  const [speed, setSpeed] = useState<number>(1);
+
+  const { containerRef, replayId, error: surfaceError } = useReplaySurface(recordingId, open);
 
   const frames = useMemo(() => payload?.frames ?? [], [payload]);
   const recordingTitle = payload?.recording.title ?? "Playback";
   const totalDuration = useMemo(() => formatDurationFromFrames(frames), [frames]);
-
-  const clearPlaybackTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const renderToCursor = useCallback(
-    (nextCursor: number) => {
-      const term = terminalRef.current;
-      if (!term) {
-        return;
-      }
-
-      term.reset();
-      for (let i = 0; i < nextCursor; i += 1) {
-        term.write(frames[i][2]);
-      }
-    },
-    [frames]
-  );
 
   useEffect(() => {
     if (!open) {
       setPlaying(false);
       setCursor(0);
       setPayload(null);
-      clearPlaybackTimer();
       return;
     }
 
@@ -94,73 +80,36 @@ export function RecordingPlaybackDialog({
       .finally(() => {
         setLoading(false);
       });
-  }, [clearPlaybackTimer, onClose, open, recordingId]);
+  }, [onClose, open, recordingId]);
 
   useEffect(() => {
-    if (!open) {
-      return;
+    if (surfaceError) {
+      toast.error(surfaceError);
     }
+  }, [surfaceError]);
 
-    let disposed = false;
-
-    void (async () => {
-      const { Terminal: XTerm } = await import("@xterm/xterm");
-      if (disposed || !terminalContainerRef.current) {
-        return;
-      }
-
-      const term = new XTerm({
-        convertEol: false,
-        disableStdin: true,
-        rows: payload?.header.height,
-        cols: payload?.header.width,
+  const sendControl = (action: "play" | "pause" | "seek", frameIndex?: number) => {
+    if (!replayId || !hasShell()) return;
+    void getShell()
+      .ghosttyReplayControl({ replayId, action, frameIndex })
+      .catch((err) => {
+        toast.error(err instanceof Error ? err.message : "Playback control failed");
       });
-      term.open(terminalContainerRef.current);
-      terminalRef.current = term;
-      renderToCursor(cursor);
-    })();
+  };
 
-    return () => {
-      disposed = true;
-      clearPlaybackTimer();
-      terminalRef.current?.dispose();
-      terminalRef.current = null;
-    };
-  }, [clearPlaybackTimer, cursor, open, payload?.header.height, payload?.header.width, renderToCursor]);
-
-  useEffect(() => {
-    renderToCursor(cursor);
-  }, [cursor, renderToCursor]);
-
-  useEffect(() => {
-    if (!playing) {
-      clearPlaybackTimer();
-      return;
-    }
-
-    if (cursor >= frames.length) {
-      setPlaying(false);
-      return;
-    }
-
-    const delayMs = (() => {
-      if (cursor === 0) {
-        return (frames[0][0] * 1000) / speed;
-      }
-      const delta = frames[cursor][0] - frames[cursor - 1][0];
-      return (Math.max(0, delta) * 1000) / speed;
-    })();
-
-    timerRef.current = setTimeout(() => {
-      setCursor((prev) => Math.min(prev + 1, frames.length));
-    }, delayMs);
-
-    return clearPlaybackTimer;
-  }, [clearPlaybackTimer, cursor, frames, playing, speed]);
+  const togglePlaying = () => {
+    setPlaying((prev) => {
+      const next = !prev;
+      sendControl(next ? "play" : "pause");
+      return next;
+    });
+  };
 
   const seek = (nextCursor: number) => {
+    const clamped = Math.max(0, Math.min(nextCursor, frames.length));
     setPlaying(false);
-    setCursor(Math.max(0, Math.min(nextCursor, frames.length)));
+    setCursor(clamped);
+    sendControl("seek", clamped);
   };
 
   return (
@@ -172,7 +121,7 @@ export function RecordingPlaybackDialog({
               Loading recording...
             </div>
           ) : (
-            <div ref={terminalContainerRef} className="h-full w-full" />
+            <div ref={containerRef} className="h-full w-full" />
           )}
         </div>
 
@@ -197,8 +146,8 @@ export function RecordingPlaybackDialog({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setPlaying((prev) => !prev)}
-              disabled={loading || frames.length === 0}
+              onClick={togglePlaying}
+              disabled={loading || frames.length === 0 || !replayId}
               className="rounded border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text-primary hover:border-border-bright transition-colors disabled:opacity-50"
             >
               {playing ? "Pause" : "Play"}
@@ -206,28 +155,11 @@ export function RecordingPlaybackDialog({
             <button
               type="button"
               onClick={() => seek(0)}
-              disabled={loading || frames.length === 0}
+              disabled={loading || frames.length === 0 || !replayId}
               className="rounded border border-border px-3 py-1.5 text-xs text-text-muted hover:text-text-primary hover:border-border-bright transition-colors disabled:opacity-50"
             >
               Restart
             </button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {PLAYBACK_SPEEDS.map((candidateSpeed) => (
-              <button
-                key={candidateSpeed}
-                type="button"
-                onClick={() => setSpeed(candidateSpeed)}
-                className={`rounded px-2 py-1 text-xs border transition-colors ${
-                  speed === candidateSpeed
-                    ? "border-accent-dim bg-accent/10 text-accent"
-                    : "border-border text-text-muted hover:text-text-primary hover:border-border-bright"
-                }`}
-              >
-                {candidateSpeed}x
-              </button>
-            ))}
           </div>
         </div>
       </div>

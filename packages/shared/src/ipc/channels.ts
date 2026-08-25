@@ -20,9 +20,13 @@ export const ghosttyChannels = {
   surfaceVisible: "ghostty:surface-visible",
   surfaceFocus: "ghostty:surface-focus",
   surfaceCommand: "ghostty:surface-command",
+  surfaceConfig: "ghostty:surface-config",
   overlayGuard: "ghostty:overlay-guard",
   event: "ghostty:event",
-  updateConfig: "ghostty:update-config"
+  updateConfig: "ghostty:update-config",
+  replayOpen: "ghostty:replay-open",
+  replayControl: "ghostty:replay-control",
+  replayClose: "ghostty:replay-close"
 } as const;
 
 export const hostChannels = {

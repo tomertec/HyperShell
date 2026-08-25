@@ -6,8 +6,13 @@ import {
   ghosttySurfaceVisibleRequestSchema,
   ghosttySurfaceFocusRequestSchema,
   ghosttySurfaceCommandRequestSchema,
+  ghosttySurfaceConfigRequestSchema,
   ghosttyOverlayGuardRequestSchema,
   ghosttyUpdateConfigRequestSchema,
+  ghosttyReplayOpenRequestSchema,
+  ghosttyReplayOpenResponseSchema,
+  ghosttyReplayControlRequestSchema,
+  ghosttyReplayCloseRequestSchema,
   setBroadcastTargetsRequestSchema,
   ghosttyEventSchema,
   type GhosttySurfaceCreateRequest,
@@ -16,8 +21,13 @@ import {
   type GhosttySurfaceVisibleRequest,
   type GhosttySurfaceFocusRequest,
   type GhosttySurfaceCommandRequest,
+  type GhosttySurfaceConfigRequest,
   type GhosttyOverlayGuardRequest,
   type GhosttyUpdateConfigRequest,
+  type GhosttyReplayOpenRequest,
+  type GhosttyReplayOpenResponse,
+  type GhosttyReplayControlRequest,
+  type GhosttyReplayCloseRequest,
   type SetBroadcastTargetsRequest,
   type GhosttyEvent,
 } from "@hypershell/shared";
@@ -56,8 +66,12 @@ export interface GhosttyApi {
   ghosttySurfaceVisible(request: GhosttySurfaceVisibleRequest): Promise<void>;
   ghosttySurfaceFocus(request: GhosttySurfaceFocusRequest): Promise<void>;
   ghosttySurfaceCommand(request: GhosttySurfaceCommandRequest): Promise<void>;
+  ghosttySurfaceConfig(request: GhosttySurfaceConfigRequest): Promise<void>;
   ghosttyOverlayGuard(request: GhosttyOverlayGuardRequest): Promise<void>;
   ghosttyUpdateConfig(request: GhosttyUpdateConfigRequest): Promise<void>;
+  ghosttyReplayOpen(request: GhosttyReplayOpenRequest): Promise<GhosttyReplayOpenResponse>;
+  ghosttyReplayControl(request: GhosttyReplayControlRequest): Promise<void>;
+  ghosttyReplayClose(request: GhosttyReplayCloseRequest): Promise<void>;
   onGhosttyEvent(listener: (event: GhosttyEvent) => void): () => void;
   setBroadcastTargets(request: SetBroadcastTargetsRequest): Promise<void>;
 }
@@ -91,6 +105,10 @@ function createGhosttyApi(
       const parsed = ghosttySurfaceCommandRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.ghostty.surfaceCommand, parsed);
     },
+    async ghosttySurfaceConfig(request) {
+      const parsed = ghosttySurfaceConfigRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.ghostty.surfaceConfig, parsed);
+    },
     async ghosttyOverlayGuard(request) {
       const parsed = ghosttyOverlayGuardRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.ghostty.overlayGuard, parsed);
@@ -98,6 +116,19 @@ function createGhosttyApi(
     async ghosttyUpdateConfig(request) {
       const parsed = ghosttyUpdateConfigRequestSchema.parse(request);
       await ipcRenderer.invoke(ipcChannels.ghostty.updateConfig, parsed);
+    },
+    async ghosttyReplayOpen(request) {
+      const parsed = ghosttyReplayOpenRequestSchema.parse(request);
+      const raw = await ipcRenderer.invoke(ipcChannels.ghostty.replayOpen, parsed);
+      return ghosttyReplayOpenResponseSchema.parse(raw);
+    },
+    async ghosttyReplayControl(request) {
+      const parsed = ghosttyReplayControlRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.ghostty.replayControl, parsed);
+    },
+    async ghosttyReplayClose(request) {
+      const parsed = ghosttyReplayCloseRequestSchema.parse(request);
+      await ipcRenderer.invoke(ipcChannels.ghostty.replayClose, parsed);
     },
     onGhosttyEvent: createSubscription(
       ipcRenderer,

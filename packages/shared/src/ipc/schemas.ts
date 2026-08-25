@@ -1284,6 +1284,37 @@ export const ghosttyUpdateConfigRequestSchema = z.object({
   theme: ghosttyResolvedThemeRequestSchema
 });
 
+// Per-surface config override (closes Task 7's per-surface font-size TODO) —
+// separate from ghosttyUpdateConfigRequestSchema's global push: this targets
+// exactly one surface's own config blob via client.updateSurfaceConfig.
+export const ghosttySurfaceConfigRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  config: z.string()
+});
+
+// Recording playback drives a replay surface (Task 3's createReplaySurface)
+// instead of an in-renderer xterm instance — recordings are DB frames
+// (recorder.getFrames), not files, so replayFile/replay_* wire commands stay
+// unused; the driver paces frames through the normal feedData path.
+export const ghosttyReplayOpenRequestSchema = z.object({
+  recordingId: z.string().min(1),
+  bounds: ghosttyBoundsSchema
+});
+
+export const ghosttyReplayOpenResponseSchema = z.object({
+  replayId: z.string().min(1)
+});
+
+export const ghosttyReplayControlRequestSchema = z.object({
+  replayId: z.string().min(1),
+  action: z.enum(["play", "pause", "seek"]),
+  frameIndex: z.number().int().min(0).optional()
+});
+
+export const ghosttyReplayCloseRequestSchema = z.object({
+  replayId: z.string().min(1)
+});
+
 export type GhosttyBounds = z.infer<typeof ghosttyBoundsSchema>;
 export type GhosttySurfaceCreateRequest = z.infer<typeof ghosttySurfaceCreateRequestSchema>;
 export type GhosttySurfaceDestroyRequest = z.infer<typeof ghosttySurfaceDestroyRequestSchema>;
@@ -1296,3 +1327,8 @@ export type GhosttyEvent = z.infer<typeof ghosttyEventSchema>;
 export type SetBroadcastTargetsRequest = z.infer<typeof setBroadcastTargetsRequestSchema>;
 export type GhosttyResolvedThemeRequest = z.infer<typeof ghosttyResolvedThemeRequestSchema>;
 export type GhosttyUpdateConfigRequest = z.infer<typeof ghosttyUpdateConfigRequestSchema>;
+export type GhosttySurfaceConfigRequest = z.infer<typeof ghosttySurfaceConfigRequestSchema>;
+export type GhosttyReplayOpenRequest = z.infer<typeof ghosttyReplayOpenRequestSchema>;
+export type GhosttyReplayOpenResponse = z.infer<typeof ghosttyReplayOpenResponseSchema>;
+export type GhosttyReplayControlRequest = z.infer<typeof ghosttyReplayControlRequestSchema>;
+export type GhosttyReplayCloseRequest = z.infer<typeof ghosttyReplayCloseRequestSchema>;

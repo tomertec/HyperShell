@@ -151,8 +151,13 @@ import type {
   GhosttySurfaceVisibleRequest,
   GhosttySurfaceFocusRequest,
   GhosttySurfaceCommandRequest,
+  GhosttySurfaceConfigRequest,
   GhosttyOverlayGuardRequest,
   GhosttyUpdateConfigRequest,
+  GhosttyReplayOpenRequest,
+  GhosttyReplayOpenResponse,
+  GhosttyReplayControlRequest,
+  GhosttyReplayCloseRequest,
   GhosttyEvent,
   SetBroadcastTargetsRequest,
 } from "@hypershell/shared";
@@ -327,8 +332,12 @@ declare global {
       ghosttySurfaceVisible?: (request: GhosttySurfaceVisibleRequest) => Promise<void>;
       ghosttySurfaceFocus?: (request: GhosttySurfaceFocusRequest) => Promise<void>;
       ghosttySurfaceCommand?: (request: GhosttySurfaceCommandRequest) => Promise<void>;
+      ghosttySurfaceConfig?: (request: GhosttySurfaceConfigRequest) => Promise<void>;
       ghosttyOverlayGuard?: (request: GhosttyOverlayGuardRequest) => Promise<void>;
       ghosttyUpdateConfig?: (request: GhosttyUpdateConfigRequest) => Promise<void>;
+      ghosttyReplayOpen?: (request: GhosttyReplayOpenRequest) => Promise<GhosttyReplayOpenResponse>;
+      ghosttyReplayControl?: (request: GhosttyReplayControlRequest) => Promise<void>;
+      ghosttyReplayClose?: (request: GhosttyReplayCloseRequest) => Promise<void>;
       onGhosttyEvent?: (listener: (event: GhosttyEvent) => void) => () => void;
       setBroadcastTargets?: (request: SetBroadcastTargetsRequest) => Promise<void>;
     };

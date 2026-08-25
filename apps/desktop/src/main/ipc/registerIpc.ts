@@ -78,6 +78,7 @@ import { registerGhosttyIpc } from "./ghosttyIpc";
 import { createGhosttyHostProcess } from "../ghosttyHost/hostProcess";
 import { createGhosttyHostClient, type GhosttyHostClient, type GhosttyRendererEvent } from "../ghosttyHost/ghosttyHostClient";
 import { resolveGhosttyHostPath } from "../ghosttyHost/hostPath";
+import { createReplayDriver, type ReplayDriver } from "../ghosttyHost/replayDriver";
 import { registerClaudeIpc } from "./claudeIpc";
 import { buildClaudeResumeCommand } from "./claudeResumeCommand";
 import { applyClaudeSessionArgs } from "./claudeSessionArgs";
@@ -292,6 +293,7 @@ let ghosttyGlobalConfigBlob = "";
 export let ghosttyClient: GhosttyHostClient | null = null;
 let ghosttyHost: ReturnType<typeof createGhosttyHostProcess> | null = null;
 let ghosttyHostStartPromise: Promise<void> | null = null;
+export let ghosttyReplayDriver: ReplayDriver | null = null;
 
 try {
   const exePath = resolveGhosttyHostPath();
@@ -318,6 +320,14 @@ try {
   });
   ghosttyHost = host;
   ghosttyClient = client;
+  // recordingIpcManager is declared further down this module — safe to
+  // forward-reference here since this callback only runs once a replay-open
+  // IPC call fires, well after the whole module (including that const) has
+  // finished evaluating.
+  ghosttyReplayDriver = createReplayDriver({
+    client,
+    getFrames: async (recordingId) => recordingIpcManager.getFrames(recordingId).frames
+  });
 } catch (error) {
   // Dev without GHOSTTY_HOST_PATH set (and no packaged process.resourcesPath)
   // must not break unrelated app startup — ghostty features degrade to a
@@ -1368,6 +1378,7 @@ export function registerIpc(
 
   const cleanupGhostty = registerGhosttyIpc(ipcMain, {
     client: ghosttyClient,
+    replayDriver: ghosttyReplayDriver,
     ensureHostStarted: ensureGhosttyHostStarted,
     setGlobalConfigBlob: (blob) => {
       ghosttyGlobalConfigBlob = blob;
