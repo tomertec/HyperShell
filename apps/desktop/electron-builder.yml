@@ -23,6 +23,17 @@ win:
       arch:
         - x64
   artifactName: hypershell-${version}-${arch}.${ext}
+  # Bundles the ghostty-host.exe PTY host + its Mesa (software GL) runtime —
+  # built separately by the ghostty port (see
+  # docs/superpowers/plans/2026-08-25-ghostty-integration-plan.md) — into
+  # resources/ghostty-host/. GHOSTTY_HOST_DIST must point at that build's
+  # output directory (e.g. zig-out/bin, containing ghostty-host.exe and
+  # mesa/) before packaging; apps/desktop's package:win:unsigned script fails
+  # loudly if it's unset or missing the exe, since electron-builder itself
+  # stays silent about a missing extraResources `from` directory.
+  extraResources:
+    - from: "${env.GHOSTTY_HOST_DIST}"
+      to: ghostty-host/
 nsis:
   oneClick: false
   perMachine: false
