@@ -9,7 +9,6 @@ import { useGhosttySurface, type UseGhosttySurfaceInput } from "./useGhosttySurf
 
 let ghosttyEventListener: ((event: GhosttyEvent) => void) | null = null;
 let resizeCallback: ResizeObserverCallback | null = null;
-let intersectionCallback: IntersectionObserverCallback | null = null;
 let currentRect: { left: number; top: number; width: number; height: number };
 
 class ControllableResizeObserver {
@@ -19,18 +18,6 @@ class ControllableResizeObserver {
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
-}
-
-class ControllableIntersectionObserver {
-  constructor(callback: IntersectionObserverCallback) {
-    intersectionCallback = callback;
-  }
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-  takeRecords(): IntersectionObserverEntry[] {
-    return [];
-  }
 }
 
 function setRect(rect: { left: number; top: number; width: number; height: number }): void {
@@ -60,11 +47,9 @@ describe("useGhosttySurface", () => {
   beforeEach(() => {
     ghosttyEventListener = null;
     resizeCallback = null;
-    intersectionCallback = null;
     setRect({ left: 0, top: 0, width: 0, height: 0 });
 
     vi.stubGlobal("ResizeObserver", ControllableResizeObserver);
-    vi.stubGlobal("IntersectionObserver", ControllableIntersectionObserver);
     vi.stubGlobal("devicePixelRatio", 1);
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
       () => currentRect as DOMRect
@@ -102,10 +87,10 @@ describe("useGhosttySurface", () => {
   it("(a) creates the surface once when sessionId becomes non-null and the container has a rect", () => {
     setRect({ left: 10, top: 20, width: 800, height: 600 });
 
-    const { rerender } = render(<Harness sessionId={null} fontSize={13} />);
+    const { rerender } = render(<Harness sessionId={null} fontSize={13} visible={true} />);
     expect(ghosttySurfaceCreate).not.toHaveBeenCalled();
 
-    rerender(<Harness sessionId="s1" fontSize={13} />);
+    rerender(<Harness sessionId="s1" fontSize={13} visible={true} />);
 
     expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(1);
     expect(ghosttySurfaceCreate).toHaveBeenCalledWith({
@@ -115,9 +100,22 @@ describe("useGhosttySurface", () => {
     });
   });
 
+  it("computes bounds at the current devicePixelRatio", () => {
+    vi.stubGlobal("devicePixelRatio", 2);
+    setRect({ left: 10, top: 20, width: 800, height: 600 });
+
+    render(<Harness sessionId="s1" fontSize={13} visible={true} />);
+
+    expect(ghosttySurfaceCreate).toHaveBeenCalledWith({
+      sessionId: "s1",
+      bounds: { x: 20, y: 40, w: 1600, h: 1200 },
+      fontSize: 13
+    });
+  });
+
   it("does not create a surface while the container has no rect yet", () => {
     setRect({ left: 0, top: 0, width: 0, height: 0 });
-    render(<Harness sessionId="s1" fontSize={13} />);
+    render(<Harness sessionId="s1" fontSize={13} visible={true} />);
     expect(ghosttySurfaceCreate).not.toHaveBeenCalled();
   });
 
@@ -125,7 +123,7 @@ describe("useGhosttySurface", () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
     try {
       setRect({ left: 0, top: 0, width: 800, height: 600 });
-      render(<Harness sessionId="s1" fontSize={13} />);
+      render(<Harness sessionId="s1" fontSize={13} visible={true} />);
       expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(1);
 
       setRect({ left: 0, top: 0, width: 900, height: 600 });
@@ -153,7 +151,7 @@ describe("useGhosttySurface", () => {
 
   it("(c) destroys the surface on unmount", () => {
     setRect({ left: 0, top: 0, width: 800, height: 600 });
-    const { unmount } = render(<Harness sessionId="s1" fontSize={13} />);
+    const { unmount } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
     expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(1);
 
     unmount();
@@ -163,7 +161,7 @@ describe("useGhosttySurface", () => {
 
   it("(d) invokes onGrid for a grid event addressed to this session", () => {
     const onGrid = vi.fn();
-    render(<Harness sessionId="s1" fontSize={13} onGrid={onGrid} />);
+    render(<Harness sessionId="s1" fontSize={13} visible={true} onGrid={onGrid} />);
 
     act(() => {
       ghosttyEventListener?.({ kind: "grid", sessionId: "s1", cols: 80, rows: 24 });
@@ -179,7 +177,7 @@ describe("useGhosttySurface", () => {
 
   it("(e) invokes onChord for a chord event addressed to this session", () => {
     const onChord = vi.fn();
-    render(<Harness sessionId="s1" fontSize={13} onChord={onChord} />);
+    render(<Harness sessionId="s1" fontSize={13} visible={true} onChord={onChord} />);
 
     act(() => {
       ghosttyEventListener?.({ kind: "chord", sessionId: "s1", chord: "ctrl+shift+d" });
@@ -189,7 +187,7 @@ describe("useGhosttySurface", () => {
   });
 
   it("(f) flips focused on focusGained/focusLost events for this session", () => {
-    const { getByTestId } = render(<Harness sessionId="s1" fontSize={13} />);
+    const { getByTestId } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
     expect(getByTestId("focused").textContent).toBe("false");
 
     act(() => {
@@ -204,7 +202,7 @@ describe("useGhosttySurface", () => {
   });
 
   it("(g) calls ghosttySurfaceFocus when a focus request targets this session", () => {
-    render(<Harness sessionId="s1" fontSize={13} />);
+    render(<Harness sessionId="s1" fontSize={13} visible={true} />);
 
     act(() => {
       window.dispatchEvent(
@@ -216,7 +214,7 @@ describe("useGhosttySurface", () => {
   });
 
   it("(g) ignores a focus request targeting a different session", () => {
-    render(<Harness sessionId="s1" fontSize={13} />);
+    render(<Harness sessionId="s1" fontSize={13} visible={true} />);
 
     act(() => {
       window.dispatchEvent(
@@ -227,30 +225,37 @@ describe("useGhosttySurface", () => {
     expect(ghosttySurfaceFocus).not.toHaveBeenCalled();
   });
 
-  it("(h) reports IntersectionObserver changes via ghosttySurfaceVisible", () => {
-    setRect({ left: 0, top: 0, width: 800, height: 600 });
-    render(<Harness sessionId="s1" fontSize={13} />);
+  it("(h) syncs visibility from the `visible` prop, including its initial value on mount", () => {
+    // Fix 1 (review round 1): IntersectionObserver cannot see this app's tab
+    // switching — Workspace.tsx hides inactive tabs with `visibility:
+    // hidden`, which keeps the full layout rect (IO computes from geometry
+    // only), so every tab would report isIntersecting:true forever. main
+    // must instead be told directly from the `isVisible` prop TerminalPane
+    // already threads down from Workspace.tsx.
+    const { rerender } = render(<Harness sessionId="s1" fontSize={13} visible={false} />);
 
-    act(() => {
-      intersectionCallback?.(
-        [{ isIntersecting: false } as IntersectionObserverEntry],
-        {} as IntersectionObserver
-      );
-    });
+    // Mount with visible=false must push false immediately, not wait for a
+    // later flip — main otherwise assumes a fresh surface is visible.
+    expect(ghosttySurfaceVisible).toHaveBeenCalledTimes(1);
     expect(ghosttySurfaceVisible).toHaveBeenCalledWith({ sessionId: "s1", visible: false });
 
-    act(() => {
-      intersectionCallback?.(
-        [{ isIntersecting: true } as IntersectionObserverEntry],
-        {} as IntersectionObserver
-      );
-    });
-    expect(ghosttySurfaceVisible).toHaveBeenCalledWith({ sessionId: "s1", visible: true });
+    rerender(<Harness sessionId="s1" fontSize={13} visible={true} />);
+    expect(ghosttySurfaceVisible).toHaveBeenCalledTimes(2);
+    expect(ghosttySurfaceVisible).toHaveBeenLastCalledWith({ sessionId: "s1", visible: true });
+
+    rerender(<Harness sessionId="s1" fontSize={13} visible={false} />);
+    expect(ghosttySurfaceVisible).toHaveBeenCalledTimes(3);
+    expect(ghosttySurfaceVisible).toHaveBeenLastCalledWith({ sessionId: "s1", visible: false });
+  });
+
+  it("(h) does not call ghosttySurfaceVisible before there is a session", () => {
+    render(<Harness sessionId={null} fontSize={13} visible={false} />);
+    expect(ghosttySurfaceVisible).not.toHaveBeenCalled();
   });
 
   it("title flow: a title event writes the sanitized title to layoutStore", () => {
     const setTabDynamicTitle = vi.spyOn(layoutStore.getState(), "setTabDynamicTitle");
-    render(<Harness sessionId="s1" fontSize={13} />);
+    render(<Harness sessionId="s1" fontSize={13} visible={true} />);
 
     act(() => {
       ghosttyEventListener?.({ kind: "title", sessionId: "s1", title: "  hello   world  " });
@@ -260,7 +265,7 @@ describe("useGhosttySurface", () => {
   });
 
   it("focusSurface() calls ghosttySurfaceFocus for the current session", () => {
-    const { getByTestId } = render(<Harness sessionId="s1" fontSize={13} />);
+    const { getByTestId } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
 
     act(() => {
       getByTestId("focus-btn").click();

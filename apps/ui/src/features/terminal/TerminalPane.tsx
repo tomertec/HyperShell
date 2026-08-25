@@ -41,6 +41,14 @@ const CHORD_PANE_KEY_MAP: Record<string, string> = {
   "ctrl+shift+]": "]",
 };
 
+// TODO(ghostty wiring): ctrl+=/ctrl+-/ctrl+0 only update the persisted
+// per-tab font size below — there is no live per-surface push. Task 4 only
+// exposed a GLOBAL config-update channel (ghosttyUpdateConfig) plus a
+// generic ghosttySurfaceCommand; a real per-surface route
+// (client.updateSurfaceConfig main-side) is planned to land over a
+// ghostty:surface-config channel in Task 10's channel work. Until then a
+// font-size chord resizes the persisted value (visible on next launch) but
+// not this running surface.
 function dispatchGhosttyChord(
   chord: string,
   fontSizeActions: {
@@ -137,6 +145,7 @@ export function TerminalPane({
   const ghostty = useGhosttySurface({
     sessionId: session.sessionId,
     fontSize,
+    visible: isVisible,
     onGrid: handleGrid,
     onChord: handleChord
   });
@@ -145,28 +154,11 @@ export function TerminalPane({
     if (isVisible) {
       ghostty.focusSurface();
     }
-  }, [ghostty.focusSurface, isVisible]);
-
-  // Push a live per-surface font-size update whenever the persisted size
-  // changes (chord-driven or otherwise) — the surface itself doesn't read
-  // `fontSize` back out of anything, so this is the only path that reaches it.
-  //
-  // TODO(ghostty wiring): Task 4 only exposed a GLOBAL config-update channel
-  // (ghosttyUpdateConfig) plus a generic per-surface ghosttySurfaceCommand —
-  // there is no dedicated per-surface config/font-size channel yet. This
-  // sends a placeholder `font-size:<n>` command whose payload ghostty-host
-  // doesn't define or interpret; swap for the real per-surface font command
-  // once the host side's command protocol exists.
-  useEffect(() => {
-    if (!session.sessionId) {
-      return;
-    }
-    void getShell()
-      .ghosttySurfaceCommand({ sessionId: session.sessionId, command: `font-size:${fontSize}` })
-      .catch(() => {
-        // Best-effort placeholder — see TODO above.
-      });
-  }, [session.sessionId, fontSize]);
+    // session.sessionId is a dependency (not just read through the stable
+    // focusSurface callback) so a session opening while this pane is already
+    // visible still focuses it — otherwise a newly opened tab never gets
+    // focus, since focusSurface() no-ops at mount when sessionId is still null.
+  }, [ghostty.focusSurface, isVisible, session.sessionId]);
 
   // Dropping a file inserts its path as terminal input, like Windows Terminal.
   const canAcceptDrop = session.state === "connected" && Boolean(session.sessionId);

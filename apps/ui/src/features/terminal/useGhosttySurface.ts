@@ -12,6 +12,14 @@ import {
 export interface UseGhosttySurfaceInput {
   sessionId: string | null;
   fontSize: number;
+  /** Whether this pane is the one currently shown to the user. Prop-driven,
+   * not geometry-derived: this app stacks every tab `absolute inset-0` and
+   * hides inactive ones with `visibility: hidden` (Workspace.tsx), which
+   * IntersectionObserver cannot see — it computes from layout geometry only,
+   * and a `visibility: hidden` box still occupies its full layout rect and
+   * reports as intersecting. A native HWND has no CSS visibility concept of
+   * its own, so it needs telling explicitly. */
+  visible: boolean;
   onGrid?: (cols: number, rows: number) => void;
   onChord?: (chord: string) => void;
 }
@@ -28,10 +36,10 @@ function logAsyncError(context: string, error: unknown): void {
 
 /**
  * Owns the lifecycle of one native ghostty surface: creates it once the
- * container has a real rect and a session to render, keeps its bounds and
- * visibility in sync with the DOM, destroys it on unmount, and relays
- * `ghostty:event`s addressed to this session (grid size, chords, focus,
- * titles) back into the app.
+ * container has a real rect and a session to render, keeps its bounds in
+ * sync with the DOM and its visibility in sync with the caller's `visible`
+ * prop, destroys it on unmount, and relays `ghostty:event`s addressed to
+ * this session (grid size, chords, focus, titles) back into the app.
  */
 export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurfaceResult {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -114,9 +122,9 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
     syncSurface();
   }, [input.sessionId, syncSurface]);
 
-  // (b) + (h): container size/scroll/visibility changes. Set up once for the
-  // container's lifetime — sessionId/fontSize are read through refs above so
-  // this doesn't need to be torn down and rebuilt on every prop change.
+  // (b): container size/scroll changes. Set up once for the container's
+  // lifetime — sessionId/fontSize are read through refs above so this
+  // doesn't need to be torn down and rebuilt on every prop change.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -136,29 +144,23 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
     const onScroll = (): void => scheduleSync();
     window.addEventListener("scroll", onScroll, true);
 
-    // visibility:hidden (a backgrounded tab) keeps layout dimensions, so
-    // ResizeObserver won't fire — a native HWND still needs telling
-    // explicitly, since DOM visibility does nothing to it.
-    const intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        const sessionId = sessionIdRef.current;
-        if (!sessionId || !hasShell()) return;
-        const visible = entries[0]?.isIntersecting ?? false;
-        void getShell()
-          .ghosttySurfaceVisible({ sessionId, visible })
-          .catch((error) => logAsyncError("ghosttySurfaceVisible failed", error));
-      },
-      { threshold: 0 }
-    );
-    intersectionObserver.observe(el);
-
     return () => {
       resizeObserver.disconnect();
-      intersectionObserver.disconnect();
       window.removeEventListener("scroll", onScroll, true);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [syncSurface]);
+
+  // (h): visibility, driven by the caller's prop (see UseGhosttySurfaceInput
+  // doc comment for why this can't be geometry-derived). Runs on mount too —
+  // main starts assuming a surface is visible, so an initially-hidden pane
+  // must say so right away, not wait for the first prop flip.
+  useEffect(() => {
+    if (!input.sessionId || !hasShell()) return;
+    void getShell()
+      .ghosttySurfaceVisible({ sessionId: input.sessionId, visible: input.visible })
+      .catch((error) => logAsyncError("ghosttySurfaceVisible failed", error));
+  }, [input.sessionId, input.visible]);
 
   // (c): destroy on unmount. Kept in its own empty-deps effect so a sessionId
   // change (handled above by syncSurface's create/destroy-old logic) never
