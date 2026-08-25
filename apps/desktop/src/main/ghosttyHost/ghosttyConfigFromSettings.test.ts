@@ -27,8 +27,11 @@ const theme: ResolvedGhosttyTheme = {
 
 describe("ghosttyConfigFromSettings", () => {
   it("emits the exact golden blob for a fixture input", () => {
+    // Same CSS font stack as apps/ui's DEFAULT_TERMINAL_SETTINGS.fontFamily
+    // (settingsStore.ts) — quoted multi-word names mixed with bare ones.
     const blob = ghosttyConfigFromSettings({
-      fontFamily: "Cascadia Mono, Cascadia Code, Consolas",
+      fontFamily:
+        '"Cascadia Mono", "Cascadia Code", Consolas, "IBM Plex Mono", "Liberation Mono", monospace',
       fontSize: 13,
       cursorBlink: true,
       scrollback: 5000,
@@ -37,7 +40,12 @@ describe("ghosttyConfigFromSettings", () => {
 
     expect(blob).toBe(
       [
-        "font-family = Cascadia Mono, Cascadia Code, Consolas",
+        "font-family = Cascadia Mono",
+        "font-family = Cascadia Code",
+        "font-family = Consolas",
+        "font-family = IBM Plex Mono",
+        "font-family = Liberation Mono",
+        "font-family = monospace",
         "font-size = 13",
         "cursor-style-blink = true",
         "scrollback-limit-bytes = 2560000",
@@ -101,20 +109,41 @@ describe("ghosttyConfigFromSettings", () => {
     });
   });
 
-  it("emits a font family containing commas and spaces unquoted", () => {
+  it("emits a single font name with spaces unquoted on its own line", () => {
     // Verified against the ghostty config LineIterator (src/cli/args.zig):
     // everything after the first '=' is trimmed and taken as the value
     // verbatim; quotes are only stripped when the *entire* trimmed value is
-    // wrapped in them. A bare comma/space-separated list needs no quoting.
+    // wrapped in them. A single font-family entry with internal spaces needs
+    // no quoting once it's on its own `font-family =` line.
     const blob = ghosttyConfigFromSettings({
-      fontFamily: "Cascadia Mono, Cascadia Code, Consolas",
+      fontFamily: "IBM Plex Mono",
       fontSize: 13,
       cursorBlink: true,
       scrollback: 5000,
       theme,
     });
 
-    expect(blob.split("\n")[0]).toBe("font-family = Cascadia Mono, Cascadia Code, Consolas");
+    expect(blob.split("\n")[0]).toBe("font-family = IBM Plex Mono");
+  });
+
+  it("splits a CSS font stack into one font-family line per entry, stripping CSS quotes", () => {
+    // font-family is a RepeatableString (Config.zig ~6113-6145), not a
+    // comma-separated StringList — the config's own doc comment says so
+    // explicitly. Each fallback font must be its own `font-family =` line.
+    const blob = ghosttyConfigFromSettings({
+      fontFamily: "'Fira Code', Menlo, \"DejaVu Sans Mono\"",
+      fontSize: 13,
+      cursorBlink: true,
+      scrollback: 5000,
+      theme,
+    });
+
+    const fontFamilyLines = blob.split("\n").filter((line) => line.startsWith("font-family = "));
+    expect(fontFamilyLines).toEqual([
+      "font-family = Fira Code",
+      "font-family = Menlo",
+      "font-family = DejaVu Sans Mono",
+    ]);
   });
 
   it("converts scrollback lines to bytes at 512 bytes/line", () => {
