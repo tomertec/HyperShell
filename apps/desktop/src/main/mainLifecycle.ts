@@ -149,6 +149,9 @@ export function createMainProcessLifecycle(
       emitUpdateState: (event: unknown) => {
         sendToMainWindow(ipcChannels.update.state, event);
       },
+      emitGhosttyEvent: (event: unknown) => {
+        sendToMainWindow(ipcChannels.ghostty.event, event);
+      },
     });
     hostMonitor = deps.createHostMonitor();
 

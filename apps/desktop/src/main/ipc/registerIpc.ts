@@ -73,6 +73,7 @@ import {
   type ReapableRenderer,
 } from "../rendererSessionOwnership";
 import { registerTmuxIpc } from "./tmuxIpc";
+import { routeSessionEvent } from "./routeSessionEvent";
 import { registerGhosttyIpc } from "./ghosttyIpc";
 import { createGhosttyHostProcess } from "../ghosttyHost/hostProcess";
 import { createGhosttyHostClient, type GhosttyHostClient, type GhosttyRendererEvent } from "../ghosttyHost/ghosttyHostClient";
@@ -1148,52 +1149,22 @@ export function registerIpc(
   }
 
   const unsubscribeSessionEvents = manager.onEvent((event) => {
-    options.emitSessionEvent?.(event);
-
-    if ("type" in event && "sessionId" in event) {
-      const sessionId = String(event.sessionId);
-
-      if (event.type === "status") {
-        if (event.state === "connected") {
-          recordConnected(sessionId);
-        } else if (event.state === "failed") {
-          recordFailedAttempt(sessionId);
-        }
-      }
-
-      if (event.type === "error") {
-        sessionErrorMessages.set(sessionId, event.message);
-        recordFailedAttempt(sessionId, event.message);
-      }
-
-      if (event.type === "process-title") {
-        claudeSessionBinder.handleProcessTitle(sessionId, event.name);
-      }
-
-      if (event.type === "exit") {
-        claudeSessionBinder.forget(sessionId);
-        markDisconnected(sessionId);
-        recordedFailedAttemptSessions.delete(sessionId);
-        sessionErrorMessages.delete(sessionId);
-        sessionHostCache.delete(sessionId);
-
-        // Wait one tick to let SessionManager finalize reconnect/disconnect
-        // state. A session that is only reconnecting still belongs to its
-        // renderer and must stay reapable.
-        setTimeout(() => {
-          if (!manager.getSession(sessionId)) {
-            rendererSessions.forget(sessionId);
-            void recorder.stop({ sessionId });
-          }
-        }, 0);
-      }
-    }
-
-    // Session logging: intercept data events.
-    if ("type" in event && event.type === "data" && "sessionId" in event && "data" in event) {
-      sessionLogger.onSessionData(event.sessionId as string, event.data as string);
-      recorder.onSessionData(event.sessionId as string, event.data as string);
-    }
+    routeSessionEvent(event, {
+      emitSessionEvent: (e) => options.emitSessionEvent?.(e),
+      feedData: (sessionId, data) => ghosttyClient?.feedData(sessionId, data),
+      sessionClosed: (sessionId, exitCode) => ghosttyClient?.sessionClosed(sessionId, exitCode),
+      sessionLogger,
+      recorder,
+      claudeSessionBinder,
+      recordConnected,
+      recordFailedAttempt,
+      markDisconnected,
+      sessionErrorMessages,
+      recordedFailedAttemptSessions,
+      sessionHostCache,
+      rendererSessions,
+      hasSession: (sessionId) => Boolean(manager.getSession(sessionId))
+    });
   });
   const unsubscribeClaudeBindings = claudeSessionBinder.onBinding(
     (sessionId, claudeSessionId) => {
