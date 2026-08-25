@@ -1192,3 +1192,107 @@ export const tmuxProbeResponseSchema = z.object({
 export type TmuxSessionIpc = z.infer<typeof tmuxSessionSchema>;
 export type TmuxProbeRequest = z.infer<typeof tmuxProbeRequestSchema>;
 export type TmuxProbeResponse = z.infer<typeof tmuxProbeResponseSchema>;
+
+// --- Ghostty ---
+
+export const ghosttyBoundsSchema = z.object({
+  x: z.number().int(),
+  y: z.number().int(),
+  w: z.number().int().min(0),
+  h: z.number().int().min(0)
+});
+
+export const ghosttySurfaceCreateRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  bounds: ghosttyBoundsSchema,
+  fontSize: z.number().optional()
+});
+
+export const ghosttySurfaceDestroyRequestSchema = z.object({
+  sessionId: z.string().min(1)
+});
+
+export const ghosttySurfaceBoundsRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  bounds: ghosttyBoundsSchema
+});
+
+export const ghosttySurfaceVisibleRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  visible: z.boolean()
+});
+
+export const ghosttySurfaceFocusRequestSchema = z.object({
+  sessionId: z.string().min(1)
+});
+
+export const ghosttySurfaceCommandRequestSchema = z.object({
+  sessionId: z.string().min(1),
+  command: z.string().min(1)
+});
+
+// Hides (or reveals) every native ghostty surface at once — raised while a DOM
+// overlay (dialog, command palette, etc.) could visually cross a surface,
+// since native HWNDs always paint above the web contents.
+export const ghosttyOverlayGuardRequestSchema = z.object({
+  hidden: z.boolean()
+});
+
+export const ghosttyEventSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("grid"), sessionId: z.string().min(1), cols: z.number().int(), rows: z.number().int() }),
+  z.object({ kind: z.literal("title"), sessionId: z.string().min(1), title: z.string() }),
+  z.object({ kind: z.literal("bell"), sessionId: z.string().min(1) }),
+  z.object({ kind: z.literal("chord"), sessionId: z.string().min(1), chord: z.string() }),
+  z.object({ kind: z.literal("focusGained"), sessionId: z.string().min(1) }),
+  z.object({ kind: z.literal("focusLost"), sessionId: z.string().min(1) }),
+  z.object({ kind: z.literal("crashed"), sessionId: z.string().min(1), error: z.string().optional() })
+]);
+
+export const setBroadcastTargetsRequestSchema = z.object({
+  enabled: z.boolean(),
+  targetSessionIds: z.array(z.string())
+});
+
+// #rrggbb only — the renderer resolves any CSS color (including rgba() alpha
+// blends used for selection backgrounds) down to an opaque hex triplet before
+// this crosses IPC, since that's the only form ghostty's config parser accepts.
+const ghosttyHexColorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "expected a #rrggbb hex color");
+
+// Field names mirror ghosttyConfigFromSettings.ts's exported GhosttyConfigInput
+// (apps/desktop/src/main/ghosttyHost/ghosttyConfigFromSettings.ts) so the IPC
+// handler can pass this straight through modulo the palette array, which that
+// function's ResolvedGhosttyTheme spells out as 16 named fields instead.
+export const ghosttyResolvedThemeRequestSchema = z.object({
+  background: ghosttyHexColorSchema,
+  foreground: ghosttyHexColorSchema,
+  cursor: ghosttyHexColorSchema,
+  selectionBackground: ghosttyHexColorSchema,
+  selectionForeground: ghosttyHexColorSchema,
+  // Standard ANSI + bright-ANSI order: black, red, green, yellow, blue,
+  // magenta, cyan, white, then the eight bright variants — palette indices 0-15.
+  palette: z.array(ghosttyHexColorSchema).length(16)
+});
+
+export const ghosttyUpdateConfigRequestSchema = z.object({
+  fontFamily: z.string().min(1),
+  fontSize: z.number(),
+  lineHeight: z.number().optional(),
+  cursorBlink: z.boolean(),
+  scrollback: z.number().int().min(0),
+  theme: ghosttyResolvedThemeRequestSchema
+});
+
+export type GhosttyBounds = z.infer<typeof ghosttyBoundsSchema>;
+export type GhosttySurfaceCreateRequest = z.infer<typeof ghosttySurfaceCreateRequestSchema>;
+export type GhosttySurfaceDestroyRequest = z.infer<typeof ghosttySurfaceDestroyRequestSchema>;
+export type GhosttySurfaceBoundsRequest = z.infer<typeof ghosttySurfaceBoundsRequestSchema>;
+export type GhosttySurfaceVisibleRequest = z.infer<typeof ghosttySurfaceVisibleRequestSchema>;
+export type GhosttySurfaceFocusRequest = z.infer<typeof ghosttySurfaceFocusRequestSchema>;
+export type GhosttySurfaceCommandRequest = z.infer<typeof ghosttySurfaceCommandRequestSchema>;
+export type GhosttyOverlayGuardRequest = z.infer<typeof ghosttyOverlayGuardRequestSchema>;
+export type GhosttyEvent = z.infer<typeof ghosttyEventSchema>;
+export type SetBroadcastTargetsRequest = z.infer<typeof setBroadcastTargetsRequestSchema>;
+export type GhosttyResolvedThemeRequest = z.infer<typeof ghosttyResolvedThemeRequestSchema>;
+export type GhosttyUpdateConfigRequest = z.infer<typeof ghosttyUpdateConfigRequestSchema>;

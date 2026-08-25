@@ -73,6 +73,10 @@ import {
   type ReapableRenderer,
 } from "../rendererSessionOwnership";
 import { registerTmuxIpc } from "./tmuxIpc";
+import { registerGhosttyIpc } from "./ghosttyIpc";
+import { createGhosttyHostProcess } from "../ghosttyHost/hostProcess";
+import { createGhosttyHostClient, type GhosttyHostClient, type GhosttyRendererEvent } from "../ghosttyHost/ghosttyHostClient";
+import { resolveGhosttyHostPath } from "../ghosttyHost/hostPath";
 import { registerClaudeIpc } from "./claudeIpc";
 import { buildClaudeResumeCommand } from "./claudeResumeCommand";
 import { applyClaudeSessionArgs } from "./claudeSessionArgs";
@@ -244,6 +248,15 @@ const registeredChannels = [
   ipcChannels.update.install,
   ipcChannels.update.openRelease,
   ipcChannels.update.getState,
+  ipcChannels.ghostty.surfaceCreate,
+  ipcChannels.ghostty.surfaceDestroy,
+  ipcChannels.ghostty.surfaceBounds,
+  ipcChannels.ghostty.surfaceVisible,
+  ipcChannels.ghostty.surfaceFocus,
+  ipcChannels.ghostty.surfaceCommand,
+  ipcChannels.ghostty.overlayGuard,
+  ipcChannels.ghostty.updateConfig,
+  ipcChannels.session.broadcastTargets,
 ] as const;
 
 const networkMonitor = createNetworkMonitor({
@@ -255,6 +268,78 @@ export const sessionManager = createSessionManager({
     provider: createWindowsProcessTreeProvider()
   })
 });
+
+// Ghostty host + client wiring. Constructing these never spawns the host
+// process — GhosttyHostProcess only spawns inside its own start(), which we
+// call lazily (see ensureGhosttyHostStarted) on the first surface-create IPC
+// call, not here at module load. That keeps every test/registerIpc-import
+// spawn-free.
+//
+// `manager` is resolved fresh inside registerIpc() on every call (tests pass
+// a fake sessionManager via options.sessionManager), so writeSession/
+// resizeSession/emitGhosttyEvent below read through mutable indirection
+// variables that registerIpc() updates on each call, rather than closing
+// over the module-level `sessionManager` directly.
+let activeSessionManagerForGhostty: SessionManager = sessionManager;
+let ghosttyEventEmitter: (event: GhosttyRendererEvent) => void = () => {};
+const ghosttyBroadcastState: { enabled: boolean; targetSessionIds: string[] } = {
+  enabled: false,
+  targetSessionIds: []
+};
+let ghosttyGlobalConfigBlob = "";
+
+export let ghosttyClient: GhosttyHostClient | null = null;
+let ghosttyHost: ReturnType<typeof createGhosttyHostProcess> | null = null;
+let ghosttyHostStartPromise: Promise<void> | null = null;
+
+try {
+  const exePath = resolveGhosttyHostPath();
+  // `client` is referenced by the host's callbacks before it exists — see
+  // ghosttyHostClient.ts's CreateGhosttyHostClientOptions doc comment for why
+  // this forward-reference ordering is required.
+  let client: GhosttyHostClient;
+  const host = createGhosttyHostProcess({
+    exePath,
+    onFrame: (frame) => client.onFrame(frame),
+    onRestart: () => client.onRestart(),
+    onDead: (reason) => {
+      console.error(`[ghostty] host process died: ${reason}`);
+    }
+  });
+  client = createGhosttyHostClient({
+    host,
+    writeSession: (sessionId, data) => activeSessionManagerForGhostty.write(sessionId, data),
+    resizeSession: (sessionId, cols, rows) => activeSessionManagerForGhostty.resize(sessionId, cols, rows),
+    emitGhosttyEvent: (event) => ghosttyEventEmitter(event),
+    getBroadcastTargets: () =>
+      ghosttyBroadcastState.enabled ? ghosttyBroadcastState.targetSessionIds : null,
+    getGlobalConfig: () => ghosttyGlobalConfigBlob
+  });
+  ghosttyHost = host;
+  ghosttyClient = client;
+} catch (error) {
+  // Dev without GHOSTTY_HOST_PATH set (and no packaged process.resourcesPath)
+  // must not break unrelated app startup — ghostty features degrade to a
+  // clear per-call error (see ghosttyIpc.ts's requireClient) instead.
+  console.error("[ghostty] host process unavailable; ghostty features disabled", error);
+}
+
+function ensureGhosttyHostStarted(): Promise<void> {
+  if (!ghosttyHost) {
+    return Promise.reject(new Error("ghostty host process is unavailable"));
+  }
+  if (!ghosttyHostStartPromise) {
+    const host = ghosttyHost;
+    ghosttyHostStartPromise = host.start().catch((error: unknown) => {
+      // Allow a later surface-create to retry instead of latching a
+      // permanent failure from a transient first-launch problem.
+      ghosttyHostStartPromise = null;
+      throw error;
+    });
+  }
+  return ghosttyHostStartPromise;
+}
+
 const ssh2ConnectionPool = createSsh2ConnectionPool();
 const sessionLogger = createSessionLogger();
 // Tracks which Claude conversation each local tab is running, including ones
@@ -456,6 +541,7 @@ export interface RegisterIpcOptions {
   emitKeyboardInteractive?: (event: unknown) => void;
   emitHostStatusEvent?: (event: unknown) => void;
   emitUpdateState?: (state: unknown) => void;
+  emitGhosttyEvent?: (event: unknown) => void;
   sessionManager?: SessionManager;
   db?: unknown;
   resolveHostProfile?: (profileId: string) => Promise<{ hostname: string; username?: string; port?: number; identityFile?: string; password?: string; proxyJump?: string; keepAliveSeconds?: number } | null>;
@@ -947,6 +1033,10 @@ export function registerIpc(
   cleanupRegisteredIpc?.();
 
   const manager = options.sessionManager ?? sessionManager;
+  activeSessionManagerForGhostty = manager;
+  ghosttyEventEmitter = (event) => {
+    options.emitGhosttyEvent?.(event);
+  };
   const rendererSessions = createRendererSessionOwnership((sessionId) =>
     manager.close(sessionId)
   );
@@ -1305,6 +1395,18 @@ export function registerIpc(
   registerTmuxIpc(ipcMain, () => getOrCreateHostsRepo());
   registerClaudeIpc();
 
+  const cleanupGhostty = registerGhosttyIpc(ipcMain, {
+    client: ghosttyClient,
+    ensureHostStarted: ensureGhosttyHostStarted,
+    setGlobalConfigBlob: (blob) => {
+      ghosttyGlobalConfigBlob = blob;
+    },
+    setBroadcastState: (state) => {
+      ghosttyBroadcastState.enabled = state.enabled;
+      ghosttyBroadcastState.targetSessionIds = state.targetSessionIds;
+    }
+  });
+
   ipcMain.handle(ipcChannels.app.setTheme, (event: IpcMainInvokeEvent, theme: string) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win) return;
@@ -1357,6 +1459,7 @@ export function registerIpc(
     ssh2ConnectionPool.destroyAll();
     cleanupFs();
     unregisterEditor();
+    cleanupGhostty();
     for (const channel of registeredChannels) {
       ipcMain.removeHandler?.(channel);
     }

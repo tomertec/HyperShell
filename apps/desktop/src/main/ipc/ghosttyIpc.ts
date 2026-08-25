@@ -1,0 +1,164 @@
+import { BrowserWindow } from "electron";
+import type { IpcMainInvokeEvent } from "electron";
+import {
+  ipcChannels,
+  ghosttySurfaceCreateRequestSchema,
+  ghosttySurfaceDestroyRequestSchema,
+  ghosttySurfaceBoundsRequestSchema,
+  ghosttySurfaceVisibleRequestSchema,
+  ghosttySurfaceFocusRequestSchema,
+  ghosttySurfaceCommandRequestSchema,
+  ghosttyOverlayGuardRequestSchema,
+  ghosttyUpdateConfigRequestSchema,
+  setBroadcastTargetsRequestSchema,
+  type SetBroadcastTargetsRequest
+} from "@hypershell/shared";
+import type { GhosttyHostClient } from "../ghosttyHost/ghosttyHostClient";
+import { ghosttyConfigFromSettings, type ResolvedGhosttyTheme } from "../ghosttyHost/ghosttyConfigFromSettings";
+import type { IpcMainLike } from "./registerIpc";
+
+// Same order as ghosttyConfigFromSettings.ts's private PALETTE_ORDER —
+// standard ANSI + bright-ANSI, palette indices 0-15.
+const PALETTE_KEYS = [
+  "black",
+  "red",
+  "green",
+  "yellow",
+  "blue",
+  "magenta",
+  "cyan",
+  "white",
+  "brightBlack",
+  "brightRed",
+  "brightGreen",
+  "brightYellow",
+  "brightBlue",
+  "brightMagenta",
+  "brightCyan",
+  "brightWhite"
+] as const;
+
+function toResolvedGhosttyTheme(theme: {
+  background: string;
+  foreground: string;
+  cursor: string;
+  selectionBackground: string;
+  selectionForeground: string;
+  palette: string[];
+}): ResolvedGhosttyTheme {
+  const paletteFields = Object.fromEntries(
+    PALETTE_KEYS.map((key, index) => [key, theme.palette[index]])
+  ) as Record<(typeof PALETTE_KEYS)[number], string>;
+
+  return {
+    background: theme.background,
+    foreground: theme.foreground,
+    cursor: theme.cursor,
+    selectionBackground: theme.selectionBackground,
+    selectionForeground: theme.selectionForeground,
+    ...paletteFields
+  };
+}
+
+function resolveParentHwnd(event: IpcMainInvokeEvent): string {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) {
+    throw new Error("ghostty surface has no owning window");
+  }
+  return win.getNativeWindowHandle().readBigUInt64LE(0).toString();
+}
+
+export interface RegisterGhosttyIpcOptions {
+  /** null when the host path couldn't be resolved (e.g. dev without
+   * GHOSTTY_HOST_PATH) — every handler below then fails loudly instead of
+   * silently no-oping, so a missing terminal renderer is never mistaken for
+   * one that's merely idle. */
+  client: GhosttyHostClient | null;
+  /** Lazily starts the host process; resolves once, or rejects if the host
+   * process is unavailable. Called before the first surface is created. */
+  ensureHostStarted: () => Promise<void>;
+  setGlobalConfigBlob: (blob: string) => void;
+  setBroadcastState: (state: SetBroadcastTargetsRequest) => void;
+}
+
+function requireClient(client: GhosttyHostClient | null): GhosttyHostClient {
+  if (!client) {
+    throw new Error(
+      "ghostty is unavailable: the host process path could not be resolved (see GHOSTTY_HOST_PATH)"
+    );
+  }
+  return client;
+}
+
+export function registerGhosttyIpc(
+  ipcMain: IpcMainLike,
+  options: RegisterGhosttyIpcOptions
+): () => void {
+  ipcMain.handle(
+    ipcChannels.ghostty.surfaceCreate,
+    async (event: IpcMainInvokeEvent, rawRequest: unknown) => {
+      const request = ghosttySurfaceCreateRequestSchema.parse(rawRequest);
+      const client = requireClient(options.client);
+      const parentHwnd = resolveParentHwnd(event);
+      await options.ensureHostStarted();
+      client.createSurface(request.sessionId, parentHwnd, request.bounds);
+    }
+  );
+
+  ipcMain.handle(ipcChannels.ghostty.surfaceDestroy, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttySurfaceDestroyRequestSchema.parse(rawRequest);
+    requireClient(options.client).destroySurface(request.sessionId);
+  });
+
+  ipcMain.handle(ipcChannels.ghostty.surfaceBounds, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttySurfaceBoundsRequestSchema.parse(rawRequest);
+    requireClient(options.client).setBounds(request.sessionId, request.bounds);
+  });
+
+  ipcMain.handle(ipcChannels.ghostty.surfaceVisible, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttySurfaceVisibleRequestSchema.parse(rawRequest);
+    requireClient(options.client).setVisible(request.sessionId, request.visible);
+  });
+
+  ipcMain.handle(ipcChannels.ghostty.surfaceFocus, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttySurfaceFocusRequestSchema.parse(rawRequest);
+    requireClient(options.client).focus(request.sessionId);
+  });
+
+  ipcMain.handle(ipcChannels.ghostty.surfaceCommand, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttySurfaceCommandRequestSchema.parse(rawRequest);
+    requireClient(options.client).sendCommand(request.sessionId, request.command);
+  });
+
+  ipcMain.handle(ipcChannels.ghostty.overlayGuard, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttyOverlayGuardRequestSchema.parse(rawRequest);
+    requireClient(options.client).setAllVisible(!request.hidden);
+  });
+
+  ipcMain.handle(ipcChannels.ghostty.updateConfig, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = ghosttyUpdateConfigRequestSchema.parse(rawRequest);
+    const client = requireClient(options.client);
+    const blob = ghosttyConfigFromSettings({
+      fontFamily: request.fontFamily,
+      fontSize: request.fontSize,
+      lineHeight: request.lineHeight,
+      cursorBlink: request.cursorBlink,
+      scrollback: request.scrollback,
+      theme: toResolvedGhosttyTheme(request.theme)
+    });
+    options.setGlobalConfigBlob(blob);
+    client.updateGlobalConfig();
+  });
+
+  ipcMain.handle(ipcChannels.session.broadcastTargets, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
+    const request = setBroadcastTargetsRequestSchema.parse(rawRequest);
+    options.setBroadcastState(request);
+  });
+
+  return () => {
+    for (const channel of Object.values(ipcChannels.ghostty)) {
+      ipcMain.removeHandler?.(channel);
+    }
+    ipcMain.removeHandler?.(ipcChannels.session.broadcastTargets);
+  };
+}

@@ -145,6 +145,16 @@ import type {
   LocalProfileEnvVar,
   LocalProfileRecord,
   UpsertLocalProfileRequest,
+  GhosttySurfaceCreateRequest,
+  GhosttySurfaceDestroyRequest,
+  GhosttySurfaceBoundsRequest,
+  GhosttySurfaceVisibleRequest,
+  GhosttySurfaceFocusRequest,
+  GhosttySurfaceCommandRequest,
+  GhosttyOverlayGuardRequest,
+  GhosttyUpdateConfigRequest,
+  GhosttyEvent,
+  SetBroadcastTargetsRequest,
 } from "@hypershell/shared";
 
 declare global {
@@ -311,6 +321,16 @@ declare global {
           lastActiveAt: string;
         } | null;
       }>;
+      ghosttySurfaceCreate?: (request: GhosttySurfaceCreateRequest) => Promise<void>;
+      ghosttySurfaceDestroy?: (request: GhosttySurfaceDestroyRequest) => Promise<void>;
+      ghosttySurfaceBounds?: (request: GhosttySurfaceBoundsRequest) => Promise<void>;
+      ghosttySurfaceVisible?: (request: GhosttySurfaceVisibleRequest) => Promise<void>;
+      ghosttySurfaceFocus?: (request: GhosttySurfaceFocusRequest) => Promise<void>;
+      ghosttySurfaceCommand?: (request: GhosttySurfaceCommandRequest) => Promise<void>;
+      ghosttyOverlayGuard?: (request: GhosttyOverlayGuardRequest) => Promise<void>;
+      ghosttyUpdateConfig?: (request: GhosttyUpdateConfigRequest) => Promise<void>;
+      onGhosttyEvent?: (listener: (event: GhosttyEvent) => void) => () => void;
+      setBroadcastTargets?: (request: SetBroadcastTargetsRequest) => Promise<void>;
     };
   }
 }

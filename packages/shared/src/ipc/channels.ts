@@ -9,7 +9,20 @@ export const sessionChannels = {
   hostStats: "session:host-stats",
   saveState: "session:save-state",
   loadSavedState: "session:load-saved-state",
-  clearSavedState: "session:clear-saved-state"
+  clearSavedState: "session:clear-saved-state",
+  broadcastTargets: "session:set-broadcast-targets"
+} as const;
+
+export const ghosttyChannels = {
+  surfaceCreate: "ghostty:surface-create",
+  surfaceDestroy: "ghostty:surface-destroy",
+  surfaceBounds: "ghostty:surface-bounds",
+  surfaceVisible: "ghostty:surface-visible",
+  surfaceFocus: "ghostty:surface-focus",
+  surfaceCommand: "ghostty:surface-command",
+  overlayGuard: "ghostty:overlay-guard",
+  event: "ghostty:event",
+  updateConfig: "ghostty:update-config"
 } as const;
 
 export const hostChannels = {
@@ -239,6 +252,7 @@ export const updateChannels = {
 
 export const ipcChannels = {
   session: sessionChannels,
+  ghostty: ghosttyChannels,
   hosts: hostChannels,
   settings: settingsChannels,
   tray: trayChannels,
