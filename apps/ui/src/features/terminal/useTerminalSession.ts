@@ -1,33 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { useStore } from "zustand";
-import type { Terminal } from "@xterm/xterm";
-import type { FitAddon } from "@xterm/addon-fit";
-import type { SearchAddon } from "@xterm/addon-search";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionEvent } from "@hypershell/shared";
 import { getShell, hasShell } from "../../lib/shell";
 
-import { broadcastStore } from "../broadcast/broadcastStore";
 import { layoutStore } from "../layout/layoutStore";
 import { sessionStateStore } from "../sessions/sessionStateStore";
 import {
   normalizeTerminalFontSize,
   settingsStore,
 } from "../settings/settingsStore";
-import { getTerminalOptions } from "./terminalTheme";
-import { getTerminalClipboardAction, getTerminalRightClickAction } from "./terminalClipboard";
-import {
-  getNextTerminalFontSize,
-  getTerminalFontSizeAction,
-} from "./terminalFontSize";
-import { TERMINAL_UNICODE_VERSION } from "./terminalUnicode";
-import { loadOptionalWebglRenderer } from "./optionalWebglRenderer";
-import { installTerminalRepaintGuard } from "./terminalRepaintGuard";
-import { createConptyResyncWiggle, type ConptyResyncWiggle } from "./conptyResyncWiggle";
-import {
-  TERMINAL_FOCUS_REQUEST_EVENT,
-  shouldHandleTerminalFocusRequest,
-  type TerminalFocusRequestDetail
-} from "./terminalFocus";
+import { getNextTerminalFontSize } from "./terminalFontSize";
 import {
   createAsyncOperationGuard,
   mapSessionEvent,
@@ -37,6 +18,9 @@ import {
 import { sanitizeTitle } from "./titleSanitizer";
 
 export type { TerminalSessionState } from "./terminalSessionModel";
+
+const DEFAULT_GRID_COLS = 120;
+const DEFAULT_GRID_ROWS = 40;
 
 export interface UseTerminalSessionInput {
   transport: "ssh" | "serial" | "telnet" | "local";
@@ -60,11 +44,6 @@ export interface UseTerminalSessionInput {
 }
 
 export interface UseTerminalSessionResult {
-  containerRef: RefObject<HTMLDivElement | null>;
-  terminal: Terminal | null;
-  searchAddon: SearchAddon | null;
-  searchVisible: boolean;
-  setSearchVisible: (visible: boolean) => void;
   sessionId: string | null;
   state: TerminalSessionState;
   fontSize: number;
@@ -75,8 +54,10 @@ export interface UseTerminalSessionResult {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   write: (data: string) => void;
-  fit: () => void;
-  focusTerminal: () => void;
+  /** Feeds the latest ghostty-reported grid size back in, so the next
+   * connect() (a reconnect, typically) seeds openSession with the real
+   * terminal size instead of the DEFAULT_GRID_COLS/ROWS fallback. */
+  reportGridSize: (cols: number, rows: number) => void;
 }
 
 function toErrorMessage(error: unknown): string {
@@ -98,27 +79,11 @@ function logAsyncError(context: string, error: unknown): void {
 export function useTerminalSession(
   input: UseTerminalSessionInput
 ): UseTerminalSessionResult {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
-  const searchAddonRef = useRef<SearchAddon | null>(null);
-  const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
-  const [searchVisible, setSearchVisible] = useState(false);
-  const terminalSettings = useStore(settingsStore, (s) => s.settings.terminal);
-  const customThemes = useStore(settingsStore, (s) => s.settings.customThemes);
-  const broadcastEnabled = useStore(broadcastStore, (store) => store.enabled);
-  const broadcastTargets = useStore(
-    broadcastStore,
-    (store) => store.targetSessionIds
-  );
   const sessionIdRef = useRef<string | null>(input.sessionId ?? null);
   const fontSizeRef = useRef(input.fontSize);
   const onFontSizeChangeRef = useRef(input.onFontSizeChange);
-  const conptyWiggleRef = useRef<ConptyResyncWiggle | null>(null);
   const mountedRef = useRef(true);
   const asyncOperationGuardRef = useRef(createAsyncOperationGuard());
-  const broadcastEnabledRef = useRef(broadcastEnabled);
-  const broadcastTargetsRef = useRef<string[]>(broadcastTargets);
   // input.onExit is a fresh closure every render — keep the latest one in a
   // ref rather than depending on it directly, so applySessionEvent (and the
   // onSessionEvent subscription that depends on it) doesn't get recreated on
@@ -127,37 +92,19 @@ export function useTerminalSession(
   const pendingSessionEventsRef = useRef<SessionEvent[]>([]);
   const eventUnsubscribeRef = useRef<(() => void) | null>(null);
   const tmuxAttachSentRef = useRef(false);
-  const [terminal, setTerminal] = useState<Terminal | null>(null);
+  // Seeds connect()'s openSession cols/rows. Ghostty determines the real grid
+  // from its own pixel bounds + font metrics after a surface exists, so this
+  // is only ever a best-effort initial size (and, on a reconnect, the last
+  // size ghostty actually reported).
+  const lastGridRef = useRef<{ cols: number; rows: number }>({
+    cols: DEFAULT_GRID_COLS,
+    rows: DEFAULT_GRID_ROWS
+  });
   const [state, setState] = useState<TerminalSessionState>(
     input.sessionId ? "connecting" : "idle"
   );
   fontSizeRef.current = input.fontSize;
   onFontSizeChangeRef.current = input.onFontSizeChange;
-
-  const applyTerminalBackground = useCallback((background: string): void => {
-    const container = containerRef.current;
-    if (!container) {
-      return;
-    }
-
-    container.style.backgroundColor = background;
-
-    const root = container.querySelector(".xterm") as HTMLElement | null;
-    if (root) {
-      root.style.backgroundColor = background;
-    }
-
-    const viewport = container.querySelector(".xterm-viewport") as HTMLElement | null;
-    if (viewport) {
-      viewport.style.backgroundColor = background;
-    }
-
-    // Never set a background on the canvases inside .xterm-screen: the WebGL
-    // renderer stacks a transparent link-layer canvas above the text canvas,
-    // and an opaque CSS background on that overlay hides every glyph. (With
-    // the DOM renderer the selector matched nothing, which is why this used
-    // to look harmless.)
-  }, []);
 
   const setStateSafe = useCallback((nextState: TerminalSessionState): void => {
     if (!mountedRef.current) {
@@ -177,32 +124,7 @@ export function useTerminalSession(
       return;
     }
 
-    terminalRef.current?.writeln(`\r\n[error] ${toErrorMessage(error)}`);
-  }, []);
-
-  const writeClipboardText = useCallback(async (text: string): Promise<void> => {
-    if (!text || !navigator.clipboard?.writeText) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (error) {
-      logAsyncError("clipboard write failed", error);
-    }
-  }, []);
-
-  const readClipboardText = useCallback(async (): Promise<string> => {
-    if (!navigator.clipboard?.readText) {
-      return "";
-    }
-
-    try {
-      return await navigator.clipboard.readText();
-    } catch (error) {
-      logAsyncError("clipboard read failed", error);
-      return "";
-    }
+    logAsyncError("session error", toErrorMessage(error));
   }, []);
 
   const setFontSize = useCallback((fontSize: number): void => {
@@ -255,23 +177,6 @@ export function useTerminalSession(
     });
   }, [setStateSafe, writeTerminalError]);
 
-  const sendSessionResize = useCallback(
-    (sessionId: string, cols: number, rows: number): void => {
-      if (!hasShell()) {
-        return;
-      }
-
-      void getShell().resizeSession({ sessionId, cols, rows }).catch((error) => {
-        if (sessionId === sessionIdRef.current) {
-          setStateSafe("failed");
-          writeTerminalError(error);
-        }
-        logAsyncError("resizeSession failed", error);
-      });
-    },
-    [setStateSafe, writeTerminalError]
-  );
-
   const applySessionEvent = useCallback((event: SessionEvent): void => {
     const effect = mapSessionEvent(sessionIdRef.current, event);
     if (!effect.handled) {
@@ -315,17 +220,8 @@ export function useTerminalSession(
         );
     }
 
-    const instance = terminalRef.current;
-    if (!instance) {
-      return;
-    }
-
-    if (effect.data) {
-      instance.write(effect.data);
-    }
-
     if (effect.errorMessage) {
-      instance.writeln(`\r\n[error] ${effect.errorMessage}`);
+      logAsyncError("session error", effect.errorMessage);
     }
   }, [setStateSafe, input.tmuxAttachTarget]);
 
@@ -375,238 +271,21 @@ export function useTerminalSession(
   }, [applySessionEvent, input.sessionId, setStateSafe]);
 
   useEffect(() => {
-    broadcastEnabledRef.current = broadcastEnabled;
-    broadcastTargetsRef.current = broadcastTargets;
-  }, [broadcastEnabled, broadcastTargets]);
-
-  useEffect(() => {
     onExitRef.current = input.onExit;
   }, [input.onExit]);
-
-  useEffect(() => {
-    let disposed = false;
-    let disposeInput: { dispose(): void } | null = null;
-    let titleDisposable: { dispose(): void } | null = null;
-    let repaintGuard: { dispose(): void } | null = null;
-    let instance: Terminal | null = null;
-    let container: HTMLDivElement | null = null;
-    let removeFocusListeners: (() => void) | null = null;
-
-    void (async () => {
-      const [
-        { Terminal: XTerm },
-        { FitAddon: FitAddonClass },
-        { SearchAddon: SearchAddonClass },
-        { UnicodeGraphemesAddon: UnicodeAddonClass }
-      ] = await Promise.all([
-        import("@xterm/xterm"),
-        import("@xterm/addon-fit"),
-        import("@xterm/addon-search"),
-        import("@xterm/addon-unicode-graphemes")
-      ]);
-      if (disposed) {
-        return;
-      }
-
-      const opts = getTerminalOptions({
-        ...terminalSettings,
-        fontSize: fontSizeRef.current,
-        customThemes,
-      });
-      instance = new XTerm(opts);
-      const addon = new FitAddonClass();
-      const search = new SearchAddonClass();
-      instance.loadAddon(addon);
-      instance.loadAddon(search);
-      instance.loadAddon(new UnicodeAddonClass());
-      instance.unicode.activeVersion = TERMINAL_UNICODE_VERSION;
-      fitAddonRef.current = addon;
-      searchAddonRef.current = search;
-      terminalRef.current = instance;
-      setTerminal(instance);
-      setSearchAddon(search);
-
-      titleDisposable = instance.onTitleChange((rawTitle) => {
-        const sessionId = sessionIdRef.current;
-        if (!sessionId) {
-          return;
-        }
-        layoutStore.getState().setTabDynamicTitle(sessionId, sanitizeTitle(rawTitle));
-      });
-
-      container = containerRef.current;
-      if (container) {
-        instance.open(container);
-        void loadOptionalWebglRenderer(instance);
-        repaintGuard = installTerminalRepaintGuard(instance);
-        applyTerminalBackground(opts.theme?.background ?? "#07111f");
-        try { addon.fit(); } catch { /* container may not have dimensions yet */ }
-        instance.focus();
-        instance.writeln("hypershell ready.");
-
-        const focusTerminal = () => {
-          instance?.focus();
-        };
-        container.addEventListener("mousedown", focusTerminal);
-        container.addEventListener("touchstart", focusTerminal, { passive: true });
-
-        const handleContextMenu = (event: MouseEvent) => {
-          const action = getTerminalRightClickAction({
-            hasSelection: instance?.hasSelection() ?? false,
-            mouseTrackingActive: (instance?.modes.mouseTrackingMode ?? "none") !== "none"
-          });
-          if (!action) {
-            return;
-          }
-          event.preventDefault();
-
-          if (action === "copy") {
-            const selection = instance?.getSelection() ?? "";
-            if (selection) {
-              void writeClipboardText(selection);
-            }
-            instance?.clearSelection();
-            return;
-          }
-
-          void (async () => {
-            const clipboardText = await readClipboardText();
-            if (clipboardText) {
-              instance?.paste(clipboardText);
-            }
-          })();
-        };
-        container.addEventListener("contextmenu", handleContextMenu);
-
-        removeFocusListeners = () => {
-          container?.removeEventListener("mousedown", focusTerminal);
-          container?.removeEventListener("touchstart", focusTerminal);
-          container?.removeEventListener("contextmenu", handleContextMenu);
-        };
-      }
-
-      const isMacLike = /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
-      instance.attachCustomKeyEventHandler((event) => {
-        if (event.type !== "keydown") {
-          return true;
-        }
-
-        // Ctrl+Shift+F (or Cmd+Shift+F on Mac) — toggle terminal search
-        const searchMod = isMacLike ? event.metaKey : event.ctrlKey;
-        if (searchMod && event.shiftKey && event.key.toLowerCase() === "f") {
-          event.preventDefault();
-          setSearchVisible((v) => !v);
-          return false;
-        }
-
-        const fontSizeAction = getTerminalFontSizeAction({
-          event,
-          isMacLike
-        });
-        if (fontSizeAction) {
-          event.preventDefault();
-          if (fontSizeAction === "increase") {
-            increaseFontSize();
-          } else if (fontSizeAction === "decrease") {
-            decreaseFontSize();
-          } else {
-            resetFontSize();
-          }
-          return false;
-        }
-
-        const action = getTerminalClipboardAction({
-          event,
-          hasSelection: instance?.hasSelection() ?? false,
-          isMacLike
-        });
-
-        if (!action) {
-          return true;
-        }
-
-        event.preventDefault();
-
-        if (action === "copy") {
-          const selection = instance?.getSelection() ?? "";
-          if (selection) {
-            void writeClipboardText(selection);
-          }
-          return false;
-        }
-
-        void (async () => {
-          const clipboardText = await readClipboardText();
-          if (clipboardText) {
-            instance?.paste(clipboardText);
-          }
-        })();
-
-        return false;
-      });
-
-      disposeInput = instance.onData((data) => {
-        const activeSessionId = sessionIdRef.current;
-
-        if (!activeSessionId || !hasShell()) {
-          return;
-        }
-
-        const targetSessionIds =
-          broadcastEnabledRef.current && broadcastTargetsRef.current.length > 0
-            ? broadcastTargetsRef.current
-            : [activeSessionId];
-
-        for (const sessionId of targetSessionIds) {
-          sendSessionWrite(sessionId, data);
-        }
-      });
-    })();
-
-    return () => {
-      disposed = true;
-      disposeInput?.dispose();
-      titleDisposable?.dispose();
-      repaintGuard?.dispose();
-      removeFocusListeners?.();
-      conptyWiggleRef.current?.dispose();
-      conptyWiggleRef.current = null;
-      instance?.dispose();
-      terminalRef.current = null;
-      fitAddonRef.current = null;
-      searchAddonRef.current = null;
-      setTerminal(null);
-      setSearchAddon(null);
-    };
-    // `terminalSettings` / `customThemes` are read here only to seed the
-    // initial xterm options. Listing them would tear down and rebuild the
-    // terminal on every settings change; the effect below applies live updates
-    // to the existing instance instead.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    applyTerminalBackground,
-    decreaseFontSize,
-    increaseFontSize,
-    readClipboardText,
-    resetFontSize,
-    sendSessionWrite,
-    writeClipboardText
-  ]);
 
   const onSessionOpened = input.onSessionOpened;
   const onClaudeSessionId = input.onClaudeSessionId;
 
   const connect = useCallback(async (): Promise<void> => {
-    const instance = terminalRef.current;
-    if (!instance || !hasShell()) {
+    if (!hasShell()) {
       return;
     }
 
     const attemptId = asyncOperationGuardRef.current.issueToken();
     setStateSafe("connecting");
     try {
-      const cols = instance.cols || 120;
-      const rows = instance.rows || 40;
+      const { cols, rows } = lastGridRef.current;
       const result = await resolveConnectAttempt({
         openSession: () =>
           getShell().openSession({
@@ -712,80 +391,17 @@ export function useTerminalSession(
     }
   }, [sendSessionWrite]);
 
-  const fit = useCallback((): void => {
-    const instance = terminalRef.current;
-    const addon = fitAddonRef.current;
-
-    if (!instance || !addon) {
-      return;
-    }
-
-    try {
-      addon.fit();
-    } catch {
-      return;
-    }
-
-    const sessionId = sessionIdRef.current;
-    if (sessionId) {
-      sendSessionResize(sessionId, instance.cols, instance.rows);
-    }
-
-    // Local shells on Windows sit on ConPTY, whose resize reflow diverges
-    // from xterm's and leaves stale rows behind after widening (see
-    // conptyResyncWiggle.ts). Watch fit()-driven resizes and resync once a
-    // widening burst settles.
-    if (input.transport === "local" && /Win/i.test(navigator.platform)) {
-      conptyWiggleRef.current ??= createConptyResyncWiggle({
-        resize: (cols, rows) => {
-          const wiggleTarget = terminalRef.current;
-          if (!wiggleTarget) {
-            return;
-          }
-          wiggleTarget.resize(cols, rows);
-          const wiggleSessionId = sessionIdRef.current;
-          if (wiggleSessionId) {
-            sendSessionResize(wiggleSessionId, cols, rows);
-          }
-        }
-      });
-      conptyWiggleRef.current.notifyResize(instance.cols, instance.rows);
-    }
-  }, [input.transport, sendSessionResize]);
+  const reportGridSize = useCallback((cols: number, rows: number): void => {
+    lastGridRef.current = { cols, rows };
+  }, []);
 
   useEffect(() => {
-    const term = terminalRef.current;
-    if (!term) return;
-    const opts = getTerminalOptions({
-      ...terminalSettings,
-      fontSize: input.fontSize,
-      customThemes,
-    });
-    const needsRefit =
-      term.options.fontFamily !== opts.fontFamily ||
-      term.options.fontSize !== opts.fontSize ||
-      term.options.lineHeight !== opts.lineHeight ||
-      term.options.letterSpacing !== opts.letterSpacing;
-    Object.assign(term.options, {
-      fontFamily: opts.fontFamily,
-      fontSize: opts.fontSize,
-      lineHeight: opts.lineHeight,
-      letterSpacing: opts.letterSpacing,
-      cursorBlink: opts.cursorBlink,
-      scrollback: opts.scrollback,
-      theme: opts.theme,
-    });
-    applyTerminalBackground(opts.theme?.background ?? "#07111f");
-    if (needsRefit) fit();
-  }, [applyTerminalBackground, terminalSettings, customThemes, fit, input.fontSize]);
-
-  useEffect(() => {
-    if (!terminal || input.autoConnect === false || sessionIdRef.current) {
+    if (input.autoConnect === false || sessionIdRef.current) {
       return;
     }
 
     void connect();
-  }, [connect, input.autoConnect, terminal]);
+  }, [connect, input.autoConnect]);
 
   useEffect(() => {
     if (!hasShell()) {
@@ -813,78 +429,7 @@ export function useTerminalSession(
     };
   }, [applySessionEvent]);
 
-  useEffect(() => {
-    const onFocusRequest = (event: Event) => {
-      const detail = (event as CustomEvent<TerminalFocusRequestDetail>).detail;
-      if (!shouldHandleTerminalFocusRequest(detail?.sessionId, sessionIdRef.current)) {
-        return;
-      }
-
-      requestAnimationFrame(() => {
-        terminalRef.current?.focus();
-      });
-    };
-
-    window.addEventListener(TERMINAL_FOCUS_REQUEST_EVENT, onFocusRequest);
-    return () => {
-      window.removeEventListener(TERMINAL_FOCUS_REQUEST_EVENT, onFocusRequest);
-    };
-  }, []);
-
-  useEffect(() => {
-    const onResize = () => {
-      fit();
-    };
-
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-    };
-  }, [fit]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    let raf: number | null = null;
-    const resizeObserver = new ResizeObserver(() => {
-      if (raf) cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        fit();
-        raf = null;
-      });
-    });
-    resizeObserver.observe(container);
-
-    // Re-fit when the terminal becomes visible (e.g. tab switch).
-    // visibility:hidden keeps layout dimensions, so ResizeObserver won't fire.
-    const intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          requestAnimationFrame(() => fit());
-        }
-      },
-      { threshold: 0.1 }
-    );
-    intersectionObserver.observe(container);
-
-    return () => {
-      resizeObserver.disconnect();
-      intersectionObserver.disconnect();
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [fit]);
-
-  const focusTerminal = useCallback((): void => {
-    terminalRef.current?.focus();
-  }, []);
-
   return {
-    containerRef,
-    terminal,
-    searchAddon,
-    searchVisible,
-    setSearchVisible,
     sessionId: sessionIdRef.current,
     state,
     fontSize: input.fontSize,
@@ -895,7 +440,6 @@ export function useTerminalSession(
     connect,
     disconnect,
     write,
-    fit,
-    focusTerminal
+    reportGridSize
   };
 }

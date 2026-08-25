@@ -4,11 +4,14 @@ import { useStore } from "zustand";
 import { extractDroppedPaths, formatPathsForTerminal } from "../../lib/droppedFilePaths";
 import { getShell } from "../../lib/shell";
 import { useTerminalSession } from "./useTerminalSession";
-import { TerminalReconnectOverlay } from "./TerminalReconnectOverlay";
-import { TerminalSearchBar } from "./TerminalSearchBar";
+import { useGhosttySurface } from "./useGhosttySurface";
+import { GhosttyPane } from "./GhosttyPane";
 import { LoggingButton } from "./LoggingButton";
 import { ClaudeResumePrompt } from "./ClaudeResumePrompt";
 import { settingsStore } from "../settings/settingsStore";
+import { layoutStore } from "../layout/layoutStore";
+import { handlePaneShortcut } from "../layout/paneShortcuts";
+import { useSnippetStore } from "../snippets/snippetStore";
 
 export interface TerminalPaneProps {
   transport: "ssh" | "serial" | "telnet" | "local";
@@ -24,6 +27,52 @@ export interface TerminalPaneProps {
   onSessionOpened?: (sessionId: string) => void;
   onClaudeSessionId?: (sessionId: string, claudeSessionId: string) => void;
   onProcessExit?: (exitCode: number | null) => void;
+}
+
+// The full ctrl+shift+<letter> chord allowlist that maps 1:1 onto
+// paneShortcuts.ts's KeyboardEvent-keyed switch (split/close/navigate).
+// ctrl+shift+s (snippets) and the font-size chords are handled separately
+// below — paneShortcuts.ts has no case for them.
+const CHORD_PANE_KEY_MAP: Record<string, string> = {
+  "ctrl+shift+d": "D",
+  "ctrl+shift+e": "E",
+  "ctrl+shift+w": "W",
+  "ctrl+shift+[": "[",
+  "ctrl+shift+]": "]",
+};
+
+function dispatchGhosttyChord(
+  chord: string,
+  fontSizeActions: {
+    increaseFontSize: () => void;
+    decreaseFontSize: () => void;
+    resetFontSize: () => void;
+  }
+): void {
+  switch (chord) {
+    case "ctrl+shift+s":
+      useSnippetStore.getState().toggle();
+      return;
+    case "ctrl+=":
+      fontSizeActions.increaseFontSize();
+      return;
+    case "ctrl+-":
+      fontSizeActions.decreaseFontSize();
+      return;
+    case "ctrl+0":
+      fontSizeActions.resetFontSize();
+      return;
+    default: {
+      const key = CHORD_PANE_KEY_MAP[chord];
+      if (!key) return;
+      handlePaneShortcut(layoutStore, {
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+        key
+      } as KeyboardEvent);
+    }
+  }
 }
 
 export function TerminalPane({
@@ -44,6 +93,7 @@ export function TerminalPane({
   const [dtr, setDtr] = useState(true);
   const [rts, setRts] = useState(true);
   const [dropActive, setDropActive] = useState(false);
+  const [grid, setGrid] = useState<{ cols: number; rows: number } | null>(null);
   // A restored tab asks before reattaching to its old Claude conversation.
   // Tabs without one skip straight to "fresh", which is just a normal launch.
   const [resumeChoice, setResumeChoice] = useState<"pending" | "resume" | "fresh">(
@@ -68,26 +118,55 @@ export function TerminalPane({
     onClaudeSessionId,
     onExit: onProcessExit
   });
-  const { fit, focusTerminal, terminal } = session;
+
+  const handleGrid = useCallback(
+    (cols: number, rows: number) => {
+      session.reportGridSize(cols, rows);
+      setGrid({ cols, rows });
+    },
+    [session.reportGridSize]
+  );
+
+  const handleChord = useCallback(
+    (chord: string) => {
+      dispatchGhosttyChord(chord, session);
+    },
+    [session]
+  );
+
+  const ghostty = useGhosttySurface({
+    sessionId: session.sessionId,
+    fontSize,
+    onGrid: handleGrid,
+    onChord: handleChord
+  });
 
   useEffect(() => {
-    fit();
-  }, [fit]);
+    if (isVisible) {
+      ghostty.focusSurface();
+    }
+  }, [ghostty.focusSurface, isVisible]);
 
+  // Push a live per-surface font-size update whenever the persisted size
+  // changes (chord-driven or otherwise) — the surface itself doesn't read
+  // `fontSize` back out of anything, so this is the only path that reaches it.
+  //
+  // TODO(ghostty wiring): Task 4 only exposed a GLOBAL config-update channel
+  // (ghosttyUpdateConfig) plus a generic per-surface ghosttySurfaceCommand —
+  // there is no dedicated per-surface config/font-size channel yet. This
+  // sends a placeholder `font-size:<n>` command whose payload ghostty-host
+  // doesn't define or interpret; swap for the real per-surface font command
+  // once the host side's command protocol exists.
   useEffect(() => {
-    if (!isVisible || !terminal) {
+    if (!session.sessionId) {
       return;
     }
-
-    const frame = requestAnimationFrame(() => {
-      fit();
-      focusTerminal();
-    });
-
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [fit, focusTerminal, isVisible, terminal]);
+    void getShell()
+      .ghosttySurfaceCommand({ sessionId: session.sessionId, command: `font-size:${fontSize}` })
+      .catch(() => {
+        // Best-effort placeholder — see TODO above.
+      });
+  }, [session.sessionId, fontSize]);
 
   // Dropping a file inserts its path as terminal input, like Windows Terminal.
   const canAcceptDrop = session.state === "connected" && Boolean(session.sessionId);
@@ -104,7 +183,8 @@ export function TerminalPane({
   };
 
   const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    // Ignore the dragleave fired when crossing into xterm's own child nodes.
+    // Ignore the dragleave fired when crossing into the surface container's
+    // own child nodes.
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
       return;
     }
@@ -126,7 +206,7 @@ export function TerminalPane({
     }
 
     session.write(formatPathsForTerminal(paths));
-    focusTerminal();
+    ghostty.focusSurface();
   };
 
   return (
@@ -167,18 +247,8 @@ export function TerminalPane({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        <div
-          ref={session.containerRef}
-          className="absolute inset-0"
-        />
-        {session.searchVisible && (
-          <TerminalSearchBar
-            searchAddon={session.searchAddon}
-            onClose={() => session.setSearchVisible(false)}
-            onFocusTerminal={session.focusTerminal}
-          />
-        )}
-        <TerminalReconnectOverlay
+        <GhosttyPane
+          containerRef={ghostty.containerRef}
           state={session.state}
           onRetry={() => { void session.connect(); }}
         />
@@ -189,15 +259,32 @@ export function TerminalPane({
             onFresh={chooseFresh}
           />
         )}
-        {showRecordingButton && session.sessionId && session.state === "connected" && (
+        {session.sessionId && session.state === "connected" && (
           <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-base-800/80 rounded px-1.5 py-0.5 backdrop-blur-sm border border-border/30">
-            <LoggingButton
-              sessionId={session.sessionId}
-              hostId={transport === "ssh" ? profileId : null}
-              title={`${transport.toUpperCase()} ${profileId}`}
-              width={session.terminal?.cols}
-              height={session.terminal?.rows}
-            />
+            <button
+              onClick={() =>
+                void getShell().ghosttySurfaceCommand({
+                  sessionId: session.sessionId!,
+                  command: "toggle_search"
+                })
+              }
+              className="p-1 rounded transition-colors text-text-muted hover:text-text-primary"
+              title="Search"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M10 10l-2.5-2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            </button>
+            {showRecordingButton && (
+              <LoggingButton
+                sessionId={session.sessionId}
+                hostId={transport === "ssh" ? profileId : null}
+                title={`${transport.toUpperCase()} ${profileId}`}
+                width={grid?.cols}
+                height={grid?.rows}
+              />
+            )}
           </div>
         )}
       </div>

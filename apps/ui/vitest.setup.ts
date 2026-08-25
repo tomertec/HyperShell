@@ -8,3 +8,35 @@ import { afterEach } from "vitest";
 afterEach(() => {
   cleanup();
 });
+
+// jsdom implements neither observer. This is a safe do-nothing default so any
+// component that merely constructs one (TabBar.tsx, useGhosttySurface.ts)
+// doesn't crash tests that don't care about its behavior; a test that does
+// care installs its own controllable mock via `vi.stubGlobal` (see
+// useGhosttySurface.test.tsx), which — being per-test-file — takes precedence
+// without needing to touch this shared default.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class ResizeObserverStub {
+    constructor(_callback: ResizeObserverCallback) {}
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  class IntersectionObserverStub {
+    constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+    root = null;
+    rootMargin = "";
+    thresholds: ReadonlyArray<number> = [];
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+    takeRecords(): IntersectionObserverEntry[] {
+      return [];
+    }
+  }
+  globalThis.IntersectionObserver = IntersectionObserverStub as unknown as typeof IntersectionObserver;
+}
