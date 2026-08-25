@@ -85,13 +85,20 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
     opts.host.send(
       FrameType.createSurface,
       entry.surfaceId,
-      JSON.stringify({ parentHwnd: entry.parentHwnd, bounds: entry.bounds, config })
+      JSON.stringify({
+        parentHwnd: entry.parentHwnd,
+        x: entry.bounds.x,
+        y: entry.bounds.y,
+        w: entry.bounds.w,
+        h: entry.bounds.h,
+        config
+      })
     );
   }
 
   function sendSetVisible(entry: SurfaceEntry, visible: boolean): void {
     entry.visible = visible;
-    opts.host.send(FrameType.setVisible, entry.surfaceId, JSON.stringify(visible));
+    opts.host.send(FrameType.setVisible, entry.surfaceId, JSON.stringify({ visible }));
   }
 
   return {
@@ -144,24 +151,25 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
     sessionClosed(sessionId, exitCode) {
       const entry = registry.get(sessionId);
       if (!entry) return;
-      opts.host.send(FrameType.sessionClosed, entry.surfaceId, JSON.stringify({ exitCode }));
+      const payload = exitCode === null ? {} : { exitCode };
+      opts.host.send(FrameType.sessionClosed, entry.surfaceId, JSON.stringify(payload));
     },
 
     updateGlobalConfig() {
-      opts.host.send(FrameType.updateConfig, GLOBAL_SURFACE_ID, JSON.stringify({ config: opts.getGlobalConfig() }));
+      opts.host.send(FrameType.updateConfig, GLOBAL_SURFACE_ID, opts.getGlobalConfig());
     },
 
     updateSurfaceConfig(sessionId, config) {
       const entry = registry.get(sessionId);
       if (!entry) return;
       entry.surfaceConfig = config;
-      opts.host.send(FrameType.updateConfig, entry.surfaceId, JSON.stringify({ config }));
+      opts.host.send(FrameType.updateConfig, entry.surfaceId, config);
     },
 
     sendCommand(sessionId, cmd) {
       const entry = registry.get(sessionId);
       if (!entry) return;
-      opts.host.send(FrameType.command, entry.surfaceId, JSON.stringify({ action: cmd }));
+      opts.host.send(FrameType.command, entry.surfaceId, JSON.stringify({ cmd }));
     },
 
     createReplaySurface(parentHwnd, bounds) {
@@ -230,14 +238,10 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
     },
 
     onRestart() {
-      opts.host.send(
-        FrameType.updateConfig,
-        GLOBAL_SURFACE_ID,
-        JSON.stringify({ config: opts.getGlobalConfig() })
-      );
+      opts.host.send(FrameType.updateConfig, GLOBAL_SURFACE_ID, opts.getGlobalConfig());
       for (const entry of registry.values()) {
         sendCreateSurface(entry);
-        opts.host.send(FrameType.setVisible, entry.surfaceId, JSON.stringify(entry.visible));
+        sendSetVisible(entry, entry.visible);
       }
     }
   };

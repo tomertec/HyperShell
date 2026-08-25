@@ -51,7 +51,10 @@ describe("createGhosttyHostClient", () => {
     expect(sendCalls[0]!.surfaceId).toBe(1);
     expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({
       parentHwnd: "0xDEADBEEF",
-      bounds: { x: 0, y: 0, w: 800, h: 600 },
+      x: 0,
+      y: 0,
+      w: 800,
+      h: 600,
       config: "global-config-text"
     });
 
@@ -153,16 +156,80 @@ describe("createGhosttyHostClient", () => {
     const configFrames = sendCalls.filter((c) => c.type === FrameType.updateConfig);
     expect(configFrames).toHaveLength(1);
     expect(configFrames[0]!.surfaceId).toBe(0);
-    expect(JSON.parse(configFrames[0]!.payload.toString())).toEqual({ config: "fresh-config" });
+    expect(configFrames[0]!.payload.toString()).toBe("fresh-config");
 
     const createFrames = sendCalls.filter((c) => c.type === FrameType.createSurface);
     expect(createFrames).toHaveLength(2);
     const payloads = createFrames.map((c) => JSON.parse(c.payload.toString()) as Record<string, unknown>);
     expect(payloads).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ parentHwnd: "hwnd-1", bounds: { x: 0, y: 0, w: 100, h: 100 } }),
-        expect.objectContaining({ parentHwnd: "hwnd-2", bounds: { x: 10, y: 10, w: 200, h: 200 } })
+        expect.objectContaining({ parentHwnd: "hwnd-1", x: 0, y: 0, w: 100, h: 100 }),
+        expect.objectContaining({ parentHwnd: "hwnd-2", x: 10, y: 10, w: 200, h: 200 })
       ])
     );
+  });
+
+  test("setVisible sends 0x05 with a {visible} object payload", () => {
+    const { host, sendCalls } = makeFakeHost();
+    const client = createGhosttyHostClient({
+      host,
+      writeSession: vi.fn(),
+      resizeSession: vi.fn(),
+      emitGhosttyEvent: vi.fn(),
+      getBroadcastTargets: () => null,
+      getGlobalConfig: () => ""
+    });
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    sendCalls.length = 0;
+
+    client.setVisible("session-1", false);
+
+    expect(sendCalls).toHaveLength(1);
+    expect(sendCalls[0]!.type).toBe(FrameType.setVisible);
+    expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({ visible: false });
+  });
+
+  test("sendCommand sends 0x0A with a {cmd} object payload", () => {
+    const { host, sendCalls } = makeFakeHost();
+    const client = createGhosttyHostClient({
+      host,
+      writeSession: vi.fn(),
+      resizeSession: vi.fn(),
+      emitGhosttyEvent: vi.fn(),
+      getBroadcastTargets: () => null,
+      getGlobalConfig: () => ""
+    });
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    sendCalls.length = 0;
+
+    client.sendCommand("session-1", "clear");
+
+    expect(sendCalls).toHaveLength(1);
+    expect(sendCalls[0]!.type).toBe(FrameType.command);
+    expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({ cmd: "clear" });
+  });
+
+  test("sessionClosed sends {} for a null exitCode and {exitCode} for a number", () => {
+    const { host, sendCalls } = makeFakeHost();
+    const client = createGhosttyHostClient({
+      host,
+      writeSession: vi.fn(),
+      resizeSession: vi.fn(),
+      emitGhosttyEvent: vi.fn(),
+      getBroadcastTargets: () => null,
+      getGlobalConfig: () => ""
+    });
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    sendCalls.length = 0;
+
+    client.sessionClosed("session-1", null);
+    client.sessionClosed("session-1", 0);
+
+    expect(sendCalls).toHaveLength(2);
+    expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({});
+    expect(JSON.parse(sendCalls[1]!.payload.toString())).toEqual({ exitCode: 0 });
   });
 });
