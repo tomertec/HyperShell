@@ -236,4 +236,70 @@ describe("createGhosttyHostProcess", () => {
     expect(harness.spawn).toHaveBeenCalledTimes(3);
     expect(proc.isAlive()).toBe(false);
   });
+
+  test("a server error after hello triggers teardown and a respawn", async () => {
+    vi.useFakeTimers();
+    const harness = makeHarness();
+    const onRestart = vi.fn();
+    const onDead = vi.fn();
+    const proc = createGhosttyHostProcess({
+      exePath: "ghostty-host.exe",
+      ...asInjectable(harness),
+      onFrame: vi.fn(),
+      onRestart,
+      onDead
+    });
+
+    const startPromise = proc.start();
+    const socket1 = new FakeSocket();
+    harness.servers[0]!.simulateConnection(socket1);
+    socket1.emit("data", helloFrame());
+    await startPromise;
+
+    expect(harness.spawn).toHaveBeenCalledTimes(1);
+
+    // A server-level fault after the handshake must not be swallowed: it
+    // has to go through the same settled-aware branching as the socket and
+    // child handlers (teardown, then respawn-or-onDead), not get silently
+    // dropped while isAlive() stays stuck true.
+    harness.servers[0]!.emit("error", new Error("pipe server exploded"));
+    expect(proc.isAlive()).toBe(false);
+    expect(onDead).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(500);
+    expect(harness.spawn).toHaveBeenCalledTimes(2);
+
+    const socket2 = new FakeSocket();
+    harness.servers[1]!.simulateConnection(socket2);
+    socket2.emit("data", helloFrame());
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(onRestart).toHaveBeenCalledTimes(1);
+    expect(proc.isAlive()).toBe(true);
+  });
+
+  test("stop() during an in-flight start() rejects the pending promise instead of hanging", async () => {
+    const harness = makeHarness();
+    const proc = createGhosttyHostProcess({
+      exePath: "ghostty-host.exe",
+      ...asInjectable(harness),
+      onFrame: vi.fn(),
+      onRestart: vi.fn(),
+      onDead: vi.fn()
+    });
+
+    const startPromise = proc.start();
+    // Mid-handshake: the pipe is connected and the child has spawned, but no
+    // hello has arrived yet.
+    const socket = new FakeSocket();
+    harness.servers[0]!.simulateConnection(socket);
+    expect(harness.spawn).toHaveBeenCalledTimes(1);
+
+    proc.stop();
+
+    await expect(startPromise).rejects.toThrow(/stopped/i);
+    expect(proc.isAlive()).toBe(false);
+    expect(socket.destroyed).toBe(true);
+    expect(harness.children[0]!.killed).toBe(true);
+  });
 });

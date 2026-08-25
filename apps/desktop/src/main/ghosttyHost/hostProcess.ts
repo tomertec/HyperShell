@@ -43,6 +43,7 @@ export function createGhosttyHostProcess(opts: CreateGhosttyHostProcessOptions):
   let respawnTimer: ReturnType<typeof setTimeout> | null = null;
   let backoffAttempt = 0;
   let failureTimestamps: number[] = [];
+  let pendingSettleReject: ((err: Error) => void) | null = null;
 
   function clearHelloTimer(): void {
     if (helloTimer !== null) {
@@ -136,9 +137,11 @@ export function createGhosttyHostProcess(opts: CreateGhosttyHostProcessOptions):
           return;
         }
         settled = true;
+        pendingSettleReject = null;
         clearHelloTimer();
         reject(err);
       };
+      pendingSettleReject = settleReject;
 
       const srv = createServerFn((sock: Socket) => {
         socket = sock;
@@ -178,6 +181,7 @@ export function createGhosttyHostProcess(opts: CreateGhosttyHostProcessOptions):
                 return;
               }
               settled = true;
+              pendingSettleReject = null;
               clearHelloTimer();
               resolve();
               continue;
@@ -207,7 +211,11 @@ export function createGhosttyHostProcess(opts: CreateGhosttyHostProcessOptions):
 
       server = srv;
       srv.on("error", (err: Error) => {
-        settleReject(err);
+        if (!settled) {
+          settleReject(err);
+        } else {
+          scheduleRespawn(err.message);
+        }
       });
 
       srv.listen(pipeName, () => {
@@ -256,6 +264,11 @@ export function createGhosttyHostProcess(opts: CreateGhosttyHostProcessOptions):
       stopped = true;
       alive = false;
       clearRespawnTimer();
+      if (pendingSettleReject) {
+        const settlePending = pendingSettleReject;
+        pendingSettleReject = null;
+        settlePending(new Error("host process was stopped"));
+      }
       teardownConnection();
     },
 
