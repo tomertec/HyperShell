@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "./ui/Button";
 import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../lib/motion";
+import { useOverlayGuard } from "../features/terminal/nativeOverlayGuard";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -27,6 +28,8 @@ export function ConfirmDialog({
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
+
+  useOverlayGuard(open);
 
   useEffect(() => {
     if (!open) return;

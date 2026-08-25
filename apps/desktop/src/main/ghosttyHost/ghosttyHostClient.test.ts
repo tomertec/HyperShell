@@ -211,6 +211,80 @@ describe("createGhosttyHostClient", () => {
     expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({ cmd: "clear" });
   });
 
+  test("guard hidden composes with a tab-visible surface: it is hidden", () => {
+    const { host, sendCalls } = makeFakeHost();
+    const client = createGhosttyHostClient({
+      host,
+      writeSession: vi.fn(),
+      resizeSession: vi.fn(),
+      emitGhosttyEvent: vi.fn(),
+      getBroadcastTargets: () => null,
+      getGlobalConfig: () => ""
+    });
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    sendCalls.length = 0;
+
+    client.setOverlayVisible(false);
+
+    expect(sendCalls).toHaveLength(1);
+    expect(sendCalls[0]!.type).toBe(FrameType.setVisible);
+    expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({ visible: false });
+  });
+
+  test("releasing the guard reshows tab-visible surfaces but leaves tab-hidden surfaces hidden", () => {
+    const { host, sendCalls } = makeFakeHost();
+    const client = createGhosttyHostClient({
+      host,
+      writeSession: vi.fn(),
+      resizeSession: vi.fn(),
+      emitGhosttyEvent: vi.fn(),
+      getBroadcastTargets: () => null,
+      getGlobalConfig: () => ""
+    });
+
+    client.createSurface("session-1", "hwnd-1", { x: 0, y: 0, w: 1, h: 1 }); // stays tab-visible
+    client.createSurface("session-2", "hwnd-2", { x: 0, y: 0, w: 1, h: 1 });
+    client.setVisible("session-2", false); // hidden by its own tab state
+    client.setOverlayVisible(true); // guard already released; only the hide below matters
+    client.setOverlayVisible(false); // guard hides both
+    sendCalls.length = 0;
+
+    client.setOverlayVisible(true); // guard releases
+
+    const bySurface = new Map(sendCalls.map((c) => [c.surfaceId, JSON.parse(c.payload.toString())]));
+    expect(bySurface.get(1)).toEqual({ visible: true }); // session-1: tab-visible -> reappears
+    expect(bySurface.get(2)).toEqual({ visible: false }); // session-2: still tab-hidden
+  });
+
+  test("a replay surface is exempt from the overlay guard and stays visible while it hides everything else", () => {
+    const { host, sendCalls } = makeFakeHost();
+    const client = createGhosttyHostClient({
+      host,
+      writeSession: vi.fn(),
+      resizeSession: vi.fn(),
+      emitGhosttyEvent: vi.fn(),
+      getBroadcastTargets: () => null,
+      getGlobalConfig: () => ""
+    });
+
+    client.createSurface("session-1", "hwnd-1", { x: 0, y: 0, w: 1, h: 1 });
+    const replaySessionId = client.createReplaySurface("hwnd-2", { x: 0, y: 0, w: 1, h: 1 });
+    sendCalls.length = 0;
+
+    client.setOverlayVisible(false);
+
+    // The ordinary surface got hidden...
+    expect(sendCalls).toHaveLength(1);
+    expect(sendCalls[0]!.surfaceId).toBe(1);
+    expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({ visible: false });
+
+    // ...but the exempt replay surface never received a setVisible frame at
+    // all, since the guard doesn't touch it.
+    expect(replaySessionId).toBe("replay:1");
+    expect(sendCalls.some((c) => c.surfaceId === 2)).toBe(false);
+  });
+
   test("sessionClosed sends {} for a null exitCode and {exitCode} for a number", () => {
     const { host, sendCalls } = makeFakeHost();
     const client = createGhosttyHostClient({

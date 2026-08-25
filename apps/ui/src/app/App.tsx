@@ -1395,8 +1395,14 @@ function MainApp() {
 
       <TransferPopup />
 
+      {/* Native ghostty surfaces sit above CSS z-index by construction
+          (they're child HWNDs, not DOM nodes) — a toast anchored over the
+          terminal area would render underneath a live surface no matter how
+          it's stacked. bottom-left with this offset keeps it over the
+          sidebar/status-bar corner, which native surfaces never cover. */}
       <Toaster
-        position="bottom-right"
+        position="bottom-left"
+        offset={{ left: "12px", bottom: "36px" }}
         toastOptions={{
           className: "!bg-base-700 !border !border-border !text-text-primary !text-sm",
         }}

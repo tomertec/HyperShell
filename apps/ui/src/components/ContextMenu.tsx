@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useOverlayGuard } from "../features/terminal/nativeOverlayGuard";
 
 export interface ContextMenuAction {
   label: string;
@@ -21,6 +22,12 @@ export interface ContextMenuProps {
 
 export function ContextMenu({ x, y, actions, onClose }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+
+  // Every hook must run unconditionally before the `actions.length === 0`
+  // early return below, so the guard is keyed on that same condition rather
+  // than assumed true — a menu callers render with zero actions never
+  // actually shows (see that return), so it must not hide native surfaces.
+  useOverlayGuard(actions.length > 0);
 
   // Clamp position so menu stays within viewport
   const menuWidth = 220;

@@ -41,7 +41,12 @@ export interface GhosttyHostClient {
   createSurface(sessionId: string, parentHwnd: string, bounds: Bounds, surfaceConfig?: string): void;
   destroySurface(sessionId: string): void;
   setBounds(sessionId: string, b: Bounds): void;
-  setAllVisible(visible: boolean): void;
+  /** DOM-overlay airspace guard (Task 8): hides/shows every non-exempt
+   *  surface, composed with each surface's own setVisible flag — a surface
+   *  is only actually shown when both are true. Surfaces created via
+   *  createReplaySurface are exempt and stay under their own setVisible
+   *  control regardless of this. */
+  setOverlayVisible(visible: boolean): void;
   setVisible(sessionId: string, visible: boolean): void;
   focus(sessionId: string): void;
   feedData(sessionId: string, data: string): void;
@@ -59,7 +64,12 @@ interface SurfaceEntry {
   surfaceId: number;
   parentHwnd: string;
   bounds: Bounds;
-  visible: boolean;
+  /** This surface's own setVisible flag (tab visibility, etc.) — independent
+   *  of the DOM-overlay guard. */
+  surfaceVisible: boolean;
+  /** Replay surfaces (createReplaySurface) are exempt: the overlay guard
+   *  never hides them, so they stay under surfaceVisible's control alone. */
+  exemptFromOverlayGuard: boolean;
   surfaceConfig: string | undefined;
 }
 
@@ -70,6 +80,9 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
   const surfaceIdToSessionId = new Map<number, string>();
   let nextSurfaceId = 1;
   let nextReplayId = 1;
+  /** DOM-overlay airspace guard state (Task 8) — composed with each entry's
+   *  surfaceVisible, except for exempt (replay) entries. */
+  let overlayVisible = true;
 
   function register(sessionId: string, entry: SurfaceEntry): void {
     const existing = registry.get(sessionId);
@@ -96,15 +109,25 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
     );
   }
 
-  function sendSetVisible(entry: SurfaceEntry, visible: boolean): void {
-    entry.visible = visible;
-    opts.host.send(FrameType.setVisible, entry.surfaceId, JSON.stringify({ visible }));
+  function effectiveVisible(entry: SurfaceEntry): boolean {
+    return entry.exemptFromOverlayGuard ? entry.surfaceVisible : overlayVisible && entry.surfaceVisible;
+  }
+
+  function sendVisibility(entry: SurfaceEntry): void {
+    opts.host.send(FrameType.setVisible, entry.surfaceId, JSON.stringify({ visible: effectiveVisible(entry) }));
   }
 
   return {
     createSurface(sessionId, parentHwnd, bounds, surfaceConfig) {
       const surfaceId = nextSurfaceId++;
-      const entry: SurfaceEntry = { surfaceId, parentHwnd, bounds, visible: true, surfaceConfig };
+      const entry: SurfaceEntry = {
+        surfaceId,
+        parentHwnd,
+        bounds,
+        surfaceVisible: true,
+        exemptFromOverlayGuard: false,
+        surfaceConfig
+      };
       register(sessionId, entry);
       sendCreateSurface(entry);
     },
@@ -124,16 +147,19 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
       opts.host.send(FrameType.setBounds, entry.surfaceId, JSON.stringify(b));
     },
 
-    setAllVisible(visible) {
+    setOverlayVisible(visible) {
+      overlayVisible = visible;
       for (const entry of registry.values()) {
-        sendSetVisible(entry, visible);
+        if (entry.exemptFromOverlayGuard) continue;
+        sendVisibility(entry);
       }
     },
 
     setVisible(sessionId, visible) {
       const entry = registry.get(sessionId);
       if (!entry) return;
-      sendSetVisible(entry, visible);
+      entry.surfaceVisible = visible;
+      sendVisibility(entry);
     },
 
     focus(sessionId) {
@@ -175,7 +201,14 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
     createReplaySurface(parentHwnd, bounds) {
       const surfaceId = nextSurfaceId++;
       const sessionId = `replay:${nextReplayId++}`;
-      const entry: SurfaceEntry = { surfaceId, parentHwnd, bounds, visible: true, surfaceConfig: undefined };
+      const entry: SurfaceEntry = {
+        surfaceId,
+        parentHwnd,
+        bounds,
+        surfaceVisible: true,
+        exemptFromOverlayGuard: true,
+        surfaceConfig: undefined
+      };
       register(sessionId, entry);
       sendCreateSurface(entry);
       return sessionId;
@@ -241,7 +274,7 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
       opts.host.send(FrameType.updateConfig, GLOBAL_SURFACE_ID, opts.getGlobalConfig());
       for (const entry of registry.values()) {
         sendCreateSurface(entry);
-        sendSetVisible(entry, entry.visible);
+        sendVisibility(entry);
       }
     }
   };

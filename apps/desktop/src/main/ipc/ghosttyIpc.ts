@@ -132,7 +132,7 @@ export function registerGhosttyIpc(
 
   ipcMain.handle(ipcChannels.ghostty.overlayGuard, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = ghosttyOverlayGuardRequestSchema.parse(rawRequest);
-    requireClient(options.client).setAllVisible(!request.hidden);
+    requireClient(options.client).setOverlayVisible(!request.hidden);
   });
 
   ipcMain.handle(ipcChannels.ghostty.updateConfig, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {

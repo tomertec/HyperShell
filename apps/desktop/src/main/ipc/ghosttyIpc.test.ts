@@ -60,7 +60,7 @@ function createFakeClient(): GhosttyHostClient {
     createSurface: vi.fn(),
     destroySurface: vi.fn(),
     setBounds: vi.fn(),
-    setAllVisible: vi.fn(),
+    setOverlayVisible: vi.fn(),
     setVisible: vi.fn(),
     focus: vi.fn(),
     feedData: vi.fn(),
@@ -247,12 +247,12 @@ describe("registerGhosttyIpc handler delegation", () => {
     expect(client.sendCommand).toHaveBeenCalledWith("s1", "clear");
   });
 
-  it("overlayGuard inverts hidden into client.setAllVisible", async () => {
+  it("overlayGuard inverts hidden into client.setOverlayVisible", async () => {
     await ipcMain.invoke(ipcChannels.ghostty.overlayGuard, { hidden: true });
-    expect(client.setAllVisible).toHaveBeenCalledWith(false);
+    expect(client.setOverlayVisible).toHaveBeenCalledWith(false);
 
     await ipcMain.invoke(ipcChannels.ghostty.overlayGuard, { hidden: false });
-    expect(client.setAllVisible).toHaveBeenCalledWith(true);
+    expect(client.setOverlayVisible).toHaveBeenCalledWith(true);
   });
 
   it("updateConfig maps the resolved theme through ghosttyConfigFromSettings and calls the client", async () => {

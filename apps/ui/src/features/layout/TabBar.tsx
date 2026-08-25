@@ -28,6 +28,7 @@ import {
 } from "../settings/tabTitleColors";
 import { ContextMenu, type ContextMenuAction } from "../../components/ContextMenu";
 import { IconButton } from "../../components/ui/IconButton";
+import { useOverlayGuard } from "../terminal/nativeOverlayGuard";
 
 const tabStateColors: Record<string, string> = {
   connected: "bg-success",
@@ -287,6 +288,9 @@ export function TabBar({
   const newTabButtonRef = useRef<HTMLButtonElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [overflow, setOverflow] = useState({ left: false, right: false });
+  const [isDraggingTab, setIsDraggingTab] = useState(false);
+
+  useOverlayGuard(isDraggingTab);
 
   // Sub-pixel widths make an exactly-scrolled-to-the-end strip report a
   // fractional gap, which would leave a chevron that scrolls nowhere.
@@ -373,6 +377,7 @@ export function TabBar({
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setIsDraggingTab(false);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const oldIndex = tabs.findIndex((t) => (t.tabKey ?? t.sessionId) === active.id);
@@ -383,7 +388,13 @@ export function TabBar({
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={() => setIsDraggingTab(true)}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setIsDraggingTab(false)}
+    >
       {/* The scrollable tab list and the "+" button/menu are siblings, not
           parent/child: a flex container with one non-`visible` overflow axis
           computes the other axis to `auto` too (CSS Overflow spec), so an

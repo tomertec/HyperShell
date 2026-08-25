@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../lib/motion";
+import { useOverlayGuard } from "../features/terminal/nativeOverlayGuard";
 
 export interface PromptDialogProps {
   open: boolean;
@@ -31,6 +32,8 @@ export function PromptDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
+
+  useOverlayGuard(open);
 
   useEffect(() => {
     if (open) {

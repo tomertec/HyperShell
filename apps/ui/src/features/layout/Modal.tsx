@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { IconButton } from "../../components/ui/IconButton";
 import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../../lib/motion";
+import { useOverlayGuard } from "../terminal/nativeOverlayGuard";
 
 export interface ModalProps {
   open: boolean;
@@ -29,6 +30,8 @@ export function Modal({ open, onClose, title, children, size = "md", footer }: M
   const dialogRef = useRef<HTMLDivElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const titleId = useId();
+
+  useOverlayGuard(open);
 
   const getFocusable = useCallback((): HTMLElement[] => {
     const dialog = dialogRef.current;

@@ -6,6 +6,7 @@ import { EmptyState } from "../../components/ui/EmptyState";
 import { useSnippetStore } from "./snippetStore";
 import { layoutStore } from "../layout/layoutStore";
 import { requestTerminalFocus } from "../terminal/terminalFocus";
+import { useOverlayGuard } from "../terminal/nativeOverlayGuard";
 import { getShell } from "../../lib/shell";
 
 function SnippetForm({
@@ -67,6 +68,8 @@ export function SnippetsPanel() {
   const [formName, setFormName] = useState("");
   const [formBody, setFormBody] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  useOverlayGuard(isOpen);
 
   useEffect(() => {
     if (isOpen) {

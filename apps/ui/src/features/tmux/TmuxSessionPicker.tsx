@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "../../components/ui/Button";
 import { MOTION_BASE, MOTION_SLOW, EASE_STANDARD } from "../../lib/motion";
+import { useOverlayGuard } from "../terminal/nativeOverlayGuard";
 
 export interface TmuxSessionInfo {
   name: string;
@@ -36,6 +37,8 @@ export function TmuxSessionPicker({
   onAttach,
   onSkip,
 }: TmuxSessionPickerProps) {
+  useOverlayGuard(open);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") onSkip();
