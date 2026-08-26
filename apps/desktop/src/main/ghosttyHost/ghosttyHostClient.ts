@@ -58,6 +58,26 @@ export interface GhosttyHostClient {
   dispose(): void;
   onFrame(frame: Frame): void;
   onRestart(): void;
+  /** The host process gave up respawning. Tells every live surface's session
+   *  so its pane can show the failure and offer a retry — a dead host is
+   *  otherwise indistinguishable from an idle terminal. */
+  onHostDead(reason: string): void;
+}
+
+/**
+ * Calls that arrive for a session whose surface hasn't been created yet.
+ *
+ * Surface creation is asynchronous on the renderer side (it awaits
+ * `ensureHostStarted` before `createSurface`), while visibility, bounds and
+ * focus go through synchronous handlers. On a cold start with restored tabs
+ * every hidden tab pushes `setVisible(false)` while its create is still in
+ * flight; dropping those left every surface visible and stacked. They are
+ * remembered here instead and applied when the surface appears.
+ */
+interface PendingSurfaceState {
+  visible?: boolean;
+  bounds?: Bounds;
+  focus?: boolean;
 }
 
 interface SurfaceEntry {
@@ -75,9 +95,19 @@ interface SurfaceEntry {
 
 const GLOBAL_SURFACE_ID = 0;
 
+/** Frames to the host are capped at 1 MiB of payload and an oversize one kills
+ *  the connection outright (wire protocol, Limits), so terminal output is split
+ *  rather than sent whole. */
+const MAX_FRAME_PAYLOAD = 1024 * 1024;
+
+function isValidGridDimension(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): GhosttyHostClient {
   const registry = new Map<string, SurfaceEntry>();
   const surfaceIdToSessionId = new Map<number, string>();
+  const pending = new Map<string, PendingSurfaceState>();
   let nextSurfaceId = 1;
   let nextReplayId = 1;
   /** DOM-overlay airspace guard state (Task 8) — composed with each entry's
@@ -87,10 +117,18 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
   function register(sessionId: string, entry: SurfaceEntry): void {
     const existing = registry.get(sessionId);
     if (existing) {
+      // A renderer reload re-creates surfaces for ids main still holds. Without
+      // this the old native surface stays alive with nothing addressing it,
+      // painting over its replacement.
+      opts.host.send(FrameType.destroySurface, existing.surfaceId, "");
       surfaceIdToSessionId.delete(existing.surfaceId);
     }
     registry.set(sessionId, entry);
     surfaceIdToSessionId.set(entry.surfaceId, sessionId);
+  }
+
+  function rememberPending(sessionId: string, patch: PendingSurfaceState): void {
+    pending.set(sessionId, { ...pending.get(sessionId), ...patch });
   }
 
   function sendCreateSurface(entry: SurfaceEntry): void {
@@ -120,19 +158,33 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
   return {
     createSurface(sessionId, parentHwnd, bounds, surfaceConfig) {
       const surfaceId = nextSurfaceId++;
+      // Anything that arrived while the create was in flight is newer than the
+      // create's own arguments, so it wins.
+      const queued = pending.get(sessionId);
+      pending.delete(sessionId);
       const entry: SurfaceEntry = {
         surfaceId,
         parentHwnd,
-        bounds,
-        surfaceVisible: true,
+        bounds: queued?.bounds ?? bounds,
+        surfaceVisible: queued?.visible ?? true,
         exemptFromOverlayGuard: false,
         surfaceConfig
       };
       register(sessionId, entry);
       sendCreateSurface(entry);
+      // The host creates every surface visible, so a surface that must not be
+      // (a background tab, or any surface born while a DOM overlay holds the
+      // airspace guard) needs telling right away.
+      if (!effectiveVisible(entry)) {
+        sendVisibility(entry);
+      }
+      if (queued?.focus) {
+        opts.host.send(FrameType.focus, entry.surfaceId, "");
+      }
     },
 
     destroySurface(sessionId) {
+      pending.delete(sessionId);
       const entry = registry.get(sessionId);
       if (!entry) return;
       opts.host.send(FrameType.destroySurface, entry.surfaceId, "");
@@ -142,7 +194,10 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
 
     setBounds(sessionId, b) {
       const entry = registry.get(sessionId);
-      if (!entry) return;
+      if (!entry) {
+        rememberPending(sessionId, { bounds: b });
+        return;
+      }
       entry.bounds = b;
       opts.host.send(FrameType.setBounds, entry.surfaceId, JSON.stringify(b));
     },
@@ -157,21 +212,40 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
 
     setVisible(sessionId, visible) {
       const entry = registry.get(sessionId);
-      if (!entry) return;
+      if (!entry) {
+        rememberPending(sessionId, { visible });
+        return;
+      }
       entry.surfaceVisible = visible;
       sendVisibility(entry);
     },
 
     focus(sessionId) {
       const entry = registry.get(sessionId);
-      if (!entry) return;
+      if (!entry) {
+        rememberPending(sessionId, { focus: true });
+        return;
+      }
       opts.host.send(FrameType.focus, entry.surfaceId, "");
     },
 
     feedData(sessionId, data) {
       const entry = registry.get(sessionId);
       if (!entry) return;
-      opts.host.send(FrameType.feedData, entry.surfaceId, data);
+      const payload = Buffer.from(data, "utf8");
+      if (payload.length <= MAX_FRAME_PAYLOAD) {
+        opts.host.send(FrameType.feedData, entry.surfaceId, payload);
+        return;
+      }
+      // Splitting mid-sequence (or mid-codepoint) is safe: the far side is a
+      // byte-oriented VT parser reading one ordered stream.
+      for (let offset = 0; offset < payload.length; offset += MAX_FRAME_PAYLOAD) {
+        opts.host.send(
+          FrameType.feedData,
+          entry.surfaceId,
+          payload.subarray(offset, offset + MAX_FRAME_PAYLOAD)
+        );
+      }
     },
 
     sessionClosed(sessionId, exitCode) {
@@ -220,12 +294,17 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
       }
       registry.clear();
       surfaceIdToSessionId.clear();
+      pending.clear();
     },
 
     onFrame(frame) {
       const sessionId = surfaceIdToSessionId.get(frame.surfaceId);
       if (!sessionId) return;
 
+      // Every JSON payload below comes off the socket inside node's `data`
+      // handler, outside the decoder's own try/catch — an unparseable one used
+      // to take the whole main process down. A malformed frame is dropped.
+      let parsed: Record<string, unknown>;
       switch (frame.type) {
         case FrameType.input: {
           const data = frame.payload.toString();
@@ -233,41 +312,81 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
           for (const target of targets) {
             opts.writeSession(target, data);
           }
-          break;
-        }
-        case FrameType.gridSize: {
-          const parsed = JSON.parse(frame.payload.toString()) as { cols: number; rows: number };
-          opts.resizeSession(sessionId, parsed.cols, parsed.rows);
-          opts.emitGhosttyEvent({ kind: "grid", sessionId, cols: parsed.cols, rows: parsed.rows });
-          break;
-        }
-        case FrameType.title: {
-          const parsed = JSON.parse(frame.payload.toString()) as { title: string };
-          opts.emitGhosttyEvent({ kind: "title", sessionId, title: parsed.title });
-          break;
+          return;
         }
         case FrameType.bell:
           opts.emitGhosttyEvent({ kind: "bell", sessionId });
+          return;
+        case FrameType.focusGained:
+          opts.emitGhosttyEvent({ kind: "focusGained", sessionId });
+          return;
+        case FrameType.focusLost:
+          opts.emitGhosttyEvent({ kind: "focusLost", sessionId });
+          return;
+        case FrameType.gridSize:
+        case FrameType.title:
+        case FrameType.passthroughChord:
+        case FrameType.surfaceCrashed: {
+          try {
+            parsed = JSON.parse(frame.payload.toString()) as Record<string, unknown>;
+          } catch (error) {
+            console.error(
+              `[ghostty] dropping malformed frame 0x${frame.type.toString(16)} for ${sessionId}`,
+              error
+            );
+            return;
+          }
           break;
+        }
+        default:
+          return;
+      }
+
+      switch (frame.type) {
+        case FrameType.gridSize: {
+          const { cols, rows } = parsed;
+          if (!isValidGridDimension(cols) || !isValidGridDimension(rows)) {
+            console.error(`[ghostty] dropping gridSize frame with invalid dimensions for ${sessionId}`);
+            return;
+          }
+          opts.resizeSession(sessionId, cols, rows);
+          opts.emitGhosttyEvent({ kind: "grid", sessionId, cols, rows });
+          break;
+        }
+        case FrameType.title: {
+          if (typeof parsed.title !== "string") return;
+          opts.emitGhosttyEvent({ kind: "title", sessionId, title: parsed.title });
+          break;
+        }
         case FrameType.passthroughChord: {
-          const parsed = JSON.parse(frame.payload.toString()) as { chord: string };
+          if (typeof parsed.chord !== "string") return;
           opts.emitGhosttyEvent({ kind: "chord", sessionId, chord: parsed.chord });
           break;
         }
-        case FrameType.focusGained:
-          opts.emitGhosttyEvent({ kind: "focusGained", sessionId });
-          break;
-        case FrameType.focusLost:
-          opts.emitGhosttyEvent({ kind: "focusLost", sessionId });
-          break;
         case FrameType.surfaceCrashed: {
-          const parsed = JSON.parse(frame.payload.toString()) as { error?: string };
-          opts.emitGhosttyEvent({ kind: "crashed", sessionId, error: parsed.error });
+          opts.emitGhosttyEvent({
+            kind: "crashed",
+            sessionId,
+            error: typeof parsed.error === "string" ? parsed.error : undefined
+          });
           break;
         }
         default:
           break;
       }
+    },
+
+    onHostDead(reason) {
+      // The host has given up respawning, so every surface died with it and
+      // every surfaceId it handed out is meaningless. The registry is emptied
+      // rather than kept: a retry creates a fresh surface, and a stale entry
+      // would only make that retry send a destroy for an id no host knows.
+      for (const sessionId of registry.keys()) {
+        opts.emitGhosttyEvent({ kind: "crashed", sessionId, error: reason });
+      }
+      registry.clear();
+      surfaceIdToSessionId.clear();
+      pending.clear();
     },
 
     onRestart() {

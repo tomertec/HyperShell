@@ -307,3 +307,177 @@ describe("createGhosttyHostClient", () => {
     expect(JSON.parse(sendCalls[1]!.payload.toString())).toEqual({ exitCode: 0 });
   });
 });
+
+function makeClient(overrides: Partial<Parameters<typeof createGhosttyHostClient>[0]> = {}) {
+  const { host, sendCalls } = makeFakeHost();
+  const client = createGhosttyHostClient({
+    host,
+    writeSession: vi.fn(),
+    resizeSession: vi.fn(),
+    emitGhosttyEvent: vi.fn(),
+    getBroadcastTargets: () => null,
+    getGlobalConfig: () => "",
+    ...overrides
+  });
+  return { client, sendCalls };
+}
+
+// Surface creation is asynchronous renderer-side (it awaits the host start),
+// while visibility/bounds/focus are synchronous. On a cold start with restored
+// tabs, every hidden tab's setVisible(false) lands before its surface exists.
+describe("calls that arrive before the surface does", () => {
+  test("setVisible(false) before createSurface leaves the new surface hidden", () => {
+    const { client, sendCalls } = makeClient();
+
+    client.setVisible("session-1", false);
+    expect(sendCalls).toHaveLength(0);
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+
+    expect(sendCalls).toHaveLength(2);
+    expect(sendCalls[0]!.type).toBe(FrameType.createSurface);
+    expect(sendCalls[1]!.type).toBe(FrameType.setVisible);
+    expect(JSON.parse(sendCalls[1]!.payload.toString())).toEqual({ visible: false });
+  });
+
+  test("a surface created while the overlay guard is up is hidden immediately", () => {
+    const { client, sendCalls } = makeClient();
+    client.setOverlayVisible(false);
+    sendCalls.length = 0;
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+
+    expect(sendCalls.map((c) => c.type)).toEqual([FrameType.createSurface, FrameType.setVisible]);
+    expect(JSON.parse(sendCalls[1]!.payload.toString())).toEqual({ visible: false });
+  });
+
+  test("a pending setBounds wins over the create call's own bounds", () => {
+    const { client, sendCalls } = makeClient();
+
+    client.setBounds("session-1", { x: 5, y: 6, w: 70, h: 80 });
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+
+    const payload = JSON.parse(sendCalls[0]!.payload.toString());
+    expect(payload).toMatchObject({ x: 5, y: 6, w: 70, h: 80 });
+  });
+
+  test("a pending focus is delivered once the surface exists", () => {
+    const { client, sendCalls } = makeClient();
+
+    client.focus("session-1");
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+
+    expect(sendCalls.some((c) => c.type === FrameType.focus)).toBe(true);
+  });
+
+  test("pending state is consumed once, not replayed onto a later surface", () => {
+    const { client, sendCalls } = makeClient();
+
+    client.setVisible("session-1", false);
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+    client.destroySurface("session-1");
+    sendCalls.length = 0;
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+    expect(sendCalls.map((c) => c.type)).toEqual([FrameType.createSurface]);
+  });
+});
+
+describe("surface lifecycle", () => {
+  test("re-registering a session destroys the surface it replaces", () => {
+    const { client, sendCalls } = makeClient();
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+    const firstSurfaceId = sendCalls[0]!.surfaceId;
+    sendCalls.length = 0;
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+
+    const destroy = sendCalls.find((c) => c.type === FrameType.destroySurface);
+    expect(destroy?.surfaceId).toBe(firstSurfaceId);
+  });
+
+  test("onHostDead reports a crash to every live session", () => {
+    const emitGhosttyEvent = vi.fn();
+    const { client } = makeClient({ emitGhosttyEvent });
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    client.createSurface("session-2", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    emitGhosttyEvent.mockClear();
+
+    client.onHostDead("host exited (code 1)");
+
+    expect(emitGhosttyEvent).toHaveBeenCalledTimes(2);
+    expect(emitGhosttyEvent).toHaveBeenCalledWith({
+      kind: "crashed",
+      sessionId: "session-1",
+      error: "host exited (code 1)"
+    });
+  });
+
+  test("onHostDead forgets the surfaces, so a retry does not destroy an id no host knows", () => {
+    const { client, sendCalls } = makeClient();
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    client.onHostDead("host exited");
+    sendCalls.length = 0;
+
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+
+    expect(sendCalls.map((c) => c.type)).toEqual([FrameType.createSurface]);
+  });
+});
+
+describe("frames from the host", () => {
+  test("a malformed JSON payload is dropped instead of thrown", () => {
+    const emitGhosttyEvent = vi.fn();
+    const resizeSession = vi.fn();
+    const { client, sendCalls } = makeClient({ emitGhosttyEvent, resizeSession });
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    const surfaceId = sendCalls[0]!.surfaceId;
+    emitGhosttyEvent.mockClear();
+
+    expect(() =>
+      injectFrame(client, {
+        type: FrameType.gridSize,
+        surfaceId,
+        payload: Buffer.from("{not json")
+      })
+    ).not.toThrow();
+    expect(resizeSession).not.toHaveBeenCalled();
+    expect(emitGhosttyEvent).not.toHaveBeenCalled();
+  });
+
+  test("a gridSize frame with non-numeric dimensions never reaches resize", () => {
+    const emitGhosttyEvent = vi.fn();
+    const resizeSession = vi.fn();
+    const { client, sendCalls } = makeClient({ emitGhosttyEvent, resizeSession });
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    const surfaceId = sendCalls[0]!.surfaceId;
+
+    injectFrame(client, {
+      type: FrameType.gridSize,
+      surfaceId,
+      payload: Buffer.from(JSON.stringify({ cols: "80", rows: null }))
+    });
+
+    expect(resizeSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("feedData", () => {
+  test("splits payloads larger than the 1 MiB frame cap", () => {
+    const { client, sendCalls } = makeClient();
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 1, h: 1 });
+    sendCalls.length = 0;
+
+    // An oversize frame kills the connection outright (wire protocol, Limits),
+    // so a burst of output has to be split rather than sent whole.
+    const data = "x".repeat(1024 * 1024 + 10);
+    client.feedData("session-1", data);
+
+    expect(sendCalls).toHaveLength(2);
+    expect(sendCalls[0]!.payload.length).toBe(1024 * 1024);
+    expect(sendCalls[1]!.payload.length).toBe(10);
+    expect(Buffer.concat(sendCalls.map((c) => c.payload)).toString()).toBe(data);
+  });
+});

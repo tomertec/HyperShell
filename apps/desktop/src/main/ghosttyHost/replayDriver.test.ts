@@ -25,7 +25,8 @@ function makeFakeClient(): GhosttyHostClient {
     createReplaySurface: vi.fn(() => "replay:1"),
     dispose: vi.fn(),
     onFrame: vi.fn(),
-    onRestart: vi.fn()
+    onRestart: vi.fn(),
+    onHostDead: vi.fn()
   };
 }
 
