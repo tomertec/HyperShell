@@ -5,14 +5,43 @@ import type { SessionManager, SessionSnapshot } from "@hypershell/session-core";
 import { openDatabase } from "@hypershell/db";
 import type { IpcMainInvokeEvent } from "electron";
 
+/**
+ * The emitter halves of the mock are recording, not inert: the surface
+ * z-order re-sync (surfaceZOrderResync.ts) subscribes to app/powerMonitor/
+ * screen events on every registerIpc() and unsubscribes on cleanup, and with
+ * no-op stubs deleting that whole call site would leave every test green.
+ */
+// vi.hoisted, because vi.mock's factory is hoisted above every import and
+// would otherwise touch these in their temporal dead zone.
+const { electronListeners, recordingEmitter } = vi.hoisted(() => {
+  const listeners = new Map<string, Set<unknown>>();
+  return {
+    electronListeners: listeners,
+    recordingEmitter: () => ({
+      on(event: string, listener: unknown) {
+        const set = listeners.get(event) ?? new Set<unknown>();
+        set.add(listener);
+        listeners.set(event, set);
+      },
+      removeListener(event: string, listener: unknown) {
+        listeners.get(event)?.delete(listener);
+      }
+    })
+  };
+});
+
 vi.mock("electron", () => ({
-  // `on`/`removeListener` are here for the GPU-restart surface re-sync watch,
-  // which subscribes to app-level process-gone events on every registerIpc().
-  app: { getPath: () => os.tmpdir(), on() {}, removeListener() {} },
+  app: { getPath: () => os.tmpdir(), ...recordingEmitter() },
+  powerMonitor: recordingEmitter(),
+  screen: recordingEmitter(),
   ipcMain: { handle() {}, removeHandler() {} }
 }));
 
 import { getRegisteredChannels, registerIpc } from "./registerIpc";
+
+function electronListenerCount(event: string): number {
+  return electronListeners.get(event)?.size ?? 0;
+}
 
 function createFakeIpcMain() {
   const handlers = new Map<
@@ -111,6 +140,28 @@ function createFakeSessionManager() {
 describe("registerIpc", () => {
   it("registers the session open channel", () => {
     expect(getRegisteredChannels()).toContain("session:open");
+  });
+
+  // The seam between registerIpc and surfaceZOrderResync: that module's own
+  // tests prove the event → resync behaviour, but nothing proved registerIpc
+  // ever wires it up, so deleting the call site left every test green.
+  // Deliberately does not open a database — it must keep running on machines
+  // where better-sqlite3's ABI does not match the local Node.
+  it("subscribes the surface z-order re-sync and drops it on cleanup", () => {
+    const ipcMain = createFakeIpcMain();
+    const manager = createFakeSessionManager();
+
+    const before = electronListenerCount("child-process-gone");
+    const unregister = registerIpc(ipcMain, { sessionManager: manager.manager });
+
+    expect(electronListenerCount("child-process-gone")).toBe(before + 1);
+    expect(electronListenerCount("display-metrics-changed")).toBeGreaterThan(0);
+    expect(electronListenerCount("resume")).toBeGreaterThan(0);
+
+    unregister();
+    expect(electronListenerCount("child-process-gone")).toBe(before);
+    expect(electronListenerCount("display-metrics-changed")).toBe(0);
+    expect(electronListenerCount("resume")).toBe(0);
   });
 
   it("rejects malformed payloads before reaching the SessionManager", async () => {

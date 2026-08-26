@@ -79,7 +79,7 @@ import { createGhosttyHostProcess, type GhosttyHostProcess } from "../ghosttyHos
 import { defaultGhosttyConfig } from "../ghosttyHost/ghosttyConfigFromSettings";
 import { createGhosttyHostClient, type GhosttyHostClient, type GhosttyRendererEvent } from "../ghosttyHost/ghosttyHostClient";
 import { resolveGhosttyHostPath } from "../ghosttyHost/hostPath";
-import { watchGpuRestart } from "../ghosttyHost/gpuRestartResync";
+import { watchSurfaceZOrder } from "../ghosttyHost/surfaceZOrderResync";
 import { createReplayDriver, type ReplayDriver } from "../ghosttyHost/replayDriver";
 import { registerClaudeIpc } from "./claudeIpc";
 import { buildClaudeResumeCommand } from "./claudeResumeCommand";
@@ -119,7 +119,7 @@ import type {
   TelnetConnectionOptions
 } from "@hypershell/session-core";
 import type { IpcMain, IpcMainInvokeEvent } from "electron";
-import { app as electronApp, BrowserWindow } from "electron";
+import { app as electronApp, BrowserWindow, powerMonitor, screen } from "electron";
 import { writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -1447,18 +1447,20 @@ export function registerIpc(
     }
   });
 
-  // Chromium recreates its compositor child windows when the GPU process
-  // restarts, and they reclaim the top of the parent's child z-order without
-  // notifying our terminal surface — which is a sibling child HWND, not a
-  // participant in that reorder. The surface would then be silently painted
-  // over until some later bounds or visibility traffic happened to re-assert
-  // it, and a user sitting in one maximized tab generates none. Re-sending the
-  // last known bounds runs the host's own HWND_TOP re-assert. Sends to a dead
-  // or respawning host are dropped by GhosttyHostProcess.send, so this cannot
-  // race the crash-respawn path — onRestart recreates surfaces from the same
-  // registry these bounds come from.
-  const stopGpuRestartWatch = watchGpuRestart(
-    electronApp,
+  // Chromium recreates its compositor child windows on a GPU-process restart
+  // (and on display or power churn), and they reclaim the top of the parent's
+  // child z-order without notifying our terminal surface — which is a sibling
+  // child HWND, not a participant in that reorder. The surface would then be
+  // silently painted over until some later bounds or visibility traffic
+  // happened to re-assert it, and a user sitting in one maximized tab
+  // generates none. Re-sending the last known bounds runs the host's own
+  // HWND_TOP re-assert. Sends to a dead or respawning host are dropped by
+  // GhosttyHostProcess.send, so this cannot race the crash-respawn path —
+  // onRestart recreates surfaces from the same registry these bounds come
+  // from, and the follow-up re-syncs cover the window where frames were
+  // dropped. See surfaceZOrderResync.ts for the rest of the why.
+  const stopSurfaceZOrderWatch = watchSurfaceZOrder(
+    { app: electronApp, powerMonitor, screen },
     () => ghosttyClient?.resyncBounds()
   );
 
@@ -1515,7 +1517,7 @@ export function registerIpc(
     cleanupFs();
     unregisterEditor();
     cleanupGhostty();
-    stopGpuRestartWatch();
+    stopSurfaceZOrderWatch();
     for (const channel of registeredChannels) {
       ipcMain.removeHandler?.(channel);
     }
