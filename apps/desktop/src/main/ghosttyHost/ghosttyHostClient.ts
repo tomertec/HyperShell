@@ -41,6 +41,11 @@ export interface GhosttyHostClient {
   createSurface(sessionId: string, parentHwnd: string, bounds: Bounds, surfaceConfig?: string): void;
   destroySurface(sessionId: string): void;
   setBounds(sessionId: string, b: Bounds): void;
+  /** Re-sends the last known bounds for every live surface, which makes the
+   *  host re-assert each leaf at HWND_TOP. Bounds-shaped rather than a
+   *  z-order op of its own because opSetBounds already re-raises, so no new
+   *  protocol frame is needed. */
+  resyncBounds(): void;
   /** DOM-overlay airspace guard (Task 8): hides/shows every non-exempt
    *  surface, composed with each surface's own setVisible flag — a surface
    *  is only actually shown when both are true. Surfaces created via
@@ -200,6 +205,12 @@ export function createGhosttyHostClient(opts: CreateGhosttyHostClientOptions): G
       }
       entry.bounds = b;
       opts.host.send(FrameType.setBounds, entry.surfaceId, JSON.stringify(b));
+    },
+
+    resyncBounds() {
+      for (const entry of registry.values()) {
+        opts.host.send(FrameType.setBounds, entry.surfaceId, JSON.stringify(entry.bounds));
+      }
     },
 
     setOverlayVisible(visible) {

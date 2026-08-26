@@ -69,6 +69,7 @@ function createFakeClient(): GhosttyHostClient {
     createSurface: vi.fn(),
     destroySurface: vi.fn(),
     setBounds: vi.fn(),
+    resyncBounds: vi.fn(),
     setOverlayVisible: vi.fn(),
     setVisible: vi.fn(),
     focus: vi.fn(),

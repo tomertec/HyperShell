@@ -6,7 +6,9 @@ import { openDatabase } from "@hypershell/db";
 import type { IpcMainInvokeEvent } from "electron";
 
 vi.mock("electron", () => ({
-  app: { getPath: () => os.tmpdir() },
+  // `on`/`removeListener` are here for the GPU-restart surface re-sync watch,
+  // which subscribes to app-level process-gone events on every registerIpc().
+  app: { getPath: () => os.tmpdir(), on() {}, removeListener() {} },
   ipcMain: { handle() {}, removeHandler() {} }
 }));
 

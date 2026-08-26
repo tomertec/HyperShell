@@ -383,6 +383,56 @@ describe("calls that arrive before the surface does", () => {
   });
 });
 
+// Chromium reclaiming the top of the parent's child z-order (a GPU-process
+// restart recreates its compositor windows) is not addressed to our leaf, so
+// the host never hears about it. Re-sending bounds runs its HWND_TOP
+// re-assert. See gpuRestartResync.ts.
+describe("resyncBounds", () => {
+  test("re-sends each live surface's last known bounds", () => {
+    const { client, sendCalls } = makeClient();
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+    client.createSurface("session-2", "hwnd", { x: 1, y: 2, w: 30, h: 40 });
+    client.setBounds("session-1", { x: 5, y: 6, w: 70, h: 80 });
+    sendCalls.length = 0;
+
+    client.resyncBounds();
+
+    expect(sendCalls.map((c) => c.type)).toEqual([FrameType.setBounds, FrameType.setBounds]);
+    expect(JSON.parse(sendCalls[0]!.payload.toString())).toEqual({ x: 5, y: 6, w: 70, h: 80 });
+    expect(JSON.parse(sendCalls[1]!.payload.toString())).toEqual({ x: 1, y: 2, w: 30, h: 40 });
+  });
+
+  test("re-syncs a hidden surface too — the overlay guard controls paint, not z-order", () => {
+    const { client, sendCalls } = makeClient();
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+    client.setVisible("session-1", false);
+    sendCalls.length = 0;
+
+    client.resyncBounds();
+
+    expect(sendCalls.map((c) => c.type)).toEqual([FrameType.setBounds]);
+  });
+
+  test("sends nothing when no surfaces are registered", () => {
+    const { client, sendCalls } = makeClient();
+
+    client.resyncBounds();
+
+    expect(sendCalls).toHaveLength(0);
+  });
+
+  test("sends nothing after the host is declared dead", () => {
+    const { client, sendCalls } = makeClient();
+    client.createSurface("session-1", "hwnd", { x: 0, y: 0, w: 10, h: 10 });
+    client.onHostDead("gave up respawning");
+    sendCalls.length = 0;
+
+    client.resyncBounds();
+
+    expect(sendCalls).toHaveLength(0);
+  });
+});
+
 describe("surface lifecycle", () => {
   test("re-registering a session destroys the surface it replaces", () => {
     const { client, sendCalls } = makeClient();
