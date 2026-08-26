@@ -37,9 +37,15 @@ export interface UseGhosttySurfaceResult {
 }
 
 const SURFACE_CRASH_MESSAGE = "The terminal renderer stopped.";
+const SURFACE_CREATE_FAILED_MESSAGE = "terminal surface could not be created";
 
 function logAsyncError(context: string, error: unknown): void {
   console.warn(`[hypershell] ${context}`, error);
+}
+
+function createErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return SURFACE_CREATE_FAILED_MESSAGE;
 }
 
 /**
@@ -123,10 +129,14 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
     surfaceFontSizeRef.current = fontSizeRef.current;
     void getShell()
       .ghosttySurfaceCreate({ sessionId, bounds, fontSize: fontSizeRef.current })
+      .then(() => {
+        setSurfaceError(null);
+      })
       .catch((error) => {
         // Allow a later sync (resize, or the caller retrying) to try again.
         surfaceSessionIdRef.current = null;
         surfaceFontSizeRef.current = null;
+        setSurfaceError(createErrorMessage(error));
         logAsyncError("ghosttySurfaceCreate failed", error);
       });
   }, [computeBounds]);

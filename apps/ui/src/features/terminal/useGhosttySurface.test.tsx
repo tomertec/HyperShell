@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GhosttyEvent } from "@hypershell/shared";
 import { setShell } from "../../lib/shell";
@@ -315,6 +315,41 @@ describe("useGhosttySurface", () => {
 
     expect(getByTestId("surface-error").textContent).toBe("null");
     expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(2);
+  });
+
+  it("a create rejection surfaces the rejection message, and a successful retry clears it", async () => {
+    setRect({ left: 0, top: 0, width: 800, height: 600 });
+    ghosttySurfaceCreate.mockRejectedValueOnce(
+      new Error("ghostty is unavailable: the host process path could not be resolved (see GHOSTTY_HOST_PATH)")
+    );
+
+    const { getByTestId } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
+    expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(1);
+
+    await waitFor(() =>
+      expect(getByTestId("surface-error").textContent).toBe(
+        "ghostty is unavailable: the host process path could not be resolved (see GHOSTTY_HOST_PATH)"
+      )
+    );
+
+    ghosttySurfaceCreate.mockResolvedValueOnce(undefined);
+    act(() => {
+      getByTestId("retry-btn").click();
+    });
+
+    expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(getByTestId("surface-error").textContent).toBe("null"));
+  });
+
+  it("a create rejection with no message falls back to a generic error", async () => {
+    setRect({ left: 0, top: 0, width: 800, height: 600 });
+    ghosttySurfaceCreate.mockRejectedValueOnce("boom");
+
+    const { getByTestId } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
+
+    await waitFor(() =>
+      expect(getByTestId("surface-error").textContent).toBe("terminal surface could not be created")
+    );
   });
 
   it("focusSurface() calls ghosttySurfaceFocus for the current session", () => {
