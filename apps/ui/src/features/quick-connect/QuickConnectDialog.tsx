@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
+import { useOverlayGuard } from "../terminal/nativeOverlayGuard";
 import { searchProfiles, type QuickConnectProfile } from "./searchIndex";
 
 export interface QuickConnectDialogProps {
@@ -35,6 +36,7 @@ export function QuickConnectDialog({
   profiles = defaultProfiles,
   onOpenProfile
 }: QuickConnectDialogProps) {
+  useOverlayGuard(open);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);

@@ -13,6 +13,7 @@ import { transferRowControls } from "../transferRowControls";
 import { toErrorMessage } from "../utils/errorUtils";
 import { formatFileSize } from "../utils/fileUtils";
 import { TransferConflictActions } from "./TransferConflictActions";
+import { useOverlayGuard } from "../../terminal/nativeOverlayGuard";
 import { getShell, hasShell } from "../../../lib/shell";
 
 const RECENT_TRANSFER_WINDOW_MS = 120000;
@@ -646,6 +647,10 @@ export function TransferPopup() {
 
   const shouldRenderPopup =
     usePopupTransferMonitor && (runningTransfers.length > 0 || recentTransfers.length > 0);
+
+  // The popup floats over the workspace, so it needs the native airspace while
+  // it is on screen — otherwise a live terminal surface paints over it.
+  useOverlayGuard(shouldRenderPopup);
 
   if (!shouldRenderPopup || typeof document === "undefined") {
     return null;

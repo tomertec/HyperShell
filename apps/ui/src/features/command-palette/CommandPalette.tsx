@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
+import { useOverlayGuard } from "../terminal/nativeOverlayGuard";
 import { useCommandPaletteStore } from "./commandPaletteStore";
 import { searchCommands, type Command } from "./searchCommands";
 
@@ -13,6 +14,7 @@ export function CommandPalette({ commands }: CommandPaletteProps) {
   const close = useCommandPaletteStore((s) => s.close);
   const recentIds = useCommandPaletteStore((s) => s.recentIds);
   const recordExecution = useCommandPaletteStore((s) => s.recordExecution);
+  useOverlayGuard(isOpen);
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);

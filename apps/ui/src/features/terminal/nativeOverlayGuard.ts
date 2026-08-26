@@ -20,7 +20,11 @@ function clearReleaseTimer(): void {
 
 function sendOverlayGuard(hidden: boolean): void {
   if (!hasShell()) return;
-  void getShell().ghosttyOverlayGuard({ hidden });
+  void getShell()
+    .ghosttyOverlayGuard({ hidden })
+    .catch((error) => {
+      console.warn("[hypershell] ghosttyOverlayGuard failed", error);
+    });
 }
 
 /**

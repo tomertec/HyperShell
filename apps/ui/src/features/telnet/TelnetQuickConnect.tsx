@@ -1,5 +1,6 @@
 import { useState, useCallback, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useOverlayGuard } from "../terminal/nativeOverlayGuard";
 
 interface TelnetQuickConnectProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function TelnetQuickConnect({
   onClose,
   onConnect,
 }: TelnetQuickConnectProps) {
+  useOverlayGuard(open);
   const fieldId = useId();
   const [hostname, setHostname] = useState("");
   const [port, setPort] = useState("23");

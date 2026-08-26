@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import type { SftpEntry } from "@hypershell/shared";
+import { useOverlayGuard } from "../../terminal/nativeOverlayGuard";
 import { formatDate, formatFileSize, getParentPath } from "../utils/fileUtils";
 
 export interface SftpPropertiesDialogProps {
@@ -84,6 +85,7 @@ export function SftpPropertiesDialog({
   onApplyPermissions,
   onClose
 }: SftpPropertiesDialogProps) {
+  useOverlayGuard(open);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
