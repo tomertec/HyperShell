@@ -131,3 +131,69 @@ export function ghosttyConfigFromSettings(input: GhosttyConfigInput): string {
 
   return lines.join("\n");
 }
+
+// Mirrors apps/ui's DEFAULT_TERMINAL_SETTINGS and the "default" entry of
+// terminalTheme.ts. The two cannot import each other (session-core/main has no
+// renderer dependencies), so this is a deliberate copy: a surface created
+// before the renderer's first ghosttyUpdateConfig push would otherwise be
+// built with an empty config and render nothing recognisable. The renderer's
+// push is authoritative and arrives moments later — surface 0 is a global
+// reload, so it reaches surfaces already created with this blob.
+//
+// selectionBackground is the alpha blend the renderer computes for the same
+// theme: rgba(125, 211, 252, 0.28) over #07111f.
+const DEFAULT_GHOSTTY_THEME: ResolvedGhosttyTheme = {
+  background: "#07111f",
+  foreground: "#e5eefb",
+  cursor: "#7dd3fc",
+  selectionBackground: "#28475d",
+  selectionForeground: "#e5eefb",
+  black: "#0f172a",
+  red: "#ef4444",
+  green: "#22c55e",
+  yellow: "#eab308",
+  blue: "#38bdf8",
+  magenta: "#c084fc",
+  cyan: "#2dd4bf",
+  white: "#e2e8f0",
+  brightBlack: "#334155",
+  brightRed: "#f87171",
+  brightGreen: "#4ade80",
+  brightYellow: "#facc15",
+  brightBlue: "#7dd3fc",
+  brightMagenta: "#d8b4fe",
+  brightCyan: "#5eead4",
+  brightWhite: "#f8fafc"
+};
+
+export function defaultGhosttyConfig(): string {
+  return ghosttyConfigFromSettings({
+    fontFamily:
+      '"Cascadia Mono", "Cascadia Code", Consolas, "IBM Plex Mono", "Liberation Mono", monospace',
+    fontSize: 13,
+    lineHeight: 1.0,
+    cursorBlink: true,
+    scrollback: 5000,
+    theme: DEFAULT_GHOSTTY_THEME
+  });
+}
+
+/** The per-surface override a per-tab font size becomes (see
+ *  composeGhosttySurfaceConfig for why it is never sent on its own). */
+export function ghosttyFontSizeOverride(fontSize: number): string {
+  return `font-size = ${fontSize}`;
+}
+
+/**
+ * A surface's config REPLACES the global one rather than extending it — both
+ * on createSurface (whose payload carries a whole config blob) and on
+ * updateConfig for a non-zero surface id. So a per-surface override has to be
+ * appended to the current global blob, not sent alone, or the surface would
+ * lose its fonts, theme and scrollback. Ghostty's config parser takes the last
+ * assignment of a scalar key, so the appended line wins.
+ */
+export function composeGhosttySurfaceConfig(globalBlob: string, override: string): string {
+  if (!override) return globalBlob;
+  if (!globalBlob) return override;
+  return `${globalBlob}\n${override}`;
+}

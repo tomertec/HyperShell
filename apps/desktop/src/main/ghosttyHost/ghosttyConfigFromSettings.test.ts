@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ghosttyConfigFromSettings, type ResolvedGhosttyTheme } from "./ghosttyConfigFromSettings";
+import {
+  composeGhosttySurfaceConfig,
+  defaultGhosttyConfig,
+  ghosttyConfigFromSettings,
+  ghosttyFontSizeOverride,
+  type ResolvedGhosttyTheme
+} from "./ghosttyConfigFromSettings";
 
 const theme: ResolvedGhosttyTheme = {
   background: "#07111f",
@@ -190,5 +196,40 @@ describe("ghosttyConfigFromSettings", () => {
 
     expect(withDefault).not.toContain("adjust-cell-height");
     expect(withUnset).not.toContain("adjust-cell-height");
+  });
+});
+
+describe("defaultGhosttyConfig", () => {
+  it("is a real config, so a surface created before the renderer's first push still renders", () => {
+    const blob = defaultGhosttyConfig();
+
+    expect(blob).not.toBe("");
+    expect(blob).toContain("font-size = 13");
+    expect(blob).toContain("background = #07111f");
+    expect(blob).toContain("palette = 0=#0f172a");
+    expect(blob).toContain("palette = 15=#f8fafc");
+    // Opaque hex only: ghostty's parser rejects the rgba() form the renderer's
+    // xterm themes use for selections.
+    expect(blob).toMatch(/selection-background = #[0-9a-f]{6}\n/);
+  });
+});
+
+describe("composeGhosttySurfaceConfig", () => {
+  it("appends the override so the surface keeps the global font, theme and scrollback", () => {
+    const composed = composeGhosttySurfaceConfig(
+      "font-family = Test Mono\nfont-size = 13",
+      ghosttyFontSizeOverride(20)
+    );
+
+    expect(composed).toBe("font-family = Test Mono\nfont-size = 13\nfont-size = 20");
+    // Ghostty takes the last assignment of a scalar key, so the override wins.
+    expect(composed.lastIndexOf("font-size = 20")).toBeGreaterThan(
+      composed.indexOf("font-size = 13")
+    );
+  });
+
+  it("handles either side being empty", () => {
+    expect(composeGhosttySurfaceConfig("", "font-size = 20")).toBe("font-size = 20");
+    expect(composeGhosttySurfaceConfig("font-size = 13", "")).toBe("font-size = 13");
   });
 });

@@ -43,6 +43,7 @@ import { appThemeVariant, resolveAppTheme } from "../features/settings/appThemes
 import { TransferPopup } from "../features/sftp/components/TransferPopup";
 import { startTransferEventCoordinator } from "../features/sftp/transferEventCoordinator";
 import { resolveTerminalTheme } from "../features/terminal/terminalTheme";
+import { syncGhosttySettingsToMain } from "../features/terminal/ghosttyConfigSync";
 import { DEFAULT_RECONNECT_BASE_INTERVAL, DEFAULT_RECONNECT_MAX_ATTEMPTS } from "@hypershell/shared";
 import type {
   ConnectionHistoryRecord,
@@ -381,6 +382,11 @@ function MainApp() {
   // One transfer-event listener for the whole app — SFTP tabs and the transfer
   // popup subscribe to it instead of the IPC bridge.
   useEffect(() => startTransferEventCoordinator(), []);
+
+  // Terminal settings reach the native surfaces only as a ghostty config blob.
+  // Subscribed here, above every terminal pane, so the first push lands before
+  // any surface is created.
+  useEffect(() => syncGhosttySettingsToMain(settingsStore), []);
 
   useEffect(() => {
     let cancelled = false;
