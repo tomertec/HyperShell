@@ -15,6 +15,7 @@ import {
   type LaunchedApp
 } from "./electronHarness";
 import {
+  childWindowsInZOrder,
   collectEvents,
   describeOcclusion,
   ghosttyEvents,
@@ -145,4 +146,63 @@ test("detects a ghostty surface buried under Chromium's child windows", async ()
   const restored = surfaceOcclusion(parentHwnd, surface);
   expect(restored.occluders, describeOcclusion(restored)).toEqual([]);
   expect(restored.zIndex).toBe(0);
+});
+
+// The fix has two halves: place the leaf on top when the surface is created,
+// and re-assert that on every bounds sync. The test above only ever exercises
+// the first, so a regression in the re-assert would sail through — and it is
+// the half that matters in the field, because the reported blank terminal
+// appeared after the window had been resized, not at create time.
+//
+// So this one buries the surface deliberately and then makes the *app* dig it
+// out: resizing the BrowserWindow moves the pane, which the pane's
+// ResizeObserver turns into a real ghostty:surface-bounds call. Waiting on the
+// leaf's own rect changing is what proves the sync actually reached the host —
+// without it, an assertion that the surface is unburied could pass simply
+// because nothing had happened yet.
+test("re-asserts z-order on a bounds sync driven by a real window resize", async () => {
+  const sessionId = await openRawTcpTab(launched.page, echo.port);
+  await waitForSurface(launched.page, sessionId);
+
+  const parentHwnd = await mainWindowHwnd(launched.app);
+  const [surface] = ghosttySurfaceHwnds(parentHwnd);
+  expect(surface).toBeDefined();
+
+  const surfaceWidth = (): number => {
+    const child = childWindowsInZOrder(parentHwnd).find((entry) => entry.hwnd === surface);
+    if (child === undefined) {
+      throw new Error(`surface ${surface} is no longer a child of ${parentHwnd}`);
+    }
+    return child.rect.right - child.rect.left;
+  };
+
+  const widthBefore = surfaceWidth();
+  expect(widthBefore).toBeGreaterThan(0);
+
+  setChildZOrder(surface, "bottom");
+  expect(surfaceOcclusion(parentHwnd, surface).occluders.length).toBeGreaterThan(0);
+
+  await launched.app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    // A maximized window ignores setBounds on Windows, and the harness does not
+    // promise one state or the other.
+    if (win.isMaximized()) win.unmaximize();
+    const bounds = win.getBounds();
+    win.setBounds({ ...bounds, width: bounds.width - 160 });
+  });
+
+  await expect
+    .poll(surfaceWidth, { timeout: 15_000 })
+    .not.toBe(widthBefore);
+
+  // The bounds sync landed, so the re-assert had its chance. No restore here on
+  // purpose: putting the surface back on top is the app's job and is precisely
+  // what is under test.
+  await expect
+    .poll(() => surfaceOcclusion(parentHwnd, surface).occluders.length, { timeout: 15_000 })
+    .toBe(0);
+
+  const after = surfaceOcclusion(parentHwnd, surface);
+  expect(after.occluders, describeOcclusion(after)).toEqual([]);
+  expect(after.zIndex).toBe(0);
 });

@@ -119,6 +119,8 @@ public static class HsWin32 {
   [DllImport("user32.dll", SetLastError = true)]
   public static extern bool IsWindowVisible(IntPtr hwnd);
   [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool IsWindow(IntPtr hwnd);
+  [DllImport("user32.dll", SetLastError = true)]
   public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 }
 '@
@@ -190,6 +192,13 @@ export interface ChildWindow {
  * there, so the index each window lands on *is* its stacking position — which
  * is the whole point: a surface can be alive, visible and correctly positioned
  * and still show nothing because Chromium's own child windows sit above it.
+ *
+ * Every user32 return value below is checked and throws on failure, because in
+ * this helper a swallowed failure degrades into a *passing* test: a discarded
+ * GetWindowRect leaves the zero-initialised RECT in place, that sibling's
+ * computed overlap is 0, `surfaceOcclusion` filters it out, and the surface
+ * reads as unoccluded while the bug is present. A loud failure is the only
+ * acceptable outcome for a check whose whole job is to not pass vacuously.
  */
 export function childWindowsInZOrder(parentHwnd: string): ChildWindow[] {
   const output = powershell(`${PS_PRELUDE}
@@ -197,14 +206,30 @@ $parent = [IntPtr]::new([int64]${parentHwnd})
 $child = [HsWin32]::GetWindow($parent, 5)
 $i = 0
 while ($child -ne [IntPtr]::Zero) {
+  # Read the next sibling before touching this one, so a window destroyed while
+  # its own properties are being read cannot truncate the walk and silently
+  # hide the siblings below it.
+  $next = [HsWin32]::GetWindow($child, 2)
   $sb = New-Object System.Text.StringBuilder 256
-  [void][HsWin32]::GetClassNameW($child, $sb, $sb.Capacity)
+  if ([HsWin32]::GetClassNameW($child, $sb, $sb.Capacity) -eq 0) {
+    throw "GetClassNameW failed for child $($child.ToInt64())"
+  }
   $r = New-Object HsRect
-  [void][HsWin32]::GetWindowRect($child, [ref]$r)
+  if (-not [HsWin32]::GetWindowRect($child, [ref]$r)) {
+    # Deliberately fatal even for the destroyed-mid-enumeration race, which
+    # IsWindow distinguishes only to make the message diagnosable. Skipping a
+    # gone window would be defensible on its own terms, but it would put a
+    # silent "this sibling is not an occluder" path back into the one helper
+    # that must never produce one — and these children (Chromium's render
+    # widget, the D3D window, the ghostty leaf) are long-lived, so the race is
+    # theoretical while the vacuous pass would be permanent.
+    $live = [HsWin32]::IsWindow($child)
+    throw "GetWindowRect failed for child $($child.ToInt64()) (IsWindow=$live)"
+  }
   $vis = [HsWin32]::IsWindowVisible($child)
   "$i|$($child.ToInt64())|$vis|$($r.Left)|$($r.Top)|$($r.Right)|$($r.Bottom)|$($sb.ToString())"
   $i++
-  $child = [HsWin32]::GetWindow($child, 2)
+  $child = $next
 }`);
 
   if (output.length === 0) {
