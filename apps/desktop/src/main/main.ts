@@ -32,6 +32,13 @@ import { createMainProcessLifecycle } from "./mainLifecycle";
 import { clearAll as clearCredentialCache } from "./security/credentialCache";
 import { getOrCreateDatabase, getOrCreateHostsRepo } from "./ipc/hostsIpc";
 
+// A console write to a pipe whose reader is gone (an instance orphaned by a
+// killed test run, a detached launcher) raises EPIPE on the stream itself.
+// Unhandled, that takes the whole main process down — no log line is worth
+// that, so the streams swallow their own write errors.
+process.stdout.on("error", () => {});
+process.stderr.on("error", () => {});
+
 const SESSION_RECOVERY_SAVE_INTERVAL_MS = 30_000;
 
 let savedSessionRepository:

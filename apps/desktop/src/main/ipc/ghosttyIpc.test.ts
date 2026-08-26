@@ -25,6 +25,10 @@ vi.mock("electron", () => ({
 
 import { registerGhosttyIpc, type RegisterGhosttyIpcOptions } from "./ghosttyIpc";
 
+/** Stands in for the config blob the renderer's settings push produced — what
+ *  a per-surface override has to be layered onto. */
+const GLOBAL_BLOB = "font-family = Test Mono\nfont-size = 13";
+
 function createFakeIpcMain() {
   const handlers = new Map<
     string,
@@ -76,7 +80,8 @@ function createFakeClient(): GhosttyHostClient {
     createReplaySurface: vi.fn(),
     dispose: vi.fn(),
     onFrame: vi.fn(),
-    onRestart: vi.fn()
+    onRestart: vi.fn(),
+    onHostDead: vi.fn()
   };
 }
 
@@ -252,6 +257,7 @@ describe("registerGhosttyIpc handler delegation", () => {
       client,
       replayDriver,
       ensureHostStarted,
+      getGlobalConfigBlob: () => GLOBAL_BLOB,
       setGlobalConfigBlob,
       setBroadcastState
     };
@@ -265,7 +271,25 @@ describe("registerGhosttyIpc handler delegation", () => {
     });
 
     expect(ensureHostStarted).toHaveBeenCalledTimes(1);
-    expect(client.createSurface).toHaveBeenCalledWith("s1", "12345", validBounds);
+    expect(client.createSurface).toHaveBeenCalledWith("s1", "12345", validBounds, undefined);
+  });
+
+  it("surfaceCreate turns a per-tab fontSize into a surface config layered on the global blob", async () => {
+    await ipcMain.invoke(ipcChannels.ghostty.surfaceCreate, {
+      sessionId: "s1",
+      bounds: validBounds,
+      fontSize: 17
+    });
+
+    // The whole global config has to come along: a surface config replaces the
+    // global one rather than extending it, so sending the override alone would
+    // strip the surface's fonts, theme and scrollback.
+    expect(client.createSurface).toHaveBeenCalledWith(
+      "s1",
+      "12345",
+      validBounds,
+      `${GLOBAL_BLOB}\nfont-size = 17`
+    );
   });
 
   it("surfaceDestroy delegates to client.destroySurface", async () => {
@@ -323,9 +347,12 @@ describe("registerGhosttyIpc handler delegation", () => {
     expect(client.updateGlobalConfig).toHaveBeenCalledTimes(1);
   });
 
-  it("surfaceConfig delegates to client.updateSurfaceConfig", async () => {
+  it("surfaceConfig layers the renderer's override onto the current global blob", async () => {
     await ipcMain.invoke(ipcChannels.ghostty.surfaceConfig, { sessionId: "s1", config: "font-size = 15" });
-    expect(client.updateSurfaceConfig).toHaveBeenCalledWith("s1", "font-size = 15");
+    expect(client.updateSurfaceConfig).toHaveBeenCalledWith(
+      "s1",
+      `${GLOBAL_BLOB}\nfont-size = 15`
+    );
   });
 
   it("replayOpen resolves the parent HWND, ensures the host started, and returns the driver's replayId", async () => {
@@ -387,6 +414,7 @@ describe("registerGhosttyIpc with an unavailable client", () => {
       client: null,
       replayDriver: null,
       ensureHostStarted: vi.fn().mockResolvedValue(undefined),
+      getGlobalConfigBlob: () => "",
       setGlobalConfigBlob: vi.fn(),
       setBroadcastState: vi.fn()
     });
@@ -402,6 +430,7 @@ describe("registerGhosttyIpc with an unavailable client", () => {
       client: null,
       replayDriver: null,
       ensureHostStarted: vi.fn().mockResolvedValue(undefined),
+      getGlobalConfigBlob: () => "",
       setGlobalConfigBlob: vi.fn(),
       setBroadcastState: vi.fn()
     });

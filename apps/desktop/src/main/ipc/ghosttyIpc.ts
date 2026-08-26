@@ -19,7 +19,12 @@ import {
 } from "@hypershell/shared";
 import type { GhosttyHostClient } from "../ghosttyHost/ghosttyHostClient";
 import type { ReplayDriver } from "../ghosttyHost/replayDriver";
-import { ghosttyConfigFromSettings, type ResolvedGhosttyTheme } from "../ghosttyHost/ghosttyConfigFromSettings";
+import {
+  composeGhosttySurfaceConfig,
+  ghosttyConfigFromSettings,
+  ghosttyFontSizeOverride,
+  type ResolvedGhosttyTheme
+} from "../ghosttyHost/ghosttyConfigFromSettings";
 import type { IpcMainLike } from "./registerIpc";
 
 // Same order as ghosttyConfigFromSettings.ts's private PALETTE_ORDER —
@@ -85,6 +90,9 @@ export interface RegisterGhosttyIpcOptions {
   /** Lazily starts the host process; resolves once, or rejects if the host
    * process is unavailable. Called before the first surface is created. */
   ensureHostStarted: () => Promise<void>;
+  /** The current global config text. Per-surface configs are built on top of
+   *  it rather than replacing it — see composeGhosttySurfaceConfig. */
+  getGlobalConfigBlob: () => string;
   setGlobalConfigBlob: (blob: string) => void;
   setBroadcastState: (state: SetBroadcastTargetsRequest) => void;
 }
@@ -118,7 +126,16 @@ export function registerGhosttyIpc(
       const client = requireClient(options.client);
       const parentHwnd = resolveParentHwnd(event);
       await options.ensureHostStarted();
-      client.createSurface(request.sessionId, parentHwnd, request.bounds);
+      // A per-tab font size is a surface-scoped override of the global config,
+      // applied at birth so the surface never renders a frame at the wrong size.
+      const surfaceConfig =
+        request.fontSize === undefined
+          ? undefined
+          : composeGhosttySurfaceConfig(
+              options.getGlobalConfigBlob(),
+              ghosttyFontSizeOverride(request.fontSize)
+            );
+      client.createSurface(request.sessionId, parentHwnd, request.bounds, surfaceConfig);
     }
   );
 
@@ -149,7 +166,13 @@ export function registerGhosttyIpc(
 
   ipcMain.handle(ipcChannels.ghostty.surfaceConfig, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {
     const request = ghosttySurfaceConfigRequestSchema.parse(rawRequest);
-    requireClient(options.client).updateSurfaceConfig(request.sessionId, request.config);
+    // The renderer sends only the override lines it cares about (a font size);
+    // main owns the global blob they layer onto, so the renderer never has to
+    // reproduce the whole config text.
+    requireClient(options.client).updateSurfaceConfig(
+      request.sessionId,
+      composeGhosttySurfaceConfig(options.getGlobalConfigBlob(), request.config)
+    );
   });
 
   ipcMain.handle(ipcChannels.ghostty.overlayGuard, (_event: IpcMainInvokeEvent, rawRequest: unknown) => {

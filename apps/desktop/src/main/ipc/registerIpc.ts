@@ -75,7 +75,8 @@ import {
 import { registerTmuxIpc } from "./tmuxIpc";
 import { routeSessionEvent } from "./routeSessionEvent";
 import { registerGhosttyIpc } from "./ghosttyIpc";
-import { createGhosttyHostProcess } from "../ghosttyHost/hostProcess";
+import { createGhosttyHostProcess, type GhosttyHostProcess } from "../ghosttyHost/hostProcess";
+import { defaultGhosttyConfig } from "../ghosttyHost/ghosttyConfigFromSettings";
 import { createGhosttyHostClient, type GhosttyHostClient, type GhosttyRendererEvent } from "../ghosttyHost/ghosttyHostClient";
 import { resolveGhosttyHostPath } from "../ghosttyHost/hostPath";
 import { createReplayDriver, type ReplayDriver } from "../ghosttyHost/replayDriver";
@@ -256,8 +257,12 @@ const registeredChannels = [
   ipcChannels.ghostty.surfaceVisible,
   ipcChannels.ghostty.surfaceFocus,
   ipcChannels.ghostty.surfaceCommand,
+  ipcChannels.ghostty.surfaceConfig,
   ipcChannels.ghostty.overlayGuard,
   ipcChannels.ghostty.updateConfig,
+  ipcChannels.ghostty.replayOpen,
+  ipcChannels.ghostty.replayControl,
+  ipcChannels.ghostty.replayClose,
   ipcChannels.session.broadcastTargets,
 ] as const;
 
@@ -288,11 +293,18 @@ const ghosttyBroadcastState: { enabled: boolean; targetSessionIds: string[] } = 
   enabled: false,
   targetSessionIds: []
 };
-let ghosttyGlobalConfigBlob = "";
+// Never "" — a surface created before the renderer's first ghosttyUpdateConfig
+// push would otherwise be built with no font, theme or scrollback at all.
+let ghosttyGlobalConfigBlob = defaultGhosttyConfig();
 
 export let ghosttyClient: GhosttyHostClient | null = null;
+/** Builds a fresh host process object. Kept as a factory because a host that
+ *  has exhausted its respawn budget latches itself stopped: reviving ghostty
+ *  means building a new one, not restarting the dead one. */
+let ghosttyHostFactory: (() => ReturnType<typeof createGhosttyHostProcess>) | null = null;
 let ghosttyHost: ReturnType<typeof createGhosttyHostProcess> | null = null;
 let ghosttyHostStartPromise: Promise<void> | null = null;
+let ghosttyHostDead = false;
 export let ghosttyReplayDriver: ReplayDriver | null = null;
 
 try {
@@ -301,24 +313,44 @@ try {
   // ghosttyHostClient.ts's CreateGhosttyHostClientOptions doc comment for why
   // this forward-reference ordering is required.
   let client: GhosttyHostClient;
-  const host = createGhosttyHostProcess({
-    exePath,
-    onFrame: (frame) => client.onFrame(frame),
-    onRestart: () => client.onRestart(),
-    onDead: (reason) => {
-      console.error(`[ghostty] host process died: ${reason}`);
-    }
-  });
+  ghosttyHostFactory = () =>
+    createGhosttyHostProcess({
+      exePath,
+      onFrame: (frame) => client.onFrame(frame),
+      onRestart: () => client.onRestart(),
+      onDead: (reason) => {
+        console.error(`[ghostty] host process died: ${reason}`);
+        ghosttyHostDead = true;
+        client.onHostDead(reason);
+      }
+    });
+  // The client outlives any single host process (its surface registry is what
+  // a rebuilt host is repopulated from), so it talks to whichever host is
+  // current rather than closing over one.
+  const hostHandle: GhosttyHostProcess = {
+    start: () =>
+      ghosttyHost
+        ? ghosttyHost.start()
+        : Promise.reject(new Error("ghostty host process is unavailable")),
+    send: (type, surfaceId, payload) => ghosttyHost?.send(type, surfaceId, payload),
+    stop: () => ghosttyHost?.stop(),
+    isAlive: () => ghosttyHost?.isAlive() ?? false
+  };
   client = createGhosttyHostClient({
-    host,
+    host: hostHandle,
     writeSession: (sessionId, data) => activeSessionManagerForGhostty.write(sessionId, data),
     resizeSession: (sessionId, cols, rows) => activeSessionManagerForGhostty.resize(sessionId, cols, rows),
     emitGhosttyEvent: (event) => ghosttyEventEmitter(event),
     getBroadcastTargets: () =>
-      ghosttyBroadcastState.enabled ? ghosttyBroadcastState.targetSessionIds : null,
+      // An empty target list with broadcast enabled must fall back to the
+      // originating session, not write to nobody — otherwise turning broadcast
+      // on before picking targets swallows every keystroke.
+      ghosttyBroadcastState.enabled && ghosttyBroadcastState.targetSessionIds.length > 0
+        ? ghosttyBroadcastState.targetSessionIds
+        : null,
     getGlobalConfig: () => ghosttyGlobalConfigBlob
   });
-  ghosttyHost = host;
+  ghosttyHost = ghosttyHostFactory();
   ghosttyClient = client;
   // recordingIpcManager is declared further down this module — safe to
   // forward-reference here since this callback only runs once a replay-open
@@ -336,11 +368,26 @@ try {
 }
 
 function ensureGhosttyHostStarted(): Promise<void> {
-  if (!ghosttyHost) {
+  if (!ghosttyHostFactory) {
     return Promise.reject(new Error("ghostty host process is unavailable"));
+  }
+  // A declared-dead host never connects again — `stopped` is latched inside it
+  // and every start() rejects. The next create attempt (which is what a crashed
+  // pane's Retry ends up calling) builds a replacement with a fresh respawn
+  // budget. Surfaces are NOT recreated from the registry here: each pane got a
+  // `crashed` event and shows its own Retry, and reviving a surface under a
+  // pane still displaying that error would leave the two disagreeing.
+  if (ghosttyHostDead) {
+    ghosttyHostDead = false;
+    ghosttyHostStartPromise = null;
+    ghosttyHost?.stop();
+    ghosttyHost = ghosttyHostFactory();
   }
   if (!ghosttyHostStartPromise) {
     const host = ghosttyHost;
+    if (!host) {
+      return Promise.reject(new Error("ghostty host process is unavailable"));
+    }
     ghosttyHostStartPromise = host.start().catch((error: unknown) => {
       // Allow a later surface-create to retry instead of latching a
       // permanent failure from a transient first-launch problem.
@@ -369,6 +416,11 @@ export function disposeSessionRuntime(): void {
   sessionManager.destroyAll();
   ssh2ConnectionPool.destroyAll();
   networkMonitor.dispose();
+  // The host exits on pipe EOF by itself, but only once the pipe actually
+  // breaks; stopping it here closes the pipe deterministically on quit rather
+  // than leaving an orphan until the OS tears the handle down.
+  ghosttyClient?.dispose();
+  ghosttyHost?.stop();
 }
 
 function getSessionRecorder(): SessionRecordingManager {
@@ -1048,9 +1100,13 @@ export function registerIpc(
   ghosttyEventEmitter = (event) => {
     options.emitGhosttyEvent?.(event);
   };
-  const rendererSessions = createRendererSessionOwnership((sessionId) =>
-    manager.close(sessionId)
-  );
+  // A renderer that reloads or dies runs no React cleanup, so its native
+  // surfaces have to be torn down from here alongside its sessions — otherwise
+  // the reloaded page's fresh surfaces paint over the abandoned ones.
+  const rendererSessions = createRendererSessionOwnership((sessionId) => {
+    ghosttyClient?.destroySurface(sessionId);
+    manager.close(sessionId);
+  });
   const getDb = () => options.db ?? getOrCreateDatabase();
   const recorder = recordingIpcManager;
   const hostStatusService = createHostStatusService();
@@ -1380,6 +1436,7 @@ export function registerIpc(
     client: ghosttyClient,
     replayDriver: ghosttyReplayDriver,
     ensureHostStarted: ensureGhosttyHostStarted,
+    getGlobalConfigBlob: () => ghosttyGlobalConfigBlob,
     setGlobalConfigBlob: (blob) => {
       ghosttyGlobalConfigBlob = blob;
     },
