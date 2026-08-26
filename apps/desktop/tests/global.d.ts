@@ -7,6 +7,7 @@ import type {
   HostRecord,
   ListBackupsResponse,
   LocalProfileRecord,
+  LoggingStateResponse,
   OpenSessionResponse,
   RestoreBackupResponse,
   SessionEvent,
@@ -47,6 +48,14 @@ interface HypershellTestApi {
   }): Promise<OpenSessionResponse>;
   writeSession(request: { sessionId: string; data: string }): Promise<void>;
   closeSession(request: { sessionId: string }): Promise<void>;
+
+  // The session logger is how these specs observe terminal output now that
+  // `data` events go to the ghostty host rather than the renderer — see
+  // electronHarness.ts's readSessionLog.
+  loggingStart(request: { sessionId: string; filePath: string }): Promise<void>;
+  loggingStop(request: { sessionId: string }): Promise<void>;
+  loggingGetState(request: { sessionId: string }): Promise<LoggingStateResponse>;
+
   onSessionEvent(listener: (event: SessionEvent) => void): () => void;
   onGhosttyEvent(listener: (event: GhosttyEvent) => void): () => void;
 }

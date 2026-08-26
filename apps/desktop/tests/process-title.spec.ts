@@ -10,6 +10,7 @@ import {
   createDataDir,
   launchApp,
   removeDataDir,
+  sessionLogPath,
   type LaunchedApp
 } from "./electronHarness";
 
@@ -33,45 +34,55 @@ test("a local session running ping emits process-title events to the renderer", 
     profiles.find((p) => p.detectKey === "cmd");
   expect(shell).toBeDefined();
 
-  const result = await launched.page.evaluate(async (profileId: string) => {
-    const session = await window.hypershell.openSession({
-      transport: "local",
-      profileId,
-      cols: 80,
-      rows: 24
-    } as never);
+  const logPath = sessionLogPath(launched.dataDir, "process-title.log");
 
-    const titleEvents: Array<{ name: string | null; at: number }> = [];
-    let dataEventCount = 0;
-    const started = Date.now();
+  const result = await launched.page.evaluate(
+    async ({ profileId, filePath }: { profileId: string; filePath: string }) => {
+      const session = await window.hypershell.openSession({
+        transport: "local",
+        profileId,
+        cols: 80,
+        rows: 24
+      } as never);
 
-    const unsubscribe = window.hypershell.onSessionEvent((event) => {
-      if (event.sessionId !== session.sessionId) return;
-      if (event.type === "process-title") {
-        titleEvents.push({ name: event.name, at: Date.now() - started });
-      }
-      if (event.type === "data") {
-        dataEventCount += 1;
-      }
-    });
+      const titleEvents: Array<{ name: string | null; at: number }> = [];
+      const started = Date.now();
 
-    // Let the shell reach its prompt, then start a long-running real .exe.
-    await new Promise((r) => setTimeout(r, 3000));
-    await window.hypershell.writeSession({
-      sessionId: session.sessionId,
-      data: "ping -t 127.0.0.1\r"
-    });
+      const unsubscribe = window.hypershell.onSessionEvent((event) => {
+        if (event.sessionId !== session.sessionId) return;
+        if (event.type === "process-title") {
+          titleEvents.push({ name: event.name, at: Date.now() - started });
+        }
+      });
 
-    // Poller ticks every 1s; give it plenty.
-    await new Promise((r) => setTimeout(r, 6000));
+      // The pty is alive check moved off `data` events, which the renderer no
+      // longer receives (routeSessionEvent.ts feeds them to the ghostty host).
+      // The session logger taps the same stream in main, so its byte count
+      // says the same thing: this shell really produced output.
+      await window.hypershell.loggingStart({ sessionId: session.sessionId, filePath });
 
-    unsubscribe();
-    void window.hypershell.closeSession({ sessionId: session.sessionId });
+      // Let the shell reach its prompt, then start a long-running real .exe.
+      await new Promise((r) => setTimeout(r, 3000));
+      await window.hypershell.writeSession({
+        sessionId: session.sessionId,
+        data: "ping -t 127.0.0.1\r"
+      });
 
-    return { sessionId: session.sessionId, titleEvents, dataEventCount };
-  }, shell!.id);
+      // Poller ticks every 1s; give it plenty.
+      await new Promise((r) => setTimeout(r, 6000));
 
-  expect(result.dataEventCount).toBeGreaterThan(0);
+      unsubscribe();
+      // Read the logger's tally before closing: stopping a session drops its
+      // logging state along with it.
+      const logging = await window.hypershell.loggingGetState({ sessionId: session.sessionId });
+      void window.hypershell.closeSession({ sessionId: session.sessionId });
+
+      return { sessionId: session.sessionId, titleEvents, loggedBytes: logging.bytesWritten };
+    },
+    { profileId: shell!.id, filePath: logPath }
+  );
+
+  expect(result.loggedBytes).toBeGreaterThan(0);
   expect(
     result.titleEvents.some((e) => e.name?.toLowerCase() === "ping"),
     `expected a process-title event naming ping; got ${JSON.stringify(result.titleEvents)}`

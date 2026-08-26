@@ -5,7 +5,9 @@ import {
   closeApp,
   createDataDir,
   launchApp,
+  readSessionLog,
   removeDataDir,
+  sessionLogPath,
   type LaunchedApp
 } from "./electronHarness";
 
@@ -112,6 +114,17 @@ test("opens, exchanges data on, and closes a session end to end", async () => {
     )
     .toContain("connected");
 
+  // Arm the session logger before writing anything. It is the observation
+  // point for what comes back, because the renderer no longer receives `data`
+  // events at all — routeSessionEvent.ts feeds them to the ghostty host — but
+  // the logger still taps that same stream inside main, one layer below where
+  // this used to read it.
+  const logPath = sessionLogPath(launched.dataDir, "lifecycle.log");
+  await launched.page.evaluate(
+    ({ id, filePath }) => window.hypershell.loggingStart({ sessionId: id, filePath }),
+    { id: sessionId, filePath: logPath }
+  );
+
   await launched.page.evaluate(
     ({ id, data }) => window.hypershell.writeSession({ sessionId: id, data }),
     { id: sessionId, data: "hello\n" }
@@ -120,16 +133,7 @@ test("opens, exchanges data on, and closes a session end to end", async () => {
   // The echo server prefixes what it receives, so seeing it back proves the
   // full round trip: renderer → IPC → session manager → socket → and back.
   await expect
-    .poll(() =>
-      launched.page.evaluate(
-        (id) =>
-          (window as unknown as { __sessionEvents: { type: string; sessionId: string; data?: string }[] }).__sessionEvents
-            .filter((event) => event.sessionId === id && event.type === "data")
-            .map((event) => event.data)
-            .join(""),
-        sessionId
-      )
-    )
+    .poll(() => readSessionLog(logPath), { timeout: 15_000 })
     .toContain("echo:hello");
 
   await launched.page.evaluate(

@@ -4,7 +4,9 @@ import {
   closeApp,
   createDataDir,
   launchApp,
+  readSessionLog,
   removeDataDir,
+  sessionLogPath,
   type LaunchedApp
 } from "./electronHarness";
 
@@ -20,22 +22,25 @@ test.afterEach(async () => {
 });
 
 /**
- * Opens a local session for `profileId`, optionally smuggling `localOptions`
- * (as a renderer would if it tried to override the spawn target), writes
- * `echo <sentinel>\r`, and waits for the sentinel to come back in a `data`
- * event. Runs inside the renderer via `page.evaluate`, so it can only touch
- * `window` — no closures over the Node-side test scope.
+ * Renderer half: opens a local session for `profileId`, optionally smuggling
+ * `localOptions` (as a renderer would if it tried to override the spawn
+ * target), points the session logger at `logPath`, and writes
+ * `echo <sentinel>\r`. Runs inside the renderer via `page.evaluate`, so it can
+ * only touch `window` — no closures over the Node-side test scope.
  *
- * Generous timeout with a fallback resolve: a hang reports a readable
- * "no sentinel yet, here's what we got" failure instead of a bare Playwright
- * timeout with no diagnostic value.
+ * The shell's answer is not read here: `data` events no longer reach the
+ * renderer at all (routeSessionEvent.ts feeds them to the ghostty host), so
+ * the Node side reads the logger's file instead — the same byte stream,
+ * tapped in main. Logging is started before the write so nothing the shell
+ * says in reply can land ahead of the stream.
  */
-async function openLocalSessionAndWaitForSentinel(params: {
+async function openLocalSessionWithLog(params: {
   profileId: string;
   sentinel: string;
+  logPath: string;
   localOptions?: { executable: string };
 }): Promise<string> {
-  const { profileId, sentinel, localOptions } = params;
+  const { profileId, sentinel, logPath, localOptions } = params;
   const session = await window.hypershell.openSession({
     transport: "local",
     profileId,
@@ -44,38 +49,37 @@ async function openLocalSessionAndWaitForSentinel(params: {
     ...(localOptions ? { localOptions } : {})
   } as never);
 
-  return await new Promise<string>((resolve) => {
-    let buffer = "";
-    let settled = false;
-
-    const finish = (result: string) => {
-      if (settled) return;
-      settled = true;
-      unsubscribe();
-      clearTimeout(timer);
-      void window.hypershell.closeSession({ sessionId: session.sessionId });
-      resolve(result);
-    };
-
-    const unsubscribe = window.hypershell.onSessionEvent((event) => {
-      if (event.sessionId !== session.sessionId) return;
-      if (event.type === "data") {
-        buffer += event.data;
-        if (buffer.includes(sentinel)) {
-          finish(buffer);
-        }
-      }
-    });
-
-    const timer = setTimeout(() => {
-      finish(`TIMEOUT waiting for sentinel; buffer so far: ${JSON.stringify(buffer)}`);
-    }, 20_000);
-
-    void window.hypershell.writeSession({
-      sessionId: session.sessionId,
-      data: `echo ${sentinel}\r`
-    });
+  await window.hypershell.loggingStart({ sessionId: session.sessionId, filePath: logPath });
+  await window.hypershell.writeSession({
+    sessionId: session.sessionId,
+    data: `echo ${sentinel}\r`
   });
+
+  return session.sessionId;
+}
+
+/**
+ * Node half: drives the above and waits for the sentinel to appear in the log.
+ * `expect.poll` prints the log as it stood on the last attempt when it gives
+ * up, which is the same "here's what we got instead" diagnostic the in-page
+ * timeout used to produce.
+ */
+async function expectLocalShellSentinel(params: {
+  profileId: string;
+  sentinel: string;
+  localOptions?: { executable: string };
+}): Promise<void> {
+  const logPath = sessionLogPath(launched.dataDir, `${params.sentinel}.log`);
+  const sessionId = await launched.page.evaluate(openLocalSessionWithLog, { ...params, logPath });
+
+  try {
+    await expect.poll(() => readSessionLog(logPath), { timeout: 20_000 }).toContain(params.sentinel);
+  } finally {
+    await launched.page.evaluate(
+      (id) => window.hypershell.closeSession({ sessionId: id }),
+      sessionId
+    );
+  }
 }
 
 test.describe("local shell profiles", () => {
@@ -100,12 +104,7 @@ test.describe("local shell profiles", () => {
     const cmd = profiles.find((profile) => profile.detectKey === "cmd");
     expect(cmd).toBeDefined();
 
-    const output = await launched.page.evaluate(openLocalSessionAndWaitForSentinel, {
-      profileId: cmd!.id,
-      sentinel: "hypershell-e2e-ok"
-    });
-
-    expect(output).toContain("hypershell-e2e-ok");
+    await expectLocalShellSentinel({ profileId: cmd!.id, sentinel: "hypershell-e2e-ok" });
   });
 
   // Covers profile-ID validation only: an unknown profileId must be rejected.
@@ -146,12 +145,10 @@ test.describe("local shell profiles", () => {
     const cmd = profiles.find((profile) => profile.detectKey === "cmd");
     expect(cmd).toBeDefined();
 
-    const output = await launched.page.evaluate(openLocalSessionAndWaitForSentinel, {
+    await expectLocalShellSentinel({
       profileId: cmd!.id,
       sentinel: "hypershell-boundary-ok",
       localOptions: { executable: "calc.exe" }
     });
-
-    expect(output).toContain("hypershell-boundary-ok");
   });
 });
