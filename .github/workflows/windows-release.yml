@@ -26,6 +26,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The terminal is a native ghostty surface, so an installer built without
+      # the host executable ships an app that cannot open a session. Nothing in
+      # this workflow produces one yet, so the job stops here with an
+      # explanation rather than failing later inside electron-builder.
+      - name: Require ghostty host build output
+        shell: bash
+        run: |
+          if [ -z "${GHOSTTY_HOST_DIST:-}" ]; then
+            echo "::error::GHOSTTY_HOST_DIST is not set, so this run cannot package a working installer."
+            echo "The terminal renderer is an out-of-process ghostty host: apps/desktop/scripts/stage-ghostty-host.mjs"
+            echo "copies ghostty-host.exe (plus ghostty-vt.dll and mesa/ when present) out of that directory into"
+            echo "apps/desktop/build/ghostty-host for electron-builder."
+            echo "The executable is built from the tomertec/ghostty 'embed-host' branch with -Dembed-host=true;"
+            echo "see docs/release/windows-packaging.md."
+            echo "No CI step builds or downloads it yet, so Windows release packaging is a manual, local step until"
+            echo "an exe source lands in this workflow."
+            exit 1
+          fi
+          echo "GHOSTTY_HOST_DIST=$GHOSTTY_HOST_DIST"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:

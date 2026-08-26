@@ -5,7 +5,15 @@
 - Windows 10 or Windows 11 build machine
 - Node.js 22+ and `pnpm@10.8.1`
 - Installed dependencies from repo root: `pnpm install`
-- `GHOSTTY_HOST_DIST` set to the ghostty port's build output directory (the one holding `ghostty-host.exe`, and `mesa/` for software GL). The terminal is a native ghostty surface, so an installer built without it ships an app that cannot open a session; the packaging script stages that directory into `apps/desktop/build/ghostty-host` and fails loudly rather than packaging nothing.
+- `GHOSTTY_HOST_DIST` set to the ghostty port's build output directory — the `zig-out/bin` produced by building the `tomertec/ghostty` `embed-host` branch with `-Dembed-host=true`. The terminal is a native ghostty surface, so an installer built without it ships an app that cannot open a session; `apps/desktop/scripts/stage-ghostty-host.mjs` stages that directory into `apps/desktop/build/ghostty-host` and fails loudly rather than packaging nothing.
+
+  From that directory it stages only the files the app opens at runtime: `ghostty-host.exe`, `ghostty-vt.dll`, and `mesa/` (software GL) when present. The rest of a zig build output — `*.pdb`, `ghostty.exe`, `embed-harness.exe` — is deliberately excluded; including it added roughly 199 MB to the installer.
+
+  **Open gap:** `mesa/` does not exist in the current build output, so a machine with no usable GPU driver has no software-GL fallback to fall back to. The staging script treats it as optional for that reason.
+
+## CI Status
+
+`.github/workflows/windows-release.yml` cannot package a release today: no step builds or downloads `ghostty-host.exe`, and there is no vendored copy in the repo. The workflow fails fast on a `Require ghostty host build output` step with that explanation rather than producing a broken installer. **Windows release packaging is a manual, local step** until an exe source (a vendored artifact, or a zig build in CI) is chosen and wired in.
 - Code signing certificate (`.pfx`) if producing signed artifacts
 - Run packaging from a native Windows shell (PowerShell/CMD), not Linux cross-compilation, because native modules (`node-pty`) cannot be rebuilt for Windows from non-Windows hosts.
 
