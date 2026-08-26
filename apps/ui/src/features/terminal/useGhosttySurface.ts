@@ -28,7 +28,15 @@ export interface UseGhosttySurfaceResult {
   containerRef: RefObject<HTMLDivElement | null>;
   focused: boolean;
   focusSurface: () => void;
+  /** Set when the native surface died under this pane (a surface crash, or the
+   *  host process giving up); null while it is healthy. */
+  surfaceError: string | null;
+  /** Clears the error and asks for the surface again. The create call revives a
+   *  dead host process before it lands. */
+  retrySurface: () => void;
 }
+
+const SURFACE_CRASH_MESSAGE = "The terminal renderer stopped.";
 
 function logAsyncError(context: string, error: unknown): void {
   console.warn(`[hypershell] ${context}`, error);
@@ -44,6 +52,7 @@ function logAsyncError(context: string, error: unknown): void {
 export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurfaceResult {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [focused, setFocused] = useState(false);
+  const [surfaceError, setSurfaceError] = useState<string | null>(null);
 
   const sessionIdRef = useRef(input.sessionId);
   const fontSizeRef = useRef(input.fontSize);
@@ -56,6 +65,9 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
 
   // The session a surface currently exists for, main-side. null when none.
   const surfaceSessionIdRef = useRef<string | null>(null);
+  // The font size that surface was created with, so a later change pushes a
+  // per-surface config update and an unchanged one pushes nothing.
+  const surfaceFontSizeRef = useRef<number | null>(null);
 
   const computeBounds = useCallback((): GhosttyBounds | null => {
     const el = containerRef.current;
@@ -108,11 +120,13 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
     }
 
     surfaceSessionIdRef.current = sessionId;
+    surfaceFontSizeRef.current = fontSizeRef.current;
     void getShell()
       .ghosttySurfaceCreate({ sessionId, bounds, fontSize: fontSizeRef.current })
       .catch((error) => {
         // Allow a later sync (resize, or the caller retrying) to try again.
         surfaceSessionIdRef.current = null;
+        surfaceFontSizeRef.current = null;
         logAsyncError("ghosttySurfaceCreate failed", error);
       });
   }, [computeBounds]);
@@ -162,6 +176,22 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
       .catch((error) => logAsyncError("ghosttySurfaceVisible failed", error));
   }, [input.sessionId, input.visible]);
 
+  // Per-tab font size. The size a surface is born with rides along on the
+  // create call; every later change (the ctrl+= / ctrl+- / ctrl+0 chords, which
+  // only moved the persisted number before) needs its own push, since a
+  // surface's config is not re-read on its own.
+  useEffect(() => {
+    const sessionId = input.sessionId;
+    if (!sessionId || !hasShell()) return;
+    if (surfaceSessionIdRef.current !== sessionId) return;
+    if (surfaceFontSizeRef.current === input.fontSize) return;
+
+    surfaceFontSizeRef.current = input.fontSize;
+    void getShell()
+      .ghosttySurfaceConfig({ sessionId, config: `font-size = ${input.fontSize}` })
+      .catch((error) => logAsyncError("ghosttySurfaceConfig failed", error));
+  }, [input.sessionId, input.fontSize]);
+
   // (c): destroy on unmount. Kept in its own empty-deps effect so a sessionId
   // change (handled above by syncSurface's create/destroy-old logic) never
   // trips this cleanup.
@@ -192,12 +222,23 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
           break;
         case "focusGained":
           setFocused(true);
+          // The click that focused this surface never reached the DOM — the
+          // child HWND ate it — so pane activation has to be driven from here.
+          layoutStore.getState().focusSession(event.sessionId);
           break;
         case "focusLost":
           setFocused(false);
           break;
         case "title":
           layoutStore.getState().setTabDynamicTitle(event.sessionId, sanitizeTitle(event.title));
+          break;
+        case "crashed":
+          // The surface is gone main-side; forgetting it here lets a retry
+          // (or the next resize tick) create a replacement rather than sending
+          // bounds updates into the void.
+          surfaceSessionIdRef.current = null;
+          surfaceFontSizeRef.current = null;
+          setSurfaceError(event.error ?? SURFACE_CRASH_MESSAGE);
           break;
         default:
           break;
@@ -233,5 +274,10 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
       .catch((error) => logAsyncError("ghosttySurfaceFocus failed", error));
   }, []);
 
-  return { containerRef, focused, focusSurface };
+  const retrySurface = useCallback((): void => {
+    setSurfaceError(null);
+    syncSurface();
+  }, [syncSurface]);
+
+  return { containerRef, focused, focusSurface, surfaceError, retrySurface };
 }

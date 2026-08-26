@@ -6,6 +6,7 @@ import { getShell } from "../../lib/shell";
 import { useTerminalSession } from "./useTerminalSession";
 import { useGhosttySurface } from "./useGhosttySurface";
 import { GhosttyPane } from "./GhosttyPane";
+import { terminalOverlayCoversSurface } from "./TerminalReconnectOverlay";
 import { LoggingButton } from "./LoggingButton";
 import { ClaudeResumePrompt } from "./ClaudeResumePrompt";
 import { settingsStore } from "../settings/settingsStore";
@@ -41,14 +42,29 @@ const CHORD_PANE_KEY_MAP: Record<string, string> = {
   "ctrl+shift+]": "]",
 };
 
-// TODO(ghostty wiring): ctrl+=/ctrl+-/ctrl+0 only update the persisted
-// per-tab font size below — there is no live per-surface push. Task 4 only
-// exposed a GLOBAL config-update channel (ghosttyUpdateConfig) plus a
-// generic ghosttySurfaceCommand; a real per-surface route
-// (client.updateSurfaceConfig main-side) is planned to land over a
-// ghostty:surface-config channel in Task 10's channel work. Until then a
-// font-size chord resizes the persisted value (visible on next launch) but
-// not this running surface.
+// The font-size chords move the persisted per-tab size; useGhosttySurface
+// watches that value and pushes the change to the live surface over
+// ghostty:surface-config.
+//
+// Chords arrive one per key event, so holding a chord down repeats it. Zoom
+// wants that; splitting and closing panes do not — a held ctrl+shift+d used to
+// spray panes across the workspace — so those are rate-limited.
+const DESTRUCTIVE_CHORD_COOLDOWN_MS = 300;
+const DESTRUCTIVE_CHORDS = new Set(["ctrl+shift+d", "ctrl+shift+e", "ctrl+shift+w"]);
+const lastDestructiveChordAt = new Map<string, number>();
+
+/** Exported for tests; module-level state is deliberate — the guard spans the
+ *  chord's whole hold, across renders and panes. */
+export function isChordRepeat(chord: string, now: number): boolean {
+  if (!DESTRUCTIVE_CHORDS.has(chord)) return false;
+  const previous = lastDestructiveChordAt.get(chord);
+  if (previous !== undefined && now - previous < DESTRUCTIVE_CHORD_COOLDOWN_MS) {
+    return true;
+  }
+  lastDestructiveChordAt.set(chord, now);
+  return false;
+}
+
 function dispatchGhosttyChord(
   chord: string,
   fontSizeActions: {
@@ -57,6 +73,10 @@ function dispatchGhosttyChord(
     resetFontSize: () => void;
   }
 ): void {
+  if (isChordRepeat(chord, Date.now())) {
+    return;
+  }
+
   switch (chord) {
     case "ctrl+shift+s":
       useSnippetStore.getState().toggle();
@@ -142,10 +162,14 @@ export function TerminalPane({
     [session]
   );
 
+  // A native surface always paints above the web contents, so the reconnect /
+  // offline / failed overlay would sit under a live terminal. Hiding the
+  // surface for exactly the states that overlay covers puts it — and its Retry
+  // button — back on top.
   const ghostty = useGhosttySurface({
     sessionId: session.sessionId,
     fontSize,
-    visible: isVisible,
+    visible: isVisible && !terminalOverlayCoversSurface(session.state),
     onGrid: handleGrid,
     onChord: handleChord
   });
@@ -243,6 +267,8 @@ export function TerminalPane({
           containerRef={ghostty.containerRef}
           state={session.state}
           onRetry={() => { void session.connect(); }}
+          surfaceError={ghostty.surfaceError}
+          onRetrySurface={ghostty.retrySurface}
         />
         {resumeChoice === "pending" && claudeResumeSessionId && (
           <ClaudeResumePrompt

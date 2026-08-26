@@ -43,6 +43,7 @@ export type LayoutState = {
   splitPane: (sessionId: string, direction?: "horizontal" | "vertical") => void;
   closePane: (paneId: string) => void;
   activatePane: (paneId: string) => void;
+  focusSession: (sessionId: string) => void;
   setPaneSizes: (sizes: number[]) => void;
   moveTab: (fromIndex: number, toIndex: number) => void;
   setTabDynamicTitle: (sessionId: string, title: string | null) => void;
@@ -184,6 +185,24 @@ export function createLayoutStore(
 
     activatePane: (paneId) =>
       set({ activePaneId: paneId }),
+
+    // What a click on a pane would do, driven from the terminal's own focus
+    // instead: a native surface swallows the click that Workspace's onClick
+    // handler is waiting for, so clicking a terminal in a split never made its
+    // pane active. Focus events repeat and can arrive for a session no pane
+    // holds any more, so this acts only on a session a pane currently shows,
+    // and returns the same state when that pane is already the active one.
+    focusSession: (sessionId) =>
+      set((state) => {
+        const pane = state.panes.find((p) => p.sessionId === sessionId);
+        if (!pane) {
+          return state;
+        }
+        if (state.activePaneId === pane.paneId && state.activeSessionId === sessionId) {
+          return state;
+        }
+        return { activePaneId: pane.paneId, activeSessionId: sessionId };
+      }),
 
     setPaneSizes: (sizes) => set({ paneSizes: sizes }),
 

@@ -3,8 +3,24 @@ interface TerminalReconnectOverlayProps {
   onRetry?: () => void;
 }
 
+const COVERED_STATES = new Set([
+  "waiting_for_network",
+  "reconnecting",
+  "failed",
+  "disconnected"
+]);
+
+/**
+ * Whether this overlay is on screen for `state`. A native terminal surface
+ * always paints above the web contents, so the caller has to hide the surface
+ * while this is true or the overlay — and its Retry button — sits underneath it.
+ */
+export function terminalOverlayCoversSurface(state: string): boolean {
+  return COVERED_STATES.has(state);
+}
+
 export function TerminalReconnectOverlay({ state, onRetry }: TerminalReconnectOverlayProps) {
-  if (state === "connected" || state === "connecting") {
+  if (!terminalOverlayCoversSurface(state)) {
     return null;
   }
 

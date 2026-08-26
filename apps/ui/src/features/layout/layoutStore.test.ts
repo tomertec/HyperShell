@@ -83,6 +83,45 @@ describe("layoutStore", () => {
     expect(store.getState().paneSizes).toEqual([30, 70]);
   });
 
+  describe("focusSession", () => {
+    // The native terminal surface swallows the click Workspace's onClick pane
+    // activation depends on, so activation is driven from the surface's own
+    // focus event instead.
+    it("activates the pane showing the focused session", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "sess-1", title: "one" });
+      store.getState().splitPane("sess-2", "horizontal");
+      expect(store.getState().activePaneId).toBe("pane-2");
+
+      store.getState().focusSession("sess-1");
+
+      expect(store.getState().activePaneId).toBe("pane-1");
+      expect(store.getState().activeSessionId).toBe("sess-1");
+    });
+
+    it("is idempotent, so a repeated focus event changes nothing", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "sess-1", title: "one" });
+      store.getState().focusSession("sess-1");
+      const afterFirst = store.getState();
+
+      store.getState().focusSession("sess-1");
+
+      expect(store.getState()).toBe(afterFirst);
+    });
+
+    it("ignores a session no pane is showing, so a stale event cannot steal activation", () => {
+      const store = createLayoutStore();
+      store.getState().openTab({ sessionId: "sess-1", title: "one" });
+      const before = store.getState();
+
+      store.getState().focusSession("closed-session");
+
+      expect(store.getState()).toBe(before);
+      expect(store.getState().activeSessionId).toBe("sess-1");
+    });
+  });
+
   it("closePane resets to single pane sizes", () => {
     const store = createLayoutStore();
     store.getState().splitPane("sess-1", "horizontal");

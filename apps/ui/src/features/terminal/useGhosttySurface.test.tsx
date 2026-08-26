@@ -25,13 +25,18 @@ function setRect(rect: { left: number; top: number; width: number; height: numbe
 }
 
 function Harness(props: UseGhosttySurfaceInput) {
-  const { containerRef, focused, focusSurface } = useGhosttySurface(props);
+  const { containerRef, focused, focusSurface, surfaceError, retrySurface } =
+    useGhosttySurface(props);
   return (
     <div>
       <div ref={containerRef} data-testid="container" />
       <span data-testid="focused">{String(focused)}</span>
+      <span data-testid="surface-error">{String(surfaceError)}</span>
       <button data-testid="focus-btn" onClick={focusSurface}>
         focus
+      </button>
+      <button data-testid="retry-btn" onClick={retrySurface}>
+        retry
       </button>
     </div>
   );
@@ -43,6 +48,7 @@ describe("useGhosttySurface", () => {
   let ghosttySurfaceBounds: ReturnType<typeof vi.fn>;
   let ghosttySurfaceVisible: ReturnType<typeof vi.fn>;
   let ghosttySurfaceFocus: ReturnType<typeof vi.fn>;
+  let ghosttySurfaceConfig: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     ghosttyEventListener = null;
@@ -60,6 +66,7 @@ describe("useGhosttySurface", () => {
     ghosttySurfaceBounds = vi.fn().mockResolvedValue(undefined);
     ghosttySurfaceVisible = vi.fn().mockResolvedValue(undefined);
     ghosttySurfaceFocus = vi.fn().mockResolvedValue(undefined);
+    ghosttySurfaceConfig = vi.fn().mockResolvedValue(undefined);
 
     setShell(
       createFakeShell({
@@ -68,6 +75,7 @@ describe("useGhosttySurface", () => {
         ghosttySurfaceBounds,
         ghosttySurfaceVisible,
         ghosttySurfaceFocus,
+        ghosttySurfaceConfig,
         onGhosttyEvent: vi.fn((listener: (event: GhosttyEvent) => void) => {
           ghosttyEventListener = listener;
           return () => {
@@ -262,6 +270,51 @@ describe("useGhosttySurface", () => {
     });
 
     expect(setTabDynamicTitle).toHaveBeenCalledWith("s1", "hello world");
+  });
+
+  it("focusGained activates the pane holding the session, since the click never reaches the DOM", () => {
+    const focusSession = vi.spyOn(layoutStore.getState(), "focusSession");
+    render(<Harness sessionId="s1" fontSize={13} visible={true} />);
+
+    act(() => {
+      ghosttyEventListener?.({ kind: "focusGained", sessionId: "s1" });
+    });
+
+    expect(focusSession).toHaveBeenCalledWith("s1");
+  });
+
+  it("a font-size change pushes a per-surface config for the running surface", () => {
+    setRect({ left: 0, top: 0, width: 800, height: 600 });
+    const { rerender } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
+
+    // Created with 13: the create call already carried it, so nothing else to push.
+    expect(ghosttySurfaceConfig).not.toHaveBeenCalled();
+
+    rerender(<Harness sessionId="s1" fontSize={16} visible={true} />);
+
+    expect(ghosttySurfaceConfig).toHaveBeenCalledTimes(1);
+    expect(ghosttySurfaceConfig).toHaveBeenCalledWith({
+      sessionId: "s1",
+      config: "font-size = 16"
+    });
+  });
+
+  it("a crashed event surfaces an error and the retry recreates the surface", () => {
+    setRect({ left: 0, top: 0, width: 800, height: 600 });
+    const { getByTestId } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
+    expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      ghosttyEventListener?.({ kind: "crashed", sessionId: "s1", error: "host exited" });
+    });
+    expect(getByTestId("surface-error").textContent).toBe("host exited");
+
+    act(() => {
+      getByTestId("retry-btn").click();
+    });
+
+    expect(getByTestId("surface-error").textContent).toBe("null");
+    expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(2);
   });
 
   it("focusSurface() calls ghosttySurfaceFocus for the current session", () => {

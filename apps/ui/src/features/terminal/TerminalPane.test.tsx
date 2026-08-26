@@ -2,7 +2,7 @@ import { render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { setShell } from "../../lib/shell";
 import { createFakeShell } from "../../lib/fakeShell";
-import { TerminalPane } from "./TerminalPane";
+import { TerminalPane, isChordRepeat } from "./TerminalPane";
 
 describe("TerminalPane", () => {
   afterEach(() => {
@@ -56,5 +56,28 @@ describe("TerminalPane", () => {
     rerender(<TerminalPane {...props} sessionId="s1" />);
 
     expect(ghosttySurfaceFocus).not.toHaveBeenCalled();
+  });
+
+  // Chords arrive one per key event, so a held key repeats. Zoom wants that;
+  // splitting and closing panes do not.
+  describe("isChordRepeat", () => {
+    it("swallows a held split chord and lets a deliberate second press through", () => {
+      expect(isChordRepeat("ctrl+shift+d", 1_000)).toBe(false);
+      expect(isChordRepeat("ctrl+shift+d", 1_030)).toBe(true);
+      expect(isChordRepeat("ctrl+shift+d", 1_060)).toBe(true);
+      expect(isChordRepeat("ctrl+shift+d", 1_400)).toBe(false);
+    });
+
+    it("never rate-limits the font-size chords", () => {
+      expect(isChordRepeat("ctrl+=", 2_000)).toBe(false);
+      expect(isChordRepeat("ctrl+=", 2_010)).toBe(false);
+      expect(isChordRepeat("ctrl+-", 2_020)).toBe(false);
+      expect(isChordRepeat("ctrl+0", 2_030)).toBe(false);
+    });
+
+    it("tracks each destructive chord separately", () => {
+      expect(isChordRepeat("ctrl+shift+w", 3_000)).toBe(false);
+      expect(isChordRepeat("ctrl+shift+e", 3_010)).toBe(false);
+    });
   });
 });
