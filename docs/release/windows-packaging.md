@@ -5,6 +5,7 @@
 - Windows 10 or Windows 11 build machine
 - Node.js 22+ and `pnpm@10.8.1`
 - Installed dependencies from repo root: `pnpm install`
+- `GHOSTTY_HOST_DIST` set to the ghostty port's build output directory (the one holding `ghostty-host.exe`, and `mesa/` for software GL). The terminal is a native ghostty surface, so an installer built without it ships an app that cannot open a session; the packaging script stages that directory into `apps/desktop/build/ghostty-host` and fails loudly rather than packaging nothing.
 - Code signing certificate (`.pfx`) if producing signed artifacts
 - Run packaging from a native Windows shell (PowerShell/CMD), not Linux cross-compilation, because native modules (`node-pty`) cannot be rebuilt for Windows from non-Windows hosts.
 

@@ -6,6 +6,9 @@ out/
 .env.*
 test-results/
 apps/desktop/release/
+# Packaging staging area: a copy of GHOSTTY_HOST_DIST, written by
+# apps/desktop/scripts/stage-ghostty-host.mjs on every Windows package build.
+apps/desktop/build/ghostty-host/
 tmp-linux-release/
 linux-artifacts/
 CLAUDE.md

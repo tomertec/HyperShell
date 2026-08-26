@@ -26,13 +26,19 @@ win:
   # Bundles the ghostty-host.exe PTY host + its Mesa (software GL) runtime —
   # built separately by the ghostty port (see
   # docs/superpowers/plans/2026-08-25-ghostty-integration-plan.md) — into
-  # resources/ghostty-host/. GHOSTTY_HOST_DIST must point at that build's
-  # output directory (e.g. zig-out/bin, containing ghostty-host.exe and
-  # mesa/) before packaging; apps/desktop's package:win:unsigned script fails
-  # loudly if it's unset or missing the exe, since electron-builder itself
-  # stays silent about a missing extraResources `from` directory.
+  # resources/ghostty-host/, which is where resolveGhosttyHostPath looks in a
+  # packaged app.
+  #
+  # The source is staged into build/ghostty-host first, by
+  # scripts/stage-ghostty-host.mjs, from the directory GHOSTTY_HOST_DIST names
+  # (e.g. the ghostty build's zig-out/bin, containing ghostty-host.exe and
+  # mesa/). `from` cannot name that directory itself: app-builder-lib resolves
+  # a `from` against the project directory before expanding `${env.X}`, so an
+  # absolute value ends up as apps\desktop\C:\..., and a `from` that does not
+  # exist is only a warning — the build would succeed and ship an app whose
+  # terminal could never start. The staging script is what fails loudly.
   extraResources:
-    - from: "${env.GHOSTTY_HOST_DIST}"
+    - from: build/ghostty-host
       to: ghostty-host/
 nsis:
   oneClick: false
