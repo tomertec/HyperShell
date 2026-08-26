@@ -27,6 +27,11 @@ if (ghosttyHostPath) {
 
 export default defineConfig({
   testDir: "./tests",
+  // Every Playwright file here is *.spec.ts. Narrowing this from the default
+  // (which also matches *.test.ts) keeps the vitest unit tests that sit beside
+  // the pure test helpers — occlusion.test.ts — out of the Electron runner,
+  // which would otherwise try to boot an app for them.
+  testMatch: "**/*.spec.ts",
   // App launch plus a bundled-renderer first paint is a few seconds on cold CI.
   timeout: 120_000,
   expect: {

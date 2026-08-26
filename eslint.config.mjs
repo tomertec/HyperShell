@@ -158,12 +158,22 @@ export default tseslint.config(
     },
   },
 
-  // Playwright specs live outside the workspace tsconfigs.
+  // Playwright specs live outside the workspace tsconfigs. apps/desktop/tests
+  // needs to be here too: it holds the Electron suite plus the pure helpers and
+  // vitest tests that sit beside it, and without a TS parser configured for the
+  // directory a `.test.ts` there falls through to espree and fails to parse on
+  // the first `import type`.
   {
-    files: ["apps/ui/tests/**/*.ts"],
+    files: ["apps/ui/tests/**/*.ts", "apps/desktop/tests/**/*.ts"],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
+    },
+    rules: {
+      // These harnesses read terminal output, so ESC and BEL in a regex are the
+      // subject matter, not a typo — electronHarness strips ANSI, ghosttyHarness
+      // builds OSC sequences.
+      "no-control-regex": "off",
     },
   }
 );

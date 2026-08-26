@@ -10,6 +10,11 @@ import { expect, type ElectronApplication, type Page } from "@playwright/test";
 import { execFileSync } from "node:child_process";
 import { createServer, type Server, type Socket } from "node:net";
 
+import { computeOcclusion, type ChildWindow, type SurfaceOcclusion } from "./occlusion";
+
+export { describeOcclusion } from "./occlusion";
+export type { ChildWindow, Occluder, SurfaceOcclusion } from "./occlusion";
+
 /**
  * The real ghostty-host.exe is built out of the Zig host repo and is not
  * checked in here, so these specs are opt-in: point `GHOSTTY_HOST_PATH` at the
@@ -175,17 +180,6 @@ $found -join ','`)
   );
 }
 
-/** A child window of the Electron window, as read out of the parent's z-order. */
-export interface ChildWindow {
-  /** Position in the parent's child z-order; 0 is topmost. */
-  zIndex: number;
-  hwnd: string;
-  className: string;
-  visible: boolean;
-  /** Screen coordinates, as GetWindowRect reports them. */
-  rect: { left: number; top: number; right: number; bottom: number };
-}
-
 /**
  * Every child of `parentHwnd` in z-order, topmost first. GW_CHILD (5) hands
  * back the child at the top of the z-order and GW_HWNDNEXT (2) walks down from
@@ -252,77 +246,11 @@ while ($child -ne [IntPtr]::Zero) {
   });
 }
 
-/** A visible sibling stacked above the surface and overlapping its rect. */
-export interface Occluder {
-  hwnd: string;
-  className: string;
-  /** Overlapping area as a percentage of the surface's own area. */
-  overlapPercent: number;
-}
-
-export interface SurfaceOcclusion {
-  /** The surface's own position in the parent's child z-order; 0 is topmost. */
-  zIndex: number;
-  /** How many children the parent has, for context in a failure message. */
-  siblingCount: number;
-  occluders: Occluder[];
-}
-
-/**
- * Where `surfaceHwnd` sits in its parent's child z-order, and what visible
- * sibling above it covers it. This is the one health signal the original blank
- * terminal did not trip: the session was connected, the host alive, the HWND
- * present, visible and correctly positioned, and every event flowing — the
- * surface was simply at the bottom of the stack with
- * Chrome_RenderWidgetHostHWND painted over 100% of it.
- */
+/** Reads the live z-order and answers what is covering `surfaceHwnd`. The
+ *  arithmetic lives in occlusion.ts, where it is unit tested against synthetic
+ *  window lists — see that file's header for why that split is load-bearing. */
 export function surfaceOcclusion(parentHwnd: string, surfaceHwnd: string): SurfaceOcclusion {
-  const children = childWindowsInZOrder(parentHwnd);
-  const surface = children.find((child) => child.hwnd === surfaceHwnd);
-  if (surface === undefined) {
-    throw new Error(
-      `surface ${surfaceHwnd} is not a child of ${parentHwnd}; found ` +
-        `[${children.map((child) => `${child.hwnd} ${child.className}`).join(", ")}]`
-    );
-  }
-
-  const surfaceArea =
-    Math.max(0, surface.rect.right - surface.rect.left) *
-    Math.max(0, surface.rect.bottom - surface.rect.top);
-
-  const occluders = children
-    .filter((child) => child.zIndex < surface.zIndex && child.visible)
-    .map((child) => {
-      const width = Math.max(
-        0,
-        Math.min(child.rect.right, surface.rect.right) - Math.max(child.rect.left, surface.rect.left)
-      );
-      const height = Math.max(
-        0,
-        Math.min(child.rect.bottom, surface.rect.bottom) - Math.max(child.rect.top, surface.rect.top)
-      );
-      return {
-        hwnd: child.hwnd,
-        className: child.className,
-        overlapPercent:
-          surfaceArea === 0 ? 0 : Math.round(((width * height) / surfaceArea) * 100)
-      };
-    })
-    .filter((occluder) => occluder.overlapPercent > 0);
-
-  return { zIndex: surface.zIndex, siblingCount: children.length, occluders };
-}
-
-/** Renders an occlusion result as the failure message a reader can act on —
- *  the occluding window classes are the signal that names this exact bug. */
-export function describeOcclusion(occlusion: SurfaceOcclusion): string {
-  const stack = occlusion.occluders
-    .map((occluder) => `${occluder.className} (${occluder.overlapPercent}% of the surface)`)
-    .join(", ");
-  return (
-    `ghostty surface is at z-index ${occlusion.zIndex} of ${occlusion.siblingCount} children ` +
-    `and is covered by: ${stack}`
-  );
+  return computeOcclusion(childWindowsInZOrder(parentHwnd), surfaceHwnd);
 }
 
 /**

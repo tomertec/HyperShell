@@ -109,13 +109,28 @@ test("renders a live session in a native ghostty surface", async () => {
   await expect(launched.page.getByTestId("tab-scroll-container")).toContainText("e2e-title");
 });
 
-// The occlusion assertion above passes because the bug is fixed, which on its
-// own proves nothing about whether it would have caught the bug. This puts the
-// surface back into the exact bad state — bottom of the parent's child z-order,
-// nothing else changed — and requires the check to notice. If someone ever
-// weakens the helper into something that always returns an empty list, this
-// test fails and the one above keeps quietly passing.
-test("detects a ghostty surface buried under Chromium's child windows", async () => {
+// The host does not only place the leaf on top when a surface is created; it
+// handles WM_WINDOWPOSCHANGED and re-raises itself whenever it finds it is not
+// first among its siblings. That recovery is what closes the hole where an
+// event outside the app's control — a GPU process restart restacking Chromium's
+// windows — buries a healthy surface, and it is the reason the deliberate-bury
+// check that used to live here no longer observes a buried state at all: the
+// surface heals before the next read can see it.
+//
+// So the bury now drives the recovery rather than the detector. The buried
+// state is not observable even in principle: WM_WINDOWPOSCHANGED is sent, not
+// posted, so the host's handler runs and re-raises the leaf before our
+// SetWindowPos call returns. What makes the assertion meaningful is not
+// catching the surface mid-fall but that SetWindowPos genuinely demoted it —
+// setChildZOrder throws if the call fails — and it is nonetheless found back on
+// top. Against a host without this recovery the same bury leaves the leaf at
+// the bottom indefinitely, which is what it did before the host gained it. The
+// poll is belt-and-braces in case a future host defers the re-raise.
+//
+// What this no longer proves is that the occlusion check can see a bad state.
+// That evidence moved to occlusion.test.ts, which feeds the same computation
+// synthetic window lists that are unambiguously occluded.
+test("re-raises itself when something buries it in the z-order", async () => {
   const sessionId = await openRawTcpTab(launched.page, echo.port);
   await waitForSurface(launched.page, sessionId);
 
@@ -124,43 +139,27 @@ test("detects a ghostty surface buried under Chromium's child windows", async ()
   expect(surface).toBeDefined();
   expect(surfaceOcclusion(parentHwnd, surface).occluders).toEqual([]);
 
-  try {
-    setChildZOrder(surface, "bottom");
-    const buried = surfaceOcclusion(parentHwnd, surface);
+  setChildZOrder(surface, "bottom");
 
-    // Every Chromium sibling is now above it, and the ones that matter cover
-    // the whole surface — the reported symptom, reproduced.
-    expect(buried.zIndex).toBeGreaterThan(0);
-    expect(buried.occluders.length).toBeGreaterThan(0);
-    expect(buried.occluders.some((occluder) => occluder.overlapPercent >= 99)).toBe(true);
-    expect(buried.occluders.map((occluder) => occluder.className)).toContain(
-      "Chrome_RenderWidgetHostHWND"
-    );
-  } finally {
-    // Restore before anything else runs. Each test gets a fresh app, so this
-    // cannot leak across the file, but a buried surface would poison the rest
-    // of this test either way.
-    setChildZOrder(surface, "top");
-  }
+  await expect
+    .poll(() => surfaceOcclusion(parentHwnd, surface).zIndex, { timeout: 15_000 })
+    .toBe(0);
 
-  const restored = surfaceOcclusion(parentHwnd, surface);
-  expect(restored.occluders, describeOcclusion(restored)).toEqual([]);
-  expect(restored.zIndex).toBe(0);
+  const healed = surfaceOcclusion(parentHwnd, surface);
+  expect(healed.occluders, describeOcclusion(healed)).toEqual([]);
 });
 
-// The fix has two halves: place the leaf on top when the surface is created,
-// and re-assert that on every bounds sync. The test above only ever exercises
-// the first, so a regression in the re-assert would sail through — and it is
-// the half that matters in the field, because the reported blank terminal
-// appeared after the window had been resized, not at create time.
+// A resize is the moment the reported blank terminal actually appeared, so the
+// surface being unoccluded afterwards is worth asserting on its own terms.
 //
-// So this one buries the surface deliberately and then makes the *app* dig it
-// out: resizing the BrowserWindow moves the pane, which the pane's
-// ResizeObserver turns into a real ghostty:surface-bounds call. Waiting on the
-// leaf's own rect changing is what proves the sync actually reached the host —
-// without it, an assertion that the surface is unburied could pass simply
-// because nothing had happened yet.
-test("re-asserts z-order on a bounds sync driven by a real window resize", async () => {
+// It is only an end-state assertion, though, and the name says so. It cannot
+// attribute the outcome to the bounds-sync re-assert specifically: the host now
+// re-raises on any WM_WINDOWPOSCHANGED where it is not first, so a surface that
+// came out of a resize unoccluded may have been placed correctly by the bounds
+// sync or healed immediately after, and nothing observable from out here
+// separates the two. What it does still catch is the failure that matters —
+// finishing a real resize with the terminal invisible.
+test("stays unoccluded through a real window resize", async () => {
   const sessionId = await openRawTcpTab(launched.page, echo.port);
   await waitForSurface(launched.page, sessionId);
 
@@ -179,9 +178,6 @@ test("re-asserts z-order on a bounds sync driven by a real window resize", async
   const widthBefore = surfaceWidth();
   expect(widthBefore).toBeGreaterThan(0);
 
-  setChildZOrder(surface, "bottom");
-  expect(surfaceOcclusion(parentHwnd, surface).occluders.length).toBeGreaterThan(0);
-
   await launched.app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
     // A maximized window ignores setBounds on Windows, and the harness does not
@@ -191,16 +187,10 @@ test("re-asserts z-order on a bounds sync driven by a real window resize", async
     win.setBounds({ ...bounds, width: bounds.width - 160 });
   });
 
-  await expect
-    .poll(surfaceWidth, { timeout: 15_000 })
-    .not.toBe(widthBefore);
-
-  // The bounds sync landed, so the re-assert had its chance. No restore here on
-  // purpose: putting the surface back on top is the app's job and is precisely
-  // what is under test.
-  await expect
-    .poll(() => surfaceOcclusion(parentHwnd, surface).occluders.length, { timeout: 15_000 })
-    .toBe(0);
+  // The leaf's own rect changing is the proof the resize actually reached the
+  // host as a bounds frame. Without it this test could pass having asserted
+  // nothing more than that a surface nobody had touched was still fine.
+  await expect.poll(surfaceWidth, { timeout: 15_000 }).not.toBe(widthBefore);
 
   const after = surfaceOcclusion(parentHwnd, surface);
   expect(after.occluders, describeOcclusion(after)).toEqual([]);
