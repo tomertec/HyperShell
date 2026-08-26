@@ -130,14 +130,23 @@ export function useGhosttySurface(input: UseGhosttySurfaceInput): UseGhosttySurf
     void getShell()
       .ghosttySurfaceCreate({ sessionId, bounds, fontSize: fontSizeRef.current })
       .then(() => {
+        // A stale settle: a later syncSurface call already moved the ref to a
+        // different (or no) session — e.g. sessionId changed while this call
+        // was in flight. That call owns surfaceError now; this one must not
+        // wipe a legitimate error (including a `crashed` event) out from
+        // under it.
+        if (surfaceSessionIdRef.current !== sessionId) return;
         setSurfaceError(null);
       })
       .catch((error) => {
+        logAsyncError("ghosttySurfaceCreate failed", error);
+        // Same stale-settle guard as above: don't clear refs or set an error
+        // for a session this call no longer owns.
+        if (surfaceSessionIdRef.current !== sessionId) return;
         // Allow a later sync (resize, or the caller retrying) to try again.
         surfaceSessionIdRef.current = null;
         surfaceFontSizeRef.current = null;
         setSurfaceError(createErrorMessage(error));
-        logAsyncError("ghosttySurfaceCreate failed", error);
       });
   }, [computeBounds]);
 

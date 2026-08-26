@@ -24,6 +24,20 @@ function setRect(rect: { left: number; top: number; width: number; height: numbe
   currentRect = rect;
 }
 
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function Harness(props: UseGhosttySurfaceInput) {
   const { containerRef, focused, focusSurface, surfaceError, retrySurface } =
     useGhosttySurface(props);
@@ -350,6 +364,68 @@ describe("useGhosttySurface", () => {
     await waitFor(() =>
       expect(getByTestId("surface-error").textContent).toBe("terminal surface could not be created")
     );
+  });
+
+  it("a stale create resolving after the session switched does not clear the new session's error", async () => {
+    setRect({ left: 0, top: 0, width: 800, height: 600 });
+    const deferredS1 = createDeferred<void>();
+    ghosttySurfaceCreate.mockReturnValueOnce(deferredS1.promise);
+
+    const { getByTestId, rerender } = render(<Harness sessionId="s1" fontSize={13} visible={true} />);
+    expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(1);
+
+    // Switch sessions while s1's create is still in flight: this destroys s1
+    // and creates s2 (which resolves immediately via the default mock).
+    rerender(<Harness sessionId="s2" fontSize={13} visible={true} />);
+    expect(ghosttySurfaceDestroy).toHaveBeenCalledWith({ sessionId: "s1" });
+    expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(2);
+
+    // s2 gets a legitimate crash error before s1's stale create ever settles.
+    act(() => {
+      ghosttyEventListener?.({ kind: "crashed", sessionId: "s2", error: "s2 crashed" });
+    });
+    expect(getByTestId("surface-error").textContent).toBe("s2 crashed");
+
+    // The stale s1 create resolves late — it must not wipe s2's error, since
+    // it no longer owns surfaceSessionIdRef.
+    await act(async () => {
+      deferredS1.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(getByTestId("surface-error").textContent).toBe("s2 crashed");
+  });
+
+  it("(then-path) an auto-retry via a resize tick — not the Retry button — clears the error on success", async () => {
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    let getByTestId: (id: string) => HTMLElement;
+    try {
+      setRect({ left: 0, top: 0, width: 800, height: 600 });
+      ({ getByTestId } = render(<Harness sessionId="s1" fontSize={13} visible={true} />));
+      expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        ghosttyEventListener?.({ kind: "crashed", sessionId: "s1", error: "host exited" });
+      });
+      expect(getByTestId("surface-error").textContent).toBe("host exited");
+
+      // Drive the recovery through the ResizeObserver path (a real resize, or
+      // the next tick after the surface died), never touching retrySurface()
+      // — retrySurface() clears surfaceError synchronously itself, which
+      // would pass even if the create-success `.then` clear were deleted.
+      act(() => {
+        resizeCallback?.([] as unknown as ResizeObserverEntry[], {} as ResizeObserver);
+      });
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      expect(ghosttySurfaceCreate).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await waitFor(() => expect(getByTestId("surface-error").textContent).toBe("null"));
   });
 
   it("focusSurface() calls ghosttySurfaceFocus for the current session", () => {
