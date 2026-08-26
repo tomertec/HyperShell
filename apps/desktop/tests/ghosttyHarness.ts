@@ -254,15 +254,28 @@ export function surfaceOcclusion(parentHwnd: string, surfaceHwnd: string): Surfa
 }
 
 /**
- * Restacks a window within its parent. Used only to prove the occlusion check
- * can fail — burying the surface reproduces the blank-terminal state exactly,
- * without touching the app's own code paths.
+ * Restacks a window within its parent: to the top, to the bottom, or directly
+ * below a named sibling.
+ *
+ * Demoting the ghostty leaf is how the self-heal test provokes the host's
+ * WM_WINDOWPOSCHANGED recovery, so this drives real app behaviour rather than
+ * only exercising the checker. `{ after }` exists so a control can put a
+ * borrowed sibling back exactly where it was instead of guessing at "top".
+ *
+ * Note that a `true` return from SetWindowPos does not by itself prove the
+ * window moved — it returns true for a no-op too. Callers that depend on the
+ * move having happened have to observe the resulting order; see the control in
+ * ghostty-session.spec.ts.
  */
-export function setChildZOrder(hwnd: string, position: "top" | "bottom"): void {
+export function setChildZOrder(
+  hwnd: string,
+  position: "top" | "bottom" | { after: string }
+): void {
   // HWND_TOP = 0, HWND_BOTTOM = 1; SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE = 0x13.
-  const insertAfter = position === "top" ? 0 : 1;
+  const insertAfter =
+    typeof position === "object" ? position.after : position === "top" ? "0" : "1";
   powershell(`${PS_PRELUDE}
-$ok = [HsWin32]::SetWindowPos([IntPtr]::new([int64]${hwnd}), [IntPtr]::new(${insertAfter}), 0, 0, 0, 0, 0x13)
+$ok = [HsWin32]::SetWindowPos([IntPtr]::new([int64]${hwnd}), [IntPtr]::new([int64]${insertAfter}), 0, 0, 0, 0, 0x13)
 if (-not $ok) { throw "SetWindowPos failed" }`);
 }
 

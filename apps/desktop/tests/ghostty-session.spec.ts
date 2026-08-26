@@ -77,6 +77,15 @@ test("renders a live session in a native ghostty surface", async () => {
   const surfaces = ghosttySurfaceHwnds(parentHwnd);
   expect(surfaces).toHaveLength(1);
 
+  // The leaf's own rect, not the pane div's. computeOcclusion treats a
+  // zero-area surface as unoccluded — correct, since it cannot divide by an
+  // empty area — so a leaf collapsed to 0x0 would sail through the assertion
+  // below on a technicality. Nothing else in this test looks at the leaf's size.
+  const leaf = childWindowsInZOrder(parentHwnd).find((child) => child.hwnd === surfaces[0]);
+  expect(leaf, `ghostty leaf ${surfaces[0]} is not a child of ${parentHwnd}`).toBeDefined();
+  expect(leaf!.rect.right - leaf!.rect.left).toBeGreaterThan(0);
+  expect(leaf!.rect.bottom - leaf!.rect.top).toBeGreaterThan(0);
+
   // ...and actually on screen. Everything asserted above was true of the blank
   // terminal a user reported: connected session, live host, a visible HWND at
   // the right rect, grid and title events flowing. The surface was invisible
@@ -109,23 +118,25 @@ test("renders a live session in a native ghostty surface", async () => {
   await expect(launched.page.getByTestId("tab-scroll-container")).toContainText("e2e-title");
 });
 
-// The host does not only place the leaf on top when a surface is created; it
-// handles WM_WINDOWPOSCHANGED and re-raises itself whenever it finds it is not
-// first among its siblings. That recovery is what closes the hole where an
-// event outside the app's control — a GPU process restart restacking Chromium's
-// windows — buries a healthy surface, and it is the reason the deliberate-bury
-// check that used to live here no longer observes a buried state at all: the
-// surface heals before the next read can see it.
+// Besides placing the leaf on top at create time, the host handles
+// WM_WINDOWPOSCHANGED and re-raises itself whenever it finds it is not first
+// among its siblings. That is the behaviour under test here.
 //
-// So the bury now drives the recovery rather than the detector. The buried
-// state is not observable even in principle: WM_WINDOWPOSCHANGED is sent, not
-// posted, so the host's handler runs and re-raises the leaf before our
-// SetWindowPos call returns. What makes the assertion meaningful is not
-// catching the surface mid-fall but that SetWindowPos genuinely demoted it —
-// setChildZOrder throws if the call fails — and it is nonetheless found back on
-// top. Against a host without this recovery the same bury leaves the leaf at
-// the bottom indefinitely, which is what it did before the host gained it. The
-// poll is belt-and-braces in case a future host defers the re-raise.
+// Scope it precisely, because the message contract is narrower than it looks:
+// WM_WINDOWPOSCHANGED goes to the window that moved. This test demotes the leaf
+// itself, so the leaf is told and can recover — but when Chromium raises or
+// recreates its *own* children, the leaf is never notified and would not heal.
+// That trigger, a GPU-process restart restacking Chromium's windows, is handled
+// app-side instead: 197815d wires Electron's `child-process-gone` to a bounds
+// re-sync, which lands as the host's opSetBounds re-assert.
+//
+// The buried state is not observable even in principle: WM_WINDOWPOSCHANGED is
+// sent, not posted, so the host's handler runs and re-raises the leaf before our
+// own SetWindowPos call returns. So this cannot catch the surface mid-fall, and
+// what it rests on instead is that the demotion really happened. SetWindowPos
+// returning true does not establish that — it returns true for a no-op — hence
+// the control below. Against a host without the recovery the same bury leaves
+// the leaf at the bottom indefinitely, which is what it did before.
 //
 // What this no longer proves is that the occlusion check can see a bad state.
 // That evidence moved to occlusion.test.ts, which feeds the same computation
@@ -137,8 +148,41 @@ test("re-raises itself when something buries it in the z-order", async () => {
   const parentHwnd = await mainWindowHwnd(launched.app);
   const [surface] = ghosttySurfaceHwnds(parentHwnd);
   expect(surface).toBeDefined();
-  expect(surfaceOcclusion(parentHwnd, surface).occluders).toEqual([]);
 
+  const before = surfaceOcclusion(parentHwnd, surface);
+  // Explicitly on top, not merely unoccluded: siblings above that happen not to
+  // overlap would also yield an empty occluder list, and then the bury below
+  // would have nothing to undo.
+  expect(before.zIndex).toBe(0);
+  expect(before.occluders, describeOcclusion(before)).toEqual([]);
+
+  // Control: prove SetWindowPos(HWND_BOTTOM) actually demotes a window on this
+  // run, using a sibling that has no self-heal of its own. Without this, an
+  // inverted HWND_TOP/HWND_BOTTOM constant or a wrong flag would turn the bury
+  // into a no-op and the assertion below would degrade into "a healthy surface
+  // is healthy" — passing, while testing nothing.
+  const siblings = childWindowsInZOrder(parentHwnd);
+  const control = siblings.find((child) => child.className === "Chrome_RenderWidgetHostHWND");
+  expect(
+    control,
+    `no Chrome_RenderWidgetHostHWND among [${siblings.map((s) => s.className).join(", ")}]`
+  ).toBeDefined();
+  const above = siblings[control!.zIndex - 1];
+
+  setChildZOrder(control!.hwnd, "bottom");
+  const demoted = childWindowsInZOrder(parentHwnd);
+  expect(demoted[demoted.length - 1].hwnd).toBe(control!.hwnd);
+
+  // Back exactly where it was — directly below whatever preceded it — rather
+  // than to "top", which would park a Chromium window above the leaf that the
+  // leaf is never told about and so would never heal from.
+  setChildZOrder(control!.hwnd, { after: above.hwnd });
+  expect(
+    childWindowsInZOrder(parentHwnd).map((child) => child.hwnd),
+    "control sibling was not restored to its original z-order position"
+  ).toEqual(siblings.map((child) => child.hwnd));
+
+  // Now the real subject: demote the leaf and require the host to undo it.
   setChildZOrder(surface, "bottom");
 
   await expect
