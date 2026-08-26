@@ -97,6 +97,9 @@ $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
+[StructLayout(LayoutKind.Sequential)]
+public struct HsRect { public int Left; public int Top; public int Right; public int Bottom; }
 public static class HsWin32 {
   [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
   public static extern IntPtr FindWindowExW(IntPtr parent, IntPtr after, string cls, string title);
@@ -104,6 +107,19 @@ public static class HsWin32 {
   public static extern bool PostMessageW(IntPtr hwnd, uint msg, IntPtr wparam, IntPtr lparam);
   [DllImport("user32.dll", SetLastError = true)]
   public static extern uint MapVirtualKeyW(uint code, uint mapType);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern IntPtr GetWindow(IntPtr hwnd, uint cmd);
+  // CharSet.Unicode is load-bearing: the default marshals the StringBuilder as
+  // ANSI into GetClassNameA, and a UTF-16 class name read back that way comes
+  // out as its first character alone.
+  [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+  public static extern int GetClassNameW(IntPtr hwnd, StringBuilder buffer, int max);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool GetWindowRect(IntPtr hwnd, out HsRect rect);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool IsWindowVisible(IntPtr hwnd);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 }
 '@
 `;
@@ -155,6 +171,146 @@ while ($true) {
 }
 $found -join ','`)
   );
+}
+
+/** A child window of the Electron window, as read out of the parent's z-order. */
+export interface ChildWindow {
+  /** Position in the parent's child z-order; 0 is topmost. */
+  zIndex: number;
+  hwnd: string;
+  className: string;
+  visible: boolean;
+  /** Screen coordinates, as GetWindowRect reports them. */
+  rect: { left: number; top: number; right: number; bottom: number };
+}
+
+/**
+ * Every child of `parentHwnd` in z-order, topmost first. GW_CHILD (5) hands
+ * back the child at the top of the z-order and GW_HWNDNEXT (2) walks down from
+ * there, so the index each window lands on *is* its stacking position — which
+ * is the whole point: a surface can be alive, visible and correctly positioned
+ * and still show nothing because Chromium's own child windows sit above it.
+ */
+export function childWindowsInZOrder(parentHwnd: string): ChildWindow[] {
+  const output = powershell(`${PS_PRELUDE}
+$parent = [IntPtr]::new([int64]${parentHwnd})
+$child = [HsWin32]::GetWindow($parent, 5)
+$i = 0
+while ($child -ne [IntPtr]::Zero) {
+  $sb = New-Object System.Text.StringBuilder 256
+  [void][HsWin32]::GetClassNameW($child, $sb, $sb.Capacity)
+  $r = New-Object HsRect
+  [void][HsWin32]::GetWindowRect($child, [ref]$r)
+  $vis = [HsWin32]::IsWindowVisible($child)
+  "$i|$($child.ToInt64())|$vis|$($r.Left)|$($r.Top)|$($r.Right)|$($r.Bottom)|$($sb.ToString())"
+  $i++
+  $child = [HsWin32]::GetWindow($child, 2)
+}`);
+
+  if (output.length === 0) {
+    return [];
+  }
+  return output.split(/\r?\n/).map((line) => {
+    const [zIndex, hwnd, visible, left, top, right, bottom, ...rest] = line.split("|");
+    return {
+      zIndex: Number(zIndex),
+      hwnd: hwnd.trim(),
+      className: rest.join("|").trim(),
+      visible: visible.trim() === "True",
+      rect: {
+        left: Number(left),
+        top: Number(top),
+        right: Number(right),
+        bottom: Number(bottom)
+      }
+    };
+  });
+}
+
+/** A visible sibling stacked above the surface and overlapping its rect. */
+export interface Occluder {
+  hwnd: string;
+  className: string;
+  /** Overlapping area as a percentage of the surface's own area. */
+  overlapPercent: number;
+}
+
+export interface SurfaceOcclusion {
+  /** The surface's own position in the parent's child z-order; 0 is topmost. */
+  zIndex: number;
+  /** How many children the parent has, for context in a failure message. */
+  siblingCount: number;
+  occluders: Occluder[];
+}
+
+/**
+ * Where `surfaceHwnd` sits in its parent's child z-order, and what visible
+ * sibling above it covers it. This is the one health signal the original blank
+ * terminal did not trip: the session was connected, the host alive, the HWND
+ * present, visible and correctly positioned, and every event flowing — the
+ * surface was simply at the bottom of the stack with
+ * Chrome_RenderWidgetHostHWND painted over 100% of it.
+ */
+export function surfaceOcclusion(parentHwnd: string, surfaceHwnd: string): SurfaceOcclusion {
+  const children = childWindowsInZOrder(parentHwnd);
+  const surface = children.find((child) => child.hwnd === surfaceHwnd);
+  if (surface === undefined) {
+    throw new Error(
+      `surface ${surfaceHwnd} is not a child of ${parentHwnd}; found ` +
+        `[${children.map((child) => `${child.hwnd} ${child.className}`).join(", ")}]`
+    );
+  }
+
+  const surfaceArea =
+    Math.max(0, surface.rect.right - surface.rect.left) *
+    Math.max(0, surface.rect.bottom - surface.rect.top);
+
+  const occluders = children
+    .filter((child) => child.zIndex < surface.zIndex && child.visible)
+    .map((child) => {
+      const width = Math.max(
+        0,
+        Math.min(child.rect.right, surface.rect.right) - Math.max(child.rect.left, surface.rect.left)
+      );
+      const height = Math.max(
+        0,
+        Math.min(child.rect.bottom, surface.rect.bottom) - Math.max(child.rect.top, surface.rect.top)
+      );
+      return {
+        hwnd: child.hwnd,
+        className: child.className,
+        overlapPercent:
+          surfaceArea === 0 ? 0 : Math.round(((width * height) / surfaceArea) * 100)
+      };
+    })
+    .filter((occluder) => occluder.overlapPercent > 0);
+
+  return { zIndex: surface.zIndex, siblingCount: children.length, occluders };
+}
+
+/** Renders an occlusion result as the failure message a reader can act on —
+ *  the occluding window classes are the signal that names this exact bug. */
+export function describeOcclusion(occlusion: SurfaceOcclusion): string {
+  const stack = occlusion.occluders
+    .map((occluder) => `${occluder.className} (${occluder.overlapPercent}% of the surface)`)
+    .join(", ");
+  return (
+    `ghostty surface is at z-index ${occlusion.zIndex} of ${occlusion.siblingCount} children ` +
+    `and is covered by: ${stack}`
+  );
+}
+
+/**
+ * Restacks a window within its parent. Used only to prove the occlusion check
+ * can fail — burying the surface reproduces the blank-terminal state exactly,
+ * without touching the app's own code paths.
+ */
+export function setChildZOrder(hwnd: string, position: "top" | "bottom"): void {
+  // HWND_TOP = 0, HWND_BOTTOM = 1; SWP_NOSIZE|SWP_NOMOVE|SWP_NOACTIVATE = 0x13.
+  const insertAfter = position === "top" ? 0 : 1;
+  powershell(`${PS_PRELUDE}
+$ok = [HsWin32]::SetWindowPos([IntPtr]::new([int64]${hwnd}), [IntPtr]::new(${insertAfter}), 0, 0, 0, 0, 0x13)
+if (-not $ok) { throw "SetWindowPos failed" }`);
 }
 
 /**

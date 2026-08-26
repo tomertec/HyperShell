@@ -16,13 +16,16 @@ import {
 } from "./electronHarness";
 import {
   collectEvents,
+  describeOcclusion,
   ghosttyEvents,
   ghosttyHostPath,
   ghosttySurfaceHwnds,
   mainWindowHwnd,
   openRawTcpTab,
   oscTitle,
+  setChildZOrder,
   startEchoServer,
+  surfaceOcclusion,
   typeIntoSurface,
   waitForSurface,
   type EchoServer
@@ -73,6 +76,16 @@ test("renders a live session in a native ghostty surface", async () => {
   const surfaces = ghosttySurfaceHwnds(parentHwnd);
   expect(surfaces).toHaveLength(1);
 
+  // ...and actually on screen. Everything asserted above was true of the blank
+  // terminal a user reported: connected session, live host, a visible HWND at
+  // the right rect, grid and title events flowing. The surface was invisible
+  // anyway because it sat at the bottom of the parent's child z-order, under
+  // Chrome_RenderWidgetHostHWND and the Intermediate D3D Window, each covering
+  // 100% of it. Nothing in the suite asserted pixels or stacking, so 34 tests
+  // passed against a terminal no one could see. This is that assertion.
+  const occlusion = surfaceOcclusion(parentHwnd, surfaces[0]);
+  expect(occlusion.occluders, describeOcclusion(occlusion)).toEqual([]);
+
   // Keystrokes: renderer window → host HWND → input frame → transport. The
   // echo server is the only place this can be observed, since `data` events
   // stop at the host now.
@@ -93,4 +106,43 @@ test("renders a live session in a native ghostty surface", async () => {
     )
     .toBe(true);
   await expect(launched.page.getByTestId("tab-scroll-container")).toContainText("e2e-title");
+});
+
+// The occlusion assertion above passes because the bug is fixed, which on its
+// own proves nothing about whether it would have caught the bug. This puts the
+// surface back into the exact bad state — bottom of the parent's child z-order,
+// nothing else changed — and requires the check to notice. If someone ever
+// weakens the helper into something that always returns an empty list, this
+// test fails and the one above keeps quietly passing.
+test("detects a ghostty surface buried under Chromium's child windows", async () => {
+  const sessionId = await openRawTcpTab(launched.page, echo.port);
+  await waitForSurface(launched.page, sessionId);
+
+  const parentHwnd = await mainWindowHwnd(launched.app);
+  const [surface] = ghosttySurfaceHwnds(parentHwnd);
+  expect(surface).toBeDefined();
+  expect(surfaceOcclusion(parentHwnd, surface).occluders).toEqual([]);
+
+  try {
+    setChildZOrder(surface, "bottom");
+    const buried = surfaceOcclusion(parentHwnd, surface);
+
+    // Every Chromium sibling is now above it, and the ones that matter cover
+    // the whole surface — the reported symptom, reproduced.
+    expect(buried.zIndex).toBeGreaterThan(0);
+    expect(buried.occluders.length).toBeGreaterThan(0);
+    expect(buried.occluders.some((occluder) => occluder.overlapPercent >= 99)).toBe(true);
+    expect(buried.occluders.map((occluder) => occluder.className)).toContain(
+      "Chrome_RenderWidgetHostHWND"
+    );
+  } finally {
+    // Restore before anything else runs. Each test gets a fresh app, so this
+    // cannot leak across the file, but a buried surface would poison the rest
+    // of this test either way.
+    setChildZOrder(surface, "top");
+  }
+
+  const restored = surfaceOcclusion(parentHwnd, surface);
+  expect(restored.occluders, describeOcclusion(restored)).toEqual([]);
+  expect(restored.zIndex).toBe(0);
 });
