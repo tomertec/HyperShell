@@ -113,7 +113,13 @@ function powershell(script: string): string {
   return execFileSync(
     "powershell.exe",
     ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
-    { encoding: "utf8", windowsHide: true }
+    // A timeout is not optional here. This is synchronous, so it blocks the
+    // worker's event loop, and Playwright's own test timeout cannot fire while
+    // it does — a wedged PowerShell (Get-CimInstance against a stuck WMI
+    // service is the realistic one) would hang the run instead of failing it.
+    // Every script here is a handful of user32 calls or one CIM query; 15s is
+    // far past slow and well short of a hang.
+    { encoding: "utf8", windowsHide: true, timeout: 15_000, killSignal: "SIGKILL" }
   ).trim();
 }
 
