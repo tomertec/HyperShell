@@ -3,6 +3,7 @@
 // widening this to the full DesktopApi would only hide drift behind `any`.
 import type {
   CreateBackupResponse,
+  GhosttyEvent,
   HostRecord,
   ListBackupsResponse,
   LocalProfileRecord,
@@ -47,6 +48,7 @@ interface HypershellTestApi {
   writeSession(request: { sessionId: string; data: string }): Promise<void>;
   closeSession(request: { sessionId: string }): Promise<void>;
   onSessionEvent(listener: (event: SessionEvent) => void): () => void;
+  onGhosttyEvent(listener: (event: GhosttyEvent) => void): () => void;
 }
 
 declare global {
